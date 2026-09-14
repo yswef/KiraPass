@@ -101,6 +101,11 @@ package-lock.json
 *.rar
 
 # ─────────────────────────────────────────
+# KiraPass experimental — run artifacts (pages, scripts, reports)
+# مخرجات سكربت التشخيص التجريبي
+KiraPass_experimental_out/
+tests/_out/
+
 # KiraPass runtime data (saved profiles)
 # بيانات التشغيل: البروفايلات المحفوظة
 # ─────────────────────────────────────────
