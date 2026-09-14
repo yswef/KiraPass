@@ -1,0 +1,56 @@
+FORM 1
+  خاصية name: sendin
+  خاصية id: -
+  خاصية method: post
+  خاصية action: http://10.10.10.10/login
+  الحقول (verbatim، سطر لكل عنصر):
+```
+<input type="hidden" name="username" />
+<input type="hidden" name="password" />
+<input type="hidden" name="dst" value="http://www.msftconnecttest.com/redirect" />
+<input type="hidden" name="popup" value="true" />
+```
+  عناصر أخرى (verbatim): لا يوجد
+
+FORM 2
+  خاصية name: login
+  خاصية id: -
+  خاصية method: post
+  خاصية action: http://10.10.10.10/login
+  الحقول (verbatim، سطر لكل عنصر):
+```
+<input type="hidden" name="dst" value="http://www.msftconnecttest.com/redirect" />
+<input type="hidden" name="popup" value="true" />
+<input type="hidden" id="domain" name="domain"  value=""  />
+<input type="hidden" id="Hspeed" name="Hspeed"  value=""  />
+<input id='uname' type="text" value="" placeholder="رقم الكرت" name="username" autocomplete="off" required improve-input rm-white-spaces to-lower only-alphanumeric to-arabic-numbers />
+<input  id='paswd'  type="hidden"   placeholder="كلمة المرور"  name="password"   improve-input rm-white-spaces to-lower only-alphanumeric to-arabic-numbers />
+<input type="checkbox" name="checkbox1" id="remember" class="ios-toggle" value="ON" checked/>
+```
+  عناصر أخرى (verbatim):
+```
+<button  id='choosedupdate' onclick="document.getElementById('alert-speed').style.display = ('block')" type="button" style="width: 100%;  border: 1px solid white; border-radius: 4px; padding: 6px 10px; font-size: 14px;" class="form-control display-7" id="username-form3-m">
+<button  id='choosedspeed' onclick="document.getElementById('alert-speed').style.display = ('block')" type="button" style="width: 100%;  border: 1px solid white; border-radius: 4px; padding: 6px 10px; font-size: 14px;" class="form-control display-7" id="username-form3-m">
+```
+ملاحظة: يوجد زران إضافيان (`onclick="alertmac()"` و`onclick="rem2();"`, كلاهما `type="submit"`) يتم إنشاؤهما وقت التشغيل عبر `document.write()` داخل وسم `<script>` موجود ضمن FORM 2 — وهما غير موجودين كوسوم HTML حرفية ثابتة في المصدر، لذلك لم يتم اقتباسهما أعلاه كوسوم حرفية. أسطر `document.write(...)` الحرفية التي تنتجهما هي:
+```
+document.write("<div class="+"submit"+" ><button onclick="+"alertmac()"+"  type="+"submit"+"  > تسجيل الدخول </button></div>");
+document.write("<div class="+"submit"+" ><button onclick="+"rem2();"+"  type="+"submit"+"  > تسجيل الدخول </button></div>");
+```
+
+أ) المصدر الكامل لدالة hexMD5:
+غير موجود في هذا الملف. الدالة `hexMD5` يتم استدعاؤها فقط، دون تعريفها — يتم تحميلها من ملف خارجي: `<script type="text/javascript" src="/md5.js"></script>`. محتوى هذا الملف الخارجي غير مضمّن في المصدر المُعطى، لذا لا يمكن اقتباس محتوى الدالة.
+
+ب) المصدر الكامل للدالة التي تستدعي `document.sendin.submit()`:
+```
+    function doLogin() {
+	userLogin();
+	document.sendin.username.value = document.login.username.value;
+	document.sendin.password.value = hexMD5('\043' + document.login.password.value + '\247\263\106\062\027\142\236\045\046\210\347\103\366\145\343\231');
+	document.sendin.speed.value = document.login.speed.value;
+	document.sendin.update.value = document.login.update.value;
+	document.sendin.facebook.value = document.login.facebook.value;
+	document.sendin.submit();
+	return false;
+    }
+```
