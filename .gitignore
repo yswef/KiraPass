@@ -99,3 +99,10 @@ package-lock.json
 *.zip
 *.tar.gz
 *.rar
+
+# ─────────────────────────────────────────
+# KiraPass runtime data (saved profiles)
+# بيانات التشغيل: البروفايلات المحفوظة
+# ─────────────────────────────────────────
+kirapass_profiles.json
+mikrotikbf_profiles.json
