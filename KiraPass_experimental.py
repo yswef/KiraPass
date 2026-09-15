@@ -987,7 +987,7 @@ def _verdict_word(rows):
 
 
 def step_attempt(rep, sess, page, calls, base_url, label, user, password,
-                 hashed, dst_value=None, extra=None):
+                 hashed, dst_value=None, extra=None, out_dir=None):
     """One real login request. Returns a dict with everything observed."""
     rep.add('')
     rep.add(f' ATTEMPT — {label}')
@@ -1047,11 +1047,24 @@ def step_attempt(rep, sess, page, calls, base_url, label, user, password,
     oks = [m for m in OK_MARKERS if m in low]
     status_page = '/status' in (res['final_url'] or '').lower() or any(
         '/status' in (h.get('url') or '').lower() for h in res['chain'])
+    size = len(res['body'])
+    sha = hashlib.sha1(res['body']).hexdigest()[:16] if res['body'] else '-'
     rep.note(f'final URL   : {res["final_url"]}')
-    rep.note(f'body size   : {len(res["body"])} B')
+    rep.note(f'body size   : {size} B')
+    rep.note(f'body sha1   : {sha}')
     rep.note(f'failure word: {fail!r}')
     rep.note(f'success words: {oks}')
     rep.note(f'cookies now : {sess.cookies() or "(none)"}')
+    reply_path = None
+    if res['body']:
+        # keep the raw reply: with no valid card this IS the rejection baseline
+        fname = ('reply_' + re.sub(r'[^a-z0-9]+', '_', label.lower()).strip('_')
+                 + '.html')
+        try:
+            reply_path = save_artifact(out_dir or os.getcwd(), fname, res['body'])
+            rep.note(f'saved reply -> {reply_path}')
+        except OSError as e:
+            rep.warn(f'could not save the reply body: {e}')
     if status_page:
         rep.add('   >>> looks like a SUCCESS (redirect to /status)')
     elif fail:
@@ -1062,7 +1075,56 @@ def step_attempt(rep, sess, page, calls, base_url, label, user, password,
     if not res['ok']:
         rep.error(f'network error during attempt: {res["error"]}')
     return {'label': label, 'hashed': hashed, 'sent': data, 'res': res,
-            'fail': fail, 'ok_markers': oks, 'status_page': status_page}
+            'fail': fail, 'ok_markers': oks, 'status_page': status_page,
+            'size': size, 'sha': sha, 'path': reply_path,
+            'status': res.get('status')}
+
+
+def step_probe_compare(rep, attempts):
+    """What two attempts with deliberately wrong data can tell WITHOUT a card."""
+    probes = [a for a in attempts
+              if a and a['label'].lower().startswith('probe')]
+    if len(probes) < 2:
+        return
+    plain = next((a for a in probes if 'PLAIN' in a['label']), None)
+    hashed = next((a for a in probes if 'HASHED' in a['label']), None)
+    rep.hr('5b. WHAT THE PROBES SAY (a valid card is NOT needed)')
+    for a in (plain, hashed):
+        if a is None:
+            continue
+        rep.note(f'{a["label"].split(":")[-1].strip():<28} HTTP '
+                 f'{a["status"]}  {a["size"]} B  sha1 {a["sha"]}  '
+                 f'fail={a["fail"]!r}  success={a["status_page"]}')
+    if plain and hashed:
+        if plain['sha'] == hashed['sha']:
+            rep.note('identical replies for a plain and a hashed password: this '
+                     'router does not separate the two in the reply, so nothing '
+                     'about plain-vs-hashed can be concluded here — the page '
+                     'itself sends the hash, so keep sending the hash.')
+        else:
+            rep.note('the replies DIFFER between a plain and a hashed password '
+                     '— the router does not treat clear text the same way, '
+                     'which is one more reason to send exactly what the page '
+                     'sends (the hash).')
+    if any(a and a['status_page'] for a in (plain, hashed)):
+        rep.warn('a random card reached /status — that would mean the router '
+                 'accepts anything; re-check the URL before trusting anything')
+    if any(a and not a['fail'] and not a['status_page'] for a in (plain, hashed)):
+        rep.warn('the reply to a wrong card had neither a known failure word '
+                 'nor a success redirect. Read the saved reply_*.html by hand: '
+                 'that page is the shape of a REJECTION on this router, and '
+                 'detection depends on knowing it.')
+    rep.note('these probes are still one HTTP page each: they prove the request '
+             'SHAPE is accepted (no 4xx/5xx, a normal portal reply, cookies, '
+             'redirect chain) but they CANNOT prove which page means success. '
+             'Only a real card can teach that.')
+    rep.note('saved for later comparison: ' + ', '.join(
+        f'{a["path"]} ({a["size"]} B)' for a in (plain, hashed) if a and a['path']))
+    # remember the failure fingerprint for the summary
+    fails = [a for a in (plain, hashed) if a and a['fail']]
+    if fails:
+        rep.note('rejection baseline: HTTP ' + ', '.join(
+            f'{a["status"]} {a["size"]} B ({a["fail"]!r})' for a in fails))
 
 
 def step_watch(rep, sess, urls, minutes, total_attempts):
@@ -1107,6 +1169,24 @@ def step_summary(rep, page, calls, base_rows, after_rows, attempts):
     rep.add('   - what a SUCCESS page looks like on this router (unless an '
             'attempt redirected to /status just now)')
     rep.add('')
+    real = [x for x in attempts if x and x['label'].startswith('REAL')]
+    if attempts and not real:
+        rep.add(' THIS RUN USED NO VALID CARD (probes only). So:')
+        rep.add('   PROVEN   the URL, the form, the field names and the hash '
+                'shape are right — the router answered normally instead of '
+                'rejecting the request itself.')
+        rep.add('   NOT KNOWN what a SUCCESS page looks like on this router, '
+                'and therefore no detection can be called correct yet.')
+        rep.add('   SAVED    the rejection reply (reply_*.html) as the '
+                'baseline to compare every later reply against.')
+        if any(x and x['fail'] for x in attempts):
+            rep.add('   the router rejects a card with a page containing: '
+                    + repr(next(x['fail'] for x in attempts
+                                if x and x['fail'])))
+        else:
+            rep.add('   WARNING: no known failure word appeared at all — '
+                    'detection cannot rely on words; read reply_*.html.')
+        rep.add('')
     b, a = _verdict_word(base_rows), _verdict_word(after_rows)
     rep.add(f' NETWORK  before attempts: {b}   after attempts: {a}')
     if b == 'CAPTIVE' and a == 'OPEN':
@@ -1196,8 +1276,8 @@ def interactive(args):
     args.url = url
     print('''
   1) Dissect only              (read-only: page, scripts, JS, facts)
-  2) Dissect + probe           (2 login attempts with random wrong data)
-  3) Dissect + probe + my own credentials
+  2) Dissect + probe           (2 attempts, random wrong data — NO CARD NEEDED)
+  3) Dissect + probe + my own card   (needs a card you know is valid)
   4) Watch the network only    (no login attempt)
   0) Exit''')
     c = ask(' → choice (Enter = 2) : ', '2')
@@ -1328,26 +1408,29 @@ def main(argv=None):
                             rep, sess, page, calls, url,
                             'probe: random wrong card, PLAIN password',
                             'zq9x' + stamp_rnd[-6:], 'zq9x' + stamp_rnd[-6:],
-                            False))
+                            False, out_dir=args.out))
                         if calls:
                             attempts.append(step_attempt(
                                 rep, sess, page, calls, url,
                                 'probe: random wrong card, HASHED password',
                                 'zq9x' + stamp_rnd[-6:], 'zq9x' + stamp_rnd[-6:],
-                                True))
+                                True, out_dir=args.out))
                         else:
                             rep.warn('no hash call found — skipped the hashed '
                                      'probe')
+                        step_probe_compare(rep, attempts)
                     if args.login and args.user:
                         attempts.append(step_attempt(
                             rep, sess, page, calls, url,
                             'REAL attempt, PLAIN password', args.user,
-                            args.passwd if args.passwd else '', False))
+                            args.passwd if args.passwd else '', False,
+                            out_dir=args.out))
                         if calls:
                             attempts.append(step_attempt(
                                 rep, sess, page, calls, url,
                                 'REAL attempt, HASHED password', args.user,
-                                args.passwd if args.passwd else '', True))
+                                args.passwd if args.passwd else '', True,
+                                out_dir=args.out))
                 after_rows = step_connectivity(rep, sess, checks,
                                                'AFTER the attempts')
                 step_summary(rep, page, calls, base_rows, after_rows, attempts)

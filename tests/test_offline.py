@@ -132,6 +132,12 @@ def main():
     check('network went CAPTIVE -> OPEN after the valid login',
           'CAPTIVE' in rep and 'after attempts: OPEN' in rep)
     check('attempt summary printed', 'ATTEMPT —' in rep)
+    check('probe comparison section present',
+          'WHAT THE PROBES SAY (a valid card is NOT needed)' in rep)
+    check('rejection reply saved to disk',
+          any(n.startswith('reply_') for n in os.listdir(out)),
+          [n for n in os.listdir(out) if n.startswith('reply_')][:2])
+    check('reply fingerprint (sha1) printed', 'body sha1' in rep)
 
     print('\n[6] errors and report quality')
     check('no ERROR lines in the report', '✗ ERROR' not in rep,
@@ -151,6 +157,27 @@ def main():
           bool(m and m2 and m.group(1) == m2.group(1)),
           'the tool prints a warning when it differs, which is the useful '
           'signal on a real router')
+
+    # ── run 2b: NO CARD AT ALL (exactly what the user asked for) ──────────
+    print('\n[7b] probe-only run: no valid card, no --login')
+    outn = tempfile.mkdtemp(prefix='kirapass_nocard_')
+    pn = run_tool(['--url', url, '--probe', '--out', outn,
+                   '--check',
+                   f'http://127.0.0.1:{port}/connectivitycheck/generate_204'])
+    repn, _ = read_report(outn)
+    check('no-card run exits 0', pn.returncode == 0, f'exit={pn.returncode}')
+    check('probe comparison section present without a card',
+          'WHAT THE PROBES SAY (a valid card is NOT needed)' in repn)
+    check('the report states plainly what is NOT known',
+          'THIS RUN USED NO VALID CARD' in repn and
+          'NOT KNOWN what a SUCCESS page looks like' in repn)
+    check('rejection baseline saved for later comparison',
+          'rejection baseline' in repn and
+          sum(1 for n in os.listdir(outn) if n.startswith('reply_')) == 2,
+          [n for n in os.listdir(outn) if n.startswith('reply_')])
+    check('no invented success claim without a card',
+          'SUCCESS — FOUND' not in repn and
+          'looks like a SUCCESS' not in repn)
 
     # ── run 3: interactive menu must not crash ────────────────────────────
     print('\n[8] interactive menu (piped answers)')
