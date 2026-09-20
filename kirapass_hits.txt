@@ -1,0 +1,9 @@
+2026-09-16 08:20:54 #1 card=0201242548 status=200 loc= len=8575 verdict=SUCCESS
+2026-09-16 08:20:54 #2 card=0201242555 status=200 loc= len=8575 verdict=DIFFERENT page len=8575
+2026-09-16 08:20:54 #3 card=0201242580 status=200 loc= len=8575 verdict=DIFFERENT page len=8575
+2026-09-16 08:20:54 #4 card=0201242510 status=200 loc= len=8575 verdict=DIFFERENT page len=8575
+2026-09-16 08:20:54 #5 card=0201242589 status=200 loc= len=8575 verdict=DIFFERENT page len=8575
+2026-09-16 08:20:54 #6 card=0201242575 status=200 loc= len=8575 verdict=DIFFERENT page len=8575
+2026-09-16 08:20:55 #7 card=0201242501 status=200 loc= len=8575 verdict=DIFFERENT page len=8575
+2026-09-16 08:20:55 #8 card=0201242520 status=200 loc= len=8575 verdict=DIFFERENT page len=8575
+2026-09-16 08:20:55 #9 card=0201242599 status=200 loc= len=8575 verdict=DIFFERENT page len=8575
