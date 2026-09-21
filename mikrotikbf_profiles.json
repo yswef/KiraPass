@@ -151,7 +151,6 @@
       "keyword": "",
       "pass_mode": "same",
       "dst_value": "",
-      "success_url": "http://t.com/login",
       "logout_url": "http://t.com/logout",
       "name": "quick",
       "created": "2026-09-16 08:20",
