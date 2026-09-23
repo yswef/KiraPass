@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark light">
+<title>KiraPass — أداة اختبار شبكات الهوتسبوت</title>
+<link rel="stylesheet" href="/ui.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <span class="logo">K</span>
+    <span class="name">KiraPass</span>
+    <span class="ver" id="verPill">v5</span>
+  </div>
+  <div class="top-actions">
+    <span class="pill" id="statePill">جاهز</span>
+    <button class="btn ghost" id="langBtn" title="اللغة">EN</button>
+    <button class="btn ghost" id="cacheBtn" title="مسح الكاش">🧹</button>
+  </div>
+</header>
+
+<div class="banner" id="banner">
+  <strong id="bannerTitle">استخدام مصرّح به فقط</strong>
+  <span id="bannerText">هذه الأداة للاختبار على شبكة تملكها أو لديك إذن كتابي من صاحبها. لا تستخدمها على شبكة غيرك.</span>
+  <button class="btn tiny ghost" id="bannerMore">التفاصيل</button>
+</div>
+
+<nav class="steps" id="steps">
+  <button class="step active" data-step="scan"><b>1</b><span data-i18n="step_scan">فحص الشبكة</span></button>
+  <button class="step" data-step="format"><b>2</b><span data-i18n="step_format">صيغة البطاقة</span></button>
+  <button class="step" data-step="run"><b>3</b><span data-i18n="step_run">التشغيل</span></button>
+  <button class="step" data-step="results"><b>4</b><span data-i18n="step_results">النتائج</span></button>
+</nav>
+
+<main>
+
+<!-- ============ STEP 1: scan ============ -->
+<section class="panel active" id="panel-scan">
+  <h2 data-i18n="scan_title">1) افحص صفحة الدخول</h2>
+  <p class="hint" data-i18n="scan_hint">
+    الصق رابط صفحة دخول الهوتسبوت كما تفتحها في المتصفح. الأداة تقرأ الصفحة
+    بنفسها وتكتشف نوع الطلب (POST/GET) وأسماء الحقول من دون أي أسئلة.
+  </p>
+  <div class="row">
+    <input id="scanUrl" class="grow" type="url" inputmode="url" autocomplete="off"
+           placeholder="http://10.5.50.1/login">
+    <button class="btn primary" id="scanBtn" data-i18n="scan_button">افحص الآن</button>
+  </div>
+  <div class="row wrap small">
+    <button class="chip" data-url="http://192.168.88.1/login">192.168.88.1/login</button>
+    <button class="chip" data-url="http://10.5.50.1/login">10.5.50.1/login</button>
+    <button class="chip" data-url="http://192.168.8.1/login">192.168.8.1/login</button>
+  </div>
+
+  <div class="card hidden" id="internetCard"></div>
+  <div class="card hidden" id="portalCard"></div>
+
+  <div class="row end">
+    <button class="btn primary" id="toFormat" disabled data-i18n="next_format">
+      التالي: صيغة البطاقة ←
+    </button>
+  </div>
+</section>
+
+<!-- ============ STEP 2: format ============ -->
+<section class="panel" id="panel-format">
+  <h2 data-i18n="format_title">2) صيغة البطاقة</h2>
+  <p class="hint" data-i18n="format_hint">
+    اكتب شكل الكرت: البادئة الثابتة + طول الكرت الكامل. الأرقام المتغيّرة هي التي
+    سيتم تخمينها. المعاينة تحت تخبرك فوراً بعدد الاحتمالات.
+  </p>
+
+  <div class="row profrow">
+    <label class="grow"><span data-i18n="saved_profiles">الملفات التعريفية المحفوظة</span>
+      <select id="profSel"></select></label>
+    <button class="btn danger" id="profDelBtn" data-i18n="btn_delete_profile">حذف</button>
+  </div>
+
+  <div class="grid">
+    <label><span data-i18n="f_prefix">البادئة الثابتة</span>
+      <input id="f_prefix" placeholder="020124" autocomplete="off"></label>
+    <label><span data-i18n="f_length">طول الكرت الكامل</span>
+      <input id="f_length" type="number" min="1" max="64" value="10"></label>
+    <label><span data-i18n="f_charset">الحروف/الأرقام المتغيّرة</span>
+      <select id="f_charset"></select></label>
+    <label id="f_customWrap" class="hidden"><span data-i18n="f_custom">محارف مخصّصة</span>
+      <input id="f_custom" placeholder="0123456789ABCDEF"></label>
+    <label><span data-i18n="f_pass_mode">قيمة كلمة المرور</span>
+      <select id="f_pass_mode"></select></label>
+    <label><span data-i18n="f_dst">قيمة dst (وجهة الضيف)</span>
+      <input id="f_dst" placeholder="http://www.msftconnecttest.com/redirect"></label>
+    <label><span data-i18n="f_name">اسم الملف التعريفي</span>
+      <input id="f_name" placeholder="my-network"></label>
+  </div>
+
+  <div class="card" id="previewCard">
+    <div class="preview"><span data-i18n="p_space">عدد الاحتمالات</span>:
+      <b id="pvSpace">—</b></div>
+    <div class="preview"><span data-i18n="p_samples">أمثلة على البطاقات</span>:
+      <span id="pvSamples" class="mono">—</span></div>
+    <div class="preview warn hidden" id="pvProblems"></div>
+  </div>
+
+  <details class="adv">
+    <summary data-i18n="adv_open">خيارات متقدمة (عادة لا تحتاجها)</summary>
+    <div class="grid">
+      <label><span data-i18n="f_method">طريقة الطلب</span>
+        <select id="f_method">
+          <option value="post">POST (الأحدث والأكثر)</option>
+          <option value="get">GET</option>
+        </select></label>
+      <label><span data-i18n="f_user_field">اسم حقل المستخدم</span>
+        <input id="f_user_field" value="username"></label>
+      <label><span data-i18n="f_pass_field">اسم حقل كلمة المرور</span>
+        <input id="f_pass_field" value="password"></label>
+      <label><span data-i18n="f_login_url">رابط إرسال الدخول (action)</span>
+        <input id="f_login_url" placeholder="http://10.5.50.1/login"></label>
+      <label class="check"><input type="checkbox" id="f_send_dst" checked>
+        <span data-i18n="f_send_dst">إرسال الحقول المخفية dst/popup</span></label>
+      <label><span data-i18n="f_extra">حقول ثابتة إضافية (name=value)</span>
+        <input id="f_extra" placeholder="mac=AA:BB:CC:DD:EE:FF"></label>
+      <label><span data-i18n="f_words">كلمات النجاح (اختياري)</span>
+        <input id="f_words" placeholder="You are logged in"></label>
+      <label><span data-i18n="f_known">بطاقة تعرف أنها تعمل (اختياري)</span>
+        <input id="f_known" placeholder="0201242548"></label>
+    </div>
+    <button class="btn" id="calibrateBtn" data-i18n="btn_calibrate">
+      تعلّم من البطاقة المعروفة + قياس الشبكة
+    </button>
+    <div class="card hidden" id="calibCard"></div>
+  </details>
+
+  <div class="row end">
+    <button class="btn" id="saveProfileBtn" data-i18n="btn_save">احفظ الملف التعريفي</button>
+    <button class="btn primary" id="toRun" data-i18n="next_run">التالي: التشغيل ←</button>
+  </div>
+</section>
+
+<!-- ============ STEP 3: run ============ -->
+<section class="panel" id="panel-run">
+  <h2 data-i18n="run_title">3) التشغيل</h2>
+  <p class="hint" data-i18n="run_hint">
+    اختر قوة مناسبة: كل ما زادت السرعة زاد احتمال أن يقطع الراوتر الاتصال أو
+    يحجبك. الأداة تخبرك داخل النتائج بسبب كل توقف.
+  </p>
+
+  <div class="row wrap" id="presetRow"></div>
+
+  <div class="grid">
+    <label><span data-i18n="r_threads">عدد المسارات (Threads)</span>
+      <input id="r_threads" type="number" min="1" max="200" value="12"></label>
+    <label><span data-i18n="r_attempts">عدد المحاولات</span>
+      <input id="r_attempts" type="number" min="1" max="20000000" value="2000"></label>
+    <label><span data-i18n="r_delay">الانتظار بين الطلبات (ms)</span>
+      <input id="r_delay" type="number" min="0" max="5000" value="0"></label>
+    <label class="check"><input type="checkbox" id="r_verify" checked>
+      <span data-i18n="r_verify">تأكيد الإنترنت بعد أي بطاقة مقبولة</span></label>
+    <label class="check"><input type="checkbox" id="r_autostop" checked>
+      <span data-i18n="r_autostop">إيقاف تلقائي عند أول نتيجة قوية</span></label>
+    <label class="check"><input type="checkbox" id="r_resume" checked>
+      <span data-i18n="r_resume">المتابعة من حيث توقفت (بلا تكرار)</span></label>
+  </div>
+
+  <div class="row wrap small">
+    <button class="btn" id="diagnoseBtn" data-i18n="btn_diagnose">تشخيص الشبكة أولاً</button>
+    <button class="btn ghost" id="clearReviewBtn" data-i18n="btn_clear_review">مسح صفحات المراجعة</button>
+  </div>
+  <div class="card hidden" id="diagCard"></div>
+
+  <label class="license">
+    <input type="checkbox" id="licenseOk">
+    <span data-i18n="license_check">
+      أتعهّد بأنني أملك هذه الشبكة أو لدي إذن كتابي من صاحبها لاختبارها.
+    </span>
+  </label>
+
+  <div class="row end">
+    <button class="btn primary big" id="startBtn" disabled data-i18n="btn_start">
+      ابدأ التخمين
+    </button>
+    <button class="btn danger big hidden" id="stopBtn" data-i18n="btn_stop">
+      إيقاف
+    </button>
+  </div>
+</section>
+
+<!-- ============ STEP 4: results ============ -->
+<section class="panel" id="panel-results">
+  <h2 data-i18n="res_title">4) النتائج الحيّة</h2>
+
+  <div class="statline">
+    <div class="stat"><span data-i18n="s_speed">السرعة</span><b id="stSpeed">0/s</b></div>
+    <div class="stat"><span data-i18n="s_sent">أُرسل</span><b id="stSent">0</b></div>
+    <div class="stat"><span data-i18n="s_covered">المغطى</span><b id="stCovered">0</b></div>
+    <div class="stat"><span data-i18n="s_latency">زمن الرد</span><b id="stLatency">— ms</b></div>
+    <div class="stat"><span data-i18n="s_delay">التباطؤ الحالي</span><b id="stDelay">0 ms</b></div>
+    <div class="stat"><span data-i18n="s_state">الحالة</span><b id="stState">جاهز</b></div>
+  </div>
+
+  <div class="progress"><div id="bar"></div></div>
+  <div class="chips" id="counterChips"></div>
+  <div class="card hidden" id="whyCard"></div>
+  <div class="card hidden" id="throttleCard"></div>
+  <div class="card hidden" id="stopCard"></div>
+
+  <div class="logwrap">
+    <table class="log">
+      <thead><tr>
+        <th>#</th><th data-i18n="t_card">البطاقة</th><th>HTTP</th>
+        <th data-i18n="t_result">النتيجة</th><th data-i18n="t_why">السبب</th>
+        <th data-i18n="t_ms">ms</th><th data-i18n="t_len">الحجم</th>
+      </tr></thead>
+      <tbody id="logBody"></tbody>
+    </table>
+  </div>
+
+  <div class="row">
+    <button class="btn" id="clearLogBtn" data-i18n="btn_clear_log">تفريغ السجل</button>
+    <button class="btn ghost" id="downloadBtn" data-i18n="btn_download">تنزيل آخر تقرير</button>
+  </div>
+
+  <h3 data-i18n="hits_title">البطاقات المقبولة</h3>
+  <div id="hitsBox" class="card muted" data-i18n="hits_none">لا شيء بعد.</div>
+
+  <h3 data-i18n="review_title">ردود غير واضحة (تحتاج نظرة منك)</h3>
+  <p class="hint" data-i18n="review_hint">
+    هذه ردود ليست مثل صفحة الرفض وليست نجاحاً مؤكداً. محفوظة لك لتفتحها وتقرأها
+    بنفسك - الأداة لا تخمّن مكانك.
+  </p>
+  <div id="reviewBox" class="card muted" data-i18n="review_none">لا شيء بعد.</div>
+</section>
+
+</main>
+
+<footer class="foot">
+  <span id="footText">KiraPass — أداة اختبار أمن الشبكات. الاستخدام بدون إذن صاحب الشبكة مخالف للقانون.</span>
+  <span class="dot">•</span>
+  <a href="#" id="licenseLink">الترخيص</a>
+</footer>
+
+<div class="modal hidden" id="modal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <b id="modalTitle">—</b>
+      <button class="btn ghost" id="modalClose">✕</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<script src="/ui.js"></script>
+</body>
+</html>
