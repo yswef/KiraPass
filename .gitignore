@@ -1,5 +1,5 @@
 # =============================================================
-# AlphaCode Extractor — .gitignore
+#.gitignore
 # =============================================================
 # القاعدة: كل ما هو بيانات محلية، مفاتيح، ملفات بيئة، مخرجات
 # مؤقتة، أو أدوات تطوير لا يجب أن يصل لـgit.
@@ -26,30 +26,14 @@ dist/
 build/
 .mypy_cache/
 .ruff_cache/
-
-
-
-
-
-
-
-
+*.json
+mikrotikbf_profiles.json
 # ─────────────────────────────────────────
 # كاش الذكاء الاصطناعي
 # AI response cache
 # ─────────────────────────────────────────
 backend/ai_cache.json
 backend/ai_cache.backup_*.json
-
-
-# ─────────────────────────────────────────
-# أرشيف الصور المحلية (مجلد حفظ المنتجات)
-# Local product image archive
-# ─────────────────────────────────────────
-# أضف مسار مجلد الحفظ الخاص بك هنا لو كان داخل المشروع
-# Add your save-folder path here if it's inside the project
-# e.g.: Products/
-
 
 # ─────────────────────────────────────────
 # أدوات التطوير والمحررات
@@ -99,3 +83,6 @@ package-lock.json
 *.zip
 *.tar.gz
 *.rar
+# local router profiles and app icon, keep out of the repo
+mikrotikbf_profiles.json
+15624314610414311314617116111215623518117912430775.ico

