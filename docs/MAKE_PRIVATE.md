@@ -8,6 +8,15 @@
 
 ---
 
+> ⚠️ **إن ظهرت لك رسالة** `Resource not accessible by integration` (أو 403) عند
+> تنفيذ الأمرين بالأسفل، فالسبب أن **الرمز (token) المستخدم لا يملك صلاحية
+> admin على المستودع** — صلاحية الكتابة على الكود لا تكفي لتغيير الإعدادات.
+> الحل: استخدم طريق الواجهة (الطريقة ١) أو سجّل الدخول بحسابك أنت على جهازك
+> (`gh auth login`) ثم نفّذ الأمر. لا تشارك رمزاً يملك صلاحية إعدادات مع أي
+> أداة لا تثق بها.
+
+---
+
 ## الطريقة ١ — من واجهة GitHub (الأسهل)
 
 1. افتح المستودع: <https://github.com/yswef/KiraPass>
@@ -98,7 +107,13 @@ Authorized security testing only - use requires written permission from the netw
 
 # English (short version)
 
-## Make it private — GitHub web
+> **If you get** `Resource not accessible by integration` (or HTTP 403) while
+> running the commands below, the token simply has no **admin** permission on
+> the repository - write access to the code is not enough to change settings.
+> Use the web path (method 1), or run `gh auth login` with your own account
+> first. Never hand a settings-capable token to a tool you do not trust.
+
+## Make it private - GitHub web
 1. Open <https://github.com/yswef/KiraPass> → **Settings**.
 2. Scroll to **Danger Zone** → **Change repository visibility**.
 3. Choose **Make private**, type `yswef/KiraPass` to confirm.
