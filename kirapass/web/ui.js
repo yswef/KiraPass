@@ -117,6 +117,9 @@ const I18N = {
     netadvice_no_rejection_baseline: "لم يصل أي رد على بطاقات التجربة: تحقق من الاتصال بالشبكة.",
     netadvice_card_space_empty: "صيغة البطاقة لا تترك شيئاً للتخمين: البادئة + اللاحقة أطول من طول الكرت، أو المحارف المتغيّرة قليلة جداً.",
     netadvice_calibration_failed: "أصلح السبب أعلاه، ثم اضغط «ابدأ التخمين» من جديد.",
+    block_but_form_present: "لكن الصفحة ما زال فيها نموذج الدخول",
+    probe_cards: "بطاقات تجربة",
+    http_ok_word_ignored: "الصفحة ترد سليم وفيها كلمة حجب، لكن ما زال فيها نموذج الدخول فاعتبرناها صفحة دخول",
     retry_now: "↻ أعد المحاولة الآن",
     retry_after_wait: "⏳ أعد المحاولة بعد ٤٥ ثانية",
     block_wait: "الراوتر حجبنا بعد بطاقات التجربة - انتظار",
@@ -337,6 +340,9 @@ const I18N = {
     netadvice_no_rejection_baseline: "No answer at all to the test cards: check the connection to the network.",
     netadvice_card_space_empty: "The card format leaves nothing to guess: prefix + suffix are longer than the card, or there are too few variable characters.",
     netadvice_calibration_failed: "Fix the reason above, then press \"start guessing\" again.",
+    block_but_form_present: "but the page still has the login form",
+    probe_cards: "test cards",
+    http_ok_word_ignored: "the page answers fine and mentions blocking, but it still offers the login form - treated as a login page",
     retry_now: "↻ Try again now",
     retry_after_wait: "⏳ Try again after 45 seconds",
     block_wait: "the router locked us after the test cards - waiting",
@@ -1156,6 +1162,16 @@ function renderCalFailure(st) {
       if (s.id === "reach_login_page" && d.text)
         extra = " — <span class='mono'>" + esc(String(d.text).slice(0, 120)) + "</span>";
       if (s.id === "internet_state" && d.state) extra = " — " + t("internet_" + d.state);
+      /* a block is decided from a word and/or a status code: show them, so the
+         user can see WHY we called this page a block page */
+      if (/blocked|ban/.test(s.reason)) {
+        const bits = [];
+        if (d.word) bits.push("«" + d.word + "»");
+        if (d.status) bits.push("HTTP " + (Array.isArray(d.status) ? d.status.join("/") : d.status));
+        if (d.has_form) bits.push(t("block_but_form_present"));
+        if (d.probes_sent) bits.push(d.probes_sent + " " + t("probe_cards"));
+        if (bits.length) extra += " — " + esc(bits.join(" · "));
+      }
       html += "<li class='" + (s.ok ? "ok" : "bad") + "'>" + (s.ok ? "✔" : "✖") +
         " " + t("cal_" + s.id, s.id) + ": " + calReasonLabel(s.reason) + extra + "</li>";
     });

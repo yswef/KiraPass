@@ -174,6 +174,8 @@ CALIBRATION_PROBES_RETRY = 2
 # then try the learning again once (the web page shows the countdown).
 # Override it without editing code:  KIRAPASS_BLOCK_WAIT=120 python3 KiraPass.py
 BLOCK_WAIT_SECONDS = max(0, int(os.environ.get("KIRAPASS_BLOCK_WAIT", "45")))
+# ... and after sitting one out we keep going at this pace, not faster.
+BAN_COOLDOWN_MS = 3000
 
 # Hosts we treat as "inside the portal" (so a redirect to them is not an exit).
 PORTAL_HINT_WORDS = ("login", "hotspot", "portal", "welcome", "splash", "auth")
