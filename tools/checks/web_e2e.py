@@ -102,3 +102,43 @@ print("net_kinds    :", json.dumps(st.get("net_kinds", {})))
 print("latency      :", json.dumps(st.get("latency", {})))
 print("hits         :", json.dumps(hits, ensure_ascii=False))
 print("events seen  :", events)
+
+# ---- step 5: "continue where you stopped" ---------------------------------
+# The page sends the saved walk position back with the profile.  A second run
+# must start there instead of guessing the same cards again.
+resume = dict(profile, name="practice-resume", prefix="030124")
+call("/api/profiles/save", {"profile": resume})
+print()
+
+
+def run_some(n):
+    # exactly what the page does: send the profile back with the position the
+    # engine saved after the previous run
+    saved = call("/api/profiles/get?name=practice-resume")["profile"]
+    payload = dict(resume, space_pos=saved.get("space_pos", 0),
+                   walk_a=saved.get("walk_a", 0), walk_b=saved.get("walk_b", 0))
+    call("/api/run/start", {"profile": payload, "attempts": n, "threads": 6,
+                            "delay_ms": 0, "verify": True, "auto_stop": True,
+                            "resume": True})
+    t0, st = time.time(), {}
+    while time.time() - t0 < 120:
+        st = call("/api/run/status?since=0")["status"]
+        if st["state"] == "done":
+            break
+        time.sleep(0.3)
+    saved = call("/api/profiles/get?name=practice-resume")["profile"]
+    return st, saved
+
+
+first_st, first_prof = run_some(150)
+second_st, second_prof = run_some(150)
+first_pos = first_prof.get("space_pos", 0)
+second_pos = second_prof.get("space_pos", 0)
+same_walk = (first_prof.get("walk_a") == second_prof.get("walk_a")
+             and first_prof.get("walk_b") == second_prof.get("walk_b"))
+ok = first_pos == 150 and second_pos == 300 and same_walk
+print("resume       : ok=%s first run ended at %s, second at %s, same walk=%s"
+      % (ok, first_pos, second_pos, same_walk))
+if not ok:
+    print("  FAILED: the second run did not continue where the first stopped")
+    raise SystemExit(1)

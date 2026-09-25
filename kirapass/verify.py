@@ -18,13 +18,6 @@ from urllib.parse import urlsplit
 from . import config
 
 
-def _check_reply(resp) -> str:
-    """Compare one internet-check reply with what it should be."""
-    if resp.is_redirect():
-        return "redirect"
-    return "ok"
-
-
 def probe_internet(session, checks=None, timeout=(3.0, 6.0)) -> dict:
     """-> {state, label, detail, status, location}
 

@@ -12,6 +12,7 @@ case a one-time token is required for every request.
 
 from __future__ import annotations
 
+import hmac
 import json
 import os
 import threading
@@ -116,6 +117,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Referrer-Policy", "no-referrer")
         for key, value in (extra or {}).items():
             self.send_header(key, value)
         self.end_headers()
@@ -153,7 +156,9 @@ class Handler(BaseHTTPRequestHandler):
         query = parse_qs(urlsplit(self.path).query)
         given = (self.headers.get("X-KiraPass-Token")
                  or (query.get("token") or [""])[0])
-        return given == self.server.token
+        # constant time: a token compared with == can be recovered byte by
+        # byte from the response time
+        return hmac.compare_digest(given or "", self.server.token)
 
     # -- routing ---------------------------------------------------------
     def do_GET(self):
@@ -309,7 +314,8 @@ class Handler(BaseHTTPRequestHandler):
                 keyword=(data.get("keyword") or "").strip(),
                 known_card=(data.get("known_card") or "").strip(),
                 verify_after=bool(data.get("verify", True)),
-                auto_stop=bool(data.get("auto_stop", True)))
+                auto_stop=bool(data.get("auto_stop", True)),
+                resume=data.get("resume", True) is not False)
             return self._json(result, 200 if result.get("ok") else 400)
         if route == "/api/run/stop":
             srv.engine.stop("user_stop")
@@ -328,6 +334,12 @@ class Handler(BaseHTTPRequestHandler):
             if "lang" in data:
                 srv.store.set_setting("lang", str(data["lang"])[:5])
             return self._json({"ok": True, "settings": srv.store.settings})
+        if route == "/api/quit":
+            # phone users (Termux/Pydroid) have no Ctrl+C: let the page stop
+            # the tool.  The shutdown runs from its own thread - calling it
+            # from inside serve_forever would deadlock.
+            threading.Timer(0.4, srv.shutdown).start()
+            return self._json({"ok": True, "shutting_down": True})
         return self._error("not_found", 404)
 
     # -- helpers ---------------------------------------------------------
@@ -338,18 +350,20 @@ class Handler(BaseHTTPRequestHandler):
         session = Session(allow_redirects=True)
         t0 = time.time()
         try:
-            portal = portals.discover(session, url)
-        except Exception as exc:                          # noqa: BLE001
-            from ..errors import classify
-            err = classify(exc, url)
-            return self._json({"ok": False, "error": f"net_{err.kind}",
-                               "detail": err.text[:200],
-                               "hint": err.short}, 200)
-        internet = verify.probe_internet(session)
-        session.close()
-        return self._json({"ok": True, "portal": portal.as_dict(),
-                           "internet": internet,
-                           "ms": round((time.time() - t0) * 1000)})
+            try:
+                portal = portals.discover(session, url)
+            except Exception as exc:                      # noqa: BLE001
+                from ..errors import classify
+                err = classify(exc, url)
+                return self._json({"ok": False, "error": f"net_{err.kind}",
+                                   "detail": err.text[:200],
+                                   "hint": err.short}, 200)
+            internet = verify.probe_internet(session)
+            return self._json({"ok": True, "portal": portal.as_dict(),
+                               "internet": internet,
+                               "ms": round((time.time() - t0) * 1000)})
+        finally:
+            session.close()
 
     def _preview(self, data) -> None:
         prof = store.migrate(data.get("profile") or {})

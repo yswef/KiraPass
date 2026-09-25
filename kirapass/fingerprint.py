@@ -129,6 +129,35 @@ def sha(text: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# phrase matching
+# ---------------------------------------------------------------------------
+# A phrase from the word lists must match a whole word, not just any substring:
+# "error" must not fire on "no errors found in the terminal", otherwise every
+# status page would look like a rejection.  Short learned phrases (the ones the
+# user typed) are still matched loosely - they are his own words.
+_PHRASE_CACHE = {}
+
+
+def _phrase_re(phrase: str):
+    pat = _PHRASE_CACHE.get(phrase)
+    if pat is None:
+        pat = re.compile(r"(?<![\w\-])" + re.escape(phrase) + r"(?![\w\-])",
+                         re.I)
+        _PHRASE_CACHE[phrase] = pat
+    return pat
+
+
+def find_phrase(haystack: str, phrases) -> str:
+    """-> the first whole-word phrase found in `haystack`, else ''."""
+    for phrase in phrases or ():
+        if not phrase:
+            continue
+        if _phrase_re(phrase).search(haystack or ""):
+            return phrase
+    return ""
+
+
+# ---------------------------------------------------------------------------
 # learning the dynamic parts of a page
 # ---------------------------------------------------------------------------
 def differing_tokens(a: str, b: str, limit: int = 40) -> list:
@@ -275,7 +304,10 @@ class Fingerprinter:
     def learn(cls, reject_replies, login_reply=None) -> "Fingerprinter":
         """`reject_replies` = list of Replies to wrong-but-well-formed cards."""
         fp = cls()
-        bodies = [r.text for r in reject_replies if r is not None]
+        # a probe that failed with a network error arrives as None - it is not
+        # a page we can learn from, and it must not crash the run either
+        replies = [r for r in (reject_replies or []) if r is not None]
+        bodies = [r.text for r in replies]
         if login_reply is not None:
             fp.login_text = login_reply.text[:40000]
         if not bodies:
@@ -283,7 +315,7 @@ class Fingerprinter:
             return fp
 
         fp.samples = len(bodies)
-        fp.reject_status = reject_replies[0].status
+        fp.reject_status = replies[0].status
         fp.reject_len = len(bodies[0])
         fp.reject_text = bodies[0][:40000]
         fp.literals = learn_dynamic(bodies)
@@ -364,10 +396,16 @@ class Judge:
     # -- helpers ---------------------------------------------------------
     @staticmethod
     def _has_any(haystack: str, needles) -> str:
+        """Loose (substring) match - for words the user gave us himself."""
         for n in needles:
-            if n in haystack:
+            if n and n in haystack:
                 return n
         return ""
+
+    @staticmethod
+    def _has_phrase(haystack: str, needles) -> str:
+        """Whole-word match - for the built-in reject/accept/ban phrases."""
+        return find_phrase(haystack, needles)
 
     # -- the decision ----------------------------------------------------
     def classify(self, resp, submitted=None) -> Verdict:
@@ -381,13 +419,21 @@ class Judge:
         # --- the router is blocking us (checked FIRST: if the baseline was
         #     learned while already blocked, a ban page could otherwise look
         #     like an ordinary rejection) ----------------------------------
-        ban = self._has_any(raw_low, config.BAN_WORDS) or \
-            self._has_any(low, config.BAN_WORDS)
+        ban = self._has_phrase(raw_low, config.BAN_WORDS) or \
+            self._has_phrase(low, config.BAN_WORDS)
         if ban or resp.status in (403, 429, 503):
             if resp.status == 429 or (ban and ("rate limit" in ban
                                                or "slow down" in ban)):
                 return Verdict("RATE_LIMITED", "ban_page" if ban else "http_429",
                                0.9, data={"word": ban, "status": resp.status},
+                               evidence=resp.as_dict())
+            if resp.status == 503 and not ban:
+                # "service unavailable" is a router/RADIUS that is drowning -
+                # telling the user he is blocked would send him to restart the
+                # router for nothing.  It is handled like a rate limit: slow
+                # down, and stop if it keeps happening.
+                return Verdict("RATE_LIMITED", "http_503", 0.9,
+                               data={"status": resp.status},
                                evidence=resp.as_dict())
             return Verdict("BANNED", "ban_page" if ban else f"http_{resp.status}",
                            0.9, data={"word": ban, "status": resp.status},
@@ -416,6 +462,13 @@ class Judge:
             host = _host(loc)
             if host and host != self.portal_host:
                 marker = self._has_any(loc.lower(), self.exit_markers)
+                if not marker and self._has_any(loc.lower(),
+                                                config.PORTAL_URL_WORDS):
+                    # another page of the same portal - not an exit, and not
+                    # something we may call a working card either
+                    return Verdict("UNKNOWN", "redirect_to_another_portal_page",
+                                   0.0, data={"location": loc[:200]},
+                                   evidence=resp.as_dict())
                 confident = 0.95 if marker else 0.85
                 return Verdict("ACCEPTED", "redirect_out_of_portal", confident,
                                data={"location": loc[:200]},
@@ -427,7 +480,7 @@ class Judge:
 
         # --- positive proof: learned success words ---------------------
         seen = [w for w in self.success_words if w in low or w in raw_low]
-        if len(seen) >= 1 and not self._has_any(low, self.reject_phrases):
+        if len(seen) >= 1 and not self._has_phrase(low, self.reject_phrases):
             return Verdict("ACCEPTED", "learned_success_words",
                            min(0.9, 0.6 + 0.1 * len(seen)),
                            data={"words": seen[:6]}, evidence=resp.as_dict())
@@ -437,8 +490,8 @@ class Judge:
                            data={"url": resp.url[:200]}, evidence=resp.as_dict())
 
         # --- positive words that are unique to a *good* page -----------
-        accept_hit = self._has_any(low, self.accept_phrases)
-        reject_hit = self._has_any(low, self.reject_phrases)
+        accept_hit = self._has_phrase(low, self.accept_phrases)
+        reject_hit = self._has_phrase(low, self.reject_phrases)
         if accept_hit and not reject_hit:
             return Verdict("ACCEPTED", "welcome_words", 0.7,
                            data={"word": accept_hit}, evidence=resp.as_dict())

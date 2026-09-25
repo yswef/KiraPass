@@ -73,26 +73,85 @@ class FormInfo:
         }
 
 
+def _form_segments(html: str) -> list:
+    """-> [(form tag, html inside that form)] for every <form> on the page."""
+    out = []
+    marks = list(FORM_RE.finditer(html))
+    for i, m in enumerate(marks):
+        start = m.end()
+        close = html.lower().find("</form", start)
+        end = marks[i + 1].start() if i + 1 < len(marks) else len(html)
+        if close != -1:
+            end = min(end, close)
+        out.append((m.group(0), html[start:max(end, start)]))
+    return out
+
+
+def _score_form(attrs: dict, segment: str) -> int:
+    """How much does this form look like the login form? (higher = better)."""
+    score = 0
+    tags = [_attrs(t) for t in INPUT_RE.findall(segment)]
+    types = [(a.get("type") or "text").lower() for a in tags]
+    names = [(a.get("name") or "").lower() for a in tags]
+    if "password" in types:
+        score += 5
+    if any(t in ("text", "tel", "number", "email") for t in types):
+        score += 2
+    if any(w in n for n in names for w in ("user", "pass", "card", "voucher",
+                                           "code", "pin")):
+        score += 2
+    blob = " ".join((attrs.get("name") or "", attrs.get("id") or "",
+                     attrs.get("action") or "")).lower()
+    if any(w in blob for w in ("login", "logon", "auth", "hotspot", "portal",
+                               "signin", "sign-in", "connect")):
+        score += 3
+    if (attrs.get("method") or "").lower() == "post":
+        score += 1
+    return score
+
+
 def parse_form(html: str, base_url: str) -> FormInfo:
-    """Find the login form and classify every field in it."""
+    """Find the login form and classify every field in it.
+
+    A captive-portal page often carries more than one form (a language picker,
+    a search box, a "buy a card" form).  Taking the first <form> blindly used
+    to fill the request with the wrong field names, so every form is scored
+    and the most login-looking one wins; fields are then read from inside it.
+    """
     html = html or ""
     action, method = base_url, "post"
-    m = FORM_RE.search(html)
-    if m:
-        a = _attrs(m.group(0))
+    body = html
+
+    segments = _form_segments(html)
+    if segments:
+        best = max(segments, key=lambda pair: _score_form(_attrs(pair[0]),
+                                                          pair[1]))
+        a = _attrs(best[0])
         if a.get("action"):
             action = urljoin(base_url, a["action"])
         if a.get("method"):
             method = a["method"].lower()
+        if INPUT_RE.search(best[1]):
+            body = best[1]
 
     fields, inputs = {}, []
-    for tag in INPUT_RE.findall(html):
+    for tag in INPUT_RE.findall(body):
         a = _attrs(tag)
         name = a.get("name")
         if not name:
             continue
         fields[name] = a.get("value", "")
         inputs.append((name, a.get("type", "text").lower()))
+
+    if not inputs and body is not html:
+        # malformed page: the form tag was found but the inputs sit outside it
+        for tag in INPUT_RE.findall(html):
+            a = _attrs(tag)
+            name = a.get("name")
+            if not name:
+                continue
+            fields[name] = a.get("value", "")
+            inputs.append((name, a.get("type", "text").lower()))
 
     info = FormInfo(action, method, fields, inputs)
 
@@ -105,15 +164,23 @@ def parse_form(html: str, base_url: str) -> FormInfo:
                             and any(w in n.lower() for w in
                                     ("user", "card", "code", "voucher", "login",
                                      "account", "name"))
-                            and t not in ("hidden", "submit")) or \
+                            and t not in ("hidden", "submit", "button", "reset",
+                                          "checkbox", "radio", "image",
+                                          "file")) or \
         _pick(inputs, lambda n, t: n != info.pass_field
               and t in ("text", "tel", "number", "email")) or "username"
 
+    # buttons are not data: a browser only sends the one that was clicked, and
+    # sending every named button on the page confuses some portals
+    NON_DATA_TYPES = ("submit", "button", "reset", "image", "file")
     for name, _type in inputs:
         low = name.lower()
         if low in ("dst", "link-orig"):
             info.dst_field, info.dst_value = name, fields.get(name, "")
-        elif low == "popup":
+            continue
+        if _type in NON_DATA_TYPES:
+            continue
+        if low == "popup":
             info.popup_field = name
         elif low not in (info.user_field.lower(), info.pass_field.lower(),
                          info.dst_field.lower()):

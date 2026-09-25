@@ -28,6 +28,7 @@ const I18N = {
     f_known: "بطاقة تعرف أنها تعمل (اختياري)",
     adv_open: "خيارات متقدمة (عادة لا تحتاجها)",
     p_space: "عدد الاحتمالات", p_samples: "أمثلة على البطاقات",
+    p_covered: "مغطى سابقاً",
     btn_calibrate: "تعلّم من البطاقة المعروفة + قياس الشبكة",
     btn_save: "احفظ الملف التعريفي",
     run_title: "3) التشغيل",
@@ -89,6 +90,11 @@ const I18N = {
     confirm_profiles: "سيتم مسح الملفات التعريفية. متأكد؟",
     yes: "نعم", no: "إلغاء", close: "إغلاق",
     loading: "جاري العمل...",
+    quit_tool: "إيقاف الأداة", confirm_quit: "سيتم إيقاف الأداة وإغلاق الصفحة. متأكد؟",
+    quit_done: "تم إيقاف الأداة - يمكنك إغلاق هذه الصفحة.",
+    resume_from: "متابعة من",
+    server_gone_title: "الأداة توقفت",
+    server_gone: "انقطع الاتصال بالأداة. إذا كنت أوقفتها فهذا طبيعي - شغّلها من جديد لتكمل.",
     /* verdicts */
     v_ACCEPTED_VERIFIED: "مقبولة ومؤكدة",
     v_ACCEPTED: "مقبولة",
@@ -113,6 +119,8 @@ const I18N = {
     r_accepted_internet_already_open: "قبلها الراوتر (لم أستطع إثبات الإنترنت لأن جهازك كان متصلاً أصلاً)",
     internet_online_verification_limited: "جهازك متصل بالإنترنت مسبقاً - سأعتمد على تحويل الراوتر وصفحة الحالة",
     r_redirect_out_of_portal: "الراوتر حوّل المتصفح خارج البوابة",
+    r_redirect_to_another_portal_page: "التحويل كان إلى صفحة داخل البوابة نفسها - ليس خروجاً",
+    r_http_503: "الراوتر أو خدمة RADIUS مشغولة/غير متاحة (503) - أبطأت الطلبات",
     r_success_url_contains: "عنوان النجاح المتوقع ظهر في الرد",
     r_learned_success_words: "ظهرت كلمات النجاح التي تعلّمتها الأداة",
     r_welcome_words: "كلمات ترحيب لا تظهر في صفحة الرفض",
@@ -215,6 +223,7 @@ const I18N = {
     f_known: "A card you know works (optional)",
     adv_open: "Advanced options (usually not needed)",
     p_space: "Combinations", p_samples: "Sample cards",
+    p_covered: "covered",
     btn_calibrate: "Learn from the known card + measure the network",
     btn_save: "Save profile",
     run_title: "3) Run",
@@ -270,6 +279,11 @@ const I18N = {
     confirm_clear_all: "Everything will be deleted, including profiles. Sure?",
     confirm_profiles: "Profiles will be deleted. Sure?",
     yes: "Yes", no: "Cancel", close: "Close", loading: "Working...",
+    quit_tool: "Stop the tool", confirm_quit: "The tool will shut down and this page will stop working. Sure?",
+    quit_done: "The tool is stopped - you can close this page.",
+    resume_from: "continuing from",
+    server_gone_title: "The tool stopped",
+    server_gone: "Lost contact with the tool. If you stopped it, that is expected - start it again to continue.",
     v_ACCEPTED_VERIFIED: "Accepted & verified",
     v_ACCEPTED: "Accepted",
     v_ACCEPTED_UNVERIFIED: "Router accepted (internet check failed)",
@@ -289,6 +303,8 @@ const I18N = {
     r_accepted_internet_already_open: "router accepted (internet proof skipped: you were online already)",
     internet_online_verification_limited: "you are online already - I will rely on the portal redirect and status page",
     r_redirect_out_of_portal: "the router redirected the browser out of the portal",
+    r_redirect_to_another_portal_page: "the redirect stayed inside the portal - not an exit",
+    r_http_503: "the router or RADIUS is unavailable (503) - slowed down",
     r_success_url_contains: "the learned success URL appeared",
     r_learned_success_words: "the success words learned from your own card appeared",
     r_welcome_words: "welcome words that never appear on the rejection page",
@@ -403,7 +419,13 @@ async function api(path, body, method) {
   const opt = { method: method || (body ? "POST" : "GET"), headers: {} };
   if (body) { opt.headers["Content-Type"] = "application/json";
               opt.body = JSON.stringify(body); }
-  const res = await fetch(withToken(path), opt);
+  let res;
+  try {
+    res = await fetch(withToken(path), opt);
+  } catch (e) {
+    /* the tool was stopped (or the phone slept): say so instead of freezing */
+    return { ok: false, error: "server_gone" };
+  }
   if (res.status === 401) { askToken(); return { ok: false, error: "unauthorized" }; }
   try { return await res.json(); } catch (e) { return { ok: false, error: "bad_response" }; }
 }
@@ -521,8 +543,22 @@ function buildSelects() {
 function charsetValue() {
   const sel = $("f_charset");
   if (sel.value === "_custom") return $("f_custom").value || "0123456789";
-  const opt = sel.selectedOptions[0];
+  const opt = (sel.selectedOptions && sel.selectedOptions[0]) || null;
   return (opt && opt.dataset.chars) || "0123456789";
+}
+
+/* where the last run stopped - kept so "start" continues instead of repeating.
+   It travels with the profile, because that is what the engine saves back. */
+function progressFromProfile(p) {
+  p = p || {};
+  const resume = $("r_resume") ? $("r_resume").checked : true;
+  if (!resume) return { space_pos: 0, walk_a: 0, walk_b: 0 };
+  return {
+    space_pos: parseInt(p.space_pos || 0, 10) || 0,
+    space_pass: parseInt(p.space_pass || 0, 10) || 0,
+    walk_a: parseInt(p.walk_a || 0, 10) || 0,
+    walk_b: parseInt(p.walk_b || 0, 10) || 0,
+  };
 }
 
 function profileFromForm() {
@@ -533,7 +569,7 @@ function profileFromForm() {
   });
   const words = ($("f_words").value || "").split(/[,;\n]/).map((w) => w.trim())
     .filter(Boolean);
-  return {
+  return Object.assign({
     name: $("f_name").value.trim() || "profile",
     login_url: $("f_login_url").value.trim() || $("scanUrl").value.trim(),
     method: $("f_method").value,
@@ -549,12 +585,16 @@ function profileFromForm() {
     send_popup: $("f_send_dst").checked,
     extra_fields: extras,
     success_words: words,
-    chap: (S.portal && S.portal.form && S.portal.form.chap) || null,
-  };
+    /* the chap formula comes from the scanned page - but a SAVED profile knows
+       it too, and loading one must not silently forget it */
+    chap: (S.portal && S.portal.form && S.portal.form.chap) ||
+          (S.profile && S.profile.chap) || null,
+  }, progressFromProfile(S.profile));
 }
 
 function fillFormFromProfile(p) {
   if (!p) return;
+  S.profile = p;                       /* keeps space_pos / walk for resume */
   $("f_name").value = p.name || "";
   $("f_login_url").value = p.login_url || "";
   $("scanUrl").value = p.login_url || "";
@@ -574,7 +614,18 @@ function fillFormFromProfile(p) {
   if (known) sel.value = known[0];
   else { sel.value = "_custom"; $("f_custom").value = p.charset || ""; }
   toggleCustomCharset();
+  showCovered(p);
   previewFormat();
+}
+
+/* how much of this space has been tried in earlier runs */
+function showCovered(p) {
+  const box = $("pvCovered");
+  if (!box) return;
+  const pos = parseInt((p && p.space_pos) || 0, 10) || 0;
+  const space = parseInt((p && p.space) || 0, 10) || 0;
+  box.classList.toggle("hidden", !pos);
+  $("pvCoveredVal").textContent = fmtSpace(pos) + (space ? " / " + fmtSpace(space) : "");
 }
 
 function renderProfiles(list) {
@@ -582,8 +633,26 @@ function renderProfiles(list) {
   const keep = sel.value;
   sel.innerHTML = "<option value=''>" + t("prof_new") + "</option>" +
     (list || []).map((p) => "<option value='" + esc(p.name) + "'>" + esc(p.name) +
-      " — " + esc(p.cards || "") + " (" + fmtSpace(p.space || 0) + ")</option>").join("");
+      " — " + esc(p.cards || "") + " (" + fmtSpace(p.space || 0) +
+      (p.covered ? " · " + t("p_covered") + " " + fmtSpace(p.covered) : "") +
+      ")</option>").join("");
   sel.value = (list || []).some((p) => p.name === keep) ? keep : "";
+}
+
+/* after a run the engine has saved how far it got - pull it back so the
+   "continue where you stopped" checkbox has something to continue from */
+async function refreshProfiles() {
+  const r = await api("/api/profiles");
+  if (!r.ok) return;
+  renderProfiles(r.profiles || []);
+  const name = (S.profile || {}).name;
+  if (!name) return;
+  const fresh = (r.profiles || []).find((p) => p.name === name);
+  if (fresh) {
+    S.profile = Object.assign({}, S.profile,
+      { space_pos: fresh.covered || 0, space: fresh.space || 0 });
+    showCovered(S.profile);
+  }
 }
 
 async function loadProfile(name) {
@@ -652,6 +721,11 @@ async function doScan() {
     try { $("f_name").value = new URL(res.portal.url).hostname; }
     catch (e) { $("f_name").value = "profile"; }
   }
+  /* a network we scanned before: load its saved profile, so a run can
+     continue where it stopped instead of starting over */
+  const same = ((S.meta || {}).profiles || []).find((p) => p.name === $("f_name").value);
+  if (same) await loadProfile(same.name);
+  else { S.profile = null; showCovered(null); }
   $("toFormat").disabled = false;
   previewFormat();
 }
@@ -798,6 +872,7 @@ async function startRun() {
     threads: parseInt($("r_threads").value || "12", 10),
     delay_ms: parseInt($("r_delay").value || "0", 10),
     verify: $("r_verify").checked, auto_stop: $("r_autostop").checked,
+    resume: $("r_resume").checked,
   };
   const res = await api("/api/run/start", payload);
   if (!res.ok) {
@@ -822,7 +897,12 @@ function pollStatus() {
   clearTimeout(S.poll);
   S.poll = setTimeout(async () => {
     const res = await api("/api/run/status?since=" + S.lastSeq);
-    if (!res.ok) { S.running = false; return; }
+    if (!res.ok) {
+      S.running = false;
+      if (res.error === "server_gone")
+        modal(t("server_gone_title"), "<div>" + esc(t("server_gone")) + "</div>");
+      return;
+    }
     renderStatus(res.status, res.events);
     if (res.status.state === "idle" && !S.running) return;
     if (res.status.state === "done" && S.running) {
@@ -830,6 +910,7 @@ function pollStatus() {
       $("startBtn").classList.remove("hidden");
       $("stopBtn").classList.add("hidden");
       renderStop(res.status);
+      refreshProfiles();          /* the engine saved where the run stopped */
       setTimeout(pollStatus, 1500);
       return;
     }
@@ -896,6 +977,8 @@ function renderStatus(st, events) {
     S.lastSeq = Math.max(S.lastSeq, ev.seq);
     if (ev.kind === "attempt") addRow(ev.data);
     else if (ev.kind === "hit") renderHits(ev.data);
+    else if (ev.kind === "resume")
+      toast("↪ " + t("resume_from") + " " + fmtSpace((ev.data || {}).from || 0));
     else if (ev.kind === "review") renderReview(st.review || []);
     else if (ev.kind === "error") modal("Error", "<pre>" + esc(ev.data.message) + "</pre>");
     else if (ev.kind === "report") S.lastReport = ev.data.file;
@@ -1034,6 +1117,13 @@ function wire() {
     modal(t("license_title"), "<pre>" + esc(t("license_body")) + "</pre>"));
   $("licenseLink").addEventListener("click", (e) => { e.preventDefault();
     modal(t("license_title"), "<pre>" + esc(t("license_body")) + "</pre>"); });
+  const quitLink = $("quitLink");
+  if (quitLink) quitLink.addEventListener("click", async (e) => {
+    e.preventDefault();
+    if (!window.confirm(t("confirm_quit"))) return;
+    await api("/api/quit", {});
+    modal(t("quit_tool"), "<div class='ok'>" + esc(t("quit_done")) + "</div>");
+  });
   $("modalClose").addEventListener("click", () => $("modal").classList.add("hidden"));
   $("modal").addEventListener("click", (e) => {
     if (e.target === $("modal")) $("modal").classList.add("hidden"); });
@@ -1080,7 +1170,7 @@ function wire() {
     $("r_delay").value = p.delay_ms;
   });
   ["f_prefix", "f_length", "f_custom", "f_pass_mode", "f_charset", "f_login_url",
-   "f_method", "f_user_field", "f_pass_field", "f_names"].forEach((id) => {
+   "f_method", "f_user_field", "f_pass_field", "f_name"].forEach((id) => {
     const node = $(id);
     if (node) { node.addEventListener("input", previewFormat);
                 node.addEventListener("change", previewFormat); }

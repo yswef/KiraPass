@@ -158,6 +158,23 @@ def calibrate(profile: dict, known_card: str = "", keyword: str = "",
     cal = Calibration()
     cal.profile = p
     say = log or (lambda *a, **k: None)
+
+    # A profile that cannot produce a single card (prefix longer than the
+    # card, one-symbol charset ...) used to calibrate "successfully" with an
+    # empty baseline, and every reply was then judged against nothing.
+    problems = [x for x in store.validate(p)
+                if x != "space_is_astronomically_big"]
+    if problems:
+        cal.error = problems[0]
+        cal.step("profile_valid", False, problems[0], {"problems": problems})
+        return cal
+    if store.space_size(p) <= 0:
+        cal.error = "card_space_empty"
+        cal.step("profile_valid", False, "card_space_empty",
+                 {"prefix": p.get("prefix", ""), "length": p.get("length", 0),
+                  "charset": p.get("charset", "")[:40]})
+        return cal
+
     session = new_session()
 
     try:
@@ -201,6 +218,14 @@ def calibrate(profile: dict, known_card: str = "", keyword: str = "",
             probes.append(card)
             replies.append(r)
 
+        if not replies:
+            # no probe card could be built, or every probe died: without a
+            # baseline anything would look "not rejected", and a run would
+            # report unverified nonsense instead of saying what happened.
+            cal.error = "no_rejection_baseline"
+            cal.step("rejection_baseline", False, "no_probe_reply", {})
+            return cal
+
         if any(s.status in (403, 429, 503) for s in replies) or \
                 any(any(w in (r.text or "").lower() for w in config.BAN_WORDS)
                     for r in replies):
@@ -214,6 +239,7 @@ def calibrate(profile: dict, known_card: str = "", keyword: str = "",
         cal.fingerprint = fp
         cal.step("rejection_baseline", True, "learned",
                  {"exact": fp.exact, "dynamic_tokens": fp.dynamic_count,
+                  "samples": fp.samples,
                   "masked_values": len(fp.literals),
                   "status": fp.reject_status, "length": fp.reject_len,
                   "sample_cards": [c[:6] + "..." for c in probes],
@@ -306,6 +332,11 @@ def _tune_with_known_card(p: dict, known_card: str, fp: Fingerprinter, session,
                          "location": r.location[:160], "words": words}
             if best is None or candidate["evidence"] > best["evidence"]:
                 best = candidate
+            if evidence:
+                # a successful login puts this session "online": the next
+                # combination would then be judged against a logged-in router
+                # and look accepted for the wrong reason
+                verify.logout(session, p["login_url"])
             if evidence >= 0.9:
                 break
         if best and best["evidence"] >= 0.9:
@@ -551,10 +582,14 @@ class Engine:
 
     def start(self, profile: dict, attempts: int, threads: int, delay_ms: int = 0,
               keyword: str = "", known_card: str = "", verify_after: bool = True,
-              auto_stop: bool = True) -> dict:
+              auto_stop: bool = True, resume: bool = True) -> dict:
         if self.state == "running":
             return {"ok": False, "error": "already_running"}
         p = store.migrate(profile)
+        if not resume:
+            # start the space from the beginning again - with a fresh walk, so
+            # it really is a new pass and not the same cards in the same order
+            p.update({"space_pos": 0, "walk_a": 0, "walk_b": 0})
         problems = store.validate(p)
         hard = [x for x in problems if x != "space_is_astronomically_big"]
         if hard:
@@ -563,7 +598,8 @@ class Engine:
         self.profile = p
         self.plan = {"attempts": int(attempts), "threads": int(threads),
                      "delay_ms": int(delay_ms), "keyword": keyword,
-                     "known_card": bool(known_card), "verify": bool(verify_after)}
+                     "known_card": bool(known_card), "verify": bool(verify_after),
+                     "resume": bool(resume)}
         self.verify_enabled = bool(verify_after)
         self.auto_stop = bool(auto_stop)
         self.counters = Counter()
@@ -625,6 +661,13 @@ class Engine:
             if self.profile.get("walk_a") in (0, None):
                 self.profile["walk_a"] = _coprime(space)
                 self.profile["walk_b"] = random.randrange(max(space, 1)) if space else 0
+            if start_pos:
+                # the user asked to continue: say it out loud instead of
+                # silently starting somewhere in the middle of the space
+                self.emit("resume", {"from": min(start_pos, space) if space
+                                             else start_pos,
+                                     "space": space,
+                                     "pass": int(self.profile.get("space_pass", 0))})
 
             task_q = queue.Queue(maxsize=max(16, threads * 4))
             stop_holder = {"done": False}
@@ -713,18 +756,30 @@ class Engine:
                 for w in workers:
                     w.join(timeout=5.0)
 
-            # remember how far we got, so the next run continues, not restarts
-            self.profile["space_pos"] = pos
-            if space and pos >= space:
-                self.profile["space_pass"] = int(self.profile.get("space_pass", 0)) + 1
-                self.profile["space_pos"] = 0
-                self.profile["walk_a"] = _coprime(space)
-                self.profile["walk_b"] = random.randrange(space) if space else 0
+            # Remember how far we got, so the next run continues instead of
+            # restarting.  Only cards that really got an answer are counted:
+            # whatever was still in the queue when the run stopped is retried
+            # next time (counting it as "done" would skip it forever).
+            with self.lock:
+                processed = sum(self.counters.values())
+            resume_pos = start_pos + processed
+            if space:
+                passes, offset = divmod(resume_pos, space)
+                self.profile["space_pos"] = offset
+                if passes:
+                    self.profile["space_pass"] = int(
+                        self.profile.get("space_pass", 0)) + passes
+                    # a new pass over the same space: walk it in a new order
+                    self.profile["walk_a"] = _coprime(space)
+                    self.profile["walk_b"] = random.randrange(space)
+            else:
+                self.profile["space_pos"] = resume_pos
             if self.persist:
                 self.store.put(self.profile)
 
             with self.lock:
-                self.progress["covered"] = min(pos, space) if space else pos
+                self.progress["covered"] = min(resume_pos, space) if space \
+                    else resume_pos
             if not self.stop_reason:
                 self.stop_reason = "attempts_done"
             self.state = "done"
@@ -792,10 +847,15 @@ class Engine:
         elif verdict.code == "UNKNOWN":
             self._save_unknown(card, verdict, resp)
         elif verdict.code == "BANNED":
-            self._ban_count += 1
+            # every worker thread touches these counters, so they are only
+            # ever changed while holding the lock (a lost update here would
+            # mean a ban page that never stops the run)
+            with self.lock:
+                self._ban_count += 1
             self._apply_delay_pressure("banned")
         elif verdict.code == "RATE_LIMITED":
-            self._rate_count += 1
+            with self.lock:
+                self._rate_count += 1
             self._apply_delay_pressure("rate_limited", resp)
         elif verdict.code == "CHALLENGE":
             self.stop("captcha_challenge")
@@ -851,9 +911,10 @@ class Engine:
                       else "found_strong_evidence")
 
     def _save_unknown(self, card: str, verdict: Verdict, resp) -> None:
-        if self._unknown_saved >= 50:
-            return
-        self._unknown_saved += 1
+        with self.lock:
+            if self._unknown_saved >= 50:
+                return
+            self._unknown_saved += 1
         saved = self.store.save_review(self.seq, card, verdict.as_dict(),
                                        resp.text or "")
         if saved:
@@ -863,11 +924,14 @@ class Engine:
 
     def _emit_attempt(self, card, resp, verdict: Verdict, idx: int) -> None:
         interesting = verdict.code != "REJECTED"
-        self._rejected_since_emit += 1
-        if not interesting and self._rejected_since_emit < 25:
+        with self.lock:
+            self._rejected_since_emit += 1
+            quiet = self._rejected_since_emit
+        if not interesting and quiet < 25:
             self._emit_stats()
             return
-        self._rejected_since_emit = 0
+        with self.lock:
+            self._rejected_since_emit = 0
         self.emit("attempt", {
             "card": card, "code": verdict.code, "reason": verdict.reason,
             "data": verdict.data, "status": resp.status,
@@ -934,12 +998,12 @@ class Engine:
 
     def _maybe_decay_delay(self) -> None:
         base = self.throttle["base_ms"]
-        current = self.throttle["delay_ms"]
-        if current <= base or self._clean_streak < 150:
-            return
-        new = max(base, int(current * 0.6))
-        self._clean_streak = 0
         with self.lock:
+            current = self.throttle["delay_ms"]
+            if current <= base or self._clean_streak < 150:
+                return
+            new = max(base, int(current * 0.6))
+            self._clean_streak = 0
             self.throttle["delay_ms"] = new
             self.throttle["reason"] = "recovering_speed" if new > base else ""
         self.emit("throttle", {"reason": "recovering_speed", "delay_ms": new})

@@ -80,6 +80,17 @@ class MaskingTests(unittest.TestCase):
         v = judge.classify(_FakeReply(ban, status=403))
         self.assertIn(v.code, ("BANNED", "RATE_LIMITED"), v.as_dict())
 
+    def test_a_redirect_inside_the_portal_is_not_a_hit(self):
+        """Some routers bounce you between their own pages - every bounce
+        used to be reported as "the router let us out"."""
+        fp = fingerprint.Fingerprinter.learn(
+            [_FakeReply("<html>wrong card</html>"), _FakeReply("<html>wrong card</html>")])
+        judge = fingerprint.Judge(fp, "http://10.5.50.1/login")
+        v = judge.classify(_FakeReply("", status=302, headers={
+            "location": "http://10.5.50.2/portal/status?dst=x"}))
+        self.assertEqual(v.code, "UNKNOWN", v.as_dict())
+        self.assertEqual(v.reason, "redirect_to_another_portal_page")
+
     def test_different_page_is_not_a_hit(self):
         fp = fingerprint.Fingerprinter.learn([
             _FakeReply("<html>wrong card</html>"), _FakeReply("<html>wrong card</html>")])
@@ -97,6 +108,103 @@ class MaskingTests(unittest.TestCase):
                                                "http://connectivitycheck.gstatic.com/generate_204"}))
         self.assertEqual(v.code, "ACCEPTED")
         self.assertTrue(v.is_hit)
+
+
+class PhraseTests(unittest.TestCase):
+    def test_builtin_phrases_match_whole_words_only(self):
+        # "error" inside "errors" must not make a page look rejected
+        self.assertEqual(fingerprint.find_phrase("no errors on this page",
+                                                 ["error"]), "")
+        self.assertEqual(fingerprint.find_phrase("an error occurred", ["error"]),
+                         "error")
+        self.assertEqual(fingerprint.find_phrase("You are blocked",
+                                                 ["you are blocked"]),
+                         "you are blocked")
+
+
+class FingerprintTests(unittest.TestCase):
+    def test_missing_probe_replies_do_not_crash_the_baseline(self):
+        fp = fingerprint.Fingerprinter.learn(
+            [None, _FakeReply("<html>wrong card</html>")])
+        self.assertEqual(fp.samples, 1)
+        self.assertEqual(fp.reject_status, 200)
+
+
+class PortalFormTests(unittest.TestCase):
+    def test_the_login_form_wins_over_other_forms(self):
+        html = """<html>
+        <form action="/search" method="get">
+          <input type="text" name="q"><input type="submit" name="go" value="Go">
+        </form>
+        <form name="login" action="/login" method="post">
+          <input type="hidden" name="dst" value="http://x/">
+          <input type="text" name="username" value="">
+          <input type="password" name="password" value="">
+          <input type="submit" name="connect" value="Connect">
+        </form></html>"""
+        form = portals.parse_form(html, "http://10.5.50.1/")
+        self.assertEqual(form.action, "http://10.5.50.1/login")
+        self.assertTrue(form.is_post)
+        self.assertEqual(form.user_field, "username")
+        self.assertEqual(form.pass_field, "password")
+        # a named submit button is not data we should replay
+        self.assertNotIn("connect", form.extra_fields)
+        self.assertNotIn("go", form.extra_fields)
+
+    def test_buttons_are_never_sent_as_fixed_fields(self):
+        html = """<html><form action="/login" method="post">
+          <input type="text" name="username">
+          <input type="password" name="password">
+          <input type="submit" name="send" value="ok">
+          <input type="button" name="cancel" value="no">
+        </form></html>"""
+        form = portals.parse_form(html, "http://10.5.50.1/login")
+        self.assertEqual(form.extra_fields, {})
+
+
+class CalibrationTests(unittest.TestCase):
+    def test_a_card_space_that_cannot_exist_is_refused(self):
+        """A profile with no room to guess in must fail with a reason - it
+        used to "calibrate" against an empty baseline and then call every
+        reply 'not rejected'."""
+        from kirapass import engine
+        p = store.new_profile(login_url="http://127.0.0.1:1/login",
+                              prefix="02", length=6, charset="0")
+        cal = engine.calibrate(p)
+        self.assertFalse(cal.ok)
+        self.assertTrue(cal.error, "calibration must say why it refused")
+        self.assertFalse([s for s in cal.steps if s["id"] == "profile_valid"
+                          and s["ok"]])
+
+    def test_a_dead_target_is_reported_as_a_network_problem(self):
+        from kirapass import engine
+        p = store.new_profile(login_url="http://127.0.0.1:1/login",
+                              prefix="02", length=6, charset="0123456789")
+        cal = engine.calibrate(p)
+        step = next((s for s in cal.steps if s["id"] == "reach_login_page"), None)
+        self.assertFalse(cal.ok)
+        self.assertTrue(step and step["reason"].startswith("net_"), cal.steps)
+
+
+class CacheTests(unittest.TestCase):
+    def test_bytecode_folders_are_counted_once(self):
+        st = store.Store()
+        st.clear_cache("temp")
+        tmp = tempfile.mkdtemp(prefix="kirapass_base_")
+        try:
+            folder = os.path.join(tmp, "__pycache__")
+            os.makedirs(folder)
+            with open(os.path.join(folder, "x.pyc"), "wb") as fh:
+                fh.write(b"0" * 64)
+            old = config.BASE_DIR
+            config.BASE_DIR = tmp
+            try:
+                info = st.clear_cache("temp")
+            finally:
+                config.BASE_DIR = old
+            self.assertEqual(info["freed_bytes"], 64, info)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
 
 
 class _FakeReply:
@@ -179,6 +287,30 @@ class StoreTests(unittest.TestCase):
 
 
 class HttpTests(unittest.TestCase):
+    def test_connect_timeout_is_not_a_read_timeout(self):
+        """Opening the socket and reading the answer are two different
+        failures - "the router never answered the connection" must not be
+        reported as "the router answered slowly"."""
+        import socket
+
+        class _DeadConn:
+            sock = None
+            timeout = 1.0
+
+            def connect(self):
+                raise socket.timeout("timed out")
+
+        s = httpclient.Session(allow_redirects=False)
+        s._conn, s._key = _DeadConn(), ("http", "127.0.0.1", 1)
+        try:
+            with self.assertRaises(Exception) as ctx:
+                s._send_once("GET", "http://127.0.0.1:1/login", None, None, {},
+                             (1.0, 1.0))
+        finally:
+            s.close()
+        self.assertEqual(getattr(ctx.exception, "kind", ""), "connect_timeout",
+                         repr(ctx.exception))
+
     def test_cookies_and_redirects(self):
         with MockPortal(valid_cards={"0242"}, pass_mode="empty") as portal:
             s = httpclient.Session(allow_redirects=True)

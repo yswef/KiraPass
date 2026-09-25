@@ -129,6 +129,18 @@ python3 tools/checks/web_e2e.py
 ونفس الجدول محفوظ داخل ملف التقرير في `kirapass_data/runs/`، فتعرف بعد أسبوع
 لماذا انتهت الجلسة كما انتهت.
 
+### المتابعة بلا تكرار
+
+كل تشغيل يحفظ موضعه داخل الملف التعريفي (`space_pos` مع مسار مشي مخلوط لا
+يكرّر بطاقة). شغّل مرة ثانية وستكمل من حيث توقفت — تعطيل خيار «المتابعة من حيث
+توقفت» يبدأ من البداية بمسار جديد. عدد ما جرّبته يظهر أمامك في قائمة الملفات
+التعريفية وفي بطاقة المعاينة.
+
+### إيقاف الأداة من الصفحة
+
+زر **«إيقاف الأداة»** في أسفل الصفحة يوقفها تماماً (مفيد على الهاتف حيث لا
+يوجد `Ctrl+C`).
+
 ---
 
 ## المسموح والممنوع (باختصار)
@@ -151,6 +163,7 @@ python3 tools/checks/web_e2e.py
 | [docs/WHY_IT_STOPPED_EN.md](docs/WHY_IT_STOPPED_EN.md) | The old failures, explained with evidence |
 | [docs/MAKE_PRIVATE.md](docs/MAKE_PRIVATE.md) | خطوات جعل المستودع خاصاً (عربي + English) |
 | [docs/DEV_NOTES.md](docs/DEV_NOTES.md) | بنية الكود والاختبارات لمن يريد التطوير |
+| [docs/CHANGES.md](docs/CHANGES.md) | ما أُصلح وما أُضيف في هذه المراجعة (سجل الإصلاحات) |
 
 ## الملفات التي تُنشئها الأداة
 
@@ -188,6 +201,11 @@ The page has four steps: **scan** the login page, describe the **card format**,
 **run**, watch the **results**. Every attempt is one of: accepted & verified,
 accepted, unverified accept, rejected, unclear reply, blocked by the router,
 rate limited, network error - each with a reason, and every stop is explained.
+
+Runs **resume** instead of repeating: the position is kept in the profile, so a
+second run continues where the first stopped (uncheck "continue where you
+stopped" to start over). The footer has a **stop the tool** button for phones.
+See [docs/CHANGES.md](docs/CHANGES.md) for the bugs this revision fixed.
 
 A safe playground ships with the tool:
 

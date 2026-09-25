@@ -13,6 +13,7 @@ The old version printed "Err: <python traceback>" or counted a card as
 from __future__ import annotations
 
 import errno
+import http.client
 import socket
 import ssl
 
@@ -77,7 +78,17 @@ def classify(exc: BaseException, url: str = "") -> NetError:
         kind = "tls"
     elif isinstance(exc, socket.gaierror):
         kind = "dns"
+    elif isinstance(exc, (http.client.RemoteDisconnected,)):
+        # a keep-alive connection the router closed between two requests
+        kind = "stale"
+    elif isinstance(exc, (http.client.IncompleteRead,
+                          http.client.LineTooLong)):
+        kind = "bad_response"
     elif isinstance(exc, socket.timeout):
+        # python >= 3.10: socket.timeout IS TimeoutError, and http.client
+        # raises it for both phases.  The client wraps the connect phase
+        # itself (see httpclient.Session._send_once), so anything that
+        # reaches here really was a read that never finished.
         kind = "read_timeout"
     elif isinstance(exc, ConnectionRefusedError):
         kind = "refused"
@@ -87,6 +98,8 @@ def classify(exc: BaseException, url: str = "") -> NetError:
         kind = "reset"
     elif isinstance(exc, OSError) and getattr(exc, "errno", None) == errno.ENETUNREACH:
         kind = "unreachable"
+    elif isinstance(exc, http.client.HTTPException):
+        kind = "bad_response"
     elif "remotedisconnected" in low or "remote end closed" in low \
             or "badstatusline" in low or "cannot read from timed out" in low:
         kind = "stale"
