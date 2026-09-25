@@ -164,6 +164,17 @@ ACCEPT_WORDS = (
     "مرحبا", "المتبقي",
 )
 
+# How many wrong cards we send to learn the rejection page.  Every one of them
+# is a failed login for the router, so we keep this small: a router that locks
+# after two failures is locked by our own learning otherwise.
+CALIBRATION_PROBES = 3
+# ... and how few we use when the first try already tripped a lockout.
+CALIBRATION_PROBES_RETRY = 2
+# Routers that lock a device usually unlock it on their own.  Wait this long,
+# then try the learning again once (the web page shows the countdown).
+# Override it without editing code:  KIRAPASS_BLOCK_WAIT=120 python3 KiraPass.py
+BLOCK_WAIT_SECONDS = max(0, int(os.environ.get("KIRAPASS_BLOCK_WAIT", "45")))
+
 # Hosts we treat as "inside the portal" (so a redirect to them is not an exit).
 PORTAL_HINT_WORDS = ("login", "hotspot", "portal", "welcome", "splash", "auth")
 

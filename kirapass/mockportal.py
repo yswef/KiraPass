@@ -58,7 +58,8 @@ RATE_PAGE = """<html><head><title>Slow down</title></head><body>
 
 class PortalState:
     def __init__(self, valid_cards, pass_mode="same", method="post",
-                 dynamic=True, ban_after=0, rate_limit_after=0, drop_every=0,
+                 dynamic=True, ban_after=0, ban_seconds=0,
+                 rate_limit_after=0, drop_every=0,
                  drop_after=0, chap=False, prefix="02", length=6,
                  error_text=None):
         self.valid_cards = set(valid_cards)
@@ -66,6 +67,8 @@ class PortalState:
         self.method = method
         self.dynamic = dynamic
         self.ban_after = ban_after          # 0 = never
+        self.ban_seconds = ban_seconds      # 0 = the ban never expires
+        self.banned_at = 0.0
         self.rate_limit_after = rate_limit_after
         self.drop_every = drop_every
         self.drop_after = drop_after      # drop EVERY request after this many
@@ -188,10 +191,20 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self._login_page(base, fields)
 
         # --- ban / rate-limit behaviour ------------------------------
+        # A real router forgives after a while: with ban_seconds the lockout
+        # expires on its own and the failure counter starts over (that is what
+        # "wait it out and try again" relies on).
+        if (st.ban_after and st.banned_at and st.ban_seconds and
+                time.time() - st.banned_at > st.ban_seconds):
+            with st.lock:
+                st.failures = 0
+                st.banned_at = 0.0
         if st.ban_after and st.failures >= st.ban_after:
             st.bump("bans")
+            if not st.banned_at:
+                st.banned_at = time.time()
             return self._reply(403, BAN_PAGE,
-                               {"Retry-After": "30"} if st.ban_after else None)
+                               {"Retry-After": str(st.ban_seconds or 30)})
         if st.rate_limit_after and st.failures >= st.rate_limit_after:
             st.bump("rate_hits")
             return self._reply(429, RATE_PAGE, {"Retry-After": "1"})
