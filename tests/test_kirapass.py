@@ -13,12 +13,13 @@ import os
 import shutil
 import sys
 import tempfile
+import time
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from kirapass import (config, fingerprint, httpclient, portals,  # noqa: E402
-                     selftest, store)
+from kirapass import (config, engine, fingerprint, httpclient,  # noqa: E402
+                     portals, selftest, store)
 from kirapass.mockportal import MockPortal                                     # noqa: E402
 
 # Test data must never land in the real kirapass_data folder: the scenarios
@@ -240,6 +241,80 @@ class RedirectPortalTests(unittest.TestCase):
             self._redirect("http://10.5.50.1/login?error=1&mac=99:88:77:66:55:44"),
             ["0302", ""])
         self.assertEqual(v.code, "REJECTED", v.as_dict())
+
+
+class BlockRecoveryTests(unittest.TestCase):
+    """A router that locks a device after N failed logins.
+
+    The learning cards are failed logins too, so three of them can fill the
+    counter on their own - the tool must notice that it caused the lockout,
+    wait for it to clear, and try again with fewer cards.
+    """
+
+    def test_the_lockout_is_waited_out_and_the_run_starts(self):
+        from unittest import mock
+        # two failures are enough for this router, and three learning cards
+        # are three failures - the third one gets the block page
+        with MockPortal(valid_cards={"020124042"}, pass_mode="empty",
+                        ban_after=2, ban_seconds=2) as portal:
+            info = selftest.scan(portal.url)
+            p = selftest.make_profile(portal.url, prefix="020", length=9,
+                                      portal_info=info)
+            # three learning cards -> the router's counter is full before any
+            # real attempt was made
+            cal = engine.calibrate(p, checks=selftest.mock_checks(portal))
+            self.assertFalse(cal.ok, cal.as_dict())
+            self.assertEqual(cal.error, "blocked_already")
+            self.assertTrue(
+                any(s["reason"] == "blocked_by_our_probes" for s in cal.steps),
+                cal.steps)
+            self.assertTrue(engine.block_caused_by_probes(cal))
+
+            # and the engine waits the lockout out, then relearns with two
+            with mock.patch.object(config, "BLOCK_WAIT_SECONDS", 3), \
+                    mock.patch.object(config, "CALIBRATION_PROBES_RETRY", 2):
+                eng = engine.Engine(store.Store(), persist=False,
+                                  checks=selftest.mock_checks(portal))
+                eng.start(p, attempts=20, threads=2, delay_ms=0)
+                deadline = time.time() + 60
+                while time.time() < deadline and eng.state not in ("running", "done"):
+                    time.sleep(0.1)
+                eng.stop("test_done")
+                while time.time() < deadline and eng.state != "done":
+                    time.sleep(0.1)
+            self.assertNotEqual(eng.stop_reason, "calibration_failed",
+                                eng.calibration)
+            self.assertEqual(eng.calibration.get("ok"), True)
+            baseline = [s for s in eng.calibration.get("steps", [])
+                        if s["id"] == "rejection_baseline"]
+            self.assertTrue(baseline, eng.calibration)
+            self.assertLessEqual(baseline[0]["detail"]["samples"], 2)
+
+    def test_a_block_that_was_already_there_is_not_our_fault(self):
+        with MockPortal(valid_cards={"020124042"}, pass_mode="empty",
+                        ban_after=1) as portal:
+            info = selftest.scan(portal.url)
+            p = selftest.make_profile(portal.url, prefix="020", length=9,
+                                      portal_info=info)
+            # one failure is enough here, so the very first learning card is
+            # already answered with the block page
+            cal = engine.calibrate(p, checks=selftest.mock_checks(portal))
+            self.assertFalse(cal.ok)
+            # the login page was clean, so this is still a lockout we caused
+            self.assertTrue(engine.block_caused_by_probes(cal))
+            # ... but with the block page shown on the login page itself it is
+            # reported as older than us - and no card is wasted on it
+            from unittest import mock
+            with mock.patch.object(engine, "new_session") as ns:
+                sess = ns.return_value
+                sess.get.return_value = _FakeReply(
+                    "<html>you are blocked</html>", status=403)
+                cal2 = engine.calibrate(p, checks=selftest.mock_checks(portal))
+                self.assertEqual(sess.post.call_count, 0)
+                self.assertEqual(sess.get.call_count, 1)
+            self.assertFalse(engine.block_caused_by_probes(cal2))
+            self.assertTrue(any(s["reason"] == "blocked_before_probes"
+                                for s in cal2.steps), cal2.steps)
 
 
 class _FakeReply:

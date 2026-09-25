@@ -36,6 +36,9 @@ def main() -> int:
                     default="same", help="what the portal expects as password")
     ap.add_argument("--chap", action="store_true", help="enable md5.js (chap)")
     ap.add_argument("--ban-after", type=int, default=0, help="0 = never")
+    ap.add_argument("--ban-seconds", type=int, default=0,
+                    help="the lockout clears after this many seconds "
+                         "(0 = it never clears)")
     ap.add_argument("--rate-limit", type=int, default=0, help="0 = never")
     ap.add_argument("--drop-every", type=int, default=0, help="0 = never")
     ap.add_argument("--static-page", action="store_true",
@@ -46,6 +49,7 @@ def main() -> int:
     portal = MockPortal(port=args.port, valid_cards={args.card},
                         method=args.method, pass_mode=pass_mode, chap=args.chap,
                         ban_after=args.ban_after,
+                        ban_seconds=args.ban_seconds,
                         rate_limit_after=args.rate_limit,
                         drop_every=args.drop_every,
                         dynamic=not args.static_page).start()
@@ -57,7 +61,7 @@ def main() -> int:
     valid card : {args.card}
     scheme     : {args.method.upper()} form, password = {pass_mode}
     page       : {'static' if args.static_page else 'a new session token every request'}
-    ban after  : {args.ban_after or 'never'} failures
+    ban after  : {args.ban_after or 'never'} failures{('  · clears after ' + str(args.ban_seconds) + 's') if args.ban_after and args.ban_seconds else ''}
     rate limit : {args.rate_limit or 'never'}
     dropped    : every {args.drop_every or '-'} connection
 

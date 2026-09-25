@@ -69,6 +69,31 @@
 
 ---
 
+## الجولة الثالثة · سبب «الحظر» وكيف يزول
+
+صورة المستخدم تظهر الحظر. الحظر في الأداة يعني: **الراوتر يرفض هذا الجهاز قبل
+أي محاولة** (صفحة حجب أو `403/429`). والآن الأداة تفرّق بين سببين مختلفين تماماً:
+
+| الحالة | كيف تعرفها | ما تفعله |
+|---|---|---|
+| **حظر سابق** (`blocked_before_probes`) — صفحة الدخول نفسها صفحة حجب | الأداة **لا تُضيّع أي بطاقة تجربة**، تكتشفه من أول GET | أعد الاتصال بالشبكة لتغيير الـ IP (أو فعّل «عنوان MAC عشوائي/خاص» لهذه الشبكة في إعدادات الهاتف)، أو أعد تشغيل الراوتر إن كنت مديره، ثم ابدأ من جديد |
+| **حظر نحن سببه** (`blocked_by_our_probes`) — بطاقات التجربة نفسها ملأت عداد المحاولات الفاشلة | الأداة تقارن: صفحة الدخول كانت سليمة قبل التجربة | **الأداة تنتظر ٤٥ ثانية ثم تعيد التعلّم ببطاقتي تجربة بدل ثلاث** تلقائياً؛ وإن تكرّر: قلّل الخيوط (2-4) وأضف مهلة بين المحاولات |
+
+* الأزرار الجديدة في بطاقة التوقف: **«أعد المحاولة الآن»** و**«أعد المحاولة بعد ٤٥ ثانية»** (عدّ تنازلي على الشاشة).
+* المهلة قابلة للتغيير بدون تعديل الكود: `KIRAPASS_BLOCK_WAIT=120 python3 KiraPass.py`.
+* للتدرّب على الحالة محلياً: `python3 tools/practice_portal.py --ban-after 2 --ban-seconds 8`
+  (يحجب بعد محاولتين و**يفك الحظر بعد ٨ ثوان**) — الأداة تتعافى منه وحدها:
+  `calibration ok=True, samples=2` ثم يبدأ التشغيل، وعدّاد `BANNED` يوضح أن
+  الراوتر يحجب كل محاولتين (أي: على راوتر كهذا لا يوجد تخمين ممكن بدون مهلة
+  طويلة بين المحاولات).
+* اختباران جديدان: `40/40` في `tests/` و`14/14` في `--selftest`.
+
+**لتجربة أن التخمين يعمل أصلاً:** استخدم البوابة المحلية الشغّالة (بدون حظر)
+على `http://127.0.0.1:8898/login` والكرت `020124042` — تصل إليه في نحو ألف
+محاولة ويظهر في الصفحة كـ «نجاح مؤكد بالإنترنت».
+
+---
+
 ## English (short)
 
 Real bugs fixed: the "continue where you stopped" feature never worked (the
@@ -100,3 +125,14 @@ ban words match whole words only and a bare 503 is no longer "blocked"; a probe
 that luckily hits is dropped from the rejection baseline; and one hiccup in the
 learning phase is retried once instead of ending the run with zero attempts
 (38 tests, 14/14 self-test).
+
+Third round - the block itself: the tool now tells the two cases apart. A block
+page that was already there (`blocked_before_probes`) is detected on the first
+GET, without wasting a single test card, and the advice is a new IP (reconnect,
+or the phone's per-network randomized/private MAC) or a router restart. A block
+our own learning cards caused (`blocked_by_our_probes`) is waited out
+automatically - 45s (override with `KIRAPASS_BLOCK_WAIT=...`), then the
+learning is retried with two cards instead of three. The stop card offers
+"try again now" and "try again after 45s" buttons. The practice portal grew
+`--ban-seconds` so the whole cycle can be rehearsed locally (40 tests,
+14/14 self-test).

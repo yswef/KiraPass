@@ -112,9 +112,14 @@ const I18N = {
     netadvice_proto: "الرابط غير مدعوم: يجب أن يبدأ بـ http:// أو https://",
     netadvice_unknown: "خطأ غير متوقع: أعد المحاولة، وإن تكرر شغّل «تشخيص الشبكة أولاً».",
     netadvice_blocked_already: "الراوتر حاجب جهازك الآن: أعد تشغيل الراوتر أو أعد الاتصال لتغيير الـ IP، ثم ابدأ من جديد.",
+    netadvice_blocked_before_probes: "الحجب سابق علينا: أعد الاتصال بالشبكة لتغيير الـ IP (أو فعّل «عنوان MAC عشوائي/خاص» لهذه الشبكة في إعدادات الهاتف) أو أعد تشغيل الراوتر، ثم ابدأ من جديد.",
+    netadvice_blocked_by_our_probes: "نحن من ملأنا عداد الفشل: الأداة تنتظر ٤٥ ثانية ثم تعيد التعلّم ببطاقتي تجربة بدل ثلاث. إن تكرّر: أعد الاتصال لتغيير الـ IP، وقلّل عدد الخيوط وأضف مهلة بين المحاولات.",
     netadvice_no_rejection_baseline: "لم يصل أي رد على بطاقات التجربة: تحقق من الاتصال بالشبكة.",
     netadvice_card_space_empty: "صيغة البطاقة لا تترك شيئاً للتخمين: البادئة + اللاحقة أطول من طول الكرت، أو المحارف المتغيّرة قليلة جداً.",
     netadvice_calibration_failed: "أصلح السبب أعلاه، ثم اضغط «ابدأ التخمين» من جديد.",
+    retry_now: "↻ أعد المحاولة الآن",
+    retry_after_wait: "⏳ أعد المحاولة بعد ٤٥ ثانية",
+    block_wait: "الراوتر حجبنا بعد بطاقات التجربة - انتظار",
     /* verdicts */
     v_ACCEPTED_VERIFIED: "مقبولة ومؤكدة",
     v_ACCEPTED: "مقبولة",
@@ -184,6 +189,8 @@ const I18N = {
     th_recovering_speed: "الشبكة هدأت - أعيد رفع السرعة تدريجياً",
     /* calibration + diagnostics */
     cal_blocked_already: "الراوتر حاجب جهازك (ظهرت صفحة حجب قبل أي محاولة)",
+    cal_blocked_before_probes: "صفحة الحجب ظهرت قبل أن نجرّب أي بطاقة: الراوتر حاجب هذا الجهاز من قبل",
+    cal_blocked_by_our_probes: "بطاقات التجربة ملأت عداد المحاولات الفاشلة عند الراوتر، فحجبنا قبل أن نبدأ",
     cal_card_space_empty: "صيغة البطاقة لا تترك شيئاً للتخمين",
     cal_no_rejection_baseline: "لم يصل أي رد من الراوتر على بطاقات التجربة",
     cal_reach_login_page: "الوصول إلى صفحة الدخول",
@@ -325,9 +332,14 @@ const I18N = {
     netadvice_proto: "Unsupported URL: it must start with http:// or https://",
     netadvice_unknown: "Unexpected error: try again, and if it repeats run \"diagnose the network first\".",
     netadvice_blocked_already: "The router is blocking your device right now: restart the router or reconnect to change your IP, then start again.",
+    netadvice_blocked_before_probes: "The block is older than we are: reconnect to the network to change your IP (or turn on the per-network \"randomized / private MAC\" in the phone settings), or restart the router, then start again.",
+    netadvice_blocked_by_our_probes: "We filled the failure counter ourselves: the tool waits 45s, then relearns with two test cards instead of three. If it repeats: reconnect to change your IP, lower the threads and add a delay between attempts.",
     netadvice_no_rejection_baseline: "No answer at all to the test cards: check the connection to the network.",
     netadvice_card_space_empty: "The card format leaves nothing to guess: prefix + suffix are longer than the card, or there are too few variable characters.",
     netadvice_calibration_failed: "Fix the reason above, then press \"start guessing\" again.",
+    retry_now: "↻ Try again now",
+    retry_after_wait: "⏳ Try again after 45 seconds",
+    block_wait: "the router locked us after the test cards - waiting",
     v_ACCEPTED_VERIFIED: "Accepted & verified",
     v_ACCEPTED: "Accepted",
     v_ACCEPTED_UNVERIFIED: "Router accepted (internet check failed)",
@@ -387,6 +399,8 @@ stop_attempts_done: "Requested attempts finished. Run again - it continues, it d
     th_network_errors_slowing_down: "Slowed down because of repeated network errors",
     th_recovering_speed: "Network calmed down - raising the speed again",
     cal_blocked_already: "the router is blocking this device (a block page came back before any attempt)",
+    cal_blocked_before_probes: "the block page was already there before we tried any card - the router blocked this device earlier",
+    cal_blocked_by_our_probes: "our own test cards filled the router's failed-login counter, so it locked us before the run started",
     cal_card_space_empty: "the card format leaves nothing to guess",
     cal_no_rejection_baseline: "no reply came back for the test cards",
     cal_reach_login_page: "Reaching the login page",
@@ -923,6 +937,7 @@ async function startRun() {
     verify: $("r_verify").checked, auto_stop: $("r_autostop").checked,
     resume: $("r_resume").checked,
   };
+  S.lastStart = payload;
   const res = await api("/api/run/start", payload);
   if (!res.ok) {
     modal(t("scan_fail"), "<pre>" + esc(JSON.stringify(res, null, 2)) + "</pre>");
@@ -1033,6 +1048,10 @@ function renderStatus(st, events) {
     else if (ev.kind === "review") renderReview(st.review || []);
     else if (ev.kind === "error") modal("Error", "<pre>" + esc(ev.data.message) + "</pre>");
     else if (ev.kind === "report") S.lastReport = ev.data.file;
+    else if (ev.kind === "block_wait") {
+      S.retryWait = (ev.data || {}).seconds || 45;
+      toast("⏳ " + t("block_wait") + " " + S.retryWait + "s");
+    }
   });
   if (st.review && st.review.length) renderReview(st.review);
   if (st.hits && st.hits.length) renderHits(null, st.hits);
@@ -1111,12 +1130,20 @@ function calReasonLabel(reason) {
 function renderCalFailure(st) {
   const cal = st.calibration || {};
   const kind = String(st.error || cal.error || "").replace(/^net_/, "");
+  const steps = cal.steps || [];
+  const failed = steps.filter((s) => !s.ok);
+  /* the failed step knows the exact cause ("our three test cards did it"
+     vs "the router was already blocking us"), the error code only knows
+     the family - prefer the step when we have one */
+  const why = failed.length ? String(failed[failed.length - 1].reason || "") : "";
   let html = "<div class='bad' style='margin-top:8px;font-weight:600'>" +
     esc(t("cal_failed_title")) + "</div>" +
     "<div class='hint'>" + esc(t("cal_failed_hint")) + "</div>";
   if (kind) {
-    html += "<div class='bad mono'>" + esc(t("net_" + kind, t("cal_" + kind, kind))) + "</div>";
-    const advice = t("netadvice_" + kind, "");
+    html += "<div class='bad mono'>" +
+      esc(t("cal_" + (why || kind), t("net_" + kind, t("cal_" + kind, kind)))) +
+      "</div>";
+    const advice = t("netadvice_" + (why || kind), "") || t("netadvice_" + kind, "");
     if (advice) html += "<div class='warn'>→ " + esc(advice) + "</div>";
   }
   if (cal.steps && cal.steps.length) {
@@ -1162,7 +1189,30 @@ function renderStop(st) {
   if (S.lastReport)
     html += "<div class='hint'>" + t("report_saved") + ": <span class='mono'>" +
             esc(S.lastReport) + "</span></div>";
+  /* a run that never started can simply be tried again - straight away, or
+     after the router's lockout has passed */
+  if (st.stop_reason === "calibration_failed") {
+    html += "<div class='row wrap' style='margin-top:8px'>" +
+            "<button class='btn' id='retryNowBtn'>" + esc(t("retry_now")) + "</button>" +
+            "<button class='btn' id='retryWaitBtn'>" + esc(t("retry_after_wait")) +
+            "</button></div>";
+  }
   card.innerHTML = html;
+  const now = $("retryNowBtn");
+  if (now) now.addEventListener("click", () => startRun());
+  const wait = $("retryWaitBtn");
+  if (wait) wait.addEventListener("click", () => {
+    let left = S.retryWait || 45;
+    wait.disabled = true;
+    if (now) now.disabled = true;
+    const tick = () => {
+      if (left <= 0) { startRun(); return; }
+      wait.textContent = t("retry_after_wait") + " (" + left + ")";
+      left -= 1;
+      setTimeout(tick, 1000);
+    };
+    tick();
+  });
 }
 
 /* ------------------------------------------------------------------ modal */
