@@ -1,16 +1,22 @@
 # =============================================================
-#.gitignore
+#  KiraPass - ما يجب ألا يصل إلى Git
+#  KiraPass - what must never reach git
 # =============================================================
-# القاعدة: كل ما هو بيانات محلية، مفاتيح، ملفات بيئة، مخرجات
-# مؤقتة، أو أدوات تطوير لا يجب أن يصل لـgit.
-# Rule: local data, secrets, env files, temporary outputs,
-# and dev tooling stay out of git.
-# =============================================================
+#
+# كل بيانات الأداة (ملفات تعريفية، تقارير، صفحات مراجعة، نتائج)
+# تُحفظ داخل مجلد واحد، ولا تُرفع أبداً لأنه يحتوي بيانات شبكتك.
+# All tool data (profiles, reports, review pages, hits) lives in one
+# folder and is never committed - it contains your network's data.
+kirapass_data/
 
+# ملفات النسخة القديمة، للتأكد من عدم عودتها
+# legacy files from the old version, to be safe
+mikrotikbf_profiles.json
+kirapass_hits.txt
 
-# ─────────────────────────────────────────
-# Python — bytecode & caches
-# ─────────────────────────────────────────
+# -------------------------------------------------------------
+# Python
+# -------------------------------------------------------------
 __pycache__/
 *.py[cod]
 *.pyo
@@ -19,70 +25,33 @@ __pycache__/
 venv/
 env/
 ENV/
-zimp/
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
 *.egg-info/
 dist/
 build/
-.mypy_cache/
-.ruff_cache/
-*.json
-mikrotikbf_profiles.json
-# ─────────────────────────────────────────
-# كاش الذكاء الاصطناعي
-# AI response cache
-# ─────────────────────────────────────────
-backend/ai_cache.json
-backend/ai_cache.backup_*.json
 
-# ─────────────────────────────────────────
-# أدوات التطوير والمحررات
-# IDEs & editors
-# ─────────────────────────────────────────
+# -------------------------------------------------------------
+# محررات وأنظمة التشغيل
+# editors & operating systems
+# -------------------------------------------------------------
 .vscode/
-dev/
 .idea/
-*.suo
-*.user
-.continue/
-.cursor/
-*.code-workspace
-.db
-.json
-
-# ─────────────────────────────────────────
-# ملفات البيئة (مفاتيح API)
-# Environment files (API keys)
-# ─────────────────────────────────────────
-.env
-.env.*
-!.env.example
-
-
-# ─────────────────────────────────────────
-# نظام التشغيل
-# OS artifacts
-# ─────────────────────────────────────────
+*.swp
 .DS_Store
 Thumbs.db
 desktop.ini
-ehthumbs.db
 
-# ─────────────────────────────────────────
-# Node.js (لو استُخدم)
-# Node.js (if ever used)
-# ─────────────────────────────────────────
-node_modules/
-package-lock.json
-
-
-# ─────────────────────────────────────────
-# ملفات ضغط مؤقتة
-# Temporary archives
-# ─────────────────────────────────────────
+# -------------------------------------------------------------
+# مخرجات مؤقتة
+# temporary outputs
+# -------------------------------------------------------------
+*.log
+*.tmp
 *.zip
 *.tar.gz
-*.rar
-# local router profiles and app icon, keep out of the repo
-mikrotikbf_profiles.json
-15624314610414311314617116111215623518117912430775.ico
+
+# ملاحظة: صفحات مثال الهوتسبوت داخل "Example pages/" مقصودة أن تُرفع
+# حتى يبقى شكل الصفحة موثّقاً في المستودع.
+# Note: example hotspot pages in "Example pages/" ARE meant to be committed.
