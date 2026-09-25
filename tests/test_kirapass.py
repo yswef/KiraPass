@@ -377,6 +377,67 @@ class BlockFalsePositiveTests(unittest.TestCase):
         self.assertEqual(sess.request.call_count, 0)
 
 
+class InternetWatchdogTests(unittest.TestCase):
+    """The nastiest real case: the router logs the guest in and still answers
+    with the rejection page, so no verdict ever looks like a hit.  The only
+    honest signal left is the internet itself.
+    """
+
+    def test_the_watchdog_names_the_cards_that_opened_the_internet(self):
+        from unittest import mock
+        with MockPortal(valid_cards={"020124042"}, pass_mode="empty",
+                        hide_success=True) as portal:
+            info = selftest.scan(portal.url)
+            p = selftest.make_profile(portal.url, prefix="0201240", length=9,
+                                      portal_info=info)
+            # walk it in order, starting on the working card - deterministic
+            # (decode_card fills the free slots least-significant first, so
+            # index 24 is the card ...042)
+            p["walk_a"], p["walk_b"], p["space_pos"] = 1, 0, 24
+            with mock.patch.object(config, "WATCH_EVERY_SECONDS", 0.3):
+                eng = engine.Engine(store.Store(), persist=False,
+                                    checks=selftest.mock_checks(portal))
+                eng.start(p, attempts=100, threads=1, delay_ms=200,
+                          verify_after=True)
+                deadline = time.time() + 60
+                while time.time() < deadline and eng.state != "done":
+                    time.sleep(0.1)
+            self.assertEqual(eng.stop_reason, "internet_opened", eng.calibration)
+            suspects = [s["card"] for s in
+                        (eng._internet_opened or {}).get("suspects", [])]
+            self.assertIn("020124042", suspects, suspects)
+            # and the judge really did miss it - the watchdog is why we know
+            self.assertEqual(eng.hits, [])
+            self.assertEqual(portal.state.hidden_successes, 1)
+
+    def test_cards_the_router_refused_to_judge_are_not_counted_as_covered(self):
+        """A block page is not an answer: that card is still untested."""
+        from unittest import mock
+        # bans start after five failures, so the learning is clean and the
+        # lockout hits in the middle of the run
+        with MockPortal(valid_cards={"020124999"}, pass_mode="empty",
+                        ban_after=5) as portal:
+            info = selftest.scan(portal.url)
+            p = selftest.make_profile(portal.url, prefix="030124", length=9,
+                                      portal_info=info)
+            with mock.patch.object(config, "BLOCK_WAIT_SECONDS", 0):
+                eng = engine.Engine(store.Store(), persist=False,
+                                    checks=selftest.mock_checks(portal))
+                eng.start(p, attempts=20, threads=2, delay_ms=0,
+                          verify_after=False)
+                deadline = time.time() + 60
+                while time.time() < deadline and eng.state != "done":
+                    time.sleep(0.1)
+            st = eng.status()
+            banned = st["counters"].get("BANNED", 0)
+            tried = sum(st["counters"].values())
+            self.assertGreater(banned, 0, st["counters"])
+            covered = st["progress"]["covered"]
+            self.assertEqual(covered, tried - banned,
+                             "a banned card is not a tested card: %s / %s"
+                             % (st["progress"], st["counters"]))
+
+
 class _FakeReply:
     def __init__(self, text, status=200, headers=None):
         self._text = text
