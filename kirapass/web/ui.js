@@ -120,6 +120,9 @@ const I18N = {
     block_but_form_present: "لكن الصفحة ما زال فيها نموذج الدخول",
     probe_cards: "بطاقات تجربة",
     http_ok_word_ignored: "الصفحة ترد سليم وفيها كلمة حجب، لكن ما زال فيها نموذج الدخول فاعتبرناها صفحة دخول",
+    internet_opened_title: "الإنترنت فتح أثناء التشغيل - أحد هذه الكروت هو الصحيح",
+    internet_opened_hint: "الراوتر أدخلك ولم يرد برد نجاح واضح، فلم نستطع تسمية الكرت من الرد وحده. أوقف الجلسة ثم جرّب هذه الكروت واحداً واحداً في صفحة الدخول - أحدها هو الذي فتح الشبكة. الأحدث في الآخر.",
+    stop_internet_opened: "توقف لأن الإنترنت فتح أثناء التشغيل: أحد آخر الكروت المجربة هو الصحيح.",
     retry_now: "↻ أعد المحاولة الآن",
     retry_after_wait: "⏳ أعد المحاولة بعد ٤٥ ثانية",
     block_wait: "الراوتر حجبنا بعد بطاقات التجربة - انتظار",
@@ -343,6 +346,9 @@ const I18N = {
     block_but_form_present: "but the page still has the login form",
     probe_cards: "test cards",
     http_ok_word_ignored: "the page answers fine and mentions blocking, but it still offers the login form - treated as a login page",
+    internet_opened_title: "the internet opened during the run - one of these cards is the working one",
+    internet_opened_hint: "the router let us in but never answered with a clear success page, so the card could not be named from the reply alone. End the session and try these cards one by one in the login page - one of them opened the network. Newest last.",
+    stop_internet_opened: "stopped because the internet opened during the run: one of the last cards tried is the working one.",
     retry_now: "↻ Try again now",
     retry_after_wait: "⏳ Try again after 45 seconds",
     block_wait: "the router locked us after the test cards - waiting",
@@ -1054,6 +1060,8 @@ function renderStatus(st, events) {
     else if (ev.kind === "review") renderReview(st.review || []);
     else if (ev.kind === "error") modal("Error", "<pre>" + esc(ev.data.message) + "</pre>");
     else if (ev.kind === "report") S.lastReport = ev.data.file;
+    else if (ev.kind === "internet_opened")
+      toast("\uD83C\uDF10 " + t("internet_opened_title"));
     else if (ev.kind === "block_wait") {
       S.retryWait = (ev.data || {}).seconds || 45;
       toast("⏳ " + t("block_wait") + " " + S.retryWait + "s");
@@ -1198,6 +1206,15 @@ function renderStop(st) {
     html += "<div class='ok' style='margin-top:6px'>" + t("hits_title") + ": " +
       st.hits.map((h) => "<b class='mono'>" + esc(h.card) + "</b> (" +
       esc(codeLabel(h.code)) + ")").join(", ") + "</div>";
+  }
+  /* the wall came down while we were guessing: one of these cards did it */
+  const opened = st.internet_opened;
+  if (opened && opened.suspects && opened.suspects.length) {
+    html += "<div class='warn' style='margin-top:8px;font-weight:600'>\u24d8 " +
+      esc(t("internet_opened_title")) + "</div>" +
+      "<div class='hint'>" + esc(t("internet_opened_hint")) + "</div>" +
+      "<div class='mono' style='margin-top:4px;word-break:break-all'>" +
+      opened.suspects.map((s) => esc(s.card)).join(" \u00b7 ") + "</div>";
   }
   const k = st.net_kinds || {};
   const parts = Object.entries(k).map(([kind, n]) => t("net_" + kind, kind) + " ×" + n);

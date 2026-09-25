@@ -142,6 +142,45 @@ stop=attempts_done  tried=100  counters={'REJECTED': 100}
 
 ---
 
+## الجولة الخامسة · «النت اشتغل بس ما قال لي في كرت صح» + «١٤ حظر»
+
+### 1. كرت صحيح والراوتر يرد «رفض»
+بعض الراوترات تُدخل الضيف فعلاً ثم ترد **بنفس صفحة الرفض**. فلا يوجد رد يُعلن النجاح،
+والتخمين يستمر بلا نتيجة. الحل: **الإنترنت نفسه لا يكذب**.
+
+* أثناء التشغيل يسأل الأداة كل ٣ ثوان: «هل ما زلنا خلف الجدار؟» (`WATCH_EVERY_SECONDS`).
+* إذا تحوّل الجواب إلى «متصل» ⇒ **أحد الكروت التي أُرسلت للتو هو الصحيح**: يوقف التشغيل
+  بسبب `internet_opened` ويعرض قائمة **المشتبهين** (كل كرت أُرسل منذ آخر فحص، مع الوقت)،
+  ويحفظها في التقرير (`internet_opened.suspects`).
+* البطاقة في الصفحة: **«الإنترنت فتح أثناء التشغيل - أحد هذه الكروت هو الصحيح»** +
+  الكروت + شرح: أوقف الجلسة وجرّبها واحداً واحداً.
+
+دليل حيّ على بوابة «نجاح مخفي» (تفتح النت وترد `invalid username or password`):
+```
+stop_reason : internet_opened
+attempts    : 5  counters: {'REJECTED': 5}   hits: []   ← لم يُعرف من الرد
+suspects    : ['020124042', '020124052', '020124062', '020124072']
+                    ↑ هو الصحيح وهو أول المشتبهين
+```
+> تنبيه مهم: «النت اشتغل» **ليس دائماً** دليلاً على كرت صحيح (بيانات الجوال، جلسة قديمة،
+> راوتر يمنح فترة تجريبية). لذلك الأداة تسجّل حالة الإنترنت قبل التشغيل، وإن كنت متصلاً
+> أصلاً فهي تقول ذلك صراحة (`internet_online_verification_limited`) ولا تدّعي تحققاً.
+
+للتدرّب: `MockPortal(..., hide_success=True)` (أضفته للبوابة التجريبية) = راوتر يدخلك ويرد رفضاً.
+
+### 2. أربعة عشر حظراً ثم إيقاف
+| المشكلة | الإصلاح |
+|---|---|
+| الكرت الذي يرد الراوتر عليه بصفحة حظر يُحسب «مُجرَّباً» ويُحسب ضمن التغطية - أي يُستبعد لاحقاً وهو **لم يُختبر أصلاً** | صفحة الحظر/التقييد ليست إجابة: الكرت لا يُحسب لا في `covered` ولا في موضع المتابعة، فيُعاد تجريبه لاحقاً |
+| التشغيل يستمر في الطرق بعد الحظر | عند ثالث رد حظر: **جلوس مرة واحدة** مدة الحظر (`KIRAPASS_BLOCK_WAIT`) ثم متابعة بمهلة ٣ ثوان |
+
+* نصيحة عملية من تجربتك: راوتر يحجب بعد محاولتين = **لا يوجد تخمين ممكن** عليه بأي سرعة؛
+  إما مهلة طويلة (٣٠–٦٠ ثانية) وخيط واحد، أو تعديل الإعداد من الراوتر نفسه إن كنت مديره.
+
+* اختبارات: `45/45` (+2 للمراقب والتغطية) و`14/14` في `--selftest`.
+
+---
+
 ## English (short)
 
 Real bugs fixed: the "continue where you stopped" feature never worked (the
@@ -199,3 +238,15 @@ it needs root, tears down the operator's own association (deauth + DHCP per
 attempt, so hundreds of attempts per minute become seconds each), and it
 circumvents a protection instead of testing with permission (43 tests,
 14/14 self-test).
+
+Fifth round - "the internet worked but it never told me a card was correct":
+some routers log the guest in and still answer with the rejection page, so no
+verdict ever looks like a hit. The tool now asks "are we still behind the
+wall?" every 3s while a run is going; when the answer flips to online it stops
+with stop_reason=internet_opened and lists every card sent since the previous
+check as suspects (also saved in the report). Rehearse it with
+MockPortal(..., hide_success=True). And a card the router answered with a block
+or rate-limit page is no longer counted as tested: it is excluded from the
+covered count and from the resume position, so it is retried instead of being
+skipped forever - which is what turned 14 bans into "covered" cards that were
+never really tried (45 tests, 14/14 self-test).

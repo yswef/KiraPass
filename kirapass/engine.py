@@ -596,6 +596,10 @@ class Engine:
         self._last_event_at = 0.0
         self._clean_streak = 0
         self._ban_count = 0
+        self._recent = deque(maxlen=config.WATCH_SUSPECTS)   # last cards tried
+        self._since_check = []      # cards sent since the last check
+        self._watch_thread = None
+        self._internet_opened = None   # set when the wall came down mid-run
         self._pause_until = 0.0     # "the router asked us to wait"
         self._banned_once = False   # we wait a lockout out exactly once
         self._rate_count = 0
@@ -646,6 +650,7 @@ class Engine:
                              "base_ms": self.throttle["base_ms"],
                              "reason": self.throttle["reason"]},
                 "calibration": self.calibration,
+                "internet_opened": self._internet_opened,
                 "diagnostics": self.diagnostics,
                 "verify_enabled": self.verify_enabled,
                 "seq": self.seq,
@@ -705,6 +710,10 @@ class Engine:
         self._ban_count = self._rate_count = self._unknown_saved = 0
         self._pause_until = 0.0
         self._banned_once = False
+        self._recent.clear()
+        self._since_check = []
+        self._internet_opened = None
+        self._unevaluated = 0       # cards the router refused to judge
         self._clean_streak = 0
         space = store.space_size(p)
         pos = max(0, int(p.get("space_pos", 0)))
@@ -771,6 +780,7 @@ class Engine:
             judge = cal.judge
             self.state = "running"
             self.emit("state", {"state": "running"})
+            self._start_watchdog()
 
             space = store.space_size(self.profile)
             start_pos = int(self.profile.get("space_pos", 0))
@@ -878,7 +888,11 @@ class Engine:
             # next time (counting it as "done" would skip it forever).
             with self.lock:
                 processed = sum(self.counters.values())
-            resume_pos = start_pos + processed
+                refused = self._unevaluated
+            # A card the router met with a block page or a rate-limit page was
+            # never judged, so it is not "done": put it back in the queue for
+            # the next run instead of skipping it forever.
+            resume_pos = max(start_pos, start_pos + processed - refused)
             if space:
                 passes, offset = divmod(resume_pos, space)
                 self.profile["space_pos"] = offset
@@ -979,6 +993,18 @@ class Engine:
         elif verdict.code == "CHALLENGE":
             self.stop("captcha_challenge")
 
+        with self.lock:
+            row = {"card": card, "code": verdict.code, "reason": verdict.reason,
+                   "time": time.strftime("%H:%M:%S")}
+            self._recent.append(row)
+            # every card sent since the last "still behind the wall?" check is
+            # a suspect; at 200 cards a second a fixed-size buffer would throw
+            # the working card away before we ever look at it
+            self._since_check.append(row)
+            if verdict.code in ("BANNED", "RATE_LIMITED"):
+                # the router refused to judge this card: it is not tested yet,
+                # so it must not be marked as covered
+                self._unevaluated += 1
         self._emit_attempt(card, resp, verdict, sent_index)
         self._maybe_decay_delay()
         self._check_stop_rules()
@@ -1127,6 +1153,54 @@ class Engine:
             self.throttle["reason"] = "recovering_speed" if new > base else ""
         self.emit("throttle", {"reason": "recovering_speed", "delay_ms": new})
 
+    # -- "did the wall come down?" -----------------------------------------
+    def _start_watchdog(self) -> None:
+        """Watch the internet while the run is going.
+
+        Some routers log the guest in and still answer with the rejection
+        page, so a hit can slip past the judge entirely.  The internet itself
+        cannot lie: when it opens mid-run, one of the cards we just sent did
+        it, and those cards are handed to the user as suspects.
+        """
+        if not (config.WATCH_INTERNET and self.verify_enabled):
+            return
+        if (self._internet_before or {}).get("state") != "WALLED":
+            return          # already online (or offline): proves nothing
+        checks = self.checks
+
+        def watch():
+            sess = new_session()
+            try:
+                while not self.stop_event.wait(config.WATCH_EVERY_SECONDS):
+                    try:
+                        state = verify.probe_internet(sess, checks=checks)["state"]
+                    except Exception:                       # noqa: BLE001
+                        continue
+                    with self.lock:
+                        if state == "ONLINE":
+                            suspects = list(self._since_check)
+                        else:
+                            suspects = None
+                            self._since_check = []   # none of these did it
+                    if suspects is not None and not self._internet_opened:
+                        with self.lock:
+                            self._internet_opened = {
+                                "at": time.strftime("%H:%M:%S"),
+                                "suspects": suspects,
+                            }
+                        self.emit("internet_opened",
+                                  {"at": self._internet_opened["at"],
+                                   "suspects": suspects,
+                                   "count": len(suspects)})
+                        self.stop("internet_opened")
+                        return
+            finally:
+                sess.close()
+
+        self._watch_thread = threading.Thread(
+            target=watch, daemon=True, name="kirapass-watchdog")
+        self._watch_thread.start()
+
     def _wait_pause(self) -> None:
         """Sit still while the router's lockout runs out."""
         while not self.stop_event.is_set():
@@ -1184,6 +1258,7 @@ class Engine:
             "latency": status["latency"],
             "throttle_events": self.throttle["events"],
             "calibration": self.calibration,
+            "internet_opened": self._internet_opened,
             "review_files": [r.get("file") for r in self.review],
             "profile_snapshot": {k: v for k, v in self.profile.items()},
         }

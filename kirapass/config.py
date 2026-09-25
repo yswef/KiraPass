@@ -177,6 +177,15 @@ BLOCK_WAIT_SECONDS = max(0, int(os.environ.get("KIRAPASS_BLOCK_WAIT", "45")))
 # ... and after sitting one out we keep going at this pace, not faster.
 BAN_COOLDOWN_MS = 3000
 
+# Some routers log the guest in and STILL answer with the rejection page.  The
+# only honest signal then is the internet itself: while the run is going we ask
+# "are we still behind the wall?" every few seconds.  When the answer flips to
+# "online", one of the cards we just sent did it - those cards are the suspects
+# we hand the user, instead of losing them.
+WATCH_INTERNET = True
+WATCH_EVERY_SECONDS = 3.0
+WATCH_SUSPECTS = 40
+
 # Hosts we treat as "inside the portal" (so a redirect to them is not an exit).
 PORTAL_HINT_WORDS = ("login", "hotspot", "portal", "welcome", "splash", "auth")
 

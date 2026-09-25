@@ -61,7 +61,7 @@ class PortalState:
                  dynamic=True, ban_after=0, ban_seconds=0,
                  rate_limit_after=0, drop_every=0,
                  drop_after=0, chap=False, prefix="02", length=6,
-                 error_text=None):
+                 error_text=None, hide_success=False):
         self.valid_cards = set(valid_cards)
         self.pass_mode = pass_mode          # same | empty | chap
         self.method = method
@@ -69,6 +69,10 @@ class PortalState:
         self.ban_after = ban_after          # 0 = never
         self.ban_seconds = ban_seconds      # 0 = the ban never expires
         self.banned_at = 0.0
+        # hide_success: the card really logs the guest in, but the router still
+        # answers with the rejection page - the nastiest real case, and the one
+        # only the "did the internet open?" watchdog can catch
+        self.hide_success = hide_success
         self.rate_limit_after = rate_limit_after
         self.drop_every = drop_every
         self.drop_after = drop_after      # drop EVERY request after this many
@@ -82,6 +86,7 @@ class PortalState:
         self.logins = 0
         self.failures = 0
         self.bans = 0
+        self.hidden_successes = 0
         self.rate_hits = 0
         self.online_ips = set()
         self.asked_cards = []
@@ -218,6 +223,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if self._is_valid(card, password):
             with st.lock:
                 st.online_ips.add(self.client_address[0])
+            if st.hide_success:
+                # logged in, but the reply is word for word a rejection page
+                st.bump("hidden_successes")
+                return self._login_page(base, fields, error=True)
             return self._reply(302, "", {
                 "Location": "http://connectivitycheck.gstatic.com/generate_204"})
 
