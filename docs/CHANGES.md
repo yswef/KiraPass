@@ -181,6 +181,43 @@ suspects    : ['020124042', '020124052', '020124062', '020124072']
 
 ---
 
+## الجولة السادسة · «كل طلب من IP/متصفح مختلف؟» + «قِس حدّ الحظر»
+
+### هل فكرة «طلب لكل IP/متصفح» تنجح؟ لا — وسببها فيزياء الشبكة
+
+| الفكرة | لماذا لا تنجح |
+|---|---|
+| **تغيير IP المصدر في كل طلب** | عنوان المصدر يحدّده الراوتر (DHCP). إن زوّرته: الراوتر يرد على ذلك العنوان فيسأل عنه بـ ARP ولا أحد يجيب، والواي فاي في وضع «عميل» يمرّر إطارات MAC جهازك فقط ⇒ **الرد لا يعود أبداً** ⇒ لا TCP ولا HTTP ⇒ **صفر محاولات** |
+| **«متصفح مختلف» / User-Agent / كوكيز** | الراوتر يحجب على **MAC + IP** (طبقة ٢ و٣)؛ المتصفح لا يراه أصلاً ولا يهمّه. تغييره تجميل لا أكثر |
+| **بروكسي/VPN متعدد المخارج** | الطلب يخرج من خارج شبكة البوابة، فالراوتر لا يراه ولا يصادق جهازك، والضيف الذي يُفتح له هو IP البروكسي لا أنت |
+| **تغيير MAC (الطريقة الوحيدة التي تغيّر الهوية فعلاً)** | تعمل تقنياً، لكن كل دورة = فصل ارتباط + إعادة ربط + DHCP = **ثوانٍ**؛ فبدل ٢٠٠ محاولة/دقيقة تصير محاولة كل ٥ ثوان = **أبطأ من التباطؤ**. وتحتاج root، وتقطع شبكتك، ويسجّلها الراوتر كإنذار MAC flooding، وهي تهرّب من حماية |
+
+> الخلاصة: المحاولة تحتاج **عشرات المحاولات على نفس الهوية** لا هوية لكل محاولة.
+> التبديل يكثر الهويات لا المحاولات المفيدة، وبسرعة أقل بكثير.
+
+### البديل المطبّق: **قِس الحظر بدل كسره**
+زر جديد **«قِس حدّ الحظر»** (`POST /api/lockout` → `engine.probe_lockout`):
+
+1. يرسل كروتاً خاطئة **واحدة واحدة وبهوادة** حتى يرفضها الراوتر ⇒ `ban_after` = كم محاولة يسامحها.
+2. ينتظر ويسأل كل ١٠ ثوان (بصفحة الدخول **وبكرت تجربة**، لأن بعض الراوترات تُظهر الحظر عند المحاولة فقط) حتى يرجع ⇒ `clears_after` = كم يطول الحظر.
+3. يحسب **أسرع وتيرة آمنة**: `clears_after ÷ ban_after` ⇒ «محاولة كل ٣٫٣ ثانية».
+
+مثال حيّ (بوابة مضبوطة على: حظر بعد ٣، يزول بعد ٨ ثوان):
+```
+ban_after   : 3        ← طابق إعداد الراوتر بالضبط
+clears_after: 10 ثانية
+safe_delay  : 3333 ms  ← «محاولة كل ٣٫٣ ثانية»
+```
+وإن كان الراوتر لا يفك الحظر أصلاً ⇒ يقولها صراحة: «لا يمكن التخمين على هذا الراوتر
+دون حظر متكرر: إما مهلة طويلة جداً، أو تعديل الإعداد من الراوتر نفسه».
+
+هذه نتيجة اختبار مشروعة تكتبها في تقريرك: «البوابة تقفل بعد N محاولة وتفتح بعد M ثانية»
+(أو: «لا تقفل أبداً» — وهي ملاحظة أمنية بحد ذاتها).
+
+* اختبارات: `48/48` (+3 للقياس) و`14/14` في `--selftest`.
+
+---
+
 ## English (short)
 
 Real bugs fixed: the "continue where you stopped" feature never worked (the
@@ -250,3 +287,18 @@ or rate-limit page is no longer counted as tested: it is excluded from the
 covered count and from the resume position, so it is retried instead of being
 skipped forever - which is what turned 14 bans into "covered" cards that were
 never really tried (45 tests, 14/14 self-test).
+
+Sixth round - "can each request come from a different IP/browser?": no, and
+not for policy reasons. A spoofed source IP never gets an answer (the router
+ARPs for it, and a Wi-Fi client may only send frames from its own MAC), so
+TCP never completes; the router blocks on MAC+IP at layers 2-3 and never sees
+a User-Agent; a proxy pool puts the traffic outside the portal so your device
+is never authenticated; and MAC rotation - the only thing that really changes
+identity - costs seconds per cycle (disassociate + DHCP) and needs root, which
+is slower than simply backing off. What is added instead is a "measure the
+lock-out" button (engine.probe_lockout, POST /api/lockout): it sends wrong
+cards one at a time until the router refuses, then watches when the door opens
+again (checking with a real trial card too, since some routers only show the
+block page on a login attempt) and reports ban_after, clears_after and the
+fastest pace that stays under the limit - or states plainly that guessing on
+this router is not possible (48 tests, 14/14 self-test).
