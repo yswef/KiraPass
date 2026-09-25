@@ -1,0 +1,86 @@
+Config({
+    "network-name": "شبكة وي ماكس اللاسلكية",
+    "service-number": "770788458",
+    "popup-adv-time": 5,
+    "popup-adv-img-type": true,
+    "popup-adv-repeat-after": 120,
+    "login-type": "User",
+    "login-chap": 0,
+    "news-line": " مرحباً بكم على شبكة وي ماكس اللاسلكية لتغيير السرعات يرجى الدخول الى المتصفح وكتابة y.net ",
+    "input-type": "tel",
+    "input-autocomplete": "on",
+    "speed-trychange": 100 ,//عدد مرات هلاح التغيير
+    "speed-trychange-timeout": 1 ,// مدة فترة  حضر التغيير بالدقائق
+    "input-rm-white-spaces": 0,
+    "input-to-lower": 0,
+    "input-to-upper": 0,
+    "input-to-arabic-numbers": 1,
+    "input-only-numbers": 0,
+    "input-no-numbers": 0,
+    "input-only-alphanumeric": 0,
+    "input-to-tel-type-when": 0,
+    "enable-hot-cookie": 1,
+    "enable-hot-blocker": 1,
+    "clear-router-cookie": 1,
+    "clear-hot-cookie": 1,
+    "block-time": 1,
+    "try-count": 20,
+    "warn-when": 10,
+    "warn-message": "تحذير !! عدد محاولاتك الخاطئة اصبح {{tryCounter}} محاولات, عدد المحاولات المسموح بها هي {{tryCount}} محاولات فقط, عدد محاولاتك المتبقية {{restTryCount}} محاولات, سيتم حظرك لمدة {{blockTime}} دقائق اذا تجاوزت العدد المسموح للمحاولات",
+    "price-button": true,
+    "sell-point-button": true,
+    "app-store-status-button": false,
+    "show-date-field": false,
+    "loan-button": true,
+    "login-speeds-mode": true,
+    "redirect-to-esterahah": "http://30.30.30.30:8096",
+    "redirect-to-mobasher": "http://30.30.30.30:8080/tv/",
+    "app-store-base-url": "",
+    "app-store-base-url-ext": "",
+   "profiles": [
+       		   {
+            "price": "100 ريال",
+            "time": "4 ساعات",
+            "transfer": "350 ميجا بايت",
+            "validity": "4 ايام",
+        },
+        {
+            "price": "200 ريال",
+            "time": "10 ساعة",
+            "transfer": "750 ميجا بايت",
+            "validity": "10 أيام",
+        },
+		  {
+            "price": "500 ريال",
+            "time": "25 ساعة",
+            "transfer": "2000 ميجا بايت",
+            "validity": "25 أيام",
+        },
+		 
+		
+	
+        
+    ],
+    "sell-points": [
+        { "name": "جميع البقالات الموجودة في اماكن التغطية   " },
+        { "name": "  جديد  " },
+        { "name": "  جديد  " },
+        { "name": "  جديد  " },
+        { "name": "  جديد  " },
+        { "name": "  جديد  " },
+        { "name": "  جديد  " },
+        { "name": "  جديد  " },
+        
+    ]
+})
+
+
+
+
+
+
+
+
+
+
+

@@ -85,7 +85,7 @@ input[type=checkbox]{width:20px;height:20px;accent-color:var(--acc);flex:0 0 aut
 .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
   padding:12px 14px;margin:10px 0;font-size:.88rem}
 .card.muted{color:var(--dim)}
-.card.hidden,.hidden{display:none}
+.card.hidden,.hidden{display:none!important}
 .card h4{margin:.1rem 0 .5rem;font-size:.92rem;color:var(--acc)}
 .kv{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;font-size:.85rem}
 .kv dt{color:var(--dim)}

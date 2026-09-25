@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<!--url=(0070)http://t.com/login?dst=http%3A%2F%2Fwww.msftconnecttest.com%2Fredirect -->
+<html lang="ar" crxlauncher-bridged="" crxlauncher=""><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    
+	<meta name="theme-color" content="#000010">
+    <meta http-equiv="pragma" content="no-cache">
+    <meta http-equiv="expires" content="-1">
+	<link rel="icon" href="http://t.com/1.ico" type="image/x-icon">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>شبكة تواصل نت</title>
+    <link rel="stylesheet" href="./شبكة تواصل نت_files/style.css">
+
+
+<style></style></head>
+<body onload="checkCookie()">
+    <form name="sendin" action="http://t.com/login" method="post" style="display:none">
+        <input type="hidden" name="username">
+        <input type="hidden" name="password">
+        <input type="hidden" name="dst" value="http://www.msftconnecttest.com/redirect">
+        <input type="hidden" name="popup" value="true">
+		<input type="hidden" name="speed" value="false">
+    </form>
+
+    <script src="./شبكة تواصل نت_files/md5.js.download"></script>
+ <script>
+function setCookie(cname,cvalue,exdays) {
+    var d = new Date();
+    d.setTime(d.getTime() + (exdays*1*1000));
+    var expires = "expires=" + d.toGMTString();
+	<!-- alert("محاولة الدخول " + cvalue ); -->
+    document.cookie = cname + "=" + cvalue + ";" + expires + ";path=/";
+}
+function getCookie(cname) {
+    var name = cname + "=";
+    var decodedCookie = decodeURIComponent(document.cookie);
+    var ca = decodedCookie.split(';');
+    for(var i = 0; i < ca.length; i++) {
+        var c = ca[i];
+        while (c.charAt(0) == ' ') {
+            c = c.substring(1);
+        }
+        if (c.indexOf(name) == 0) {
+            return c.substring(name.length, c.length);
+        }
+    }
+    return "";
+}
+function checkCookie() {
+    var user=getCookie("username");
+        if (user >= 1000) {
+        window.location = "blocked.html";
+    } else {
+	var counts;
+	counts=Number(user);
+	setCookie("username", counts+1, 30);
+    }
+}
+</script>
+	<script type="text/javascript" language="javascript">
+	function rem(){
+	var uname = document.getElementById('uname').value;
+        var passw = document.getElementById('passw').value = "";
+    var rem   = document.getElementById('remember').checked;
+	if(rem == true){
+    var date = new Date();
+    date.setTime(date.getTime()+(5*1000));
+    var expires = date.toGMTString();
+    date.setTime(date.getTime()+(259200*1000));
+    var expire  = date.toGMTString();
+    document.cookie = 'uname='+uname+';expires='+expire+'';
+    document.cookie = 'passw='+passw+';expires='+expire+'';
+    document.cookie = 'error=1;expires='+expires+'';
+    }
+    else{
+    return;
+    }
+	}
+	function getCookie2(){
+	var date = new Date();
+    date.setTime(date.getTime()+(5*1000));
+    var expires = date.toGMTString();
+    var SP = document.cookie.split(';');
+    for (i=0; i < SP.length; i++) {
+    name_value = SP[i];
+    str = name_value.substring(0,6);
+    if(str.indexOf("uname") !== -1){
+    uname = name_value.split('=');
+    uname = uname[1];
+    }
+    if(str.indexOf("passw") !== -1){
+    passw = name_value.split('=');
+    passw = passw[1];
+    }
+    if(str.indexOf("error") !== -1){
+    return;
+    }
+    }
+    if(uname != ""){
+    document.cookie = 'error=1;expires='+expires+'';
+    window.location.href='login?username='+uname+'&password='+passw+'';
+    }
+    }
+   getCookie2();
+</script>
+    <div class="ie-fixMinHeight">
+        <div class="main">
+            <div class="wrap animated fadeIn">
+                <form name="login" action="http://t.com/login" method="post" onsubmit="return doLogin()">
+                    <input type="hidden" name="dst" value="http://www.msftconnecttest.com/redirect">
+                    <input type="hidden" name="popup" value="true">
+					    <marquee id="marquee" onmouseout="this.start()" align="center" truespeed="" nowrap="" onmouseover="this.stop()" scrolldelay="60" valign="middle" loop="INFINITE" dir="ltr" direction="right" scrollamount="3"><i style="color: #fff;"> 
+						مرحبا بكم في شبكة تواصل نت
+
+</i> </marquee>
+
+		<h1>شبكة تواصل اللاسلكية</h1>
+
+
+<br>
+
+
+<br>
+		 
+
+<p class="info ">
+
+</p>
+<center>
+<select id="speed" name="speed">
+<option value="55987b0d-ca6d-464f-93c8-db9ac4a08000">سرعة نص ميجا</option>
+<option value="55987b0d-ca6d-464f-93c8-db9ac4a08888" selected="">سرعة 1 ميجا</option>
+<option value="55987b0d-ca6d-464f-93c8-db9ac4a08111">سرعة 2 ميجا</option>
+<option value="55987b0d-ca6d-464f-93c8-db9ac4a08222">سرعة 4 ميجا</option>
+ </select></center>
+
+
+                    <label>
+                        <img class="ico" src="./شبكة تواصل نت_files/user.svg" alt="#">
+                        <input name="username" id="uname" type="tel" value="" placeholder="رقم الكرت" required="">
+						<input checked="" id="remember" type="checkbox" name="remember">  
+                    </label>
+                    <label>
+                        <img class="ico" src="./شبكة تواصل نت_files/password.svg" alt="#">
+                        <input id="passw" name="password" type="hidden" placeholder="كلمة المرور">
+                    </label>
+
+                    <input type="submit" onclick="return rem();" value="تسجيل الدخول">
+
+
+<script type="text/javascript">
+loadpage(pagetype);
+</script>
+<br>
+
+
+<br>
+	
+ </form>
+<br><br>
+
+	<a href="http://t.com/stor.html"><button type="button" style="width: 100%; background-color: #ffc107; border: 1px solid white; border-radius: 6px; padding: 10px 20px; font-size: 14px;" class="form-control display-7" id="username-form3-m">
+نقاط البيع 
+</button></a>	<br>
+	<a href="http://t.com/prices.html"><button type="button" style="width: 100%; background-color: #ffc107; border: 1px solid white; border-radius: 6px; padding: 10px 20px; font-size: 14px;" class="form-control display-7" id="username-form3-m">
+اسعار الكروت
+</button></a>		
+<a style="display:none;" href="http://t.com/2.jpg"><button type="button" style="width: 100%; background-color: #92d097; border: 1px solid white; border-radius: 6px; padding: 10px 20px; font-size: 14px;" class="form-control display-7" id="username-form3-m">
+الباقات ونقاط البيع
+</button></a>
+
+
+<center><a style="color: #f2f2f2;text-decoration:none" href="http://t.com/w.net"><font size="2"></font></a></center>
+		<center><a style="color: #f2f2f2;text-decoration:none" href="http://t.com/777730080-777570757"><font size="2"></font></a></center>
+
+
+ 
+				 <br><br>
+            </div>
+        </div>
+    </div>
+
+
+
+</body></html>
