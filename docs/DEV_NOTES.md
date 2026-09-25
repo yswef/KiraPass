@@ -14,7 +14,7 @@ kirapass/
   engine.py                 calibration, threaded run, verdict accounting
   store.py                  profiles (+migration), reports, cache clearing
   mockportal.py             local mock router used by the self-test
-  selftest.py               13 end-to-end scenarios
+  selftest.py               14 end-to-end scenarios
   cli.py, __main__.py       command line entry points
   web/server.py             JSON API + static assets (ThreadingHTTPServer)
   web/ui.html|ui.js|ui.css  the whole UI (no build step, no CDN)
@@ -33,7 +33,13 @@ tests/test_kirapass.py      unittest wrapper (scenarios + units)
    hung the old design), and whatever is dropped is counted as `dropped`.
 3. **The rejection baseline is learned, not assumed**, using format-valid
    probe cards, and it is compared with learned value/pattern masking plus a
-   structural similarity fallback.
+   structural similarity fallback. A profile that cannot produce a single card
+   is refused with a reason instead of calibrating against an empty baseline.
+3b. **A run resumes, it does not repeat.** `space_pos` + the shuffled walk
+   (`walk_a`/`walk_b`) live in the profile; the page sends them back with every
+   start, and the next run continues where the previous one stopped. The engine
+   emits a `resume` event, and `resume=False` starts a fresh pass with a new
+   walk.
 4. **Actions are isolated per thread**: one `Session` (connection + cookies)
    per worker, throw-away sessions for diagnostics.
 5. **Reasons are machine keys** (`same_as_rejection_page_exact`,
@@ -46,8 +52,8 @@ tests/test_kirapass.py      unittest wrapper (scenarios + units)
 ## Tests
 
 ```bash
-python3 -m unittest discover -s tests -v     # 26 tests
-python3 KiraPass.py --selftest               # the 13 scenarios, readable output
+python3 -m unittest discover -s tests -v     # 36 tests
+python3 KiraPass.py --selftest               # the 14 scenarios, readable output
 python3 -m kirapass.selftest --keep          # keep the test data folder
 ```
 
@@ -58,8 +64,12 @@ reports; `--keep` leaves the folder behind and prints where it is.
 The scenarios cover: format math/validation, legacy profile migration,
 calibration with dynamic tokens, 50 wrong cards never reported as hits, finding
 and verifying a real card, router ban, 429 rate limiting, dropped connections,
-a dead target, MikroTik chap, a GET portal, diagnostics on a dead target, cache
-clearing.
+a dead target, MikroTik chap, a GET portal, diagnostics on a dead target,
+**a second run continuing where the first one stopped**, cache clearing.
+
+What changed in this revision - and why - is written down in
+[docs/CHANGES.md](CHANGES.md) (bugs found by reading the code file by file,
+each one with the test that now covers it).
 
 Everything runs against `mockportal.MockPortal` on 127.0.0.1, so tests never
 touch a real network.
@@ -79,6 +89,11 @@ touch a real network.
 | POST | `/api/diagnose` | background job: reachability, latency, ban check |
 | POST | `/api/run/start`, `/api/run/stop` | start/stop a run |
 | POST | `/api/cache/clear`, `/api/settings`, `/api/profiles/*` | housekeeping |
+| POST | `/api/quit` | shut the tool down (phone users have no Ctrl+C) |
+
+`/api/run/start` accepts `resume` (default true): when the profile carries
+`space_pos`/`walk_a`/`walk_b` the run continues from there; with `resume`
+false the space is restarted from the beginning with a fresh walk.
 
 `/api/run/status` returns `{ok, status, events}`; every attempt event carries
 `{card, code, reason, ...}`, and `status.reason_counts` is the histogram of why

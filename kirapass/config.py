@@ -167,6 +167,11 @@ ACCEPT_WORDS = (
 # Hosts we treat as "inside the portal" (so a redirect to them is not an exit).
 PORTAL_HINT_WORDS = ("login", "hotspot", "portal", "welcome", "splash", "auth")
 
+# A redirect carrying one of these in the URL is still the portal - it is not
+# proof that the guest got out (some routers bounce you between their own
+# pages: /login -> /status -> /login, and every bounce used to look like a hit).
+PORTAL_URL_WORDS = ("login", "hotspot", "portal", "splash", "auth", "captive")
+
 DEFAULT_PREFIX = ""
 
 # Sampling used when the tool has to talk about the space size.

@@ -66,12 +66,17 @@ _RUN_ID = [0]
 
 
 def run_engine(profile: dict, attempts: int, threads: int = 3,
-               timeout: float = 90.0, checks=None, **kw):
-    """Fresh, throw-away run: no resume state, nothing saved on disk."""
+               timeout: float = 90.0, checks=None, reset: bool = True, **kw):
+    """Fresh, throw-away run: no resume state, nothing saved on disk.
+
+    `reset=False` keeps `space_pos`/`walk_*` - that is how the "continue where
+    you stopped" path is tested (the UI sends them back with the profile).
+    """
     _RUN_ID[0] += 1
     profile = dict(profile)
-    profile.update({"name": f"selftest-{_RUN_ID[0]}", "space_pos": 0,
-                    "walk_a": 0, "walk_b": 0})
+    profile.update({"name": f"selftest-{_RUN_ID[0]}"})
+    if reset:
+        profile.update({"space_pos": 0, "walk_a": 0, "walk_b": 0})
     eng = engine.Engine(store.Store(), persist=False, checks=checks)
     res = eng.start(profile, attempts=attempts, threads=threads, **kw)
     if not res.get("ok"):
@@ -256,7 +261,9 @@ def t_get_portal():
         hits = st.get("hits", [])
         ok = bool(hits) and hits[0]["card"] == "0242"
         return Result("get_style_portal_is_supported", ok,
-                      f"method={(info.get('form') or {}).get('method')} hits={hits}")
+                      f"method={(info.get('form') or {}).get('method')} hits={hits} "
+                      f"stop={st.get('stop_reason')} counters={st.get('counters')} "
+                      f"net={st.get('net_kinds')}")
 
 
 def t_legacy_profile():
@@ -285,6 +292,31 @@ def t_diagnose_dead_target():
     ok = bool(step) and not step["ok"] and step["reason"].startswith("net_")
     return Result("diagnose_explains_a_dead_target", ok,
                   f"reason={step['reason'] if step else '-'}")
+
+
+def t_resume_continues():
+    """A second run must continue - not repeat the cards of the first one.
+
+    The run position lives in the profile (`space_pos` + the shuffled walk).
+    The page sends it back with the profile, so the next run starts where the
+    previous one stopped; this scenario is that promise, tested.
+    """
+    with MockPortal(valid_cards={"9999"}, pass_mode="empty") as portal:
+        info = scan(portal.url)
+        p = make_profile(portal.url, prefix="03", length=4, portal_info=info)
+        _st1, eng1 = run_engine(p, attempts=20, threads=2,
+                                checks=mock_checks(portal))
+        resumed = dict(eng1.profile)      # exactly what the page sends back
+        st2, eng2 = run_engine(resumed, attempts=20, threads=2,
+                               checks=mock_checks(portal), reset=False)
+        pos1 = int(eng1.profile.get("space_pos", 0))
+        pos2 = int(eng2.profile.get("space_pos", 0))
+        same_walk = (eng1.profile.get("walk_a") == eng2.profile.get("walk_a")
+                     and eng1.profile.get("walk_b") == eng2.profile.get("walk_b"))
+        ok = pos1 == 20 and pos2 == 40 and same_walk
+        return Result("a_second_run_continues_where_the_first_stopped", ok,
+                      f"first_run_ended_at={pos1} second_run_ended_at={pos2} "
+                      f"same_walk={same_walk} counters={st2.get('counters')}")
 
 
 def t_cache_clear():
@@ -337,6 +369,7 @@ SCENARIOS = (
     t_chap_portal,
     t_get_portal,
     t_diagnose_dead_target,
+    t_resume_continues,
     t_cache_clear,
 )
 

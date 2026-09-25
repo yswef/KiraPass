@@ -205,7 +205,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if self._is_valid(card, password):
             with st.lock:
                 st.online_ips.add(self.client_address[0])
-            st.bump("logins")
             return self._reply(302, "", {
                 "Location": "http://connectivitycheck.gstatic.com/generate_204"})
 

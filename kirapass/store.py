@@ -216,6 +216,9 @@ def migrate(raw: dict) -> dict:
         "success_words": raw.get("success_signature") or raw.get("success_words") or [],
         "success_url_contains": raw.get("success_url_contains", "") or "",
         "space_pos": int(raw.get("space_pos", 0) or 0),
+        "space_pass": int(raw.get("space_pass", 0) or 0),
+        "walk_a": int(raw.get("walk_a", 0) or 0),
+        "walk_b": int(raw.get("walk_b", 0) or 0),
         "schema": SCHEMA,
     })
     if (raw.get("walk") or {}).get("pos"):
@@ -394,10 +397,17 @@ class Store:
                 self._profiles = {}
             except OSError:
                 pass
-        # python bytecode caches of the tool itself
+        # python bytecode caches of the tool itself (the two glob patterns
+        # overlap - without this set the same folder was counted twice and
+        # the "freed" number was a lie)
+        seen_paths = set()
         for pattern in ("**/__pycache__", "__pycache__"):
             for path in glob.glob(os.path.join(config.BASE_DIR, pattern),
                                   recursive=True):
+                key = os.path.normpath(path)
+                if key in seen_paths:
+                    continue
+                seen_paths.add(key)
                 size, _ = _dir_size(path)
                 shutil.rmtree(path, ignore_errors=True)
                 freed += size

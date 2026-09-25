@@ -158,6 +158,13 @@ class Session:
         self.stats = {"requests": 0, "retries": 0, "bytes": 0}
         self._ssl_ctx = None
 
+    def __enter__(self) -> "Session":
+        return self
+
+    def __exit__(self, *exc) -> bool:
+        self.close()
+        return False
+
     # -- connection -------------------------------------------------------
     def _ssl_context(self):
         if self._ssl_ctx is None:
@@ -269,7 +276,17 @@ class Session:
                 conn = self._connection(scheme, host, port)
                 if conn.sock is None:
                     conn.timeout = connect_to
-                    conn.connect()
+                    # Opening the socket is its own phase: if it times out we
+                    # must say "the router never answered the connection",
+                    # not "the router never answered the request".  (Without
+                    # this, python folds both into one TimeoutError and every
+                    # dead router looked like a slow one.)
+                    try:
+                        conn.connect()
+                    except (socket.timeout, TimeoutError) as exc:
+                        self.close()
+                        raise NetError("connect_timeout",
+                                       f"{type(exc).__name__}: {exc}", url)
                 conn.sock.settimeout(read_to)
                 start = time.time()
                 conn.request(method, path, body=body, headers=headers)
