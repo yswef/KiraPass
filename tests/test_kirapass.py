@@ -317,6 +317,66 @@ class BlockRecoveryTests(unittest.TestCase):
                                 for s in cal2.steps), cal2.steps)
 
 
+class BlockFalsePositiveTests(unittest.TestCase):
+    """A page that MENTIONS blocking is not the same as a block page.
+
+    Real login pages warn ("abuse is banned", "slow down") while still
+    offering the form.  The word alone used to stop every run before it
+    started - this is what "still blocked" reports were made of.
+    """
+
+    LOGIN_PAGE = ("<html><body><form method='post' action='/login'>"
+                  "<input name='username'><input name='password' type='password'>"
+                  "<input type='submit'></form>"
+                  "<p>note: abusing this network is banned</p></body></html>")
+    BLOCK_PAGE = ("<html><body><h1>you are blocked</h1>"
+                  "<p>too many attempts, try later</p></body></html>")
+
+    @staticmethod
+    def _session_with(page, status=200):
+        from unittest import mock
+        sess = mock.MagicMock()
+        sess.get.return_value = _FakeReply(page, status=status)
+        sess.request.return_value = _FakeReply(
+            "<html>invalid username or password</html>", status=200)
+        return mock.patch.object(engine, "new_session", return_value=sess), sess
+
+    def _profile(self):
+        p = selftest.make_profile("http://10.5.50.1/login", prefix="030124",
+                                  length=9, portal_info=None)
+        p["user_field"], p["pass_field"] = "username", "password"
+        p["method"] = "post"
+        return p
+
+    def test_a_login_page_that_warns_about_blocking_is_still_a_login_page(self):
+        patcher, sess = self._session_with(self.LOGIN_PAGE)
+        with patcher:
+            cal = engine.calibrate(self._profile(), checks=())
+        self.assertTrue(cal.ok, cal.as_dict())
+        reason = [s["reason"] for s in cal.steps
+                  if s["id"] == "reach_login_page"][0]
+        self.assertEqual(reason, "http_ok_word_ignored")
+        self.assertFalse(engine.block_caused_by_probes(cal))
+
+    def test_a_real_block_page_stops_before_any_card_is_wasted(self):
+        patcher, sess = self._session_with(self.BLOCK_PAGE)
+        with patcher:
+            cal = engine.calibrate(self._profile(), checks=())
+        self.assertFalse(cal.ok)
+        self.assertEqual(cal.error, "blocked_already")
+        self.assertEqual(sess.request.call_count, 0)   # no failed login added
+        self.assertTrue(any(s["reason"] == "blocked_before_probes"
+                            for s in cal.steps), cal.steps)
+        self.assertFalse(engine.block_caused_by_probes(cal))
+
+    def test_a_403_login_page_is_a_block_even_with_a_form(self):
+        patcher, sess = self._session_with(self.LOGIN_PAGE, status=403)
+        with patcher:
+            cal = engine.calibrate(self._profile(), checks=())
+        self.assertEqual(cal.error, "blocked_already")
+        self.assertEqual(sess.request.call_count, 0)
+
+
 class _FakeReply:
     def __init__(self, text, status=200, headers=None):
         self._text = text

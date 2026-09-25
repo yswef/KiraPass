@@ -94,6 +94,54 @@
 
 ---
 
+## الجولة الرابعة · «لازالت تنحظر» — كان تشخيصاً خاطئاً
+
+بطاقة التوقف التي أرسلتها كانت تقول:
+
+```
+✔ الوصول إلى صفحة الدخول: الصفحة ردت بشكل سليم
+✖ الوصول إلى صفحة الدخول: صفحة الحجب ظهرت قبل أن نجرّب أي بطاقة
+```
+
+سطران متناقضان لنفس الخطوة، وفيهما المشكلة كلها:
+
+| # | المشكلة | الإصلاح |
+|---|---|---|
+| 1 | **صفحة الدخول تُعتبر صفحة حجب لمجرّد أن نصها فيه كلمة حجب** («banned»/«محظور»/«slow down» في سطر تحذير أو Footer). الصفحة فيها نموذج الدخول وترد 200 — أي ليست صفحة حجب | «حجب» الآن = `403/429` **أو** (كلمة حجب **و** الصفحة بلا نموذج دخول). صفحة فيها النموذج تُقبل، ويُكتب سبب ذلك في الخطوة: `http_ok_word_ignored` مع الكلمة التي وُجدت |
+| 2 | نفس الخطوة تُعرض مرتين (✔ ثم ✖) | تُسجَّل مرة واحدة فقط |
+| 3 | لا يُعرض دليل الحكم | البطاقة تعرض الآن الكلمة المطابقة ورمز الحالة وعدد بطاقات التجربة: `«banned» · HTTP 403 · 3 بطاقات تجربة` |
+
+**دليل حيّ** على بوابة صفحتها فيها كلمة «banned» وفيها النموذج:
+```
+OK   reach_login_page -> http_ok_word_ignored {'word': 'banned'}
+stop=attempts_done  tried=100  counters={'REJECTED': 100}
+```
+قبل الإصلاح نفس الصفحة كانت تعطي `blocked_before_probes` و**صفر محاولة**.
+
+### والحظر إن كان حقيقياً: صبر بدل الطرق
+بدل أن يوقف التشغيل عند ثالث ردّ حظر، الأداة الآن **تجلس مدة الحظر مرة واحدة**
+(٤٥ ثانية، `KIRAPASS_BLOCK_WAIT`) ثم تكمل ببطء (مهلة ٣ ثوان بين المحاولات).
+إن عاد الحظر توقّف مع `banned_by_router` — لأن الراوتر يقول بوضوح: «أبطئ».
+
+### لماذا لا نغيّر MAC/IP في كل طلب؟
+طلبك كان «خليها تغيّر الـ MAC والـ IP في كل طلب». هذا غير مطبّق، وثلاثة أسباب:
+
+1. **غير ممكن بالمعدّل المطلوب**: تغيير الـ MAC يعني فصل الارتباط عن نقطة الوصول،
+   ثم إعادة الارتباط وطلب DHCP — ثوانٍ لكل محاولة، بينما التخمين يحتاج مئات
+   المحاولات في الدقيقة. وتغيير الـ IP يحتاج إعادة الاتصال نفسها.
+2. **يقطع شبكتك أنت**: كل تغيير يفصل جهازك عن الشبكة، وإن فشل DHCP تبقى خارجها.
+3. **هو تهرّب من حماية**: على شبكة تملكها الحل من داخل الراوتر نفسه (استثناء
+   جهازك / رفع حدّ المحاولات / تخفيف مهلة الدخول) لا من كسر الحماية؛ وعلى شبكة
+   لا تملكها فهو خارج نطاق الأداة (`AUTHORIZED_USE_LICENSE.md`).
+
+البديل اليدوي المشروع على جهازك أنت: **«عنوان MAC عشوائي/خاص»** في إعدادات الهاتف
+لهذه الشبكة (أندرويد: Private Wi-Fi address · iOS: Private Address) — تغيّره مرة
+واحدة وتكمل الاختبار، دون أن نبرمجه كتهرّب تلقائي داخل الأداة.
+
+* اختبارات: `43/43` (+3 للتشخيص الخاطئ) و`14/14` في `--selftest`.
+
+---
+
 ## English (short)
 
 Real bugs fixed: the "continue where you stopped" feature never worked (the
@@ -135,4 +183,19 @@ automatically - 45s (override with `KIRAPASS_BLOCK_WAIT=...`), then the
 learning is retried with two cards instead of three. The stop card offers
 "try again now" and "try again after 45s" buttons. The practice portal grew
 `--ban-seconds` so the whole cycle can be rehearsed locally (40 tests,
+14/14 self-test).
+
+Fourth round - "still blocked": the block was a misdiagnosis. A login page
+that merely MENTIONS blocking ("... is banned" in a footnote) while still
+offering the form was called a block page, which stopped every run with zero
+attempts - the page even printed the same step twice, once ok and once failed.
+A block is now 403/429, or a ban word on a page that has NO login form; the
+step is recorded once, and the card shows the evidence (matched word, status,
+number of test cards). When a block is real the run no longer dies at the third
+ban reply: it sits out the lockout once (45s, KIRAPASS_BLOCK_WAIT) and then
+continues at 3s per attempt instead of hammering a router that asked us to slow
+down. Automatic MAC/IP rotation per request is deliberately NOT implemented -
+it needs root, tears down the operator's own association (deauth + DHCP per
+attempt, so hundreds of attempts per minute become seconds each), and it
+circumvents a protection instead of testing with permission (43 tests,
 14/14 self-test).
