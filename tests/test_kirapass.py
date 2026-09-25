@@ -438,6 +438,55 @@ class InternetWatchdogTests(unittest.TestCase):
                              % (st["progress"], st["counters"]))
 
 
+class LockoutProbeTests(unittest.TestCase):
+    """Measure the protection instead of fighting it: how many failures does
+    this router forgive, and how long does the lockout last?
+    """
+
+    def test_it_measures_the_limit_and_the_recovery(self):
+        # blocks after 3 failures, clears after 2 seconds
+        with MockPortal(valid_cards={"020124999"}, pass_mode="empty",
+                        ban_after=3, ban_seconds=2) as portal:
+            info = selftest.scan(portal.url)
+            p = selftest.make_profile(portal.url, prefix="030124", length=9,
+                                      portal_info=info)
+            got = engine.probe_lockout(p, checks=selftest.mock_checks(portal),
+                                       max_failures=10, wait_limit=30,
+                                       step=1.0, pace=0.0)
+        self.assertTrue(got["ok"], got)
+        self.assertEqual(got["ban_after"], 3, got)
+        self.assertIsNotNone(got["clears_after"], got)
+        self.assertLessEqual(got["clears_after"], 10, got)
+        # 3 failures forgiven every couple of seconds -> about a second each
+        self.assertGreaterEqual(got["safe_delay_ms"], 1000, got)
+
+    def test_a_router_that_never_forgives_says_so(self):
+        with MockPortal(valid_cards={"020124999"}, pass_mode="empty",
+                        ban_after=2) as portal:
+            info = selftest.scan(portal.url)
+            p = selftest.make_profile(portal.url, prefix="030124", length=9,
+                                      portal_info=info)
+            got = engine.probe_lockout(p, checks=selftest.mock_checks(portal),
+                                       max_failures=6, wait_limit=4,
+                                       step=1.0, pace=0.0)
+        self.assertTrue(got["ok"], got)
+        self.assertEqual(got["ban_after"], 2, got)
+        self.assertIsNone(got["clears_after"], got)   # never cleared
+        self.assertIsNone(got["safe_delay_ms"], got)  # so: no safe pace
+
+    def test_a_router_that_never_blocks_is_reported_as_such(self):
+        with MockPortal(valid_cards={"020124999"}, pass_mode="empty") as portal:
+            info = selftest.scan(portal.url)
+            p = selftest.make_profile(portal.url, prefix="030124", length=9,
+                                      portal_info=info)
+            got = engine.probe_lockout(p, checks=selftest.mock_checks(portal),
+                                       max_failures=6, wait_limit=2,
+                                       step=1.0, pace=0.0)
+        self.assertTrue(got["ok"], got)
+        self.assertIsNone(got["ban_after"], got)
+        self.assertEqual(got["tried"], 6, got)
+
+
 class _FakeReply:
     def __init__(self, text, status=200, headers=None):
         self._text = text

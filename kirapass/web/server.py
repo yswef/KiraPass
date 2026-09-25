@@ -304,6 +304,15 @@ class Handler(BaseHTTPRequestHandler):
                              lambda: engine.calibrate(prof, known_card=known,
                                                       keyword=keyword).as_dict())
             return self._json({"ok": True, "job": job.as_dict()})
+        if route == "/api/lockout":
+            # "how much does this router forgive?" - measured, not bypassed
+            prof = store.migrate(data.get("profile") or {})
+            job = srv.submit("lockout",
+                             lambda: engine.probe_lockout(
+                                 prof,
+                                 max_failures=int(data.get("max_failures") or 30),
+                                 wait_limit=float(data.get("wait_limit") or 240)))
+            return self._json({"ok": True, "job": job.as_dict()})
         if route == "/api/run/start":
             prof = store.migrate(data.get("profile") or {})
             result = srv.engine.start(

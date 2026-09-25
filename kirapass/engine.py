@@ -1286,3 +1286,135 @@ def _retry_after(resp) -> int:
         return max(0, min(value, 30))
     except Exception:
         return 0
+
+
+# ---------------------------------------------------------------------------
+# how much does this router forgive?  (measure the protection, do not fight it)
+# ---------------------------------------------------------------------------
+def probe_lockout(profile: dict, checks=None, max_failures: int = 30,
+                  wait_limit: float = 240.0, step: float = 10.0,
+                  pace: float = 0.4, log=None) -> dict:
+    """How many failed logins does this router take before it locks us out,
+    and how long does the lockout last?
+
+    This is the honest answer to "the router keeps blocking me": instead of
+    trying to sneak past the protection we measure it, and the answer tells
+    the user the fastest pace that does not trip it - or that guessing on
+    this router is simply not possible.
+    """
+    p = store.migrate(profile)
+    say = log or (lambda *a, **k: None)
+    out = {"ok": False, "error": "", "tried": 0, "ban_after": None,
+           "clears_after": None, "safe_delay_ms": None, "steps": [],
+           "max_failures": int(max_failures), "waited": 0.0}
+
+    def step_row(step_id, ok, reason, detail=None):
+        out["steps"].append({"id": step_id, "ok": ok, "reason": reason,
+                             "detail": detail or {}})
+
+    if store.space_size(p) <= 0:
+        out["error"] = "card_space_empty"
+        step_row("profile_valid", False, "card_space_empty", {})
+        return out
+
+    session = new_session()
+    try:
+        try:
+            resp = session.get(p["login_url"], allow_redirects=True)
+        except Exception as exc:                        # noqa: BLE001
+            err = classify(exc, p["login_url"])
+            out["error"] = err.kind
+            step_row("reach_login_page", False, f"net_{err.kind}",
+                     {"text": err.text[:200]})
+            return out
+        p["login_url"] = resp.url or p["login_url"]
+
+        def blocked(r) -> tuple:
+            """(is it a block page, matched word)"""
+            word = find_phrase((r.text or "").lower(), config.BAN_WORDS)
+            form = bool(portals.parse_form(r.text or "", p["login_url"]).inputs)
+            if r.status in (403, 429):
+                return True, word or f"HTTP {r.status}"
+            if word and not form:
+                return True, word
+            return False, ""
+
+        is_block, word = blocked(resp)
+        if is_block:
+            out["error"] = "blocked_from_the_start"
+            step_row("reach_login_page", False, "blocked_from_the_start",
+                     {"status": resp.status, "word": word})
+            return out
+        step_row("reach_login_page", True, "http_ok", {"status": resp.status})
+
+        # --- 1. how many failures before it says no? ---------------------
+        space = store.space_size(p)
+        failures = 0
+        for i in range(int(max_failures)):
+            card = store.decode_card(p, i % space)
+            try:
+                r = send_login(session, p, card)
+            except Exception as exc:                    # noqa: BLE001
+                err = classify(exc, p["login_url"])
+                out["error"] = err.kind
+                step_row("failures", False, f"net_{err.kind}",
+                         {"text": err.text[:160], "failures": failures})
+                return out
+            failures += 1
+            is_block, word = blocked(r)
+            if is_block:
+                # the attempt that got the block page was not judged, so the
+                # number this router really forgives is one less
+                out["ban_after"] = max(0, failures - 1)
+                step_row("failures", True, "blocked_after",
+                         {"failures": failures, "forgiven": out["ban_after"],
+                          "status": r.status, "word": word})
+                break
+            time.sleep(pace)
+        out["tried"] = failures
+        if out["ban_after"] is None:
+            out["ok"] = True
+            step_row("failures", True, "never_blocked", {"failures": failures})
+            return out
+
+        # --- 2. and when does the door open again? -----------------------
+        started = time.time()
+        trial_i = int(max_failures)
+        while time.time() - started < wait_limit:
+            time.sleep(step)
+            try:
+                again = session.get(p["login_url"], allow_redirects=True)
+            except Exception:                           # noqa: BLE001
+                continue
+            is_block, word = blocked(again)
+            if not is_block:
+                # Some routers keep serving the login page and only show the
+                # block page when you actually try a card - so ask with one
+                # wrong card.  A reply we cannot read is not a lockout.
+                try:
+                    trial = send_login(session, p,
+                                       store.decode_card(p, trial_i % space))
+                except Exception:                       # noqa: BLE001
+                    continue
+                trial_i += 1
+                is_block, word = blocked(trial)
+            if not is_block:
+                out["clears_after"] = round(time.time() - started)
+                out["ok"] = True
+                step_row("recovery", True, "cleared",
+                         {"seconds": out["clears_after"], "trials": trial_i})
+                break
+        out["waited"] = round(time.time() - started)
+        if out["clears_after"] is None:
+            out["ok"] = True
+            step_row("recovery", False, "still_blocked",
+                     {"waited": out["waited"]})
+
+        # --- 3. the fastest pace that stays under the limit --------------
+        if out["clears_after"] and out["ban_after"]:
+            # ban_after failures are forgiven every clears_after seconds
+            out["safe_delay_ms"] = int(
+                max(1000.0, out["clears_after"] * 1000.0 / out["ban_after"]))
+        return out
+    finally:
+        session.close()

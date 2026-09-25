@@ -38,6 +38,18 @@ const I18N = {
     r_verify: "تأكيد الإنترنت بعد أي بطاقة مقبولة",
     r_autostop: "إيقاف تلقائي عند أول نتيجة قوية",
     r_resume: "المتابعة من حيث توقفت (بلا تكرار)",
+    btn_lockout: "قِس حدّ الحظر",
+    lockout_measuring: "جارٍ قياس حدّ الحظر (قد يستغرق دقائق)...",
+    lockout_after: "الراوتر يحجب بعد",
+    lockout_clears: "ويفكّ الحظر بعد",
+    lockout_never: "لم يحجبك الراوتر بعد",
+    lockout_never_clears: "ولم يفتح الحظر خلال الانتظار",
+    lockout_pace: "أسرع وتيرة آمنة: محاولة كل",
+    lockout_pace_hint: "ضع هذه المهلة في خانة «مهلة بين المحاولات» واستخدم خيطاً واحداً أو اثنين.",
+    lockout_impossible: "على هذا الراوتر لا يمكن التخمين دون حظر متكرر: إما مهلة طويلة جداً، أو تعديل الإعداد من الراوتر نفسه.",
+    seconds: "ثانية",
+    attempt: "محاولة",
+    netadvice_blocked_from_the_start: "الراوتر حاجب هذا الجهاز قبل أن نقيس: أعد الاتصال لتغيير الـ IP أو أعد تشغيل الراوتر، ثم قِس من جديد.",
     btn_diagnose: "تشخيص الشبكة أولاً",
     btn_clear_review: "مسح صفحات المراجعة",
     license_check: "أتعهّد بأنني أملك هذه الشبكة أو لدي إذن كتابي من صاحبها لاختبارها.",
@@ -270,6 +282,18 @@ const I18N = {
     r_verify: "Verify internet after any accepted card",
     r_autostop: "Auto-stop on the first strong result",
     r_resume: "Continue where you stopped (no repeats)",
+    btn_lockout: "measure the lock-out",
+    lockout_measuring: "measuring the lock-out (this can take minutes)...",
+    lockout_after: "the router blocks after",
+    lockout_clears: "and the block clears after",
+    lockout_never: "the router never blocked us in",
+    lockout_never_clears: "and the block never cleared while we waited",
+    lockout_pace: "fastest pace that stays under the limit: one attempt every",
+    lockout_pace_hint: "put that in the delay box and use one or two threads.",
+    lockout_impossible: "guessing on this router means getting blocked over and over: either a very long delay, or change the setting in the router itself.",
+    seconds: "seconds",
+    attempt: "attempt",
+    netadvice_blocked_from_the_start: "the router was already blocking this device: reconnect for a new IP or restart the router, then measure again.",
     btn_diagnose: "Diagnose the network first", btn_clear_review: "Clear review pages",
     license_check: "I confirm I own this network or hold written permission from its owner.",
     btn_start: "Start guessing", btn_stop: "Stop",
@@ -912,6 +936,61 @@ async function runDiagnose() {
   renderDiagnose(job, card);
 }
 
+async function runLockoutProbe() {
+  const btn = $("lockoutBtn"); btn.disabled = true;
+  const card = $("lockoutCard"); card.classList.remove("hidden");
+  card.innerHTML = "<h4>" + t("lockout_measuring") + "</h4>";
+  const res = await api("/api/lockout", { profile: profileFromForm(),
+                                          max_failures: 30, wait_limit: 240 });
+  if (!res.ok) {
+    card.innerHTML = "<div class='bad'>" + esc(res.error) + "</div>";
+    btn.disabled = false; return;
+  }
+  const job = await waitJob(res.job.id);
+  btn.disabled = false;
+  if (!job) return;
+  renderLockout(job, card);
+}
+
+function renderLockout(job, node) {
+  if (job.state === "error") {
+    node.innerHTML = "<div class='bad'>" + esc(job.error) + "</div>";
+    return;
+  }
+  const r = job.result || {};
+  let html = "<h4>" + t("btn_lockout") + "</h4>";
+  if (r.error) {
+    html += "<div class='bad mono'>" + esc(r.error) + "</div>" +
+            "<div class='warn'>" + esc(t("netadvice_" + r.error, "")) + "</div>";
+    node.innerHTML = html;
+    return;
+  }
+  if (r.ban_after == null) {
+    html += "<div class='ok'>" + t("lockout_never", "") + " " +
+            esc(String(r.tried || 0)) + "</div>";
+  } else {
+    html += "<div class='bad'>" + t("lockout_after") + ": <b>" + r.ban_after +
+            "</b></div>";
+    if (r.clears_after != null) {
+      html += "<div class='ok'>" + t("lockout_clears") + ": <b>" + r.clears_after +
+              "</b> " + t("seconds") + "</div>";
+    } else {
+      html += "<div class='bad'>" + t("lockout_never_clears") + " (" +
+              esc(String(r.waited || 0)) + " " + t("seconds") + ")</div>";
+    }
+  }
+  if (r.safe_delay_ms) {
+    html += "<div class='warn' style='margin-top:6px'>→ " + t("lockout_pace") +
+            ": <b>" + (r.safe_delay_ms / 1000).toFixed(1) + "</b> " + t("seconds") +
+            " / " + t("attempt") + "</div>" +
+            "<div class='hint'>" + t("lockout_pace_hint") + "</div>";
+  } else if (r.ban_after != null) {
+    html += "<div class='warn' style='margin-top:6px'>→ " +
+            t("lockout_impossible") + "</div>";
+  }
+  node.innerHTML = html;
+}
+
 function renderDiagnose(job, node) {
   if (job.state === "error") { node.innerHTML = "<div class='bad'>" + esc(job.error) + "</div>"; return; }
   const r = job.result || {};
@@ -1315,6 +1394,7 @@ function wire() {
   $("stopBtn").addEventListener("click", stopRun);
   $("calibrateBtn").addEventListener("click", runCalibration);
   $("diagnoseBtn").addEventListener("click", runDiagnose);
+  $("lockoutBtn").addEventListener("click", runLockoutProbe);
   $("saveProfileBtn").addEventListener("click", async () => {
     const r = await api("/api/profiles/save", { profile: profileFromForm() });
     toast(r.ok ? "💾 OK" : t("scan_fail"));
