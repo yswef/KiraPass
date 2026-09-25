@@ -95,6 +95,26 @@ const I18N = {
     resume_from: "متابعة من",
     server_gone_title: "الأداة توقفت",
     server_gone: "انقطع الاتصال بالأداة. إذا كنت أوقفتها فهذا طبيعي - شغّلها من جديد لتكمل.",
+    /* why nothing was tried: the initial learning failed */
+    cal_failed_title: "لم أبدأ التخمين: فشل التعلّم الأولي",
+    cal_failed_hint: "لم تُجرَ أي محاولة لأن الأداة لم تستطع تعلّم شكل صفحة الرفض. هذا ما فعله الراوتر:",
+    no_attempt_was_made: "المحاولات التي أُجريت فعلاً: صفر - لم يتم تخمين أي بطاقة.",
+    netadvice_refused: "تأكد أنك متصل بشبكة هذا الراوتر وأن الرابط صحيح (البورت مقفل أو الحماية رفضت جهازك).",
+    netadvice_dns: "اسم العنوان لم يُترجم: اكتب IP الراوتر بدل الاسم (مثل 10.5.50.1).",
+    netadvice_connect_timeout: "لا يوجد رد عند فتح الاتصال: الراوتر بعيد أو مزدحم، أو لست متصلاً بشبكته.",
+    netadvice_read_timeout: "الراوتر فتح الاتصال ولم يرد: انتظر قليلاً وقلّل عدد المسارات.",
+    netadvice_reset: "الراوتر قطع الاتصال فجأة: أعد الاتصال بالشبكة ثم أعد المحاولة.",
+    netadvice_stale: "اتصال قديم أُغلق من الراوتر: أعد المحاولة.",
+    netadvice_tls: "خطأ في شهادة TLS: جرّب http:// بدل https://",
+    netadvice_unreachable: "لست متصلاً بهذه الشبكة: اتصل بواي فاي الراوتر أولاً.",
+    netadvice_bad_response: "رد غير مفهوم من الراوتر: جرّب رابط صفحة الدخول الذي يظهر للضيف فعلاً.",
+    netadvice_too_many_redirects: "الراوتر يحوّل الطلب بلا نهاية: انسخ الرابط النهائي من المتصفح.",
+    netadvice_proto: "الرابط غير مدعوم: يجب أن يبدأ بـ http:// أو https://",
+    netadvice_unknown: "خطأ غير متوقع: أعد المحاولة، وإن تكرر شغّل «تشخيص الشبكة أولاً».",
+    netadvice_blocked_already: "الراوتر حاجب جهازك الآن: أعد تشغيل الراوتر أو أعد الاتصال لتغيير الـ IP، ثم ابدأ من جديد.",
+    netadvice_no_rejection_baseline: "لم يصل أي رد على بطاقات التجربة: تحقق من الاتصال بالشبكة.",
+    netadvice_card_space_empty: "صيغة البطاقة لا تترك شيئاً للتخمين: البادئة + اللاحقة أطول من طول الكرت، أو المحارف المتغيّرة قليلة جداً.",
+    netadvice_calibration_failed: "أصلح السبب أعلاه، ثم اضغط «ابدأ التخمين» من جديد.",
     /* verdicts */
     v_ACCEPTED_VERIFIED: "مقبولة ومؤكدة",
     v_ACCEPTED: "مقبولة",
@@ -111,6 +131,8 @@ const I18N = {
     r_same_as_rejection_page_shape: "نفس صفحة الرفض (مع اختلاف الرموز المؤقتة)",
     r_same_as_rejection_page_similar: "يشبه صفحة الرفض بشدة",
     r_same_as_rejection_page_empty: "رد فارغ مثل صفحة الرفض",
+    r_same_as_rejection_page_redirect: "نفس تحويل صفحة الرفض (نفس المكان)",
+    r_redirect_differs_from_rejection: "الراوتر حوّل هذه البطاقة إلى مكان غير مكان البطاقات المرفوضة",
     r_ban_page: "ظهرت صفحة حجب صريحة من الراوتر",
     r_http_403: "الراوتر يرفض الطلب (403)",
     r_http_429: "طلبات كثيرة جداً (429) - تهدئة مطلوبة",
@@ -150,7 +172,7 @@ const I18N = {
     why_title: "لماذا انتهت كل محاولة بهذه النتيجة؟",
     stop_attempts_done: "انتهى عدد المحاولات المطلوب. شغّل مرة أخرى - ستكمل من حيث توقفت.",
     stop_space_done: "غطّيت كل الاحتمالات في هذا النطاق.",
-    stop_calibration_failed: "فشل التعلّم الأولي، لذلك لم أبدأ (التفاصيل في السجل).",
+    stop_calibration_failed: "لم أبدأ التخمين لأن التعلّم الأولي فشل - السبب مكتوب بالأسفل.",
     stop_engine_error: "خطأ داخلي - التفاصيل في السجل.",
     stop_captcha_challenge: "ظهرت كابتشا، والتخمين بعدها بلا فائدة.",
     stop_found_unverified: "قبل الراوتر البطاقة لكن لم أستطع تأكيد الإنترنت.",
@@ -161,6 +183,9 @@ const I18N = {
     th_network_errors_slowing_down: "أبطأت الطلبات بسبب أخطاء شبكة متكررة",
     th_recovering_speed: "الشبكة هدأت - أعيد رفع السرعة تدريجياً",
     /* calibration + diagnostics */
+    cal_blocked_already: "الراوتر حاجب جهازك (ظهرت صفحة حجب قبل أي محاولة)",
+    cal_card_space_empty: "صيغة البطاقة لا تترك شيئاً للتخمين",
+    cal_no_rejection_baseline: "لم يصل أي رد من الراوتر على بطاقات التجربة",
     cal_reach_login_page: "الوصول إلى صفحة الدخول",
     cal_internet_state: "حالة الإنترنت قبل أي محاولة",
     cal_rejection_baseline: "تعلّم شكل صفحة الرفض",
@@ -284,6 +309,25 @@ const I18N = {
     resume_from: "continuing from",
     server_gone_title: "The tool stopped",
     server_gone: "Lost contact with the tool. If you stopped it, that is expected - start it again to continue.",
+    cal_failed_title: "Nothing was tried: the initial learning failed",
+    cal_failed_hint: "No attempt was made because the tool could not learn what a rejected card looks like. This is what the router did:",
+    no_attempt_was_made: "Attempts actually made: zero - no card was guessed.",
+    netadvice_refused: "Check that you are on this router's network and the URL is right (the port is closed or the router refused your device).",
+    netadvice_dns: "The host name did not resolve: use the router's IP instead (like 10.5.50.1).",
+    netadvice_connect_timeout: "No answer when opening the connection: the router is far, busy, or you are not on its network.",
+    netadvice_read_timeout: "The router opened the connection but never answered: wait a little and lower the thread count.",
+    netadvice_reset: "The router cut the connection: reconnect to the network and try again.",
+    netadvice_stale: "An old keep-alive connection was closed by the router: try again.",
+    netadvice_tls: "TLS certificate error: try http:// instead of https://",
+    netadvice_unreachable: "You are not connected to this network: join the router's wifi first.",
+    netadvice_bad_response: "The router sent an unreadable reply: use the exact login URL a guest sees.",
+    netadvice_too_many_redirects: "Endless redirect loop: copy the final URL from the browser.",
+    netadvice_proto: "Unsupported URL: it must start with http:// or https://",
+    netadvice_unknown: "Unexpected error: try again, and if it repeats run \"diagnose the network first\".",
+    netadvice_blocked_already: "The router is blocking your device right now: restart the router or reconnect to change your IP, then start again.",
+    netadvice_no_rejection_baseline: "No answer at all to the test cards: check the connection to the network.",
+    netadvice_card_space_empty: "The card format leaves nothing to guess: prefix + suffix are longer than the card, or there are too few variable characters.",
+    netadvice_calibration_failed: "Fix the reason above, then press \"start guessing\" again.",
     v_ACCEPTED_VERIFIED: "Accepted & verified",
     v_ACCEPTED: "Accepted",
     v_ACCEPTED_UNVERIFIED: "Router accepted (internet check failed)",
@@ -295,6 +339,8 @@ const I18N = {
     r_same_as_rejection_page_shape: "same page as a rejection (temporary tokens differ)",
     r_same_as_rejection_page_similar: "very close to the rejection page",
     r_same_as_rejection_page_empty: "empty reply, like the rejection page",
+    r_same_as_rejection_page_redirect: "same redirect as a rejected card",
+    r_redirect_differs_from_rejection: "the router sent this card somewhere else than a rejected one",
     r_ban_page: "an explicit block page from the router",
     r_http_403: "the router refuses the request (403)",
     r_http_429: "too many requests (429) - slow down",
@@ -331,7 +377,7 @@ const I18N = {
         why_title: "Why each attempt ended the way it did",
 stop_attempts_done: "Requested attempts finished. Run again - it continues, it does not repeat.",
     stop_space_done: "Every combination in this range has been covered.",
-    stop_calibration_failed: "Initial learning failed, so nothing was started (details in the log).",
+    stop_calibration_failed: "Nothing was started because the initial learning failed - the reason is written below.",
     stop_engine_error: "Internal error - see the log.",
     stop_captcha_challenge: "A captcha appeared; guessing is pointless after that.",
     stop_found_unverified: "The router accepted the card but the internet check failed.",
@@ -340,6 +386,9 @@ stop_attempts_done: "Requested attempts finished. Run again - it continues, it d
     th_connections_refused_slowing_down: "Slowed down because the router refuses connections",
     th_network_errors_slowing_down: "Slowed down because of repeated network errors",
     th_recovering_speed: "Network calmed down - raising the speed again",
+    cal_blocked_already: "the router is blocking this device (a block page came back before any attempt)",
+    cal_card_space_empty: "the card format leaves nothing to guess",
+    cal_no_rejection_baseline: "no reply came back for the test cards",
     cal_reach_login_page: "Reaching the login page",
     cal_internet_state: "Internet state before any attempt",
     cal_rejection_baseline: "Learning the rejection page",
@@ -962,7 +1011,9 @@ function renderStatus(st, events) {
       ((st.throttle || {}).delay_ms || 0) + " ms</span>";
   } else { thCard.classList.add("hidden"); }
 
-  if (st.calibration && st.calibration.steps && S.rows === 0) {
+  /* while the run is still going, the stop card shows the learning progress -
+     never after it, because renderStop owns that card once the run is over */
+  if (st.calibration && st.calibration.steps && S.rows === 0 && st.state !== "done") {
     const c = $("stopCard");
     const okSteps = st.calibration.steps.filter((s) => s.ok).length;
     c.classList.remove("hidden");
@@ -1047,11 +1098,59 @@ async function openReview(name) {
         esc(html) + "'></iframe>");
 }
 
+/* The worst case used to be silent: the run said "finished", the log was
+   empty and the only text was "details in the log".  Now the page spells out
+   what the router did, step by step, and what to do about it. */
+function calReasonLabel(reason) {
+  reason = reason || "";
+  if (reason.startsWith("net_")) return t("net_" + reason.slice(4), reason.slice(4));
+  if (reason.startsWith("internet_")) return t(reason, reason.slice(9));
+  return t("cal_" + reason, reason);
+}
+
+function renderCalFailure(st) {
+  const cal = st.calibration || {};
+  const kind = String(st.error || cal.error || "").replace(/^net_/, "");
+  let html = "<div class='bad' style='margin-top:8px;font-weight:600'>" +
+    esc(t("cal_failed_title")) + "</div>" +
+    "<div class='hint'>" + esc(t("cal_failed_hint")) + "</div>";
+  if (kind) {
+    html += "<div class='bad mono'>" + esc(t("net_" + kind, t("cal_" + kind, kind))) + "</div>";
+    const advice = t("netadvice_" + kind, "");
+    if (advice) html += "<div class='warn'>→ " + esc(advice) + "</div>";
+  }
+  if (cal.steps && cal.steps.length) {
+    html += "<ul style='margin:.4rem 0 0;padding-inline-start:1.1rem'>";
+    cal.steps.forEach((s) => {
+      const d = s.detail || {};
+      let extra = "";
+      if (s.id === "profile_valid" && d.problems)
+        extra = " — " + (d.problems || []).map((p) => t("prob_" + p, p)).join("، ");
+      if (s.id === "reach_login_page" && d.text)
+        extra = " — <span class='mono'>" + esc(String(d.text).slice(0, 120)) + "</span>";
+      if (s.id === "internet_state" && d.state) extra = " — " + t("internet_" + d.state);
+      html += "<li class='" + (s.ok ? "ok" : "bad") + "'>" + (s.ok ? "✔" : "✖") +
+        " " + t("cal_" + s.id, s.id) + ": " + calReasonLabel(s.reason) + extra + "</li>";
+    });
+    html += "</ul>";
+  }
+  html += "<div class='hint'>" + esc(t("no_attempt_was_made")) + "</div>";
+  return html;
+}
+
 function renderStop(st) {
   const card = $("stopCard");
   card.classList.remove("hidden");
   let html = "<h4>" + t("why_stopped") + "</h4><div>" +
     t("stop_" + st.stop_reason, st.stop_reason || "") + "</div>";
+  const tried = (st.progress || {}).attempts || 0;
+  if ((st.calibration && st.calibration.ok === false) ||
+      st.stop_reason === "calibration_failed") {
+    html += renderCalFailure(st);
+  } else if (!tried) {
+    html += "<div class='warn' style='margin-top:6px'>" + esc(t("no_attempt_was_made")) +
+      (st.error ? " — <span class='mono'>" + esc(st.error) + "</span>" : "") + "</div>";
+  }
   if (st.hits && st.hits.length) {
     html += "<div class='ok' style='margin-top:6px'>" + t("hits_title") + ": " +
       st.hits.map((h) => "<b class='mono'>" + esc(h.card) + "</b> (" +

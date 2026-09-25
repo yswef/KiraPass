@@ -294,6 +294,9 @@ class Fingerprinter:
         self.reject_status = 0
         self.reject_len = 0
         self.reject_text = ""
+        # where a WRONG card gets redirected to (empty = not a redirect, or it
+        # changes on its own and cannot be compared)
+        self.reject_location_key = ()
         self.login_text = ""
         self.samples = 0
         self.note = ""
@@ -318,6 +321,12 @@ class Fingerprinter:
         fp.reject_status = replies[0].status
         fp.reject_len = len(bodies[0])
         fp.reject_text = bodies[0][:40000]
+        # Only usable when every probe was a redirect to the same place: if
+        # only some of them were, the baseline is mixed and no comparison is
+        # safe (one of the probes may have been the working card).
+        if replies and all(r.is_redirect() for r in replies):
+            locs = {_loc_key(r.location) for r in replies}
+            fp.reject_location_key = locs.pop() if len(locs) == 1 else ()
         fp.literals = learn_dynamic(bodies)
         fp.patterns = learn_patterns(bodies)
         fp.dynamic_count = len(differing_tokens(bodies[0], bodies[1])) \
@@ -345,6 +354,15 @@ class Fingerprinter:
         body = resp.text or ""
         literals = tuple(self.literals) + tuple(extra_literals or ())
         if not body and not self.reject_text:
+            # Both replies are empty pages - that alone means nothing.  A
+            # router that redirects on a wrong card sends us back to the login
+            # page; a card that works goes somewhere else.  Ignoring that used
+            # to hide every real hit behind "same as the rejection page".
+            if self.reject_location_key and resp.is_redirect():
+                same = _loc_key(resp.location) == self.reject_location_key
+                return same, "redirect", 1.0 if same else 0.0
+            if self.reject_status and resp.status != self.reject_status:
+                return False, "empty_status_differs", 0.0
             return True, "empty", 1.0
 
         masked = mask_text(body, literals, patterns=self.patterns)
@@ -473,6 +491,14 @@ class Judge:
                 return Verdict("ACCEPTED", "redirect_out_of_portal", confident,
                                data={"location": loc[:200]},
                                evidence=resp.as_dict())
+            # the router sends us somewhere else than it does for a wrong
+            # card - that is real evidence, even when the target is its own
+            # status page (never strong enough to stop a run by itself)
+            if self.fp.reject_location_key and resp.is_redirect():
+                if _loc_key(loc) != self.fp.reject_location_key:
+                    return Verdict("ACCEPTED", "redirect_differs_from_rejection",
+                                   0.7, data={"location": loc[:200]},
+                                   evidence=resp.as_dict())
             if self.success_url_contains and self.success_url_contains in loc.lower():
                 return Verdict("ACCEPTED", "success_url_contains", 0.9,
                                data={"location": loc[:200]},
@@ -507,6 +533,23 @@ class Judge:
                        data={"diff": diff, "similarity": round(sim, 3),
                              "status": resp.status, "length": resp.length},
                        evidence=resp.as_dict())
+
+
+def _loc_key(url: str) -> tuple:
+    """The stable part of a redirect target: scheme + host + path.
+
+    A router that answers "wrong card" with a redirect usually appends a
+    changing token or the guest's own dst to the query string - comparing the
+    whole URL would call every reply different.
+    """
+    from urllib.parse import urlsplit
+    try:
+        parts = urlsplit(url or "")
+    except Exception:
+        return ()
+    if not parts.netloc and not parts.path:
+        return ()
+    return (parts.scheme, parts.netloc.lower(), parts.path or "/")
 
 
 def _host(url: str) -> str:

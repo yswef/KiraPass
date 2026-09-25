@@ -24,7 +24,7 @@ from collections import Counter, deque
 
 from . import config, verify
 from .errors import classify
-from .fingerprint import Fingerprinter, Judge, Verdict
+from .fingerprint import Fingerprinter, Judge, Verdict, find_phrase
 from .httpclient import Session
 from . import store
 
@@ -226,13 +226,20 @@ def calibrate(profile: dict, known_card: str = "", keyword: str = "",
             cal.step("rejection_baseline", False, "no_probe_reply", {})
             return cal
 
-        if any(s.status in (403, 429, 503) for s in replies) or \
-                any(any(w in (r.text or "").lower() for w in config.BAN_WORDS)
-                    for r in replies):
+        # 403/429 or an explicit block page means the router is refusing us
+        # before we even start.  A bare 503 is only a busy router/RADIUS, so it
+        # is NOT treated as a block here - the run just slows down on it.
+        block_status = [s.status for s in replies if s.status in (403, 429)]
+        block_word = ""
+        for r in replies:
+            block_word = find_phrase((r.text or "").lower(), config.BAN_WORDS)
+            if block_word:
+                break
+        if block_status or block_word:
             cal.error = "blocked_already"
             cal.step("rejection_baseline", False, "blocked_already",
                      {"advice": "restart_router_or_reconnect",
-                      "status": replies[0].status if replies else 0})
+                      "status": block_status[:3], "word": block_word})
             return cal
 
         fp = Fingerprinter.learn(replies, login_reply=resp)
@@ -248,12 +255,21 @@ def calibrate(profile: dict, known_card: str = "", keyword: str = "",
         # A probe that already looks accepted is a free known-good card.
         if not known_card:
             probe_judge = Judge(fp, p["login_url"], keyword and [keyword] or [])
-            for card, r in zip(probes, replies):
+            for i, (card, r) in enumerate(zip(probes, replies)):
                 v = probe_judge.classify(r, submitted_values(p, card))
                 if v.is_hit:
                     known_card = card
                     cal.step("probe_looked_accepted", True, v.reason,
                              {"card_hint": card[:4] + "..."})
+                    # it must not stay inside the "wrong card" baseline, or the
+                    # tool would learn the success page as a rejection
+                    rest = [x for j, x in enumerate(replies) if j != i]
+                    if len(rest) >= 2:
+                        fp = Fingerprinter.learn(rest, login_reply=resp)
+                        cal.fingerprint = fp
+                        cal.step("rejection_baseline", True,
+                                 "relearned_without_the_working_probe",
+                                 {"exact": fp.exact, "samples": fp.samples})
                     break
 
         # --- 4. tune the request shape with a known-good card -----------
@@ -354,6 +370,18 @@ def _tune_with_known_card(p: dict, known_card: str, fp: Fingerprinter, session,
 def _new_words(page: str, reference: str, limit: int = 10) -> list:
     from .fingerprint import diff_words
     return diff_words(page, reference, limit=limit)["new_words"]
+
+
+# Failures of the learning phase that are usually a single hiccup: a keep-alive
+# socket the router closed, a router busy for one second.  Retrying them costs
+# a second; not retrying them costs the user the whole run ("it said finished
+# and tried nothing").
+CALIBRATION_RETRYABLE = ("stale", "reset", "read_timeout", "connect_timeout",
+                         "bad_response", "unknown", "no_rejection_baseline")
+
+
+def calibration_retryable(error: str) -> bool:
+    return (error or "") in CALIBRATION_RETRYABLE
 
 
 # ---------------------------------------------------------------------------
@@ -641,6 +669,13 @@ class Engine:
         try:
             cal = calibrate(p, known_card=known_card, keyword=keyword,
                             checks=self.checks)
+            if not cal.ok and calibration_retryable(cal.error):
+                # one hiccup must not cost the user the whole run
+                self.emit("note", {"message": "retrying_learning",
+                                   "after": cal.error})
+                time.sleep(1.0)
+                cal = calibrate(p, known_card=known_card, keyword=keyword,
+                                checks=self.checks)
             self.calibration = cal.as_dict()
             self.emit("calibration", self.calibration)
             if not cal.ok:

@@ -207,6 +207,41 @@ class CacheTests(unittest.TestCase):
             shutil.rmtree(tmp, ignore_errors=True)
 
 
+class RedirectPortalTests(unittest.TestCase):
+    """Routers that answer a WRONG card with a redirect, not with a page.
+
+    Both replies are then empty pages, and the old comparison called them
+    "identical" - which hid every real hit behind "same as the rejection page".
+    """
+
+    @staticmethod
+    def _redirect(location):
+        return _FakeReply("", status=302, headers={"location": location})
+
+    def _learn(self):
+        wrong_a = "http://10.5.50.1/login?error=1&mac=AA:BB:CC:DD:EE:FF"
+        wrong_b = "http://10.5.50.1/login?error=1&mac=11:22:33:44:55:66"
+        return fingerprint.Fingerprinter.learn(
+            [self._redirect(wrong_a), self._redirect(wrong_b)],
+            login_reply=_FakeReply("<html><form>login</form></html>"))
+
+    def test_a_card_that_goes_somewhere_else_is_a_hit(self):
+        fp = self._learn()
+        judge = fingerprint.Judge(fp, "http://10.5.50.1/login")
+        v = judge.classify(self._redirect("http://10.5.50.1/status?sid=7"),
+                           ["0301", ""])
+        self.assertEqual(v.code, "ACCEPTED", v.as_dict())
+        self.assertEqual(v.reason, "redirect_differs_from_rejection")
+
+    def test_the_same_redirect_as_a_wrong_card_is_still_rejected(self):
+        fp = self._learn()
+        judge = fingerprint.Judge(fp, "http://10.5.50.1/login")
+        v = judge.classify(
+            self._redirect("http://10.5.50.1/login?error=1&mac=99:88:77:66:55:44"),
+            ["0302", ""])
+        self.assertEqual(v.code, "REJECTED", v.as_dict())
+
+
 class _FakeReply:
     def __init__(self, text, status=200, headers=None):
         self._text = text
