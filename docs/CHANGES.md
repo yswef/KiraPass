@@ -218,6 +218,35 @@ safe_delay  : 3333 ms  ← «محاولة كل ٣٫٣ ثانية»
 
 ---
 
+## الجولة السابعة · «الكرت المعروف ما أثبت نفسه»
+
+الرسالة `✖ ضبط شكل الطلب باستخدام البطاقة المعروفة: لم أستطع إثبات أن البطاقة
+المعروفة تعمل بهذه الإعدادات` كانت بلا سبب ولا دليل. الآن ثلاث تحسينات:
+
+| # | المشكلة | الإصلاح |
+|---|---|---|
+| 1 | **لا يُقال لماذا فشل** | الخطوة تعرض **جدولاً** بكل شكل جرّبناه (كلمة المرور: فارغة/نفس الكرت/محذوفة/chap/md5 × الرابط dst) مع رمز الحالة ونوع الحكم **ونصّ ردّ الراوتر**: `empty · HTTP 200 · رفض · «invalid username or password»` |
+| 2 | **الكرت قد لا يطابق الصيغة أصلاً** (أكثر سبب شيوعاً) | فحص قبل أي طلب: الطول ≠ الطول المضبوط / لا يبدأ بالبادئة / لا ينتهي باللاحقة / فيه رموز خارج الأبجدية ⇒ `known_card_out_of_format` مع السبب بالتحديد — **بلا أي محاولة فاشلة على الراوتر** |
+| 3 | **نصوص ناقصة تظهر كمفاتيح خام** (`internet_walled`، `internet_`) | أضيفت ترجمة `cal_internet_*`، وإضافة «حالة الإنترنت» لا تُطبع إلا إن وُجدت فعلاً |
+
+مخرجات حقيقية من نفس الأداة على بوابة التدريب:
+```
+كرت يعمل          → OK   shape_tuned  known_card_works      {"mode":"empty","evidence":1.0,"verified":true}
+كرت لا يعمل       → FAIL shape_tuned  known_card_not_proven  جُرّب ١٢ شكلاً؛ مثال: [empty] HTTP 200 «invalid username or password»
+كرت بصيغة أخرى    → FAIL shape_tuned  known_card_out_of_format  {"reason":"length_mismatch",...}
+```
+
+**كيف تقرأ الجدول إن فشل كرتك:**
+* كل الأشكال رجعت «مثل صفحة الرفض» ⇒ الكرت **منتهٍ/مستخدم**، أو كلمة المرور/أحد الحقول
+  ناقص ⇒ افتح صفحة الدخول في المتصفح، سجّل دخولاً ناجحاً، وقارن الحقول المرسَلة.
+* رجع «محجوب» ⇒ أعد الاتصال لتغيير الـ IP ثم أعد المحاولة.
+* رجع «الكرت لا يطابق الصيغة» ⇒ صحّح **الطول والبادئة** في نموذج البطاقة (مثال: كرت من
+  ١٠ خانات يحتاج «الطول = ١٠»).
+
+* اختبارات: `51/51` (+3 للكرت المعروف) و`14/14` في `--selftest`.
+
+---
+
 ## English (short)
 
 Real bugs fixed: the "continue where you stopped" feature never worked (the
@@ -302,3 +331,14 @@ again (checking with a real trial card too, since some routers only show the
 block page on a login attempt) and reports ban_after, clears_after and the
 fastest pace that stays under the limit - or states plainly that guessing on
 this router is not possible (48 tests, 14/14 self-test).
+
+Seventh round - the known-good card step: "could not prove this card works"
+now comes with the evidence. Every request shape we tried (password empty /
+same as card / omitted / chap / md5 x each dst value) is reported with its
+status, verdict and the router's own words, so "the card is used up", "a field
+is missing" and "you are blocked" can be told apart. Before any request the
+card is checked against the format - wrong length, prefix, suffix or charset
+is reported as known_card_out_of_format without spending a single failed login
+on the router (the most common cause: a 10-digit card in a 9-digit profile).
+Two raw translation keys that leaked into the Arabic page (internet_walled and
+a bare "internet_") are fixed (51 tests, 14/14 self-test).

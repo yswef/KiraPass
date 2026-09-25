@@ -487,6 +487,66 @@ class LockoutProbeTests(unittest.TestCase):
         self.assertEqual(got["tried"], 6, got)
 
 
+class KnownCardTests(unittest.TestCase):
+    """The "I know a card that works" field: it must either prove the card or
+    say exactly why it could not.
+    """
+
+    @staticmethod
+    def _shape_step(cal):
+        for s in cal.steps:
+            if s["id"] == "shape_tuned":
+                return s
+        return None
+
+    def test_a_card_that_does_not_fit_the_format_is_named(self):
+        p = {"prefix": "0201", "length": 9, "suffix": "", "charset": "0123456789"}
+        self.assertEqual(engine.known_card_problem(p, "020124042"), {})
+        got = engine.known_card_problem(p, "293466475")   # right length,
+        self.assertEqual(got["reason"], "prefix_mismatch")   # wrong prefix
+        got = engine.known_card_problem(
+            {"prefix": "", "length": 9, "suffix": "", "charset": "0123456789"},
+            "2934664754")
+        self.assertEqual(got["reason"], "length_mismatch")
+        got = engine.known_card_problem(
+            {"prefix": "", "length": 10, "suffix": "", "charset": "abc"},
+            "2934664754")
+        self.assertEqual(got["reason"], "charset_mismatch")
+
+    def test_it_finds_the_right_request_shape_and_says_so(self):
+        with MockPortal(valid_cards={"020124042"}, pass_mode="same") as portal:
+            info = selftest.scan(portal.url)
+            # the profile says "no password" - the router wants the card itself
+            p = selftest.make_profile(portal.url, prefix="020124", length=9,
+                                      portal_info=info, pass_mode="empty")
+            cal = engine.calibrate(p, known_card="020124042",
+                                   checks=selftest.mock_checks(portal))
+        self.assertTrue(cal.ok, cal.as_dict())
+        step = self._shape_step(cal)
+        self.assertIsNotNone(step, cal.steps)
+        self.assertTrue(step["ok"], step)
+        self.assertEqual(step["reason"], "known_card_works")
+        self.assertEqual(cal.profile["pass_mode"], "same")
+
+    def test_a_card_the_router_refuses_reports_what_came_back(self):
+        with MockPortal(valid_cards={"020124042"}, pass_mode="empty") as portal:
+            info = selftest.scan(portal.url)
+            p = selftest.make_profile(portal.url, prefix="020124", length=9,
+                                      portal_info=info, pass_mode="empty")
+            cal = engine.calibrate(p, known_card="020124999",
+                                   checks=selftest.mock_checks(portal))
+        self.assertTrue(cal.ok, cal.as_dict())     # the run can still go on
+        step = self._shape_step(cal)
+        self.assertIsNotNone(step, cal.steps)
+        self.assertFalse(step["ok"], step)
+        self.assertEqual(step["reason"], "known_card_not_proven")
+        trials = step["detail"]["trials"]
+        self.assertTrue(trials, step["detail"])
+        self.assertTrue(all(t["code"] == "REJECTED" for t in trials), trials)
+        # and the router's own answer is in there, not just "it failed"
+        self.assertTrue(any(t.get("word") for t in trials), trials)
+
+
 class _FakeReply:
     def __init__(self, text, status=200, headers=None):
         self._text = text

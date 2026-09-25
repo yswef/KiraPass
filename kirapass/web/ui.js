@@ -38,6 +38,19 @@ const I18N = {
     r_verify: "تأكيد الإنترنت بعد أي بطاقة مقبولة",
     r_autostop: "إيقاف تلقائي عند أول نتيجة قوية",
     r_resume: "المتابعة من حيث توقفت (بلا تكرار)",
+    cal_internet_walled: "خلف بوابة الدخول (يحتاج بطاقة)",
+    cal_internet_online: "متصل بالإنترنت فعلاً",
+    cal_internet_offline: "لا يوجد اتصال",
+    cal_internet_blocked: "محجوب من الشبكة",
+    cal_internet_unknown: "حالة الشبكة غير معروفة",
+    cal_known_card_out_of_format: "الكرت لا يطابق صيغة البطاقات",
+    cal_known_card_not_proven: "لم أستطع إثبات أن هذا الكرت يعمل",
+    prob_length_mismatch: "طول الكرت لا يساوي الطول المضبوط",
+    prob_prefix_mismatch: "الكرت لا يبدأ بالبادئة المضبوطة",
+    prob_suffix_mismatch: "الكرت لا ينتهي باللاحقة المضبوطة",
+    prob_charset_mismatch: "الكرت فيه رموز ليست ضمن الأبجدية المختارة",
+    known_card_tried: "جرّبنا هذا الكرت بعدة أشكال للطلب، وكان رد الراوتر:",
+    known_card_hint: "→ إن كان الرد «مثل صفحة الرفض» في كل الأشكال: فالكرت منتهي/مستخدم أو كلمة المرور/الحقول ناقصة (افتح صفحة الدخول في المتصفح وسجّل طلباً ناجحاً ثم قارن الحقول). وإن كان «محجوب»: أعد الاتصال ثم أعد المحاولة.",
     btn_lockout: "قِس حدّ الحظر",
     lockout_measuring: "جارٍ قياس حدّ الحظر (قد يستغرق دقائق)...",
     lockout_after: "الراوتر يحجب بعد",
@@ -282,6 +295,19 @@ const I18N = {
     r_verify: "Verify internet after any accepted card",
     r_autostop: "Auto-stop on the first strong result",
     r_resume: "Continue where you stopped (no repeats)",
+    cal_internet_walled: "behind the login portal (needs a card)",
+    cal_internet_online: "already online",
+    cal_internet_offline: "no connection",
+    cal_internet_blocked: "blocked by the network",
+    cal_internet_unknown: "network state unknown",
+    cal_known_card_out_of_format: "the card does not match the card format",
+    cal_known_card_not_proven: "this card could not be proven to work",
+    prob_length_mismatch: "the card length does not match the profile length",
+    prob_prefix_mismatch: "the card does not start with the prefix",
+    prob_suffix_mismatch: "the card does not end with the suffix",
+    prob_charset_mismatch: "the card has characters outside the chosen charset",
+    known_card_tried: "we tried this card in several request shapes; the router answered:",
+    known_card_hint: "→ if every shape came back \"like the rejection page\": the card is used up/expired or a field or the password is missing (open the login page in a browser, log in once and compare the fields). If it came back \"blocked\": reconnect and try again.",
     btn_lockout: "measure the lock-out",
     lockout_measuring: "measuring the lock-out (this can take minutes)...",
     lockout_after: "the router blocks after",
@@ -907,15 +933,31 @@ function renderCalibration(job, node) {
     const cls = s.ok ? "ok" : "warn";
     let extra = "";
     const d = s.detail || {};
-    if (s.id === "internet_state") extra = " — " + t("internet_" + (d.state || ""));
+    if (s.id === "internet_state" && d.state) extra = " — " + t("internet_" + d.state);
     if (s.id === "reach_login_page" && d.ms) extra = " — HTTP " + d.status + " · " + d.ms + " ms";
     if (s.id === "shape_tuned" && d.tuned)
       extra = " — " + t("pm_" + d.tuned.mode, d.tuned.mode) +
               (d.tuned.dst ? " · dst=" + esc(d.tuned.dst) : "");
+    if (s.id === "shape_tuned" && d.wrong) extra = " — " + esc(t("prob_" + d.wrong, d.wrong));
     html += "<li class='" + cls + "'>" + mark + " " + t("cal_" + s.id, s.id) + ": " +
             t("cal_" + s.reason, s.reason) + esc(extra) + "</li>";
   });
   html += "</ul>";
+  /* "could not prove the known card" is worthless without what came back */
+  (r.steps || []).forEach((s) => {
+    const d = s.detail || {};
+    if (s.id !== "shape_tuned" || !d.trials || !d.trials.length) return;
+    html += "<div class='hint'>" + esc(t("known_card_tried")) + " " + d.tried +
+            "</div><table class='why' style='margin-top:4px'><tbody>";
+    d.trials.forEach((tr) => {
+      html += "<tr><td class='mono'>" + esc(t("pm_" + tr.mode, tr.mode)) +
+              "</td><td>" + (tr.status || "—") + "</td><td>" +
+              esc(codeLabel(tr.code)) + "</td><td class='why'>" +
+              esc(reasonLabel(tr.code, tr.reason, {})) +
+              (tr.word ? " «" + esc(tr.word) + "»" : "") + "</td></tr>";
+    });
+    html += "</tbody></table><div class='warn'>" + esc(t("known_card_hint")) + "</div>";
+  });
   if (r.success_words && r.success_words.length)
     html += "<div class='kv'><dt>" + t("f_words") + "</dt><dd>" +
             esc(r.success_words.join(", ")) + "</dd></div>";
