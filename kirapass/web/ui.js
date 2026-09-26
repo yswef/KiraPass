@@ -51,6 +51,12 @@ const I18N = {
     prob_charset_mismatch: "الكرت فيه رموز ليست ضمن الأبجدية المختارة",
     known_card_tried: "جرّبنا هذا الكرت بعدة أشكال للطلب، وكان رد الراوتر:",
     known_card_hint: "→ إن كان الرد «مثل صفحة الرفض» في كل الأشكال: فالكرت منتهي/مستخدم أو كلمة المرور/الحقول ناقصة (افتح صفحة الدخول في المتصفح وسجّل طلباً ناجحاً ثم قارن الحقول). وإن كان «محجوب»: أعد الاتصال ثم أعد المحاولة.",
+    s_eta: "الوقت المتبقي",
+    th_auto_slowed_router_complaining: "أبطأت تلقائياً: الراوتر بدأ يشتكي (أخطاء/تقييد)",
+    th_auto_sped_up: "أسرعت تلقائياً: الراوتر يستجيب بلا أخطاء",
+    th_auto_sped_up_more_threads: "أسرعت تلقائياً: أضفت مسارات لأن الراوتر يستجيب بلا أخطاء",
+    lockout_apply: "طبّق الوتيرة الآمنة على الإعدادات",
+    lockout_applied: "تم ضبط المهلة والمسارات",
     btn_lockout: "قِس حدّ الحظر",
     lockout_measuring: "جارٍ قياس حدّ الحظر (قد يستغرق دقائق)...",
     lockout_after: "الراوتر يحجب بعد",
@@ -69,7 +75,7 @@ const I18N = {
     btn_start: "ابدأ التخمين", btn_stop: "إيقاف",
     res_title: "4) النتائج الحيّة",
     s_speed: "السرعة", s_sent: "أُرسل", s_covered: "المغطى",
-    s_latency: "زمن الرد", s_delay: "التباطؤ الحالي", s_state: "الحالة",
+    s_latency: "زمن الرد", s_delay: "التباطؤ الحالي", s_eta: "الوقت المتبقي", s_state: "الحالة",
     t_card: "البطاقة", t_result: "النتيجة", t_why: "السبب", t_ms: "ms", t_len: "الحجم",
     btn_clear_log: "تفريغ السجل", btn_download: "تنزيل آخر تقرير",
     hits_title: "البطاقات المقبولة", hits_none: "لا شيء بعد.",
@@ -308,6 +314,12 @@ const I18N = {
     prob_charset_mismatch: "the card has characters outside the chosen charset",
     known_card_tried: "we tried this card in several request shapes; the router answered:",
     known_card_hint: "→ if every shape came back \"like the rejection page\": the card is used up/expired or a field or the password is missing (open the login page in a browser, log in once and compare the fields). If it came back \"blocked\": reconnect and try again.",
+    s_eta: "time left",
+    th_auto_slowed_router_complaining: "slowed down automatically: the router started complaining (errors/limits)",
+    th_auto_sped_up: "sped up automatically: the router is answering cleanly",
+    th_auto_sped_up_more_threads: "sped up automatically: added threads because the router is answering cleanly",
+    lockout_apply: "apply the safe pace to the settings",
+    lockout_applied: "delay and threads updated",
     btn_lockout: "measure the lock-out",
     lockout_measuring: "measuring the lock-out (this can take minutes)...",
     lockout_after: "the router blocks after",
@@ -325,7 +337,7 @@ const I18N = {
     btn_start: "Start guessing", btn_stop: "Stop",
     res_title: "4) Live results",
     s_speed: "Speed", s_sent: "Sent", s_covered: "Covered",
-    s_latency: "Latency", s_delay: "Current slowdown", s_state: "State",
+    s_latency: "Latency", s_delay: "Current slowdown", s_eta: "Time left", s_state: "State",
     t_card: "Card", t_result: "Result", t_why: "Reason", t_ms: "ms", t_len: "Size",
     btn_clear_log: "Clear log", btn_download: "Download last report",
     hits_title: "Accepted cards", hits_none: "Nothing yet.",
@@ -599,6 +611,15 @@ function whyLabel(code) {
   const table = I18N[LANG] || {};
   if (code === "NET_ERROR") return codeLabel("NET_ERROR");
   return table["r_" + code] || table["net_" + code] || code;
+}
+
+function humanTime(seconds) {
+  const s = Math.max(0, Math.round(seconds || 0));
+  if (s < 60) return s + (LANG === "ar" ? " ثانية" : "s");
+  const m = Math.round(s / 60);
+  if (m < 60) return m + (LANG === "ar" ? " دقيقة" : " min");
+  const h = Math.floor(m / 60), rm = m % 60;
+  return h + (LANG === "ar" ? " ساعة" : "h") + (rm ? " " + rm : "");
 }
 
 function stateLabel(state) {
@@ -1025,12 +1046,21 @@ function renderLockout(job, node) {
     html += "<div class='warn' style='margin-top:6px'>→ " + t("lockout_pace") +
             ": <b>" + (r.safe_delay_ms / 1000).toFixed(1) + "</b> " + t("seconds") +
             " / " + t("attempt") + "</div>" +
-            "<div class='hint'>" + t("lockout_pace_hint") + "</div>";
+            "<div class='hint'>" + t("lockout_pace_hint") + "</div>" +
+            "<div class='row wrap' style='margin-top:6px'>" +
+            "<button class='btn' id='applyPaceBtn'>" + esc(t("lockout_apply")) +
+            "</button></div>";
   } else if (r.ban_after != null) {
     html += "<div class='warn' style='margin-top:6px'>→ " +
             t("lockout_impossible") + "</div>";
   }
   node.innerHTML = html;
+  const apply = $("applyPaceBtn");
+  if (apply) apply.addEventListener("click", () => {
+    $("r_delay").value = r.safe_delay_ms;
+    $("r_threads").value = Math.min(2, parseInt($("r_threads").value || "2", 10));
+    toast("✓ " + t("lockout_applied"));
+  });
 }
 
 function renderDiagnose(job, node) {
@@ -1125,6 +1155,12 @@ function renderStatus(st, events) {
   $("stSpeed").textContent = (st.speed || 0) + "/s";
   $("stSent").textContent = fmtSpace((st.progress || {}).attempts || 0);
   $("stCovered").textContent = fmtSpace((st.progress || {}).covered || 0);
+  const eta = (st.progress || {}).eta_seconds || 0;
+  const etaBox = $("stEta");
+  if (etaBox) {
+    etaBox.textContent = st.state === "running" && eta
+      ? (LANG === "ar" ? "≈ " : "≈ ") + humanTime(eta) : "—";
+  }
   $("stLatency").textContent = ((st.latency || {}).avg_ms || 0) + " ms";
   $("stDelay").textContent = ((st.throttle || {}).delay_ms || 0) + " ms";
   const total = (st.progress || {}).total || 1;
