@@ -99,6 +99,12 @@ def new_profile(**kw) -> dict:
         "note": "",
         "success_words": [],
         "success_url_contains": "",
+        # what the lock-out probe measured on this router (see
+        # engine.probe_lockout) - the run uses it to wait exactly as long as
+        # this router needs instead of a guessed 45 seconds
+        "ban_after": None,
+        "clears_after": None,
+        "safe_delay_ms": 0,
     }
     p.update(kw)
     return p

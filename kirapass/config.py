@@ -176,6 +176,19 @@ CALIBRATION_PROBES_RETRY = 2
 BLOCK_WAIT_SECONDS = max(0, int(os.environ.get("KIRAPASS_BLOCK_WAIT", "45")))
 # ... and after sitting one out we keep going at this pace, not faster.
 BAN_COOLDOWN_MS = 3000
+# How many lockouts a single run sits out before it gives up.  On a router
+# that blocks every few attempts this is what makes a long run possible at
+# all - raise it with KIRAPASS_BLOCK_PATIENCE=10.
+BLOCK_PATIENCE = max(0, int(os.environ.get("KIRAPASS_BLOCK_PATIENCE", "3")))
+
+# Let the run find its own pace: push until the router complains, then back
+# off (additive increase / multiplicative decrease).  AUTO_PACE=0 keeps the
+# tool exactly at the pace the user typed.
+AUTO_PACE = os.environ.get("KIRAPASS_AUTO_PACE", "1") not in ("0", "no", "off")
+PACE_WINDOW_SECONDS = 3.0     # look at what came back every 3 seconds
+PACE_BAD_RATIO = 0.02         # above 2% errors/limits: this router has enough
+PACE_MAX_DELAY_MS = 4000      # never slower than this on its own
+PACE_MAX_THREADS = 32         # hard ceiling for hands it adds by itself
 
 # Some routers log the guest in and STILL answer with the rejection page.  The
 # only honest signal then is the internet itself: while the run is going we ask

@@ -159,6 +159,17 @@ def t_find_card():
 
 def t_ban_is_reported():
     """A ban must be named as a ban - never as a hit or as 'tested'."""
+    from . import config as _cfg
+    saved = (_cfg.BLOCK_PATIENCE, _cfg.BLOCK_WAIT_SECONDS)
+    # the self-test must not sit through real lockouts
+    _cfg.BLOCK_PATIENCE, _cfg.BLOCK_WAIT_SECONDS = 1, 1
+    try:
+        return _t_ban_is_reported()
+    finally:
+        _cfg.BLOCK_PATIENCE, _cfg.BLOCK_WAIT_SECONDS = saved
+
+
+def _t_ban_is_reported():
     with MockPortal(valid_cards={"0299"}, ban_after=5, pass_mode="empty") as portal:
         info = scan(portal.url)
         p = make_profile(portal.url, prefix="03", length=4, portal_info=info)

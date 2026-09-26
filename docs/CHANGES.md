@@ -247,6 +247,29 @@ safe_delay  : 3333 ms  ← «محاولة كل ٣٫٣ ثانية»
 
 ---
 
+## الجولة الثامنة · تحسين الأداء + سبب «لا يوجد لديك انترنت»
+
+### ما تعنيه رسائلك الآن
+* **«لا يوجد لديك انترنت»** = جهازك لا يصل إلى الخارج أصلاً (أو الراوتر حاجبك)، فلا
+  يمكن إثبات أي كرت بالإنترنت — الأداة تقول ذلك ولا تدّعي تحققاً.
+* **«الراوتر يحجبك»** = أنت **محجوب الآن**؛ كل ما بعده موقوف حتى يزول الحظر (راجع
+  «قِس حدّ الحظر» في الجولة السادسة).
+* الرابط الذي أرسلته `.../login?username=2934664754&password=` يعني أن الطلب أُرسل
+  **GET وبكلمة مرور فارغة** — لذلك أضفنا أدناه تجربة **POST وGET** معاً.
+
+### تحسينات الأداء
+| # | التحسين | الأثر |
+|---|---|---|
+| 1 | **ضبط السرعة تلقائياً (AIMD مثل TCP)**: كل ٣ ثوان تحسب نسبة الأخطاء/التقييد؛ إن كانت صفراً ترفع السرعة (**تقصير المهلة ثم إضافة مسارات**)، وإن تجاوزت ٢٪ **تخفض السرعة للنصف** | قياس حيّ: من خيطين و٤٣ محاولة/ثانية **إلى ٤ مسارات و٧٨/ثانية** تلقائياً؛ ومع ٤ خيوط وصل **٨ مسارات و١٢٩/ثانية**. إيقافه: `KIRAPASS_AUTO_PACE=0` |
+| 2 | **الوقت المتبقي (ETA)** في بطاقة الحالة + عدد المسارات الفعلي | القياس: `المسار ١٠٠ ألف كرت · ١٢٩/ثانية · الوقت المتبقي ≈ ١٢٫٨ دقيقة` |
+| 3 | **جلوس الحظر صار مرناً**: حتى ٣ دورات حظر (`KIRAPASS_BLOCK_PATIENCE`)، والمدة تُؤخذ **من القياس** إن كان معروفاً (`clears_after + ٢`) بدل ٤٥ ثانية مقطوعة | تشغيل طويل على راوتر يحجب كل محاولتين صار ممكناً |
+| 4 | **الكرت المعروف**: يُجرَّب الآن **GET وPOST** معاً (كثير من البوابات المبنية بـ JavaScript تُفحص خطأً كـ GET) | فرصة أكبر لإثبات الكرت من أول مرة |
+| 5 | نتيجة القياس تُحفظ في الملف التعريفي (`ban_after` / `clears_after` / `safe_delay_ms`) + زر **«طبّق الوتيرة الآمنة»** | القياس ينتقل إلى التشغيل الفعلي تلقائياً |
+
+* اختبارات: `51/51` و`14/14` في `--selftest`.
+
+---
+
 ## English (short)
 
 Real bugs fixed: the "continue where you stopped" feature never worked (the
@@ -342,3 +365,15 @@ is reported as known_card_out_of_format without spending a single failed login
 on the router (the most common cause: a 10-digit card in a 9-digit profile).
 Two raw translation keys that leaked into the Arabic page (internet_walled and
 a bare "internet_") are fixed (51 tests, 14/14 self-test).
+
+Eighth round - performance. The run now tunes its own pace: every 3 seconds it
+looks at the error/limit ratio and, when the router answers cleanly, shortens
+the delay and then adds threads (up to twice the number the user chose, 32 at
+most); above 2% it halves the rate (KIRAPASS_AUTO_PACE=0 turns it off).
+Measured: 2 threads at 43/s grew to 78/s on its own, 4 threads to 129/s. The
+status now carries an ETA and the live thread count ("100k cards at 129/s =
+12.8 minutes left"). Lock-outs are waited out up to BLOCK_PATIENCE times and
+the wait comes from the measured clears_after when the profile has it. The
+known-card tuner tries GET and POST, and the lock-out probe stores what it
+measured on the profile with an "apply the safe pace" button (51 tests,
+14/14 self-test).
