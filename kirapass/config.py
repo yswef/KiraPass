@@ -168,18 +168,14 @@ ACCEPT_WORDS = (
 # is a failed login for the router, so we keep this small: a router that locks
 # after two failures is locked by our own learning otherwise.
 CALIBRATION_PROBES = 3
-# ... and how few we use when the first try already tripped a lockout.
-CALIBRATION_PROBES_RETRY = 2
-# Routers that lock a device usually unlock it on their own.  Wait this long,
-# then try the learning again once (the web page shows the countdown).
-# Override it without editing code:  KIRAPASS_BLOCK_WAIT=120 python3 KiraPass.py
-BLOCK_WAIT_SECONDS = max(0, int(os.environ.get("KIRAPASS_BLOCK_WAIT", "45")))
-# ... and after sitting one out we keep going at this pace, not faster.
-BAN_COOLDOWN_MS = 3000
-# How many lockouts a single run sits out before it gives up.  On a router
-# that blocks every few attempts this is what makes a long run possible at
-# all - raise it with KIRAPASS_BLOCK_PATIENCE=10.
-BLOCK_PATIENCE = max(0, int(os.environ.get("KIRAPASS_BLOCK_PATIENCE", "3")))
+# A known-good card is only used for a small, bounded request-shape check.
+# If it still cannot be proven, stop and ask the operator to review the portal
+# instead of cycling through dozens of login attempts and risking a lockout.
+KNOWN_CARD_TRIAL_LIMIT = 8
+# The opt-in lockout diagnostic is capped and stops at the first block reply.
+LOCKOUT_PROBE_MAX_FAILURES = 8
+# Network diagnostics use small samples and stop on the first block response.
+DIAGNOSTIC_SAMPLE_LIMIT = 8
 
 # Let the run find its own pace: push until the router complains, then back
 # off (additive increase / multiplicative decrease).  AUTO_PACE=0 keeps the

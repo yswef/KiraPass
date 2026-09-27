@@ -238,6 +238,12 @@ def migrate(raw: dict) -> dict:
     })
     if (raw.get("walk") or {}).get("pos"):
         p["space_pos"] = int(raw["walk"]["pos"])
+    # Legacy profiles may contain a copied successful GET URL with the actual
+    # card and password hash in its query. Keep its request shape, not secrets.
+    from .portals import sanitize_login_url
+    p["login_url"] = sanitize_login_url(
+        p.get("login_url", ""), p.get("user_field", "username"),
+        p.get("pass_field", "password"))
     return p
 
 

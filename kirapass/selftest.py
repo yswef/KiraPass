@@ -159,17 +159,6 @@ def t_find_card():
 
 def t_ban_is_reported():
     """A ban must be named as a ban - never as a hit or as 'tested'."""
-    from . import config as _cfg
-    saved = (_cfg.BLOCK_PATIENCE, _cfg.BLOCK_WAIT_SECONDS)
-    # the self-test must not sit through real lockouts
-    _cfg.BLOCK_PATIENCE, _cfg.BLOCK_WAIT_SECONDS = 1, 1
-    try:
-        return _t_ban_is_reported()
-    finally:
-        _cfg.BLOCK_PATIENCE, _cfg.BLOCK_WAIT_SECONDS = saved
-
-
-def _t_ban_is_reported():
     with MockPortal(valid_cards={"0299"}, ban_after=5, pass_mode="empty") as portal:
         info = scan(portal.url)
         p = make_profile(portal.url, prefix="03", length=4, portal_info=info)
@@ -184,7 +173,7 @@ def _t_ban_is_reported():
                       f"stop={st.get('stop_reason')}")
 
 
-def t_rate_limit_slows_down():
+def t_rate_limit_stops():
     with MockPortal(valid_cards={"0299"}, rate_limit_after=4,
                     pass_mode="empty") as portal:
         info = scan(portal.url)
@@ -199,8 +188,9 @@ def t_rate_limit_slows_down():
         st = eng.status()
         c = st.get("counters", {})
         delay = (st.get("throttle") or {}).get("delay_ms", 0)
-        ok = c.get("RATE_LIMITED", 0) >= 1 and delay > 0
-        return Result("rate_limit_is_reported_and_slows_down", ok,
+        ok = (c.get("RATE_LIMITED", 0) >= 1 and delay > 0
+              and st.get("stop_reason") == "rate_limited_by_router")
+        return Result("rate_limit_is_reported_and_stops_the_run", ok,
                       f"rate_limited={c.get('RATE_LIMITED', 0)} delay={delay}ms "
                       f"reason={(st.get('throttle') or {}).get('reason')}")
 
@@ -374,7 +364,7 @@ SCENARIOS = (
     t_no_false_hits,
     t_find_card,
     t_ban_is_reported,
-    t_rate_limit_slows_down,
+    t_rate_limit_stops,
     t_dropped_connections,
     t_dead_target_stops,
     t_chap_portal,

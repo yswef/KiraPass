@@ -314,13 +314,13 @@ class Handler(BaseHTTPRequestHandler):
                                                       keyword=keyword).as_dict())
             return self._json({"ok": True, "job": job.as_dict()})
         if route == "/api/lockout":
-            # "how much does this router forgive?" - measured, not bypassed
+            # Explicitly opted-in, capped check; the engine stops on the first
+            # block response and never waits for expiry or retries afterward.
             prof = store.migrate(data.get("profile") or {})
             job = srv.submit("lockout",
                              lambda: engine.probe_lockout(
                                  prof,
-                                 max_failures=int(data.get("max_failures") or 30),
-                                 wait_limit=float(data.get("wait_limit") or 240)))
+                                 max_failures=int(data.get("max_failures") or 8)))
             return self._json({"ok": True, "job": job.as_dict()})
         if route == "/api/run/start":
             prof = store.migrate(data.get("profile") or {})

@@ -91,17 +91,18 @@ const I18N = {
     ua_hint: "غيّرها فقط إذا كان الكرت يعمل في متصفح هاتفك لكن الراوتر يرفض شكل طلب الأداة.",
     f_referer: "إرسال ترويسات المتصفح (Referer/Origin)",
     btn_lockout: "قِس حدّ الحظر",
-    lockout_measuring: "جارٍ قياس حدّ الحظر (قد يستغرق دقائق)...",
+    lockout_measuring: "يجري فحص محدود (بحد أقصى ٨ طلبات) ويتوقف فور ظهور الحجب...",
+    lockout_confirm: "هذا الفحص الاختياري يرسل حتى ٨ محاولات دخول خاطئة وقد يفعّل حجب الشبكة. هل تريد المتابعة؟ إذا كانت الشبكة تحجبك الآن، ألغِ الفحص واتصل بمسؤول الشبكة.",
     lockout_after: "الراوتر يحجب بعد",
     lockout_clears: "ويفكّ الحظر بعد",
-    lockout_never: "لم يحجبك الراوتر بعد",
-    lockout_never_clears: "ولم يفتح الحظر خلال الانتظار",
+    lockout_never: "لم يظهر حجب ضمن الحد الآمن من المحاولات",
+    lockout_stopped_after_block: "توقفت الأداة فور ظهور الحجب؛ لم تنتظر زواله ولم ترسل طلبات أخرى. أوقف المحاولات واطلب من مسؤول الشبكة مراجعة الوصول.",
     lockout_pace: "أسرع وتيرة آمنة: محاولة كل",
     lockout_pace_hint: "ضع هذه المهلة في خانة «مهلة بين المحاولات» واستخدم خيطاً واحداً أو اثنين.",
     lockout_impossible: "على هذا الراوتر لا يمكن التخمين دون حظر متكرر: إما مهلة طويلة جداً، أو تعديل الإعداد من الراوتر نفسه.",
     seconds: "ثانية",
     attempt: "محاولة",
-    netadvice_blocked_from_the_start: "الراوتر حاجب هذا الجهاز قبل أن نقيس: أعد الاتصال لتغيير الـ IP أو أعد تشغيل الراوتر، ثم قِس من جديد.",
+    netadvice_blocked_from_the_start: "الشبكة كانت تحجب هذا الجهاز قبل القياس. أوقف المحاولات واطلب من مسؤول الشبكة مراجعة الوصول وإعادة الخدمة.",
     btn_diagnose: "تشخيص الشبكة أولاً",
     btn_clear_review: "مسح صفحات المراجعة",
     license_check: "أتعهّد بأنني أملك هذه الشبكة أو لدي إذن كتابي من صاحبها لاختبارها.",
@@ -162,7 +163,7 @@ const I18N = {
     /* why nothing was tried: the initial learning failed */
     cal_failed_title: "لم أبدأ التخمين: فشل التعلّم الأولي",
     cal_failed_hint: "لم تُجرَ أي محاولة لأن الأداة لم تستطع تعلّم شكل صفحة الرفض. هذا ما فعله الراوتر:",
-    no_attempt_was_made: "المحاولات التي أُجريت فعلاً: صفر - لم يتم تخمين أي بطاقة.",
+    no_attempt_was_made: "لم يبدأ تخمين نطاق البطاقات؛ طلبات المعايرة (إن وجدت) ظاهرة أعلاه.",
     netadvice_refused: "تأكد أنك متصل بشبكة هذا الراوتر وأن الرابط صحيح (البورت مقفل أو الحماية رفضت جهازك).",
     netadvice_dns: "اسم العنوان لم يُترجم: اكتب IP الراوتر بدل الاسم (مثل 10.5.50.1).",
     netadvice_no_session: "صفحة الدخول لم تعطِ جلسة: تأكد من الرابط، ثم اختر هوية نفس متصفح هاتفك وأعد الفحص. لم تُحسب البطاقات كمجرّبة.",
@@ -176,9 +177,9 @@ const I18N = {
     netadvice_too_many_redirects: "الراوتر يحوّل الطلب بلا نهاية: انسخ الرابط النهائي من المتصفح.",
     netadvice_proto: "الرابط غير مدعوم: يجب أن يبدأ بـ http:// أو https://",
     netadvice_unknown: "خطأ غير متوقع: أعد المحاولة، وإن تكرر شغّل «تشخيص الشبكة أولاً».",
-    netadvice_blocked_already: "الراوتر حاجب جهازك الآن: أعد تشغيل الراوتر أو أعد الاتصال لتغيير الـ IP، ثم ابدأ من جديد.",
-    netadvice_blocked_before_probes: "الحجب سابق علينا: أعد الاتصال بالشبكة لتغيير الـ IP (أو فعّل «عنوان MAC عشوائي/خاص» لهذه الشبكة في إعدادات الهاتف) أو أعد تشغيل الراوتر، ثم ابدأ من جديد.",
-    netadvice_blocked_by_our_probes: "نحن من ملأنا عداد الفشل: الأداة تنتظر ٤٥ ثانية ثم تعيد التعلّم ببطاقتي تجربة بدل ثلاث. إن تكرّر: أعد الاتصال لتغيير الـ IP، وقلّل عدد الخيوط وأضف مهلة بين المحاولات.",
+    netadvice_blocked_already: "الشبكة تحجب هذا الجهاز. أوقف المحاولات واطلب من مسؤول الشبكة/الراوتر مراجعة الحجب وإعادة الخدمة.",
+    netadvice_blocked_before_probes: "ظهر الحجب قبل أي بطاقة تجربة. لا تحاول تجاوزه؛ اطلب من مسؤول الشبكة/الراوتر مراجعة الوصول وإعادة الخدمة.",
+    netadvice_blocked_by_our_probes: "ظهر رد حجب أثناء المعايرة، فتوقفت الأداة دون إعادة المحاولة. أوقف المحاولات واطلب من مسؤول الشبكة/الراوتر مراجعة الوصول وإعادة الخدمة.",
     netadvice_no_rejection_baseline: "لم يصل أي رد على بطاقات التجربة: تحقق من الاتصال بالشبكة.",
     netadvice_card_space_empty: "صيغة البطاقة لا تترك شيئاً للتخمين: البادئة + اللاحقة أطول من طول الكرت، أو المحارف المتغيّرة قليلة جداً.",
     netadvice_calibration_failed: "أصلح السبب أعلاه، ثم اضغط «ابدأ التخمين» من جديد.",
@@ -189,8 +190,6 @@ const I18N = {
     internet_opened_hint: "الراوتر أدخلك ولم يرد برد نجاح واضح، فلم نستطع تسمية الكرت من الرد وحده. أوقف الجلسة ثم جرّب هذه الكروت واحداً واحداً في صفحة الدخول - أحدها هو الذي فتح الشبكة. الأحدث في الآخر.",
     stop_internet_opened: "توقف لأن الإنترنت فتح أثناء التشغيل: أحد آخر الكروت المجربة هو الصحيح.",
     retry_now: "↻ أعد المحاولة الآن",
-    retry_after_wait: "⏳ أعد المحاولة بعد ٤٥ ثانية",
-    block_wait: "الراوتر حجبنا بعد بطاقات التجربة - انتظار",
     /* verdicts */
     v_ACCEPTED_VERIFIED: "مقبولة ومؤكدة",
     v_ACCEPTED: "مقبولة",
@@ -244,8 +243,8 @@ const I18N = {
     stop_found_verified: "وجدت بطاقة تعمل وتحقّقت من الإنترنت فعلياً.",
     stop_found_strong_evidence: "ظهرت بطاقة بدليل قوي (تحويل خارج البوابة) وتوقفت.",
     stop_user_stop: "أوقفت التشغيل بنفسك.",
-    stop_banned_by_router: "الراوتر حجبك. غيّر الـ IP (أعد تشغيل الراوتر أو أعد الاتصال) وقلّل المسارات.",
-    stop_rate_limited_by_router: "الشبكة تحدّ من الطلبات (429). قلّل المسارات أو أضف انتظاراً.",
+    stop_banned_by_router: "الراوتر حجب الطلبات. أوقف المحاولات واطلب من مسؤول الشبكة مراجعة الوصول وإعادة الخدمة.",
+    stop_rate_limited_by_router: "الشبكة حدّت من الطلبات (429). أوقفت الأداة المحاولات؛ اطلب من مسؤول الشبكة مراجعة الوصول قبل المتابعة.",
     stop_target_unreachable: "انقطع الوصول إلى الراوتر تماماً: تحقق من الشبكة.",
     why_title: "لماذا انتهت كل محاولة بهذه النتيجة؟",
     stop_attempts_done: "انتهى عدد المحاولات المطلوب. شغّل مرة أخرى - ستكمل من حيث توقفت.",
@@ -255,15 +254,16 @@ const I18N = {
     stop_captcha_challenge: "ظهرت كابتشا، والتخمين بعدها بلا فائدة.",
     stop_found_unverified: "قبل الراوتر البطاقة لكن لم أستطع تأكيد الإنترنت.",
     /* throttle */
-    th_rate_limited_slowing_down: "أبطأت الطلبات بسبب تحديد المعدل (429)",
-    th_ban_page_slowing_down: "أبطأت الطلبات بسبب ظهور صفحة حجب",
+    th_rate_limited_slowing_down: "أوقفت الطلبات بعد رد تحديد المعدل (429)",
+    th_ban_page_slowing_down: "أوقفت الطلبات بعد ظهور صفحة حجب",
     th_connections_refused_slowing_down: "أبطأت الطلبات لأن الراوتر يرفض الاتصالات",
     th_network_errors_slowing_down: "أبطأت الطلبات بسبب أخطاء شبكة متكررة",
     th_recovering_speed: "الشبكة هدأت - أعيد رفع السرعة تدريجياً",
     /* calibration + diagnostics */
-    cal_blocked_already: "الراوتر حاجب جهازك (ظهرت صفحة حجب قبل أي محاولة)",
+    cal_blocked_already: "الراوتر يرفض الطلبات بسبب حجب نشط (توقفت الأداة دون إعادة المحاولة)",
     cal_blocked_before_probes: "صفحة الحجب ظهرت قبل أن نجرّب أي بطاقة: الراوتر حاجب هذا الجهاز من قبل",
-    cal_blocked_by_our_probes: "بطاقات التجربة ملأت عداد المحاولات الفاشلة عند الراوتر، فحجبنا قبل أن نبدأ",
+    cal_blocked_by_our_probes: "ظهر رد حجب أثناء المعايرة فتوقفت الأداة دون انتظار أو إعادة محاولة",
+    cal_captcha_challenge: "ظهرت كابتشا أو خطوة تحقق؛ توقفت الأداة ولن تتابع الطلبات",
     cal_card_space_empty: "صيغة البطاقة لا تترك شيئاً للتخمين",
     cal_no_rejection_baseline: "لم يصل أي رد من الراوتر على بطاقات التجربة",
     cal_request_shape_rejected: "الراوتر رفض شكل الطلب قبل أن يفحص الكرت (HTTP 400/405/415/422). الأداة أخذت الكوكي والرمز المخفي؛ جرّب هوية نفس متصفحك، وإن استمر فالصفحة تنفّذ JavaScript خاصاً يحتاج تسجيل الطلب الناجح.",
@@ -285,7 +285,7 @@ const I18N = {
     diag_ban_check: "فحص الحجب",
     diag_ok: "سليم", diag_errors_present: "توجد أخطاء", diag_errors_rising: "الأخطاء تزيد مع السرعة",
     diag_no_ban_seen: "لا يوجد حجب", diag_ban_page_seen: "ظهرت صفحة حجب",
-    advice_blocked_already: "أنت محجوب بالفعل: أعد تشغيل الراوتر أو أعد الاتصال لتغيير الـ IP.",
+    advice_blocked_already: "الشبكة تحجب هذا الجهاز. أوقف المحاولات واطلب من مسؤول الشبكة مراجعة الوصول وإعادة الخدمة.",
     advice_router_pressure: "الأخطاء سببها ضغط على الراوتر: قلّل عدد المسارات.",
     advice_slow_router: "الراوتر بطيء في الرد: استخدم مسارات أقل وانتظاراً أطول.",
     advice_already_online_no_captive_portal: "أنت متصل بالإنترنت فعلاً - تأكد أنك على شبكة الضيف الصحيحة.",
@@ -391,17 +391,18 @@ const I18N = {
     ua_hint: "Change this only when a card works in your phone browser but the router rejects the tool's request shape.",
     f_referer: "send browser headers (Referer/Origin)",
     btn_lockout: "measure the lock-out",
-    lockout_measuring: "measuring the lock-out (this can take minutes)...",
+    lockout_measuring: "running a bounded check (up to 8 requests); it stops at the first block...",
+    lockout_confirm: "This optional check sends up to 8 failed login attempts and may trigger a network block. Continue only if authorized. If the network is already blocking you, cancel and contact its administrator.",
     lockout_after: "the router blocks after",
     lockout_clears: "and the block clears after",
-    lockout_never: "the router never blocked us in",
-    lockout_never_clears: "and the block never cleared while we waited",
+    lockout_never: "no block appeared within the safe attempt limit",
+    lockout_stopped_after_block: "The tool stopped as soon as the block appeared; it did not wait for expiry or send more requests. Stop attempts and ask the network administrator to review access.",
     lockout_pace: "fastest pace that stays under the limit: one attempt every",
     lockout_pace_hint: "put that in the delay box and use one or two threads.",
     lockout_impossible: "guessing on this router means getting blocked over and over: either a very long delay, or change the setting in the router itself.",
     seconds: "seconds",
     attempt: "attempt",
-    netadvice_blocked_from_the_start: "the router was already blocking this device: reconnect for a new IP or restart the router, then measure again.",
+    netadvice_blocked_from_the_start: "The network was already blocking this device before the check. Stop attempts and ask the network administrator to review access and restore service.",
     btn_diagnose: "Diagnose the network first", btn_clear_review: "Clear review pages",
     license_check: "I confirm I own this network or hold written permission from its owner.",
     btn_start: "Start guessing", btn_stop: "Stop",
@@ -456,7 +457,7 @@ const I18N = {
     server_gone: "Lost contact with the tool. If you stopped it, that is expected - start it again to continue.",
     cal_failed_title: "Nothing was tried: the initial learning failed",
     cal_failed_hint: "No attempt was made because the tool could not learn what a rejected card looks like. This is what the router did:",
-    no_attempt_was_made: "Attempts actually made: zero - no card was guessed.",
+    no_attempt_was_made: "The card-space guessing run did not start; any calibration requests are listed above.",
     netadvice_refused: "Check that you are on this router's network and the URL is right (the port is closed or the router refused your device).",
     netadvice_dns: "The host name did not resolve: use the router's IP instead (like 10.5.50.1).",
     netadvice_no_session: "The login page gave no session: verify the URL, pick the same browser identity as your phone and scan again. Cards were not counted as tested.",
@@ -470,9 +471,9 @@ const I18N = {
     netadvice_too_many_redirects: "Endless redirect loop: copy the final URL from the browser.",
     netadvice_proto: "Unsupported URL: it must start with http:// or https://",
     netadvice_unknown: "Unexpected error: try again, and if it repeats run \"diagnose the network first\".",
-    netadvice_blocked_already: "The router is blocking your device right now: restart the router or reconnect to change your IP, then start again.",
-    netadvice_blocked_before_probes: "The block is older than we are: reconnect to the network to change your IP (or turn on the per-network \"randomized / private MAC\" in the phone settings), or restart the router, then start again.",
-    netadvice_blocked_by_our_probes: "We filled the failure counter ourselves: the tool waits 45s, then relearns with two test cards instead of three. If it repeats: reconnect to change your IP, lower the threads and add a delay between attempts.",
+    netadvice_blocked_already: "The network is blocking this device. Stop attempts and ask the network/router administrator to review access and restore service.",
+    netadvice_blocked_before_probes: "The block appeared before any test card. Do not try to bypass it; ask the network/router administrator to review access and restore service.",
+    netadvice_blocked_by_our_probes: "A block reply appeared during calibration, so the tool stopped without retrying. Stop attempts and ask the network/router administrator to review access and restore service.",
     netadvice_no_rejection_baseline: "No answer at all to the test cards: check the connection to the network.",
     netadvice_card_space_empty: "The card format leaves nothing to guess: prefix + suffix are longer than the card, or there are too few variable characters.",
     netadvice_calibration_failed: "Fix the reason above, then press \"start guessing\" again.",
@@ -483,8 +484,6 @@ const I18N = {
     internet_opened_hint: "the router let us in but never answered with a clear success page, so the card could not be named from the reply alone. End the session and try these cards one by one in the login page - one of them opened the network. Newest last.",
     stop_internet_opened: "stopped because the internet opened during the run: one of the last cards tried is the working one.",
     retry_now: "↻ Try again now",
-    retry_after_wait: "⏳ Try again after 45 seconds",
-    block_wait: "the router locked us after the test cards - waiting",
     v_ACCEPTED_VERIFIED: "Accepted & verified",
     v_ACCEPTED: "Accepted",
     v_ACCEPTED_UNVERIFIED: "Router accepted (internet check failed)",
@@ -530,8 +529,8 @@ const I18N = {
     stop_found_verified: "Found a working card and verified real internet access.",
     stop_found_strong_evidence: "A card produced strong evidence (redirect out of the portal).",
     stop_user_stop: "You stopped it.", 
-    stop_banned_by_router: "The router blocked you. Change your IP (restart the router / reconnect) and lower the threads.",
-    stop_rate_limited_by_router: "The network is rate limiting (429). Lower the threads or add a delay.",
+    stop_banned_by_router: "The router blocked requests. Stop attempts and ask the network administrator to review access and restore service.",
+    stop_rate_limited_by_router: "The network rate limited requests (429). The tool stopped; ask the network administrator to review access before continuing.",
     stop_target_unreachable: "Lost contact with the router completely: check the network.",
         why_title: "Why each attempt ended the way it did",
 stop_attempts_done: "Requested attempts finished. Run again - it continues, it does not repeat.",
@@ -540,14 +539,15 @@ stop_attempts_done: "Requested attempts finished. Run again - it continues, it d
     stop_engine_error: "Internal error - see the log.",
     stop_captcha_challenge: "A captcha appeared; guessing is pointless after that.",
     stop_found_unverified: "The router accepted the card but the internet check failed.",
-    th_rate_limited_slowing_down: "Slowed down because of rate limiting (429)",
-    th_ban_page_slowing_down: "Slowed down because a block page appeared",
+    th_rate_limited_slowing_down: "Stopped further requests after a rate-limit response (429)",
+    th_ban_page_slowing_down: "Stopped further requests after a block page appeared",
     th_connections_refused_slowing_down: "Slowed down because the router refuses connections",
     th_network_errors_slowing_down: "Slowed down because of repeated network errors",
     th_recovering_speed: "Network calmed down - raising the speed again",
-    cal_blocked_already: "the router is blocking this device (a block page came back before any attempt)",
+    cal_blocked_already: "the router is refusing requests due to an active block (the tool stopped without retrying)",
     cal_blocked_before_probes: "the block page was already there before we tried any card - the router blocked this device earlier",
-    cal_blocked_by_our_probes: "our own test cards filled the router's failed-login counter, so it locked us before the run started",
+    cal_blocked_by_our_probes: "a block reply appeared during calibration, so the tool stopped without waiting or retrying",
+    cal_captcha_challenge: "a CAPTCHA or verification challenge appeared; the tool stopped sending requests",
     cal_card_space_empty: "the card format leaves nothing to guess",
     cal_no_rejection_baseline: "no reply came back for the test cards",
     cal_request_shape_rejected: "The router rejected the request before judging the card (HTTP 400/405/415/422). Cookies and hidden tokens were refreshed; try the same browser identity, otherwise the page uses custom JavaScript and a successful request must be captured.",
@@ -568,7 +568,7 @@ stop_attempts_done: "Requested attempts finished. Run again - it continues, it d
     diag_ban_check: "Block check",
     diag_ok: "clean", diag_errors_present: "errors present", diag_errors_rising: "errors rise with speed",
     diag_no_ban_seen: "no blocking seen", diag_ban_page_seen: "a block page appeared",
-    advice_blocked_already: "You are already blocked: restart the router or reconnect to change your IP.",
+    advice_blocked_already: "The network is blocking this device. Stop attempts and ask the network administrator to review access and restore service.",
     advice_router_pressure: "The errors come from router pressure: lower the thread count.",
     advice_slow_router: "The router answers slowly: fewer threads and more delay.",
     advice_already_online_no_captive_portal: "You are online already - make sure you are on the guest network.",
@@ -1143,11 +1143,12 @@ async function runDiagnose() {
 }
 
 async function runLockoutProbe() {
+  if (!window.confirm(t("lockout_confirm"))) return;
   const btn = $("lockoutBtn"); btn.disabled = true;
   const card = $("lockoutCard"); card.classList.remove("hidden");
   card.innerHTML = "<h4>" + t("lockout_measuring") + "</h4>";
   const res = await api("/api/lockout", { profile: profileFromForm(),
-                                          max_failures: 30, wait_limit: 240 });
+                                          max_failures: 8 });
   if (!res.ok) {
     card.innerHTML = "<div class='bad'>" + esc(res.error) + "</div>";
     btn.disabled = false; return;
@@ -1177,33 +1178,9 @@ function renderLockout(job, node) {
   } else {
     html += "<div class='bad'>" + t("lockout_after") + ": <b>" + r.ban_after +
             "</b></div>";
-    if (r.clears_after != null) {
-      html += "<div class='ok'>" + t("lockout_clears") + ": <b>" + r.clears_after +
-              "</b> " + t("seconds") + "</div>";
-    } else {
-      html += "<div class='bad'>" + t("lockout_never_clears") + " (" +
-              esc(String(r.waited || 0)) + " " + t("seconds") + ")</div>";
-    }
-  }
-  if (r.safe_delay_ms) {
-    html += "<div class='warn' style='margin-top:6px'>→ " + t("lockout_pace") +
-            ": <b>" + (r.safe_delay_ms / 1000).toFixed(1) + "</b> " + t("seconds") +
-            " / " + t("attempt") + "</div>" +
-            "<div class='hint'>" + t("lockout_pace_hint") + "</div>" +
-            "<div class='row wrap' style='margin-top:6px'>" +
-            "<button class='btn' id='applyPaceBtn'>" + esc(t("lockout_apply")) +
-            "</button></div>";
-  } else if (r.ban_after != null) {
-    html += "<div class='warn' style='margin-top:6px'>→ " +
-            t("lockout_impossible") + "</div>";
+    html += "<div class='warn'>" + t("lockout_stopped_after_block") + "</div>";
   }
   node.innerHTML = html;
-  const apply = $("applyPaceBtn");
-  if (apply) apply.addEventListener("click", () => {
-    $("r_delay").value = r.safe_delay_ms;
-    $("r_threads").value = Math.min(2, parseInt($("r_threads").value || "2", 10));
-    toast("✓ " + t("lockout_applied"));
-  });
 }
 
 function renderDiagnose(job, node) {
@@ -1312,8 +1289,8 @@ function renderStatus(st, events) {
   }
   $("stLatency").textContent = ((st.latency || {}).avg_ms || 0) + " ms";
   $("stDelay").textContent = ((st.throttle || {}).delay_ms || 0) + " ms";
-  const total = (st.progress || {}).total || 1;
-  const pct = Math.min(100, ((st.progress || {}).attempts || 0) / total * 100);
+  const pct = Math.max(0, Math.min(100,
+    Number((st.progress || {}).percent) || 0));
   $("bar").style.width = pct.toFixed(1) + "%";
   $("progressTrack").setAttribute("aria-valuenow", String(Math.round(pct)));
 
@@ -1369,10 +1346,6 @@ function renderStatus(st, events) {
     else if (ev.kind === "report") S.lastReport = ev.data.file;
     else if (ev.kind === "internet_opened")
       toast("\uD83C\uDF10 " + t("internet_opened_title"));
-    else if (ev.kind === "block_wait") {
-      S.retryWait = (ev.data || {}).seconds || 45;
-      toast("⏳ " + t("block_wait") + " " + S.retryWait + "s");
-    }
   });
   if (st.review && st.review.length) renderReview(st.review);
   if (st.hits && st.hits.length) renderHits(null, st.hits);
@@ -1529,30 +1502,19 @@ function renderStop(st) {
   if (S.lastReport)
     html += "<div class='hint'>" + t("report_saved") + ": <span class='mono'>" +
             esc(S.lastReport) + "</span></div>";
-  /* a run that never started can simply be tried again - straight away, or
-     after the router's lockout has passed */
-  if (st.stop_reason === "calibration_failed") {
+  /* Do not offer an automatic retry for explicit network blocks or an
+     unproven known card; those need operator review before any more requests. */
+  const calError = (st.calibration || {}).error || st.error || "";
+  const stopForReview = ["blocked_already", "blocked_before_probes",
+    "captcha_challenge", "known_card_not_proven",
+    "known_card_out_of_format"].includes(calError);
+  if (st.stop_reason === "calibration_failed" && !stopForReview) {
     html += "<div class='row wrap' style='margin-top:8px'>" +
-            "<button class='btn' id='retryNowBtn'>" + esc(t("retry_now")) + "</button>" +
-            "<button class='btn' id='retryWaitBtn'>" + esc(t("retry_after_wait")) +
-            "</button></div>";
+            "<button class='btn' id='retryNowBtn'>" + esc(t("retry_now")) + "</button></div>";
   }
   card.innerHTML = html;
   const now = $("retryNowBtn");
   if (now) now.addEventListener("click", () => startRun());
-  const wait = $("retryWaitBtn");
-  if (wait) wait.addEventListener("click", () => {
-    let left = S.retryWait || 45;
-    wait.disabled = true;
-    if (now) now.disabled = true;
-    const tick = () => {
-      if (left <= 0) { startRun(); return; }
-      wait.textContent = t("retry_after_wait") + " (" + left + ")";
-      left -= 1;
-      setTimeout(tick, 1000);
-    };
-    tick();
-  });
 }
 
 /* ------------------------------------------------------------------ modal */
