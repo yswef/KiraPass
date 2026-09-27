@@ -152,6 +152,15 @@ class PortalFormTests(unittest.TestCase):
         self.assertNotIn("connect", form.extra_fields)
         self.assertNotIn("go", form.extra_fields)
 
+    def test_a_copied_get_submission_is_recognised_without_a_form(self):
+        url = "http://a.com/login?username=2934664754&password=&dst=%2F"
+        form = portals.parse_form("<html>please wait</html>", url)
+        self.assertEqual(form.method, "get")
+        self.assertEqual(form.user_field, "username")
+        self.assertEqual(form.pass_field, "password")
+        self.assertEqual(form.dst_field, "dst")
+        self.assertEqual(form.dst_value, "/")
+
     def test_buttons_are_never_sent_as_fixed_fields(self):
         html = """<html><form action="/login" method="post">
           <input type="text" name="username">
@@ -545,6 +554,211 @@ class KnownCardTests(unittest.TestCase):
         self.assertTrue(all(t["code"] == "REJECTED" for t in trials), trials)
         # and the router's own answer is in there, not just "it failed"
         self.assertTrue(any(t.get("word") for t in trials), trials)
+
+
+class BrowserParityTests(unittest.TestCase):
+    """A real portal hands out a cookie and a token on the login page, and
+    refuses the post without them: "bad request" instead of a judgement.
+    That is the difference between a browser - which asks for the page first
+    - and a script that only posts.
+    """
+
+    def test_a_bare_post_is_refused_but_the_run_gets_judged(self):
+        with MockPortal(valid_cards={"020124042"}, pass_mode="empty",
+                        require_session=True) as portal:
+            info = selftest.scan(portal.url)
+            p = selftest.make_profile(portal.url, prefix="020124", length=9,
+                                      portal_info=info)
+            # no page was ever asked for: the router refuses the request
+            sess = engine.new_session()
+            self.addCleanup(sess.close)
+            r = engine.send_login(sess, p, "020124000")
+            self.assertEqual(r.status, 400, r.text[:120])
+
+            # asking for the page first hands us what the portal wants
+            warmed = engine.warm_up(sess, p)
+            self.assertTrue((warmed.get("extra_fields") or {}).get("tok"),
+                            warmed.get("extra_fields"))
+            r = engine.send_login(sess, warmed, "020124000")
+            self.assertEqual(r.status, 200, r.text[:120])
+
+            # and a whole run gets its cards judged, not refused
+            eng = engine.Engine(store.Store(), persist=False,
+                                checks=selftest.mock_checks(portal))
+            eng.start(p, attempts=20, threads=2, delay_ms=0, verify_after=False)
+            deadline = time.time() + 60
+            while time.time() < deadline and eng.state != "done":
+                time.sleep(0.1)
+            st = eng.status()
+            self.assertGreater(st["counters"].get("REJECTED", 0), 5,
+                               st["counters"])
+            self.assertEqual(st["counters"].get("NET_ERROR", 0), 0,
+                             st["counters"])
+            self.assertEqual(portal.state.bad_requests, 1)   # only the bare one
+
+    def test_the_request_looks_like_the_browser_that_scanned_it(self):
+        p = selftest.make_profile("http://10.5.50.1/login",
+                                  prefix="020124", length=9)
+        h = engine.browser_headers(p, p["login_url"])
+        self.assertEqual(h["Referer"], p["login_url"])
+        self.assertEqual(h["Origin"], "http://10.5.50.1")
+        self.assertIn("x-www-form-urlencoded", h["Content-Type"])
+        # the operator can send another identity - some portals refuse others
+        p2 = dict(p, user_agent="Mozilla/5.0 (iPhone)", send_referer=False)
+        h2 = engine.browser_headers(p2, p2["login_url"])
+        self.assertEqual(h2["User-Agent"], "Mozilla/5.0 (iPhone)")
+        self.assertNotIn("Referer", h2)
+
+        # A browser GET form has a Referer but no POST-only Origin/content type.
+        get_profile = dict(p, method="get")
+        h3 = engine.browser_headers(get_profile, get_profile["login_url"])
+        self.assertIn("Referer", h3)
+        self.assertNotIn("Origin", h3)
+        self.assertNotIn("Content-Type", h3)
+
+    def test_known_card_tuning_keeps_rotating_session_tokens(self):
+        """Calibration tries many shapes; every one needs the token just returned."""
+        with MockPortal(valid_cards={"0242"}, pass_mode="same",
+                        require_session=True) as portal:
+            info = selftest.scan(portal.url)
+            p = selftest.make_profile(portal.url, prefix="02", length=4,
+                                      portal_info=info, pass_mode="empty")
+            cal = engine.calibrate(p, known_card="0242",
+                                   checks=selftest.mock_checks(portal))
+            self.assertTrue(cal.ok, cal.as_dict())
+            self.assertEqual(cal.profile["pass_mode"], "same")
+            self.assertEqual((cal.tuned or {}).get("mode"), "same", cal.tuned)
+            self.assertEqual(portal.state.bad_requests, 0,
+                             "a one-use token was reused during calibration")
+
+    def test_diagnosis_uses_a_browser_session_in_every_thread(self):
+        with MockPortal(valid_cards={"0299"}, pass_mode="empty",
+                        require_session=True) as portal:
+            info = selftest.scan(portal.url)
+            p = selftest.make_profile(portal.url, prefix="03", length=4,
+                                      portal_info=info)
+            result = engine.diagnose(p, threads=4,
+                                     checks=selftest.mock_checks(portal))
+            self.assertTrue(result["ok"], result)
+            self.assertEqual(result["latency"]["sequential"]["errors"], 0,
+                             result["latency"])
+            self.assertEqual(result["latency"]["parallel"]["errors"], 0,
+                             result["latency"])
+            self.assertEqual(portal.state.bad_requests, 0,
+                             "parallel diagnosis posted without a page session")
+
+    def test_scanning_a_copied_success_url_does_not_spend_its_card(self):
+        with MockPortal(valid_cards={"0242"}, method="get",
+                        pass_mode="empty") as portal:
+            copied = portal.url + "?username=0242&password=&dst=%2F"
+            sess = engine.new_session()
+            self.addCleanup(sess.close)
+            found = portals.discover(sess, copied)
+            self.assertEqual(portal.state.logins, 0,
+                             "the scan submitted and consumed the real card")
+            self.assertEqual(found.form.method, "get")
+            self.assertNotIn("username=0242", found.form.action)
+
+    def test_a_copied_success_url_replaces_old_credentials(self):
+        """Never append USER2 after ?username=USER1&password=.
+
+        The user's exact report was that changing the username in this URL in
+        a browser works. Many routers read the first duplicate query value, so
+        appending fields would silently test USER1 for the entire run.
+        """
+        with MockPortal(valid_cards={"0242"}, method="get",
+                        pass_mode="empty") as portal:
+            p = selftest.make_profile(
+                portal.url + "?username=OLD&password=", prefix="02", length=4,
+                method="get", pass_mode="empty")
+            sess = engine.new_session()
+            self.addCleanup(sess.close)
+            r = engine.send_login(sess, p, "0242")
+            self.assertEqual(r.status, 302, r.text[:120])
+            self.assertEqual(portal.state.asked_cards[-1], "0242")
+            self.assertNotIn("OLD", portal.state.asked_cards)
+
+    def test_http_400_is_not_learned_as_a_wrong_card(self):
+        """A bad request is the router rejecting the shape, not the card."""
+        with MockPortal(valid_cards={"0242"}, pass_mode="empty",
+                        reject_shape=True) as portal:
+            info = selftest.scan(portal.url)
+            p = selftest.make_profile(portal.url, prefix="02", length=4,
+                                      portal_info=info)
+            cal = engine.calibrate(p)
+            self.assertFalse(cal.ok, cal.as_dict())
+            self.assertEqual(cal.error, "request_shape_rejected")
+            step = next(s for s in cal.steps
+                        if s["reason"] == "request_shape_rejected")
+            self.assertEqual(step["detail"]["status"], [400, 400, 400])
+
+
+class LostAnswerTests(unittest.TestCase):
+    """A request can die on the way while the router did take it.
+
+    Such a card has no answer, so it is not tested: the tool has to ask about
+    it again instead of moving on - otherwise a run over a whole card space
+    can finish without ever really asking about the card that works.
+    """
+
+    def test_status_is_safe_before_the_first_run(self):
+        eng = engine.Engine(store.Store(), persist=False)
+        st = eng.status()
+        self.assertEqual(st["state"], "idle")
+        self.assertEqual(st["progress"]["threads"], 0)
+
+    def test_a_card_that_got_no_answer_is_asked_again(self):
+        from kirapass import httpclient, selftest as _st
+
+        with MockPortal(valid_cards={"0242"}, pass_mode="empty") as portal:
+            info = _st.scan(portal.url)
+            p = _st.make_profile(portal.url, prefix="02", length=4,
+                                 portal_info=info, pass_mode="empty")
+            real = engine.send_login
+            lost = {"left": 2}
+
+            def silent_twice(session, prof, card, *a, **k):
+                # "refused" is not retryable on the spot, so without the
+                # re-queue the card would simply be dropped
+                if card == "0242" and lost["left"] > 0:
+                    lost["left"] -= 1
+                    raise httpclient.NetError("refused", "simulated silence",
+                                              prof.get("login_url", ""))
+                return real(session, prof, card, *a, **k)
+
+            engine.send_login = silent_twice
+            try:
+                st, _eng = _st.run_engine(p, attempts=200, threads=2,
+                                          checks=_st.mock_checks(portal))
+            finally:
+                engine.send_login = real
+            counters = st.get("counters", {})
+            self.assertTrue(st.get("hits"), f"hits={st.get('hits')} "
+                                            f"counters={counters}")
+            self.assertGreaterEqual(counters.get("NET_ERROR", 0), 1, counters)
+            self.assertEqual(lost["left"], 0, "the card was never asked again")
+
+    def test_a_redirect_out_of_the_portal_is_never_called_rejected(self):
+        # A router that answers with an empty body and a redirect for wrong
+        # cards (and never the same target twice) leaves the judge with
+        # nothing but the status to compare.  A card that goes somewhere else
+        # entirely must not then be reported as a normal rejection.
+        # ... two different targets, so there is no single "wrong card" target
+        # to compare with and only the status is left
+        fp = fingerprint.Fingerprinter.learn([
+            _FakeReply("", status=302,
+                       headers={"Location": "http://portal/login?e=1"}),
+            _FakeReply("", status=302,
+                       headers={"Location": "http://portal/status?e=2"})])
+        judge = fingerprint.Judge(fp, "http://portal/login")
+        v = judge.classify(_FakeReply(
+            "", status=302,
+            headers={"Location":
+                     "http://connectivitycheck.gstatic.com/generate_204"}),
+            submitted=["0242"])
+        self.assertNotEqual(v.code, "REJECTED", v.as_dict())
+        self.assertEqual(
+            v.reason, "redirect_out_of_portal_but_page_matches", v.as_dict())
 
 
 class _FakeReply:

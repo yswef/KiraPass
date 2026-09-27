@@ -40,8 +40,16 @@ tests/test_kirapass.py      unittest wrapper (scenarios + units)
    start, and the next run continues where the previous one stopped. The engine
    emits a `resume` event, and `resume=False` starts a fresh pass with a new
    walk.
-4. **Actions are isolated per thread**: one `Session` (connection + cookies)
-   per worker, throw-away sessions for diagnostics.
+4. **Actions are isolated per thread**: one browser-like `Session` per worker.
+   Before submitting anything it fetches the page, receives that session's
+   cookie/hidden token, and absorbs the fresh form returned after every failed
+   login (one-use CSRF tokens are common). Parallel diagnostics do the same.
+   A copied `?username=...&password=` URL is scrubbed before scanning so a real
+   card is never spent; each later GET replaces those keys rather than
+   appending duplicate credentials.
+4b. **No answer is not a rejection and not coverage.** A card whose socket died
+   is re-queued up to `MAX_CARD_RETRIES`; retry requests stay in the visible
+   counters but do not advance `space_pos` as extra cards.
 5. **Reasons are machine keys** (`same_as_rejection_page_exact`,
    `net_read_timeout`, `banned_by_router`, ...) and the UI translates them -
    so nothing is hardcoded in two places.
@@ -52,7 +60,7 @@ tests/test_kirapass.py      unittest wrapper (scenarios + units)
 ## Tests
 
 ```bash
-python3 -m unittest discover -s tests -v     # 36 tests
+python3 -m unittest discover -s tests -v     # 62 tests
 python3 KiraPass.py --selftest               # the 14 scenarios, readable output
 python3 -m kirapass.selftest --keep          # keep the test data folder
 ```
@@ -111,6 +119,13 @@ UI can ask for the token.
   when a network blocks the well-known ones:
   `"http://my.check/generate_204|204"` or `"http://a/ok|200|Expected text"`,
   comma separated. Defaults to google204 / msft / apple.
+* `KIRAPASS_WARMUP_EVERY` - refetch each worker's login form after this many
+  attempts (default 25) as a fallback for expiring sessions; every returned
+  rejection form is absorbed immediately regardless. `0` means page once.
+* `KIRAPASS_AUTO_PACE=0` - disable the AIMD pace/thread tuner and hold exactly
+  the operator's delay/thread settings.
+* `KIRAPASS_BLOCK_PATIENCE` - how many temporary lockouts a long run waits out
+  before stopping (default 3).
 * `--host 0.0.0.0 --token <secret>` - serve the page to the LAN (phone on the
   same Wi-Fi). Non-loopback API calls then need the token.
 

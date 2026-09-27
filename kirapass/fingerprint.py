@@ -458,6 +458,20 @@ class Judge:
                            evidence=resp.as_dict())
 
         rejected, how, sim = self.fp.same_as_reject(resp, extra_literals=sub)
+        if rejected and how != "redirect" and resp.is_redirect():
+            # A reply cannot be "the same as the rejection page" AND send the
+            # browser out of the portal at the same time: the router is
+            # answering something else for this card.  Calling that a plain
+            # rejection is how a working card gets lost, so it goes to review
+            # instead - with the reason and the target written down.
+            host = _host(loc)
+            if host and host != self.portal_host:
+                return Verdict("UNKNOWN",
+                               "redirect_out_of_portal_but_page_matches",
+                               0.0,
+                               data={"location": loc[:200], "how": how,
+                                     "similarity": round(sim, 3)},
+                               evidence=resp.as_dict())
         if rejected:
             seen_ok = [w for w in self.success_words if w in low or w in raw_low]
             if seen_ok and how != "exact":

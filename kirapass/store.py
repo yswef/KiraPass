@@ -102,6 +102,10 @@ def new_profile(**kw) -> dict:
         # what the lock-out probe measured on this router (see
         # engine.probe_lockout) - the run uses it to wait exactly as long as
         # this router needs instead of a guessed 45 seconds
+        # how the request has to look for this portal: some of them refuse
+        # anything that does not look like the browser that scanned them
+        "user_agent": "",
+        "send_referer": True,
         "ban_after": None,
         "clears_after": None,
         "safe_delay_ms": 0,

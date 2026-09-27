@@ -8,7 +8,7 @@ const I18N = {
     step_scan: "فحص الشبكة", step_format: "صيغة البطاقة",
     step_run: "التشغيل", step_results: "النتائج",
     scan_title: "1) افحص صفحة الدخول",
-    scan_hint: "الصق رابط صفحة دخول الهوتسبوت كما تفتحها في المتصفح. الأداة تقرأ الصفحة بنفسها وتكتشف نوع الطلب (POST/GET) وأسماء الحقول من دون أسئلة.",
+    scan_hint: "الصق رابط صفحة دخول الهوتسبوت كما تفتحها في المتصفح. إن كان الرابط نفسه يحتوي ?username=…&password= فالأداة تعرف أنه GET، وتحذف الكرت من طلب الفحص حتى لا تستهلكه ولا تكرر الاسم القديم. ثم تقرأ الصفحة وتكتشف الحقول تلقائياً.",
     scan_button: "افحص الآن",
     next_format: "التالي: صيغة البطاقة ←",
     next_run: "التالي: التشغيل ←",
@@ -50,13 +50,20 @@ const I18N = {
     prob_suffix_mismatch: "الكرت لا ينتهي باللاحقة المضبوطة",
     prob_charset_mismatch: "الكرت فيه رموز ليست ضمن الأبجدية المختارة",
     known_card_tried: "جرّبنا هذا الكرت بعدة أشكال للطلب، وكان رد الراوتر:",
-    known_card_hint: "→ إن كان الرد «مثل صفحة الرفض» في كل الأشكال: فالكرت منتهي/مستخدم أو كلمة المرور/الحقول ناقصة (افتح صفحة الدخول في المتصفح وسجّل طلباً ناجحاً ثم قارن الحقول). وإن كان «محجوب»: أعد الاتصال ثم أعد المحاولة.",
+    known_card_hint: "→ HTTP 400/405/415/422 يعني أن الراوتر رفض شكل الطلب قبل فحص الكرت. الأداة الآن تجدّد الكوكي والرمز المخفي؛ اختر أيضاً هوية نفس متصفحك. أما «مثل صفحة الرفض» مع HTTP 200 فالكرت منتهي/مستخدم أو كلمة المرور/الحقول ناقصة. وإن كان «محجوب»: أعد الاتصال ثم أعد المحاولة.",
     s_eta: "الوقت المتبقي",
     th_auto_slowed_router_complaining: "أبطأت تلقائياً: الراوتر بدأ يشتكي (أخطاء/تقييد)",
     th_auto_sped_up: "أسرعت تلقائياً: الراوتر يستجيب بلا أخطاء",
     th_auto_sped_up_more_threads: "أسرعت تلقائياً: أضفت مسارات لأن الراوتر يستجيب بلا أخطاء",
     lockout_apply: "طبّق الوتيرة الآمنة على الإعدادات",
     lockout_applied: "تم ضبط المهلة والمسارات",
+    f_ua: "هوية المتصفح User-Agent",
+    f_ua_custom: "User-Agent مخصص",
+    ua_default: "المتصفح الافتراضي (Chrome/Windows)",
+    ua_android: "أندرويد Chrome", ua_iphone: "آيفون Safari",
+    ua_custom: "اكتبها بنفسك…",
+    ua_hint: "غيّرها فقط إذا كان الكرت يعمل في متصفح هاتفك لكن الراوتر يرفض شكل طلب الأداة.",
+    f_referer: "إرسال ترويسات المتصفح (Referer/Origin)",
     btn_lockout: "قِس حدّ الحظر",
     lockout_measuring: "جارٍ قياس حدّ الحظر (قد يستغرق دقائق)...",
     lockout_after: "الراوتر يحجب بعد",
@@ -132,6 +139,7 @@ const I18N = {
     no_attempt_was_made: "المحاولات التي أُجريت فعلاً: صفر - لم يتم تخمين أي بطاقة.",
     netadvice_refused: "تأكد أنك متصل بشبكة هذا الراوتر وأن الرابط صحيح (البورت مقفل أو الحماية رفضت جهازك).",
     netadvice_dns: "اسم العنوان لم يُترجم: اكتب IP الراوتر بدل الاسم (مثل 10.5.50.1).",
+    netadvice_no_session: "صفحة الدخول لم تعطِ جلسة: تأكد من الرابط، ثم اختر هوية نفس متصفح هاتفك وأعد الفحص. لم تُحسب البطاقات كمجرّبة.",
     netadvice_connect_timeout: "لا يوجد رد عند فتح الاتصال: الراوتر بعيد أو مزدحم، أو لست متصلاً بشبكته.",
     netadvice_read_timeout: "الراوتر فتح الاتصال ولم يرد: انتظر قليلاً وقلّل عدد المسارات.",
     netadvice_reset: "الراوتر قطع الاتصال فجأة: أعد الاتصال بالشبكة ثم أعد المحاولة.",
@@ -191,6 +199,7 @@ const I18N = {
     r_rejection_wording: "نص الرفض موجود في الصفحة",
     r_reply_differs_not_proven: "الرد مختلف لكن لا دليل على القبول - احفظته للمراجعة",
     r_looks_rejected_but_success_words_found: "الرد يشبه الرفض لكن فيه كلمات نجاح تعلّمتها - يحتاج نظرة منك",
+    r_redirect_out_of_portal_but_page_matches: "الراوتر حوّلنا لجهة أخرى لكن الصفحة تشبه الرفض - لا نسمّيها رفضاً، محفوظة للمراجعة",
     /* network error kinds */
     net_dns: "اسم العنوان لم يُترجم (DNS)",
     net_refused: "الراوتر رفض الاتصال (البورت مقفول أو الحماية منعتك)",
@@ -204,6 +213,7 @@ const I18N = {
     net_too_many_redirects: "دوران لا نهائي في التحويل",
     net_proto: "رابط غير مدعوم",
     net_unknown: "خطأ غير متوقع",
+    net_no_session: "لم نستطع أخذ جلسة من صفحة الدخول - لم يُجرَّب الكرت",
     /* stop reasons */
     stop_found_verified: "وجدت بطاقة تعمل وتحقّقت من الإنترنت فعلياً.",
     stop_found_strong_evidence: "ظهرت بطاقة بدليل قوي (تحويل خارج البوابة) وتوقفت.",
@@ -230,6 +240,7 @@ const I18N = {
     cal_blocked_by_our_probes: "بطاقات التجربة ملأت عداد المحاولات الفاشلة عند الراوتر، فحجبنا قبل أن نبدأ",
     cal_card_space_empty: "صيغة البطاقة لا تترك شيئاً للتخمين",
     cal_no_rejection_baseline: "لم يصل أي رد من الراوتر على بطاقات التجربة",
+    cal_request_shape_rejected: "الراوتر رفض شكل الطلب قبل أن يفحص الكرت (HTTP 400/405/415/422). الأداة أخذت الكوكي والرمز المخفي؛ جرّب هوية نفس متصفحك، وإن استمر فالصفحة تنفّذ JavaScript خاصاً يحتاج تسجيل الطلب الناجح.",
     cal_reach_login_page: "الوصول إلى صفحة الدخول",
     cal_internet_state: "حالة الإنترنت قبل أي محاولة",
     cal_rejection_baseline: "تعلّم شكل صفحة الرفض",
@@ -274,7 +285,7 @@ const I18N = {
   en: {
     step_scan: "Scan", step_format: "Card format", step_run: "Run", step_results: "Results",
     scan_title: "1) Scan the login page",
-    scan_hint: "Paste the hotspot login URL exactly as you open it in the browser. The tool reads the page and detects POST/GET and the field names by itself.",
+    scan_hint: "Paste the hotspot login URL exactly as you open it in the browser. If it already contains ?username=…&password=, the tool recognises GET and removes that card from the scan request so it is neither consumed nor left as the old duplicate username. It then detects the fields automatically.",
     scan_button: "Scan now", next_format: "Next: card format →", next_run: "Next: run →",
     format_title: "2) Card format",
     format_hint: "Describe the card: fixed prefix + full length. The variable part is what gets guessed. The preview shows how many combinations exist.",
@@ -313,13 +324,20 @@ const I18N = {
     prob_suffix_mismatch: "the card does not end with the suffix",
     prob_charset_mismatch: "the card has characters outside the chosen charset",
     known_card_tried: "we tried this card in several request shapes; the router answered:",
-    known_card_hint: "→ if every shape came back \"like the rejection page\": the card is used up/expired or a field or the password is missing (open the login page in a browser, log in once and compare the fields). If it came back \"blocked\": reconnect and try again.",
+    known_card_hint: "→ HTTP 400/405/415/422 means the router rejected the request before judging the card. Cookies and hidden tokens are now refreshed; also select the same browser identity. A 200 that still matches the rejection page means an expired/used card or a missing field/password. If blocked, reconnect and retry.",
     s_eta: "time left",
     th_auto_slowed_router_complaining: "slowed down automatically: the router started complaining (errors/limits)",
     th_auto_sped_up: "sped up automatically: the router is answering cleanly",
     th_auto_sped_up_more_threads: "sped up automatically: added threads because the router is answering cleanly",
     lockout_apply: "apply the safe pace to the settings",
     lockout_applied: "delay and threads updated",
+    f_ua: "browser identity (User-Agent)",
+    f_ua_custom: "custom User-Agent",
+    ua_default: "default browser (Chrome/Windows)",
+    ua_android: "Android Chrome", ua_iphone: "iPhone Safari",
+    ua_custom: "write a custom value…",
+    ua_hint: "Change this only when a card works in your phone browser but the router rejects the tool's request shape.",
+    f_referer: "send browser headers (Referer/Origin)",
     btn_lockout: "measure the lock-out",
     lockout_measuring: "measuring the lock-out (this can take minutes)...",
     lockout_after: "the router blocks after",
@@ -389,6 +407,7 @@ const I18N = {
     no_attempt_was_made: "Attempts actually made: zero - no card was guessed.",
     netadvice_refused: "Check that you are on this router's network and the URL is right (the port is closed or the router refused your device).",
     netadvice_dns: "The host name did not resolve: use the router's IP instead (like 10.5.50.1).",
+    netadvice_no_session: "The login page gave no session: verify the URL, pick the same browser identity as your phone and scan again. Cards were not counted as tested.",
     netadvice_connect_timeout: "No answer when opening the connection: the router is far, busy, or you are not on its network.",
     netadvice_read_timeout: "The router opened the connection but never answered: wait a little and lower the thread count.",
     netadvice_reset: "The router cut the connection: reconnect to the network and try again.",
@@ -443,6 +462,7 @@ const I18N = {
     r_rejection_wording: "the rejection wording is on the page",
     r_reply_differs_not_proven: "reply differs but nothing proves acceptance - saved for review",
     r_looks_rejected_but_success_words_found: "looks like the rejection page but contains success words - needs your eyes",
+    r_redirect_out_of_portal_but_page_matches: "the router sent us somewhere else though the page matches a rejection - not called a rejection, saved for review",
     net_dns: "host name could not be resolved",
     net_refused: "the router refused the connection",
     net_connect_timeout: "no answer while opening the connection",
@@ -454,6 +474,7 @@ const I18N = {
     net_bad_response: "unreadable reply from the router",
     net_too_many_redirects: "redirect loop", net_proto: "unsupported URL",
     net_unknown: "unexpected error",
+    net_no_session: "could not obtain a login-page session - the card was not tested",
     stop_found_verified: "Found a working card and verified real internet access.",
     stop_found_strong_evidence: "A card produced strong evidence (redirect out of the portal).",
     stop_user_stop: "You stopped it.", 
@@ -477,6 +498,7 @@ stop_attempts_done: "Requested attempts finished. Run again - it continues, it d
     cal_blocked_by_our_probes: "our own test cards filled the router's failed-login counter, so it locked us before the run started",
     cal_card_space_empty: "the card format leaves nothing to guess",
     cal_no_rejection_baseline: "no reply came back for the test cards",
+    cal_request_shape_rejected: "The router rejected the request before judging the card (HTTP 400/405/415/422). Cookies and hidden tokens were refreshed; try the same browser identity, otherwise the page uses custom JavaScript and a successful request must be captured.",
     cal_reach_login_page: "Reaching the login page",
     cal_internet_state: "Internet state before any attempt",
     cal_rejection_baseline: "Learning the rejection page",
@@ -622,6 +644,25 @@ function humanTime(seconds) {
   return h + (LANG === "ar" ? " ساعة" : "h") + (rm ? " " + rm : "");
 }
 
+const UA_PRESETS = {
+  android: "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Mobile Safari/537.36",
+  iphone: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1",
+};
+
+function uaFromForm() {
+  const pick = $("f_ua").value;
+  if (pick === "custom") return ($("f_ua_custom").value || "").trim();
+  return UA_PRESETS[pick] || "";
+}
+
+function uaToForm(value) {
+  value = value || "";
+  const hit = Object.keys(UA_PRESETS).find((k) => UA_PRESETS[k] === value);
+  $("f_ua").value = value ? (hit || "custom") : "";
+  $("f_ua_custom").value = value && !hit ? value : "";
+  $("f_ua_custom_wrap").classList.toggle("hidden", !(value && !hit));
+}
+
 function stateLabel(state) {
   if (state === "running") return t("state_running");
   if (state === "calibrating") return t("state_calibrating");
@@ -735,12 +776,16 @@ function profileFromForm() {
        it too, and loading one must not silently forget it */
     chap: (S.portal && S.portal.form && S.portal.form.chap) ||
           (S.profile && S.profile.chap) || null,
+    user_agent: uaFromForm(),
+    send_referer: $("f_referer").checked,
   }, progressFromProfile(S.profile));
 }
 
 function fillFormFromProfile(p) {
   if (!p) return;
   S.profile = p;                       /* keeps space_pos / walk for resume */
+  uaToForm(p.user_agent || "");
+  $("f_referer").checked = p.send_referer !== false;
   $("f_name").value = p.name || "";
   $("f_login_url").value = p.login_url || "";
   $("scanUrl").value = p.login_url || "";
@@ -1473,6 +1518,9 @@ function wire() {
   $("calibrateBtn").addEventListener("click", runCalibration);
   $("diagnoseBtn").addEventListener("click", runDiagnose);
   $("lockoutBtn").addEventListener("click", runLockoutProbe);
+  $("f_ua").addEventListener("change", () => {
+    $("f_ua_custom_wrap").classList.toggle("hidden", $("f_ua").value !== "custom");
+  });
   $("saveProfileBtn").addEventListener("click", async () => {
     const r = await api("/api/profiles/save", { profile: profileFromForm() });
     toast(r.ok ? "💾 OK" : t("scan_fail"));

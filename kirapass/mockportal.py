@@ -24,6 +24,7 @@ import string
 import threading
 import time
 import urllib.parse
+import uuid
 
 CARD_PAGE = """<!DOCTYPE html><html><head><title>Hotspot Login</title>
 <script type="text/javascript" src="md5.js"></script>
@@ -39,7 +40,7 @@ function doLogin() {{
 <p id="message">{message}</p>
 <form name="login" action="{action}" method="{method}" onSubmit="return doLogin()">
 <input type="hidden" name="dst" value="{dst}">
-<input type="hidden" name="popup" value="true">
+<input type="hidden" name="popup" value="true">{tok_field}
 <input type="text" name="username" value="{echo_user}">
 <input type="password" name="password" value="">
 <input type="submit" value="Connect">
@@ -61,7 +62,8 @@ class PortalState:
                  dynamic=True, ban_after=0, ban_seconds=0,
                  rate_limit_after=0, drop_every=0,
                  drop_after=0, chap=False, prefix="02", length=6,
-                 error_text=None, hide_success=False):
+                 error_text=None, hide_success=False, require_session=False,
+                 reject_shape=False):
         self.valid_cards = set(valid_cards)
         self.pass_mode = pass_mode          # same | empty | chap
         self.method = method
@@ -73,6 +75,13 @@ class PortalState:
         # answers with the rejection page - the nastiest real case, and the one
         # only the "did the internet open?" watchdog can catch
         self.hide_success = hide_success
+        # require_session: a real portal hands out a session cookie and a token
+        # in the login page and refuses the post without them (this is what a
+        # browser does automatically and a bare script does not)
+        self.require_session = require_session
+        self.reject_shape = reject_shape
+        self.tokens = {}
+        self.bad_requests = 0
         self.rate_limit_after = rate_limit_after
         self.drop_every = drop_every
         self.drop_after = drop_after      # drop EVERY request after this many
@@ -114,7 +123,16 @@ class Handler(http.server.BaseHTTPRequestHandler):
             super().log_message(*args)
 
     # -- plumbing ---------------------------------------------------------
-    def _reply(self, code, body: str, headers=None):
+    def _reply(self, code, body, headers=None):
+        # a real portal sets its session cookie together with the page
+        sid = getattr(self, "_new_cookie", None)
+        if sid:
+            self._new_cookie = None
+            headers = dict(headers or {})
+            headers["Set-Cookie"] = "portal_sid=%s; Path=/" % sid
+        return self._raw_reply(code, body, headers)
+
+    def _raw_reply(self, code, body: str, headers=None):
         payload = body.encode("utf-8")
         self.send_response(code)
         self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -214,6 +232,21 @@ class Handler(http.server.BaseHTTPRequestHandler):
             st.bump("rate_hits")
             return self._reply(429, RATE_PAGE, {"Retry-After": "1"})
 
+        if st.require_session:
+            sid = ""
+            for part in (self.headers.get("Cookie") or "").split(";"):
+                if part.strip().startswith("portal_sid="):
+                    sid = part.strip().split("=", 1)[1]
+            if not sid or fields.get("tok") != st.tokens.get(sid):
+                return self._bad_request()
+            # A strict CSRF token is single-use: the returned login page gives
+            # the browser the next one.  This catches scripts that fetch the
+            # page once but keep reusing its first hidden value forever.
+            st.tokens[sid] = uuid.uuid4().hex[:16]
+
+        if st.reject_shape:
+            return self._bad_request("bad request: request shape rejected")
+
         card = fields.get("username", "")
         password = fields.get("password", "")
         with st.lock:
@@ -251,6 +284,25 @@ class Handler(http.server.BaseHTTPRequestHandler):
         return self._reply(302, "", {"Location": base + "/login?dst=" +
                                      urllib.parse.quote(path, safe="")})
 
+    def _session_id(self) -> str:
+        """The portal's session cookie: created on the first page view."""
+        st = self.server.state
+        raw = self.headers.get("Cookie") or ""
+        sid = ""
+        for part in raw.split(";"):
+            if part.strip().startswith("portal_sid="):
+                sid = part.strip().split("=", 1)[1]
+        if not sid or sid not in st.tokens:
+            sid = uuid.uuid4().hex[:12]
+            st.tokens[sid] = uuid.uuid4().hex[:16]
+            self._new_cookie = sid
+        return sid
+
+    def _bad_request(self, why="bad request: the form token is missing or old"):
+        st = self.server.state
+        st.bump("bad_requests")
+        return self._reply(400, "<html><body>%s</body></html>" % why)
+
     def _is_valid(self, card, password) -> bool:
         st = self.server.state
         if card not in st.valid_cards:
@@ -273,13 +325,18 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def _login_page(self, base, fields, error=False):
         st = self.server.state
+        tok_field = ""
+        if st.require_session:
+            sid = self._session_id()
+            tok_field = ('<input type="hidden" name="tok" value="%s">'
+                         % st.tokens.get(sid, ""))
         nonce = "".join(random.choices(string.hexdigits.lower()[:16], k=8)) \
             if st.dynamic else "fixednonce"
         message = st.error_text if error else ""
         html = CARD_PAGE.format(
             action=base + "/login", method=st.method,
             dst=fields.get("dst", ""), echo_user=fields.get("username", ""),
-            nonce=nonce, message=message,
+            nonce=nonce, message=message, tok_field=tok_field,
             chap_id=st.chap_id, chap_challenge=st.chap_challenge,
             mac_tail="33:44")
         return self._reply(200, html)

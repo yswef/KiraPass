@@ -270,6 +270,65 @@ safe_delay  : 3333 ms  ← «محاولة كل ٣٫٣ ثانية»
 
 ---
 
+## الجولة التاسعة · «الكرت يشتغل في المتصفح بس كل الاختبارات تقول شكل الطلب خاطئ»
+
+### السبب الأول في رابطك نفسه (وهو الأهم)
+الرابط الذي جرّبته هو طلب دخول مكتمل، لا مجرد صفحة:
+`/login?username=2934664754&password=`. الأداة كانت تستطيع أن تترك هذا
+`username` داخل الرابط ثم تضيف `username` جديداً، فيصبح الطلب فيه اسمَان؛
+راوترات كثيرة تقرأ **الأول**، ولذلك تغيّر الكرت في الأداة بينما الراوتر يظل
+يفحص الاسم القديم. كذلك كان فحص الرابط قادراً على إرسال الكرت الحقيقي نفسه
+واستهلاكه.
+
+الإصلاح الآن:
+1. وجود `username + password` في رابط بلا نموذج = دليل تلقائي أن الطريقة **GET**.
+2. الفحص يحذف بيانات الدخول من الرابط قبل فتحه، فلا يستهلك الكرت.
+3. كل محاولة **تستبدل** حقول الاستعلام القديمة ولا تلحق نسخة ثانية منها، مع
+   إبقاء `dst`/رموز التوجيه الأخرى.
+
+### السبب الثاني: جلسة المتصفح والرمز المخفي
+بوابات كثيرة تعطي **كوكي جلسة + رمز CSRF مخفياً** عند فتح صفحة الدخول، وقد
+تستهلك الرمز بعد محاولة واحدة. المتصفح يفتح الصفحة أولاً ثم يعرض صفحة الرفض
+الجديدة ورمزها الجديد؛ أما السكربت الذي يرسل الطلب مباشرة أو يعيد نفس الرمز
+فيرى `HTTP 400 bad request` مهما كان الكرت صحيحاً.
+
+### الإصلاح: الأداة تعمل كما يعمل المتصفح
+| # | ما صارت تفعله | الأثر |
+|---|---|---|
+| 1 | كل مسار يفتح الصفحة أولاً ويأخذ **كوكي ورمز نفس الجلسة** | لا يُرفض الطلب قبل فحص الكرت |
+| 2 | بعد كل صفحة رفض تمتص الأداة النموذج الجديد فوراً (token/action/CHAP)، وفوق ذلك تعيد فتح الصفحة كل `KIRAPASS_WARMUP_EVERY` (٢٥ افتراضياً؛ `0` = مرة واحدة) | الرموز أحادية الاستخدام والجلسات المنتهية تعمل |
+| 3 | المعايرة، الكرت المعروف، التشخيص المتوازي وقياس الحظر كلها تستخدم جلسات متصفح أيضاً | لا ينجح التشغيل ويفشل «كل اختبار» قبله |
+| 4 | ترويسات صحيحة: `Referer`؛ و`Origin` + form content-type للـ POST فقط (GET لا يأخذ ترويسات POST) | الطلب يطابق المتصفح بدل تقليد غير صحيح |
+| 5 | هوية المتصفح بيدك: Chrome/Windows · Android Chrome · iPhone Safari · مخصص، مع مفتاح Referer/Origin؛ وتُحفظ في الملف (`user_agent`, `send_referer`) | يمكن مطابقة متصفح الهاتف الذي نجح |
+| 6 | إن كانت **كل** ردود التعلم 400/405/415/422، تتوقف الأداة قبل النطاق وتقول بالعربية: الراوتر رفض الطلب قبل أن يفحص الكرت | لا تتحول ألف «bad request» إلى ألف «كرت مرفوض» |
+
+### إصلاحات أمان النتيجة ظهرت أثناء الفحص
+* كرت لم يصل له رد لا يُعد مجرّباً: يُعاد في **نفس التشغيل** حتى مرتين، مع حل
+  سباق كان يضيّع المحاولة المتأخرة قرب نهاية الطابور. محاولات الإعادة تظهر في
+  العدادات لكن لا ترفع `space_pos` كأنها كروت جديدة.
+* التحويل إلى خارج البوابة لا يُسمّى رفضاً حتى لو تشابه جسم الصفحة مع الرفض؛
+  يصبح «غير واضح» محفوظاً مع الرابط.
+* موت طلب تأكيد الإنترنت لا يمحو قبول الكرت؛ يبقى «مقبول، غير مؤكد».
+* `/api/run/status` قبل أول تشغيل صار آمناً بدلاً من 500.
+
+### إثبات على الحالة نفسها عبر واجهة 8770
+بوابة تدريب شديدة: **GET + كوكي + token أحادي الاستخدام**، والرابط الملصوق
+نفس شكلك وفيه كرت حقيقي:
+
+```
+SCAN: method=get
+      action=http://127.0.0.1:8898/login       # username القديم حُذف
+      internet_before=WALLED                   # الفحص لم يستهلك الكرت
+RUN : counters={'REJECTED': 821, 'ACCEPTED_VERIFIED': 1}
+      hits=['020124042']
+      stop=found_verified · net_errors={} · 8 مسارات · 113.95 طلب/ث
+```
+
+* للتجربة: `python3 tools/practice_portal.py --method get --pass-mode empty --session`
+* الاختبارات النهائية: **62/62** و`14/14` في `--selftest`.
+
+---
+
 ## English (short)
 
 Real bugs fixed: the "continue where you stopped" feature never worked (the
@@ -289,6 +348,28 @@ count shown in the profile list and the preview, auto-loading a saved profile
 when the same network is scanned again, a `resume` event in the run log, a
 clear message when the tool is gone, and 10 new tests plus one new self-test
 scenario.
+
+Ninth round - "a new card works when I change the username in the browser URL,
+but every tool test says bad request": the copied URL itself was already a GET
+submission (`?username=...&password=`). Appending each candidate produced two
+usernames and many routers kept reading the first, old one; scanning that URL
+could also consume the real card. The scanner now recognises GET from those
+fields, strips credentials before opening the page, and every attempt replaces
+captured query fields rather than appending duplicates. The second cause is
+browser state: portals hand out a session cookie and often a one-use hidden
+CSRF token on the login page. Every worker now fetches that page first and
+absorbs the fresh form returned after every rejection; calibration, known-card
+tuning, parallel diagnosis and lockout measurement do the same. A periodic
+`KIRAPASS_WARMUP_EVERY` refetch is a fallback. Requests carry browser-accurate
+headers (Origin/content type only for POST), and the UI can select default,
+Android, iPhone or custom User-Agent plus Referer/Origin. If all baseline
+answers are 400/405/415/422, the run now stops in Arabic before spending the
+card space: the request was refused before credentials were judged. No-answer
+cards are retried in the same run with race-free accounting, external redirects
+can never be plain REJECTED, verification failure cannot erase an accepted
+card, and idle `/api/run/status` no longer returns 500. Live proof through the
+real API using a copied GET URL plus cookie and rotating single-use tokens:
+821 rejected, one `ACCEPTED_VERIFIED` (`020124042`), no network errors, 113.95/s.
 
 Second round - "it said *finished* and never tried once": the stop card now
 spells out, in Arabic, exactly what the router did (the network error, which
