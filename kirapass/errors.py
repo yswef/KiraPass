@@ -39,6 +39,10 @@ KINDS = {
                            "too many redirects"),
     "proto": (False, "بروتوكول غير مدعوم", "unsupported protocol"),
     "unknown": (True, "خطأ غير متوقع", "unexpected network error"),
+    # the portal did not give us its login page, so posting would only be
+    # refused: the card was NOT tested, and we say so instead of guessing
+    "no_session": (True, "لم نستطع أخذ صفحة الدخول (لا جلسة) - الكرت لم يُجرَّب",
+                   "could not fetch the login page (no session) - card not tested"),
 }
 
 # Errors that are usually just a dead keep-alive connection: retry silently.

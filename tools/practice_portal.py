@@ -8,6 +8,7 @@
     python3 tools/practice_portal.py --ban-after 25  # block after 25 failures
     python3 tools/practice_portal.py --rate-limit 20 # answer 429 after 20
     python3 tools/practice_portal.py --drop-every 3  # cut one connection in 3
+    python3 tools/practice_portal.py --session  # only a browser gets in (400)
 
 It answers on 127.0.0.1 only, so it can never be reached from outside your
 machine. Point KiraPass at the printed URL and watch every verdict - this is
@@ -36,22 +37,25 @@ def main() -> int:
                     default="same", help="what the portal expects as password")
     ap.add_argument("--chap", action="store_true", help="enable md5.js (chap)")
     ap.add_argument("--ban-after", type=int, default=0, help="0 = never")
-    ap.add_argument("--ban-seconds", type=int, default=0,
-                    help="the lockout clears after this many seconds "
-                         "(0 = it never clears)")
     ap.add_argument("--rate-limit", type=int, default=0, help="0 = never")
     ap.add_argument("--drop-every", type=int, default=0, help="0 = never")
     ap.add_argument("--static-page", action="store_true",
                     help="same token on every page (tests the easy case)")
+    ap.add_argument("--session", action="store_true",
+                    help="like a real portal: hand out a session cookie plus a "
+                         "hidden token on the page, and answer 400 'bad "
+                         "request' to anything that does not carry them - a "
+                         "browser asks for the page first, a bare script does "
+                         "not, and that is the whole difference")
     args = ap.parse_args()
 
     pass_mode = "chap" if args.chap else args.pass_mode
     portal = MockPortal(port=args.port, valid_cards={args.card},
                         method=args.method, pass_mode=pass_mode, chap=args.chap,
                         ban_after=args.ban_after,
-                        ban_seconds=args.ban_seconds,
                         rate_limit_after=args.rate_limit,
                         drop_every=args.drop_every,
+                        require_session=args.session,
                         dynamic=not args.static_page).start()
 
     print(f"""
@@ -61,9 +65,11 @@ def main() -> int:
     valid card : {args.card}
     scheme     : {args.method.upper()} form, password = {pass_mode}
     page       : {'static' if args.static_page else 'a new session token every request'}
-    ban after  : {args.ban_after or 'never'} failures{('  · clears after ' + str(args.ban_seconds) + 's') if args.ban_after and args.ban_seconds else ''}
+    ban after  : {args.ban_after or 'never'} failures
     rate limit : {args.rate_limit or 'never'}
     dropped    : every {args.drop_every or '-'} connection
+    session    : {'required - a cookie + token from the page, or 400 "bad request"'
+                  if args.session else 'not required (any script may post)'}
 
   Point KiraPass at the login page above and start.
   Ctrl+C to stop.   (this server listens on 127.0.0.1 only)

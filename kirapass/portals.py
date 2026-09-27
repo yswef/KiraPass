@@ -15,7 +15,7 @@ rejects everything, and the tool looks broken.
 from __future__ import annotations
 
 import re
-from urllib.parse import parse_qs, urljoin, urlsplit
+from urllib.parse import parse_qs, parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
 
 FORM_RE = re.compile(r"<form\b[^>]*>", re.I)
 INPUT_RE = re.compile(r"<input\b[^>]*>", re.I)
@@ -123,6 +123,20 @@ def parse_form(html: str, base_url: str) -> FormInfo:
     body = html
 
     segments = _form_segments(html)
+    # A copied successful browser URL often *is* the form submission:
+    #   /login?username=293...&password=
+    # If the page has no HTML form, that query is direct evidence of GET - do
+    # not default to POST and do not append a second username later.
+    query_pairs = parse_qsl(urlsplit(base_url).query, keep_blank_values=True)
+    query_names = {name.lower() for name, _ in query_pairs}
+    query_login = (not segments and
+                   any(any(w in name for w in
+                           ("user", "login", "card", "voucher", "account"))
+                       for name in query_names) and
+                   any(any(w in name for w in ("pass", "pwd", "pin"))
+                       for name in query_names))
+    if query_login:
+        method = "get"
     if segments:
         best = max(segments, key=lambda pair: _score_form(_attrs(pair[0]),
                                                           pair[1]))
@@ -152,6 +166,20 @@ def parse_form(html: str, base_url: str) -> FormInfo:
                 continue
             fields[name] = a.get("value", "")
             inputs.append((name, a.get("type", "text").lower()))
+
+    if query_login:
+        existing = {name for name, _type in inputs}
+        for name, value in query_pairs:
+            fields.setdefault(name, value)
+            if name in existing:
+                continue
+            low = name.lower()
+            typ = ("password" if any(w in low for w in ("pass", "pwd", "pin"))
+                   else "text" if any(w in low for w in
+                                      ("user", "login", "card", "voucher",
+                                       "account"))
+                   else "hidden")
+            inputs.append((name, typ))
 
     info = FormInfo(action, method, fields, inputs)
 
@@ -235,11 +263,47 @@ class Portal:
         }
 
 
+
+
+def _copied_login_query(url: str) -> tuple:
+    """(looks like a submitted GET login, credential field names)."""
+    pairs = parse_qsl(urlsplit(url).query, keep_blank_values=True)
+    names = {name.lower(): name for name, _ in pairs}
+    users = {original for low, original in names.items()
+             if any(w in low for w in
+                    ("user", "login", "card", "voucher", "account"))}
+    passwords = {original for low, original in names.items()
+                 if any(w in low for w in ("pass", "pwd", "pin"))}
+    return bool(users and passwords), users | passwords
+
+
+def _safe_page_url(url: str) -> str:
+    """Open the login *page*, never spend the card embedded in a copied URL."""
+    copied, credential_names = _copied_login_query(url)
+    if not copied:
+        return url
+    parts = urlsplit(url)
+    pairs = [(k, v) for k, v in parse_qsl(parts.query, keep_blank_values=True)
+             if k not in credential_names]
+    return urlunsplit((parts.scheme, parts.netloc, parts.path,
+                       urlencode(pairs, doseq=True), parts.fragment))
+
+
 def discover(session, url: str, timeout=None) -> Portal:
-    """Open the login page and report everything the tool learned from it."""
-    resp = session.get(url, allow_redirects=True, timeout=timeout)
-    base = resp.url or url
+    """Open the login page and report everything the tool learned from it.
+
+    If the operator pasted an already-submitted GET URL, remove its username
+    and password before opening it: scanning must never consume a real card.
+    The original query still teaches us that this is a GET portal.
+    """
+    page_url = _safe_page_url(url)
+    resp = session.get(page_url, allow_redirects=True, timeout=timeout)
+    base = resp.url or page_url
     form = parse_form(resp.text, base)
+    copied_get, _credential_names = _copied_login_query(url)
+    if copied_get and not _form_segments(resp.text or ""):
+        form = parse_form(resp.text, url)
+        form.action = base
 
     dsts, seen = [], set()
     for src in (parse_qs(urlsplit(base).query).get("dst", [None])[0],

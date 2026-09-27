@@ -190,6 +190,18 @@ PACE_BAD_RATIO = 0.02         # above 2% errors/limits: this router has enough
 PACE_MAX_DELAY_MS = 4000      # never slower than this on its own
 PACE_MAX_THREADS = 32         # hard ceiling for hands it adds by itself
 
+# Ask for the login page again every this many attempts per worker, so the
+# session cookie and the hidden fields stay as fresh as a browser would keep
+# them.  0 = ask once and never again.
+WARMUP_EVERY = max(0, int(os.environ.get("KIRAPASS_WARMUP_EVERY", "25")))
+
+# How often a card we never got an ANSWER for is asked again.  A request can
+# die on the way (the router closes the socket, the reply comes after our
+# timeout) while the router did take it - such a card is not "tested", and a
+# run must not end up skipping the one card that works.  Only requests with no
+# answer at all are retried; a REJECTED answer is an answer.
+MAX_CARD_RETRIES = 2
+
 # Some routers log the guest in and STILL answer with the rejection page.  The
 # only honest signal then is the internet itself: while the run is going we ask
 # "are we still behind the wall?" every few seconds.  When the answer flips to

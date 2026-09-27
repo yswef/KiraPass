@@ -125,6 +125,17 @@
         <span data-i18n="f_send_dst">إرسال الحقول المخفية dst/popup</span></label>
       <label><span data-i18n="f_extra">حقول ثابتة إضافية (name=value)</span>
         <input id="f_extra" placeholder="mac=AA:BB:CC:DD:EE:FF"></label>
+      <label><span data-i18n="f_ua">هوية المتصفح User-Agent</span>
+        <select id="f_ua">
+          <option value="" data-i18n="ua_default">نفس المتصفح الافتراضي (Chrome/Windows)</option>
+          <option value="android" data-i18n="ua_android">أندرويد Chrome</option>
+          <option value="iphone" data-i18n="ua_iphone">آيفون Safari</option>
+          <option value="custom" data-i18n="ua_custom">اكتبها بنفسك…</option>
+        </select><small class="hint" data-i18n="ua_hint">غيّرها فقط إذا كان الكرت يعمل في متصفح هاتفك لكن الراوتر يرفض شكل طلب الأداة.</small></label>
+      <label id="f_ua_custom_wrap" class="hidden"><span data-i18n="f_ua_custom">User-Agent مخصص</span>
+        <input id="f_ua_custom" placeholder="Mozilla/5.0 ..."></label>
+      <label class="check"><input type="checkbox" id="f_referer" checked>
+        <span data-i18n="f_referer">إرسال ترويسات المتصفح (Referer/Origin)</span></label>
       <label><span data-i18n="f_words">كلمات النجاح (اختياري)</span>
         <input id="f_words" placeholder="You are logged in"></label>
       <label><span data-i18n="f_known">بطاقة تعرف أنها تعمل (اختياري)</span>
