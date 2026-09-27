@@ -910,6 +910,20 @@ class PortalParsingTests(unittest.TestCase):
 class CaptureTests(unittest.TestCase):
     """Redacted browser-assisted recorder: secrets stay out of the report."""
 
+    def test_learn_words_uses_only_visible_body_text(self):
+        html = """<html lang='en'><head><title>HeadOnlyMarker</title>
+        <meta name='description' content='MetaOnlyMarker windows theme color apple touch icon sizes'>
+        <script>ScriptOnlyMarker</script><style>.css { content: 'StyleOnlyMarker'; }</style>
+        </head><body data-theme='BodyAttributeMarker'>
+        <p>PortalVisibleGreeting welcomes every guest today.</p>
+        </body></html>"""
+        words = {word.lower() for word in capture.learn_words(html)}
+        self.assertIn("portalvisiblegreeting", words)
+        for hidden in ("headonlymarker", "metaonlymarker", "windows", "theme",
+                       "color", "apple", "touch", "icon", "sizes",
+                       "scriptonlymarker", "styleonlymarker", "bodyattributemarker"):
+            self.assertNotIn(hidden, words)
+
     def test_only_generalizable_password_patterns_are_learned(self):
         html = "<form><input name='username'><input name='password'></form>"
         same = capture.infer_pass_mode("0201", "0201", "0201", "0201", html,
@@ -973,13 +987,33 @@ class CaptureTests(unittest.TestCase):
                 "fields_after": dict(fields),
             })
             hub.mark(cap.id, "success")
+            learned_before_status = dict(cap.pass_learn)
             hub.step(cap.id, {
                 "kind": "navigate", "method": "GET",
                 "url": portal.base + "/status",
             })
+            self.assertEqual(cap.form.user_field, "username")
+            self.assertEqual(cap.form.pass_field, "password")
+            self.assertEqual(cap.form.dst_field, "dst")
+            self.assertEqual(cap.form.popup_field, "popup")
             hub.mark(cap.id, "status")
+            # A form on the statistics page must not replace the login model
+            # or make its empty fields look like a new password transform.
+            hub.step(cap.id, {
+                "kind": "form", "method": "POST",
+                "url": portal.base + "/status",
+                "fields": {"erase-cookie": "1"},
+                "fields_before": {"erase-cookie": "1"},
+                "fields_after": {"erase-cookie": "1"},
+            })
+            self.assertEqual(cap.pass_learn, learned_before_status)
             st = store.Store()
             result = hub.finish(cap.id, st)
+            self.assertEqual(result["profile"]["user_field"], "username")
+            self.assertEqual(result["profile"]["pass_field"], "password")
+            self.assertEqual(result["profile"]["dst_field"], "dst")
+            self.assertEqual(result["profile"]["popup_field"], "popup")
+            self.assertEqual(result["profile"]["pass_mode"], "same")
             blob = json.dumps(result["report"], ensure_ascii=False)
             self.assertNotIn(card, blob)
             self.assertNotIn("portal_sid=", blob)

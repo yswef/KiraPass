@@ -215,9 +215,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
             online = self.client_address[0] in st.online_ips
             if not online:
                 return self._reply(302, "", {"Location": base + "/login"})
-            return self._reply(200, "<html><title>Status</title>You are logged in"
-                                    ", session uptime 0:01:20 remaining 3h 59m"
-                                    " <a href='/logout'>logout</a></html>")
+            return self._reply(200, "<html><head><title>Status</title></head><body>"
+                                    "You are logged in, session uptime 0:01:20 "
+                                    "remaining 3h 59m <a href='/logout'>logout</a>"
+                                    "<form action='/status'><input type='hidden' "
+                                    "name='erase-cookie' value='1'></form></body></html>")
 
         if not parts.path.startswith("/login"):
             return self._reply(404, "<html>not found</html>")

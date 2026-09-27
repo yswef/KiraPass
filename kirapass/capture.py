@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import hashlib
 import html as htmlmod
+from html.parser import HTMLParser
 import json
 import re
 import threading
@@ -261,8 +262,72 @@ def success_url_hint(url: str) -> str:
     return path
 
 
+class _VisibleBodyText(HTMLParser):
+    """Collect text nodes in body; ignore head metadata and executable/style text."""
+
+    _IGNORED = {"head", "script", "style"}
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.in_body = False
+        self.ignored = []
+        self.parts = []
+
+    def handle_starttag(self, tag, attrs):
+        tag = tag.lower()
+        if tag == "body":
+            self.in_body = True
+        if self.in_body and tag in self._IGNORED:
+            self.ignored.append(tag)
+
+    def handle_endtag(self, tag):
+        tag = tag.lower()
+        if self.ignored and tag == self.ignored[-1]:
+            self.ignored.pop()
+        if tag == "body":
+            self.in_body = False
+
+    def handle_data(self, data):
+        if self.in_body and not self.ignored:
+            self.parts.append(data)
+
+
+def _visible_body_text(document: str) -> str:
+    """Return body text only, never tags/attributes/head/script/style contents."""
+    parser = _VisibleBodyText()
+    try:
+        parser.feed(document or "")
+        parser.close()
+    except Exception:
+        # HTMLParser is deliberately forgiving, but malformed portal markup
+        # should fail closed rather than learn from the raw HTML source.
+        return ""
+    return " ".join(parser.parts)
+
+
+def _is_login_form(form) -> bool:
+    """Require real username and password inputs, not a status-page action form."""
+    if not form:
+        return False
+    inputs = {str(name).lower(): str(kind).lower()
+              for name, kind in (form.inputs or [])}
+    user_name = (form.user_field or "").lower()
+    pass_name = (form.pass_field or "").lower()
+    user_kind = inputs.get(user_name, "")
+    pass_kind = inputs.get(pass_name, "")
+    has_user = bool(user_kind and user_kind not in
+                    ("hidden", "submit", "button", "reset", "checkbox", "radio",
+                     "image", "file"))
+    has_password = bool(pass_kind == "password" or
+                        any(part in pass_name for part in ("pass", "pwd", "pin")))
+    return has_user and has_password
+
+
 def learn_words(text: str, strip_values=()) -> list:
-    blob = text or ""
+    # The source is an HTML document. In particular, do not learn words from
+    # meta attributes such as lang, windows, theme, color, apple, touch, icon,
+    # or sizes; they are not text visible to the person using the portal.
+    blob = _visible_body_text(text or "")
     for value in strip_values:
         if value and len(str(value)) >= 4:
             blob = blob.replace(str(value), " ")
@@ -696,7 +761,10 @@ class Capture:
         self.marks = []
         self.pass_learn = {"pass_mode": "", "needs_browser_js": False,
                            "reason": "", "reason_ar": "", "next_ar": ""}
+        # Keep the login form separately from later success/status pages, which
+        # often contain unrelated forms such as erase-cookie.
         self.form = None
+        self.login_html = ""
         self.last_fields_redacted = []
         self._strip_values = []
         self.success_words = []
@@ -888,19 +956,22 @@ class Hub:
     # -- internals -------------------------------------------------------
     def _learn_password(self, cap: Capture, before: dict, after: dict,
                         sent_keys) -> None:
-        form = portals.parse_form(cap.html, cap.url)
-        user_f = (form.user_field if form else "") or "username"
-        pass_f = (form.pass_field if form else "") or "password"
+        form = cap.form
+        if not _is_login_form(form):
+            return
+        user_f, pass_f = form.user_field, form.pass_field
+        # A later empty form (for example erase-cookie on /status.html) is not
+        # evidence about the password transform. Only learn from a submission
+        # where the operator actually entered a username/card or password.
+        entered = any(str(before.get(key) or "").strip()
+                      for key in (user_f, pass_f))
+        if not entered:
+            return
         learned = infer_pass_mode(
-            before.get(user_f, before.get("username")),
-            before.get(pass_f, before.get("password")),
-            after.get(user_f, after.get("username")),
-            after.get(pass_f) if pass_f in after else after.get("password"),
-            cap.html, sent_keys)
+            before.get(user_f), before.get(pass_f),
+            after.get(user_f), after.get(pass_f),
+            cap.login_html, sent_keys)
         cap.pass_learn = learned
-        if form:
-            cap.form = form
-            cap.method = form.method
 
     def _exchange(self, cap: Capture, method: str, url: str, data=None,
                   headers=None, content_type: str = "", kind: str = "navigate"):
@@ -950,9 +1021,11 @@ class Hub:
         ctype = (last.header("content-type") if last is not None else "") or ""
         if "html" in ctype.lower() or text.lstrip()[:15].lower().startswith(("<!", "<html")):
             cap.html = text[:400000]
-            cap.form = portals.parse_form(cap.html, cap.url)
-            if cap.form:
-                cap.method = cap.form.method
+            page_form = portals.parse_form(cap.html, cap.url)
+            if _is_login_form(page_form):
+                cap.form = page_form
+                cap.login_html = cap.html
+                cap.method = page_form.method
         cap.events.append({
             "kind": kind,
             "method": orig_method,
