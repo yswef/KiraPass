@@ -16,6 +16,7 @@ from __future__ import annotations
 import gzip
 import http.client
 import http.cookies
+import json
 import socket
 import ssl
 import time
@@ -135,6 +136,10 @@ class CookieStore:
     def clear(self) -> None:
         self._jar.clear()
 
+    def names(self) -> list:
+        """Cookie names only - never the values."""
+        return sorted(self._jar.keys())
+
     def __len__(self) -> int:
         return len(self._jar)
 
@@ -205,12 +210,22 @@ class Session:
         if params:
             sep = "&" if urllib.parse.urlsplit(url).query else "?"
             url = url + sep + urllib.parse.urlencode(params, doseq=True)
+        hdr_ct = ""
+        if headers:
+            for key, value in headers.items():
+                if str(key).lower() == "content-type":
+                    hdr_ct = value or ""
+                    break
         if isinstance(data, dict):
-            body = urllib.parse.urlencode(data, doseq=True).encode()
-            post_headers = {"Content-Type": "application/x-www-form-urlencoded"}
+            if "json" in hdr_ct.lower():
+                body = json.dumps(data).encode("utf-8")
+                post_headers = {"Content-Type": hdr_ct or "application/json"}
+            else:
+                body = urllib.parse.urlencode(data, doseq=True).encode()
+                post_headers = {"Content-Type": "application/x-www-form-urlencoded"}
         elif isinstance(data, str):
             body = data.encode()
-            post_headers = {"Content-Type": "application/x-www-form-urlencoded"}
+            post_headers = {"Content-Type": hdr_ct or "application/x-www-form-urlencoded"}
         elif isinstance(data, bytes):
             body = data
             post_headers = {"Content-Type": "application/octet-stream"}

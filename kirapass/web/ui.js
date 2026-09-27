@@ -30,6 +30,17 @@ const I18N = {
     p_space: "عدد الاحتمالات", p_samples: "أمثلة على البطاقات",
     p_covered: "مغطى سابقاً",
     btn_calibrate: "تعلّم من البطاقة المعروفة + قياس الشبكة",
+    btn_capture: "افتح البوابة وسجّل دخولاً ناجحاً",
+    capture_hint: "تُفتح البوابة داخل إطار معزول (بدون allow-same-origin) ولا يصل JavaScript الصفحة إلى واجهة KiraPass. سجّل دخولاً ناجحاً ثم علّم صفحات النجاح/الرفض/الإحصائيات.",
+    capture_opened: "فُتح المسجّل في نافذة جديدة.",
+    capture_fail: "تعذّر بدء المسجّل",
+    capture_blocked_title: "التخمين الآلي غير متاح لهذه البوابة",
+    capture_blocked_body: "تحويل كلمة المرور يستخدم JavaScript مخصصاً غير معروف. لا ندّعي أنه قابل للأتمتة.",
+    capture_blocked_next: "الخطوة التالية: سجّل الدخول يدوياً عند الحاجة. التقرير المنقّح لا يحتوي رقم البطاقة ولا كلمة المرور.",
+    capture_mark_success: "هذه صفحة النجاح",
+    capture_mark_reject: "هذه صفحة رفض",
+    capture_mark_status: "هذه صفحة الإحصائيات",
+    capture_finish: "إنهاء + تنزيل التقرير",
     btn_save: "احفظ الملف التعريفي",
     run_title: "3) التشغيل",
     run_hint: "اختر قوة مناسبة: كل ما زادت السرعة زاد احتمال أن يقطع الراوتر الاتصال أو يحجبك. الأداة تخبرك داخل النتائج بسبب كل توقف.",
@@ -271,6 +282,7 @@ const I18N = {
     prob_charset_too_small: "المحارف المتغيّرة قليلة جداً",
     prob_unknown_pass_mode: "طريقة كلمة المرور غير معروفة",
     prob_fixed_password_empty: "كلمة المرور الثابتة فارغة",
+    prob_needs_browser_js: "تحويل كلمة المرور في هذه البوابة يحتاج متصفحاً ولا يمكن تشغيله آلياً",
     prob_space_is_astronomically_big: "عدد الاحتمالات ضخم جداً - استخدم طولاً أقل أو مسارات أكثر",
     /* pass modes */
     pm_same: "نفس البطاقة", pm_empty: "فارغة", pm_omit: "بدون إرسال الحقل",
@@ -305,6 +317,17 @@ const I18N = {
     p_space: "Combinations", p_samples: "Sample cards",
     p_covered: "covered",
     btn_calibrate: "Learn from the known card + measure the network",
+    btn_capture: "Open the portal and record a successful login",
+    capture_hint: "The portal opens in an isolated frame (no allow-same-origin). Its JavaScript cannot reach the KiraPass API. Log in once, then mark the success / reject / statistics pages.",
+    capture_opened: "The recorder opened in a new window.",
+    capture_fail: "Could not start the recorder",
+    capture_blocked_title: "Automated guessing is not available for this portal",
+    capture_blocked_body: "The password transform uses unknown custom JavaScript. We do not claim it can be automated.",
+    capture_blocked_next: "Next: log in by hand when you need to. The redacted report contains neither the card number nor the password.",
+    capture_mark_success: "This is the success page",
+    capture_mark_reject: "This is a reject page",
+    capture_mark_status: "This is the statistics page",
+    capture_finish: "Finish + download the report",
     btn_save: "Save profile",
     run_title: "3) Run",
     run_hint: "Pick the load: faster means more chance the router cuts you off or blocks you. Results always tell you why a run stopped.",
@@ -527,6 +550,7 @@ stop_attempts_done: "Requested attempts finished. Run again - it continues, it d
     prob_charset_too_small: "too few variable characters",
     prob_unknown_pass_mode: "unknown password mode",
     prob_fixed_password_empty: "the fixed password is empty",
+    prob_needs_browser_js: "this portal's password transform needs a browser and cannot be automated",
     prob_space_is_astronomically_big: "the space is enormous - shorten it or use more threads",
     pm_same: "same as card", pm_empty: "empty", pm_omit: "field omitted",
     pm_fixed: "fixed value", pm_chap: "MikroTik MD5 (chap) of the card",
@@ -756,7 +780,7 @@ function profileFromForm() {
   });
   const words = ($("f_words").value || "").split(/[,;\n]/).map((w) => w.trim())
     .filter(Boolean);
-  return Object.assign({
+  return Object.assign({}, S.profile || {}, {
     name: $("f_name").value.trim() || "profile",
     login_url: $("f_login_url").value.trim() || $("scanUrl").value.trim(),
     method: $("f_method").value,
@@ -807,6 +831,13 @@ function fillFormFromProfile(p) {
   toggleCustomCharset();
   showCovered(p);
   previewFormat();
+  const capBox = $("captureCard");
+  if (capBox && p.capture_needs_browser_js) {
+    capBox.classList.remove("hidden");
+    capBox.innerHTML = "<h4 class='warn'>" + t("capture_blocked_title") + "</h4><p>" +
+      esc(p.capture_block_reason || t("capture_blocked_body")) + "</p><p>" +
+      esc(t("capture_blocked_next")) + "</p>";
+  }
 }
 
 /* how much of this space has been tried in earlier runs */
@@ -961,6 +992,24 @@ async function waitJob(jobId, onTick) {
     if (res.job.state !== "running") return res.job;
   }
   return { state: "error", error: t("job_timeout"), result: {} };
+}
+
+async function startCapture() {
+  const url = ($("f_login_url").value.trim() || $("scanUrl").value.trim());
+  if (!url) { toast(t("scan_fail")); return; }
+  const box = $("captureCard");
+  if (box) {
+    box.classList.remove("hidden");
+    box.innerHTML = "<p>" + esc(t("capture_hint")) + "</p>";
+  }
+  const res = await api("/api/capture/start", { url });
+  if (!res.ok) {
+    modal(t("capture_fail"), "<pre>" + esc(JSON.stringify(res, null, 2)) + "</pre>");
+    return;
+  }
+  const view = res.view || ("/capture/view?id=" + encodeURIComponent(res.id));
+  window.open(withToken(view), "kp-capture");
+  toast(t("capture_opened"));
 }
 
 async function runCalibration() {
@@ -1136,6 +1185,12 @@ function renderDiagnose(job, node) {
 /* ------------------------------------------------------------------ run */
 async function startRun() {
   const profile = profileFromForm();
+  if (profile.capture_needs_browser_js) {
+    modal(t("capture_blocked_title"),
+      "<p>" + esc(t("capture_blocked_body")) + "</p><p>" +
+      esc(profile.capture_block_reason || t("capture_blocked_next")) + "</p>");
+    return;
+  }
   const known = $("f_known").value.trim();
   const payload = {
     profile, known_card: known,
@@ -1516,6 +1571,8 @@ function wire() {
   $("startBtn").addEventListener("click", startRun);
   $("stopBtn").addEventListener("click", stopRun);
   $("calibrateBtn").addEventListener("click", runCalibration);
+  const captureBtn = $("captureBtn");
+  if (captureBtn) captureBtn.addEventListener("click", startCapture);
   $("diagnoseBtn").addEventListener("click", runDiagnose);
   $("lockoutBtn").addEventListener("click", runLockoutProbe);
   $("f_ua").addEventListener("change", () => {

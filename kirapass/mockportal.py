@@ -56,6 +56,12 @@ BAN_PAGE = """<html><head><title>Blocked</title></head><body>
 RATE_PAGE = """<html><head><title>Slow down</title></head><body>
 <p>rate limit exceeded, please slow down</p></body></html>"""
 
+SUCCESS_PAGE = """<!DOCTYPE html><html><head><title>Welcome</title></head>
+<body><h1>You are logged in</h1>
+<p>Welcome to the network. Remaining time 3h 59m.</p>
+<p><a href="/status">statistics</a></p>
+</body></html>"""
+
 
 class PortalState:
     def __init__(self, valid_cards, pass_mode="same", method="post",
@@ -63,7 +69,7 @@ class PortalState:
                  rate_limit_after=0, drop_every=0,
                  drop_after=0, chap=False, prefix="02", length=6,
                  error_text=None, hide_success=False, require_session=False,
-                 reject_shape=False):
+                 reject_shape=False, success_page=False):
         self.valid_cards = set(valid_cards)
         self.pass_mode = pass_mode          # same | empty | chap
         self.method = method
@@ -80,6 +86,7 @@ class PortalState:
         # browser does automatically and a bare script does not)
         self.require_session = require_session
         self.reject_shape = reject_shape
+        self.success_page = success_page
         self.tokens = {}
         self.bad_requests = 0
         self.rate_limit_after = rate_limit_after
@@ -198,6 +205,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 st.online_ips = set()
             return self._reply(200, "<html><title>Logged out</title>bye</html>")
 
+        if parts.path.startswith("/success"):
+            online = self.client_address[0] in st.online_ips
+            if not online:
+                return self._reply(302, "", {"Location": base + "/login"})
+            return self._reply(200, SUCCESS_PAGE)
+
         if parts.path.startswith("/status"):
             online = self.client_address[0] in st.online_ips
             if not online:
@@ -260,6 +273,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 # logged in, but the reply is word for word a rejection page
                 st.bump("hidden_successes")
                 return self._login_page(base, fields, error=True)
+            if st.success_page:
+                return self._reply(302, "", {"Location": base + "/success"})
             return self._reply(302, "", {
                 "Location": "http://connectivitycheck.gstatic.com/generate_204"})
 

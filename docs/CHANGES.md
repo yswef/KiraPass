@@ -458,3 +458,27 @@ the wait comes from the measured clears_after when the profile has it. The
 known-card tuner tries GET and POST, and the lock-out probe stores what it
 measured on the profile with an "apply the safe pace" button (51 tests,
 14/14 self-test).
+
+---
+
+## الجولة التاسعة · مسجّل دخول البوابة (منقّح)
+
+زر في الخيارات المتقدمة: **«افتح البوابة وسجّل دخولاً ناجحاً»**. البوابة تُفتح
+داخل iframe مع `sandbox="allow-scripts allow-forms"` **بدون** `allow-same-origin`
+وبلا إرسال النموذج مباشرة. JavaScript الصفحة لا يصل إلى API أو ملفات KiraPass
+(CSP `connect-src 'none'` + `form-action 'none'` + منع السيرفر لطلبات localhost
+نحو `/api` و`/capture`). جلسة HTTP مخصّصة على السيرفر تحفظ الكوكي والرموز
+المخفية والتحويلات.
+
+يُلتقط الحقل قبل وبعد `onsubmit`/JavaScript. يُسجَّل method/action/content-type
+وأسماء الترويسات المخصصة والتحويلات وHTTP status وmetadata الرد وأسماء الكوكي
+فقط. الأنماط القابلة للتعميم فقط: `same` / `empty` / `omit` / `md5user` /
+MikroTik CHAP. أي تحويل JS غير معروف يضبط `capture_needs_browser_js` ويمنع
+التشغيل الآلي ويعرض السبب والخطوة التالية بالعربية. HTTP 200 وحده ليس نجاحاً
+ولا رفضاً.
+
+تقرير JSON في `kirapass_data/runs/` لا يحتوي رقم البطاقة ولا كلمة المرور/ناتجها
+ولا قيم الكوكي ولا رموز CSRF/nonce/session الحيّة. الملف التعريفي المتعلّم
+يُحفظ تلقائياً. بوابة التدريب: `--success-page`.
+
+الاختبارات: **66** وحدة + **14/14** سيناريو ذاتي.

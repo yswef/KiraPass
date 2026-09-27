@@ -99,6 +99,9 @@ def new_profile(**kw) -> dict:
         "note": "",
         "success_words": [],
         "success_url_contains": "",
+        "stats_url": "",
+        "capture_needs_browser_js": False,
+        "capture_block_reason": "",
         # what the lock-out probe measured on this router (see
         # engine.probe_lockout) - the run uses it to wait exactly as long as
         # this router needs instead of a guessed 45 seconds
@@ -143,6 +146,8 @@ def validate(p: dict) -> list:
         problems.append("unknown_pass_mode")
     if p.get("pass_mode") == "fixed" and not p.get("pass_fixed"):
         problems.append("fixed_password_empty")
+    if p.get("capture_needs_browser_js"):
+        problems.append("needs_browser_js")
     if len(set(p.get("charset") or "")) ** max(vlen, 1) > config.BIG_SPACE:
         problems.append("space_is_astronomically_big")   # warning, not a blocker
     return problems

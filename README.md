@@ -35,6 +35,10 @@
 * **تعمل من المتصفح**: الأداة باك-إند فقط، تطبع رابطاً محلياً وتفتحه وتجيب على
   كل شيء من الصفحة — لذلك تعمل على ويندوز وهاتف أندرويد (Termux/Pydroid) ولينكس
   وماك **بدون أي مكتبات خارجية** (لا تحتاج `pip install`).
+* **مسجّل دخول منقّح**: من الخيارات المتقدمة «افتح البوابة وسجّل دخولاً ناجحاً».
+  الصفحة تُفتح في إطار معزول لا يصل إلى API الأداة، والتقرير لا يخزّن رقم البطاقة
+  ولا كلمة المرور ولا قيم الكوكي. إن كان تحويل كلمة المرور JavaScript غير معروف
+  تُمنع الأتمتة ويُشرح السبب بالعربية.
 
 ---
 
@@ -103,6 +107,12 @@ KIRAPASS_INTERNET_CHECKS="http://127.0.0.1:8898/generate_204|204" python3 KiraPa
 
 ```bash
 python3 tools/checks/web_e2e.py
+```
+
+لتدريب المسجّل يدوياً (نجاح + إحصائيات):
+
+```bash
+python3 tools/practice_portal.py --port 8899 --card 020124042 --pass-mode same --session --success-page
 ```
 
 ---
@@ -204,7 +214,11 @@ runs on Windows, Linux, macOS and Android (Termux / Pydroid) alike. iPhone is
 not supported (its browsers cannot reach a local server reliably).
 
 The page has four steps: **scan** the login page, describe the **card format**,
-**run**, watch the **results**. Every attempt is one of: accepted & verified,
+**run**, watch the **results**. Advanced options include a **redacted browser
+recorder** that opens the portal in an opaque-origin sandbox (no
+allow-same-origin); the JSON report never stores the card, password, cookie
+values or live tokens, and unknown JavaScript password transforms block
+automation. Every attempt is one of: accepted & verified,
 accepted, unverified accept, rejected, unclear reply, blocked by the router,
 rate limited, network error - each with a reason, and every stop is explained.
 
