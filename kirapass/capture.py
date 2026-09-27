@@ -713,7 +713,7 @@ VIEW_PAGE = """<!DOCTYPE html>
   });
   async function mark(kind){
     const r = await api("/api/capture/mark", {id:ID, mark:kind});
-    show(r.ok ? (r.message_ar || "تم التعليم") : (r.error || "فشل"), r.ok ? "" : "warn");
+    show(r.message_ar || (r.ok ? "تم التعليم" : (r.error || "فشل")), r.ok ? "" : "warn");
   }
   document.getElementById("btnSuccess").onclick = function(){ mark("success"); };
   document.getElementById("btnReject").onclick = function(){ mark("reject"); };
@@ -900,9 +900,25 @@ class Hub:
             mark = "status"
         if mark not in ("success", "reject", "status"):
             return {"ok": False, "error": "bad_mark"}
+        current_form = portals.parse_form(cap.html, cap.url)
+        if mark in ("success", "status") and _is_login_form(current_form):
+            return {
+                "ok": False,
+                "error": "login_form_still_visible",
+                "message_ar": (
+                    "ما زالت الصفحة تعرض نموذج الدخول؛ افتح صفحة النجاح أو "
+                    "الإحصائيات أولاً ثم علّمها."
+                ),
+            }
         words = learn_words(cap.html, cap._strip_values)
         entry = {"mark": mark, "url": safe_url(cap.url),
                  "status": cap.last_status, "words": words}
+        for existing in cap.marks:
+            if (existing.get("mark") == mark and existing.get("url") == entry["url"]
+                    and existing.get("status") == entry["status"]
+                    and existing.get("words") == words):
+                return {"ok": True, "message_ar": "هذه الصفحة مسجّلة بهذا التصنيف بالفعل.",
+                        "mark": existing}
         cap.marks.append(entry)
         if mark == "success":
             cap.success_words = words

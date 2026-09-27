@@ -966,6 +966,23 @@ class CaptureTests(unittest.TestCase):
         self.assertEqual(capture.verdict_from_status(200, "success"), "success")
         self.assertEqual(capture.verdict_from_status(302), "redirect")
 
+    def test_login_form_cannot_be_marked_success_or_status(self):
+        with MockPortal(valid_cards={"0242"}) as portal:
+            hub = capture.Hub()
+            cap = hub.start(portal.url)
+            self.addCleanup(cap.close)
+            success = hub.mark(cap.id, "success")
+            status = hub.mark(cap.id, "status")
+            self.assertFalse(success["ok"])
+            self.assertEqual(success["error"], "login_form_still_visible")
+            self.assertFalse(status["ok"])
+            self.assertEqual(status["error"], "login_form_still_visible")
+            reject = hub.mark(cap.id, "reject")
+            self.assertTrue(reject["ok"])
+            duplicate = hub.mark(cap.id, "reject")
+            self.assertTrue(duplicate["ok"])
+            self.assertEqual(len(cap.marks), 1)
+
     def test_report_never_contains_secrets(self):
         card = "020124042"
         with MockPortal(valid_cards={card}, pass_mode="same",
