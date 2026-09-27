@@ -29,6 +29,30 @@ from ..version_helpers import package_dir
 STATIC = package_dir("web")
 
 
+def _safe_calibration_report(value, profile, key=""):
+    """Redact card hints and sensitive URL/query material from report text."""
+    sensitive_names = {"card_hint", "sample_cards", "cookie", "cookies",
+                       "token", "csrf", "challenge", "password", "pass_fixed"}
+    if isinstance(value, dict):
+        out = {}
+        for name, item in value.items():
+            low = str(name).lower()
+            if low in sensitive_names or any(secret in low for secret in
+                                             ("cookie", "csrf", "token", "challenge")):
+                out[name] = "[REDACTED]"
+            else:
+                out[name] = _safe_calibration_report(item, profile, low)
+        return out
+    if isinstance(value, list):
+        return [_safe_calibration_report(item, profile, key) for item in value]
+    if isinstance(value, str):
+        if key in {"url", "login_url", "final_url", "location", "dst"}:
+            return engine._safe_url_shape(value, profile)
+        if key == "text":
+            return "[REDACTED]"
+    return value
+
+
 def _json_bytes(obj) -> bytes:
     return json.dumps(obj, ensure_ascii=False).encode("utf-8")
 
@@ -309,9 +333,23 @@ class Handler(BaseHTTPRequestHandler):
             prof = store.migrate(data.get("profile") or {})
             known = (data.get("known_card") or "").strip()
             keyword = (data.get("keyword") or "").strip()
-            job = srv.submit("calibrate",
-                             lambda: engine.calibrate(prof, known_card=known,
-                                                      keyword=keyword).as_dict())
+
+            def run_calibration():
+                result = engine.calibrate(prof, known_card=known,
+                                          keyword=keyword).as_dict()
+                report = {
+                    "tool": config.APP_NAME, "version": config.VERSION,
+                    "finished": time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "kind": "calibration", "profile": prof.get("name", ""),
+                    "calibration": _safe_calibration_report(result, prof),
+                }
+                try:
+                    result["report_file"] = os.path.basename(srv.store.save_run(report))
+                except OSError:
+                    result["report_file"] = ""
+                return result
+
+            job = srv.submit("calibrate", run_calibration)
             return self._json({"ok": True, "job": job.as_dict()})
         if route == "/api/lockout":
             # Explicitly opted-in, capped check; the engine stops on the first
@@ -393,11 +431,18 @@ class Handler(BaseHTTPRequestHandler):
 
     def _preview(self, data) -> None:
         prof = store.migrate(data.get("profile") or {})
+        request_shape = None
+        if prof.get("login_url"):
+            try:
+                request_shape = engine.safe_request_shape(prof, "CARD")
+            except Exception:                               # noqa: BLE001
+                request_shape = None
         return self._json({"ok": True,
                            "space": store.space_size(prof),
                            "variable_len": store.variable_len(prof),
                            "samples": store.sample_cards(prof, 4),
                            "problems": store.validate(prof),
+                           "request_shape": request_shape,
                            "charset_size": len(set(prof.get("charset") or ""))})
 
     def _guard(self) -> str:

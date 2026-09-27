@@ -1001,9 +1001,16 @@ class Hub:
             extra["Content-Type"] = content_type
         if cap.url and "referer" not in {k.lower() for k in extra}:
             extra["Referer"] = cap.url
+        # Browsers send Origin on POST forms and fetch/XHR requests, but not
+        # ordinary GET navigations. Adding it to a captured GET can change a
+        # portal's response compared with the user's successful browser flow.
+        request_kind = (kind or "").lower()
+        if (cap.url and (method.upper() != "GET" or
+                         request_kind in ("fetch", "xhr")) and
+                "origin" not in {k.lower() for k in extra}):
             origin = urlsplit(cap.url)
             if origin.scheme and origin.netloc:
-                extra.setdefault("Origin", f"{origin.scheme}://{origin.netloc}")
+                extra["Origin"] = f"{origin.scheme}://{origin.netloc}"
         hops = []
         body = data
         last = None
@@ -1108,6 +1115,8 @@ class Hub:
             dst_field=(form.dst_field if form else "dst") or "dst",
             dst_value=(form.dst_value if form else "") or "",
             popup_field=(form.popup_field if form else "popup") or "popup",
+            send_dst=bool(form and form.dst_field in (form.fields or {})),
+            send_popup=bool(form and form.popup_field in (form.fields or {})),
             chap=(form.chap if form else None),
             success_words=list(cap.success_words),
             success_url_contains=cap.success_url_contains,

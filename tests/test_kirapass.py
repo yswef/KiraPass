@@ -19,6 +19,7 @@ import tempfile
 import time
 import unittest
 from html.parser import HTMLParser
+from urllib.parse import parse_qsl, urlsplit
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -560,6 +561,25 @@ class KnownCardTests(unittest.TestCase):
             "2934664754")
         self.assertEqual(got["reason"], "charset_mismatch")
 
+    def test_http_200_unknown_page_is_verified_against_internet_state(self):
+        """A valid card may open the network without a clear success page."""
+        with MockPortal(valid_cards={"020124042"}, pass_mode="empty",
+                        unknown_success_page=True) as portal:
+            info = selftest.scan(portal.url)
+            p = selftest.make_profile(portal.url, prefix="020124", length=9,
+                                      portal_info=info, pass_mode="empty")
+            cal = engine.calibrate(p, known_card="020124042",
+                                   checks=selftest.mock_checks(portal))
+        step = self._shape_step(cal)
+        self.assertTrue(step and step["ok"], cal.as_dict())
+        self.assertEqual(step["reason"], "known_card_works")
+        self.assertTrue(cal.tuned and cal.tuned.get("verified"), cal.tuned)
+        self.assertEqual(cal.tuned.get("internet"), "expected_answer")
+        trial = cal.tuned.get("trial") or {}
+        self.assertEqual(trial.get("status"), 200)
+        self.assertEqual(trial.get("code"), "UNKNOWN")
+        self.assertTrue(trial.get("online_transition"), trial)
+
     def test_it_finds_the_right_request_shape_and_says_so(self):
         with MockPortal(valid_cards={"020124042"}, pass_mode="same") as portal:
             info = selftest.scan(portal.url)
@@ -695,6 +715,50 @@ class BrowserParityTests(unittest.TestCase):
                              "parallel diagnosis posted without a page session")
             self.assertLessEqual(portal.state.logins,
                                  config.DIAGNOSTIC_SAMPLE_LIMIT)
+
+    def test_get_submission_preserves_query_order_and_omits_absent_fields(self):
+        from unittest import mock
+        url = "http://example.invalid/login?username=&password="
+        p = store.new_profile(login_url=url, method="get",
+                              user_field="username", pass_field="password",
+                              pass_mode="empty", send_dst=False,
+                              send_popup=False,
+                              extra_fields={"dst": "stale", "popup": "stale"})
+        page = ("<form method='get' action='/login?username=&password='>"
+                "<input name='username'><input name='password' type='password'>"
+                "</form>")
+        p = engine.absorb_form(p, page, url)
+        self.assertFalse(p.get("send_dst"))
+        self.assertFalse(p.get("send_popup"))
+        self.assertNotIn("dst", engine.build_fields(p, "CARD"))
+        self.assertNotIn("popup", engine.build_fields(p, "CARD"))
+
+        sess = mock.MagicMock()
+        engine.send_login(sess, p, "CARD")
+        method, request_url = sess.request.call_args.args[:2]
+        self.assertEqual(method, "GET")
+        pairs = parse_qsl(urlsplit(request_url).query, keep_blank_values=True)
+        self.assertEqual([key for key, _ in pairs], ["username", "password"])
+        self.assertEqual(pairs[0][1], "CARD")
+        self.assertEqual(pairs[1][1], "")
+        self.assertNotIn("dst=", request_url)
+        self.assertNotIn("popup=", request_url)
+
+    def test_safe_request_shape_preserves_order_and_redacts_values(self):
+        p = store.new_profile(
+            login_url="https://url-user:url-pass@portal.invalid/login?token=secret-token&username=OLD&password=",
+            method="get", user_field="username", pass_field="password",
+            pass_mode="same", send_dst=False, send_popup=False)
+        shape = engine.safe_request_shape(p, "CARD-123")
+        self.assertEqual(shape["method"], "GET")
+        self.assertEqual(shape["field_names"], ["password", "username"])
+        self.assertNotIn("secret-token", shape["url"])
+        self.assertNotIn("OLD", shape["url"])
+        self.assertNotIn("CARD-123", shape["url"])
+        self.assertNotIn("secret-token", repr(shape))
+        self.assertNotIn("url-user", repr(shape))
+        self.assertNotIn("url-pass", repr(shape))
+        self.assertEqual(shape["body_field_names"], [])
 
     def test_scanning_a_copied_success_url_does_not_spend_its_card(self):
         with MockPortal(valid_cards={"0242"}, method="get",
@@ -873,6 +937,19 @@ class _FakeReply:
 
 
 class StoreTests(unittest.TestCase):
+    def test_calibration_report_redacts_hints_and_url_secrets(self):
+        from kirapass.web.server import _safe_calibration_report
+        profile = {"user_field": "username", "pass_field": "password"}
+        safe = _safe_calibration_report({
+            "steps": [{"detail": {"card_hint": "020124...",
+                                    "sample_cards": ["020124001"],
+                                    "url": "https://u:p@portal.invalid/login?token=private"}}],
+        }, profile)
+        blob = json.dumps(safe)
+        for secret in ("020124", "private", "https://u:p@"):
+            self.assertNotIn(secret, blob)
+        self.assertIn("[REDACTED]", blob)
+
     def test_report_snapshot_redacts_query_and_live_profile_secrets(self):
         card, digest, challenge, csrf = (
             "2972801416", "4529b5cb476335e9a70a5f7acd29b663",
@@ -908,6 +985,16 @@ class StoreTests(unittest.TestCase):
         self.assertNotIn(card, json.dumps(prof))
         self.assertNotIn(digest, json.dumps(prof))
         self.assertNotIn("&amp;", prof["login_url"])
+
+    def test_migration_preserves_explicit_dst_popup_flags(self):
+        current = store.migrate({"schema": store.SCHEMA,
+                                 "send_dst": False, "send_popup": False,
+                                 "extras": True})
+        self.assertFalse(current["send_dst"])
+        self.assertFalse(current["send_popup"])
+        legacy = store.migrate({"network_type": "1", "extras": False})
+        self.assertFalse(legacy["send_dst"])
+        self.assertFalse(legacy["send_popup"])
 
     def test_migrates_all_old_shapes(self):
         samples = [

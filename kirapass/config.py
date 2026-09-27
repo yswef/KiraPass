@@ -10,7 +10,7 @@ from __future__ import annotations
 import os
 
 APP_NAME = "KiraPass"
-VERSION = "5.0"
+VERSION = "5.8.2"
 
 # --------------------------------------------------------------------------
 # Folders
@@ -172,6 +172,8 @@ CALIBRATION_PROBES = 3
 # If it still cannot be proven, stop and ask the operator to review the portal
 # instead of cycling through dozens of login attempts and risking a lockout.
 KNOWN_CARD_TRIAL_LIMIT = 8
+# Let the router apply the known-card login before checking external access.
+KNOWN_CARD_VERIFY_DELAY_SECONDS = 1.0
 # The opt-in lockout diagnostic is capped and stops at the first block reply.
 LOCKOUT_PROBE_MAX_FAILURES = 8
 # Network diagnostics use small samples and stop on the first block response.

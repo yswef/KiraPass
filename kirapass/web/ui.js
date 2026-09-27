@@ -42,6 +42,8 @@ const I18N = {
     f_known: "بطاقة تعرف أنها تعمل (اختياري)",
     adv_open: "خيارات متقدمة (عادة لا تحتاجها)",
     p_space: "عدد الاحتمالات", p_samples: "أمثلة على البطاقات",
+    p_request_shape: "شكل الطلب المتوقع (القيم الحساسة مخفية)",
+    online_transition: "انتقال إلى الإنترنت", logout_state: "حالة ما بعد الخروج",
     p_covered: "مغطى سابقاً",
     btn_calibrate: "تعلّم من البطاقة المعروفة + قياس الشبكة",
     btn_capture: "افتح البوابة وسجّل دخولاً ناجحاً",
@@ -71,12 +73,13 @@ const I18N = {
     cal_internet_unknown: "حالة الشبكة غير معروفة",
     cal_known_card_out_of_format: "الكرت لا يطابق صيغة البطاقات",
     cal_known_card_not_proven: "لم أستطع إثبات أن هذا الكرت يعمل",
+    cal_logout_unconfirmed: "لم أستطع تأكيد تسجيل الخروج؛ أوقفت أي محاولات أخرى",
     prob_length_mismatch: "طول الكرت لا يساوي الطول المضبوط",
     prob_prefix_mismatch: "الكرت لا يبدأ بالبادئة المضبوطة",
     prob_suffix_mismatch: "الكرت لا ينتهي باللاحقة المضبوطة",
     prob_charset_mismatch: "الكرت فيه رموز ليست ضمن الأبجدية المختارة",
     known_card_tried: "جرّبنا هذا الكرت بعدة أشكال للطلب، وكان رد الراوتر:",
-    known_card_hint: "→ HTTP 400/405/415/422 يعني أن الراوتر رفض شكل الطلب قبل فحص الكرت. الأداة الآن تجدّد الكوكي والرمز المخفي؛ اختر أيضاً هوية نفس متصفحك. أما «مثل صفحة الرفض» مع HTTP 200 فالكرت منتهي/مستخدم أو كلمة المرور/الحقول ناقصة. وإن كان «محجوب»: أعد الاتصال ثم أعد المحاولة.",
+    known_card_hint: "→ HTTP 400/405/415/422 يعني أن الراوتر رفض شكل الطلب قبل فحص الكرت. راجع الطريقة والرابط والحقول المعروضة، وطابقها مع طلب المتصفح الناجح. أما HTTP 200 المشابه لصفحة الرفض فلا يثبت نجاحاً. عند ظهور حجب: أوقف المحاولات واطلب من مسؤول الشبكة مراجعة الوصول؛ لا تعاود الاتصال تلقائياً.",
     s_eta: "الوقت المتبقي",
     th_auto_slowed_router_complaining: "أبطأت تلقائياً: الراوتر بدأ يشتكي (أخطاء/تقييد)",
     th_auto_sped_up: "أسرعت تلقائياً: الراوتر يستجيب بلا أخطاء",
@@ -151,6 +154,7 @@ const I18N = {
     review_diff: "كلمات ظهرت في هذا الرد ولم تظهر في صفحة الرفض",
     missing_words: "كلمات كانت في صفحة الرفض واختفت",
     report_saved: "حُفظ التقرير",
+    download_calibration_report: "تنزيل تقرير المعايرة المنقّح",
     confirm_clear_all: "سيتم مسح كل شيء بما فيها الملفات التعريفية. متأكد؟",
     confirm_profiles: "سيتم مسح الملفات التعريفية. متأكد؟",
     yes: "نعم", no: "إلغاء", close: "إغلاق",
@@ -277,6 +281,7 @@ const I18N = {
     cal_learned: "تم التعلّم بنجاح",
     cal_known_card_works: "البطاقة المعروفة تعمل مع هذا الشكل",
     cal_known_card_not_proven: "لم أستطع إثبات أن البطاقة المعروفة تعمل بهذه الإعدادات",
+    cal_logout_unconfirmed: "لم أستطع تأكيد تسجيل الخروج؛ أوقفت أي محاولات أخرى",
     cal_browser_trace: "افتح F12 في المتصفح وانسخ بيانات نموذج الدخول وأرسلها لي",
     dyn_tokens: "رموز متغيّرة تم تجاهلها", exact_mode: "مقارنة دقيقة جاهزة",
     shape_mode: "مقارنة بالشكل (الصفحة تتغير وحدها)",
@@ -343,6 +348,8 @@ const I18N = {
     f_known: "A card you know works (optional)",
     adv_open: "Advanced options (usually not needed)",
     p_space: "Combinations", p_samples: "Sample cards",
+    p_request_shape: "Expected request shape (sensitive values hidden)",
+    online_transition: "transition to online", logout_state: "state after logout",
     p_covered: "covered",
     btn_calibrate: "Learn from the known card + measure the network",
     btn_capture: "Open the portal and record a successful login",
@@ -371,12 +378,13 @@ const I18N = {
     cal_internet_unknown: "network state unknown",
     cal_known_card_out_of_format: "the card does not match the card format",
     cal_known_card_not_proven: "this card could not be proven to work",
+    cal_logout_unconfirmed: "could not confirm logout; stopped further attempts",
     prob_length_mismatch: "the card length does not match the profile length",
     prob_prefix_mismatch: "the card does not start with the prefix",
     prob_suffix_mismatch: "the card does not end with the suffix",
     prob_charset_mismatch: "the card has characters outside the chosen charset",
     known_card_tried: "we tried this card in several request shapes; the router answered:",
-    known_card_hint: "→ HTTP 400/405/415/422 means the router rejected the request before judging the card. Cookies and hidden tokens are now refreshed; also select the same browser identity. A 200 that still matches the rejection page means an expired/used card or a missing field/password. If blocked, reconnect and retry.",
+    known_card_hint: "→ HTTP 400/405/415/422 means the router rejected the request shape before judging the card. Compare the displayed method, URL, and fields with the successful browser request. HTTP 200 matching the rejection page does not prove success. If blocked, stop attempts and ask the network administrator to review access; do not automatically reconnect.",
     s_eta: "time left",
     th_auto_slowed_router_complaining: "slowed down automatically: the router started complaining (errors/limits)",
     th_auto_sped_up: "sped up automatically: the router is answering cleanly",
@@ -447,6 +455,7 @@ const I18N = {
     review_diff: "Words in this reply that are not on the rejection page",
     missing_words: "Words that were on the rejection page and are gone",
     report_saved: "Report saved",
+    download_calibration_report: "Download redacted calibration report",
     confirm_clear_all: "Everything will be deleted, including profiles. Sure?",
     confirm_profiles: "Profiles will be deleted. Sure?",
     yes: "Yes", no: "Cancel", close: "Close", loading: "Working...",
@@ -817,7 +826,13 @@ function profileFromForm() {
   });
   const words = ($("f_words").value || "").split(/[,;\n]/).map((w) => w.trim())
     .filter(Boolean);
-  return Object.assign({}, S.profile || {}, {
+  const baseProfile = S.profile || {};
+  const portalForm = (S.portal || {}).form || {};
+  const detectedFields = new Set(portalForm.all_fields || []);
+  const dstField = baseProfile.dst_field || portalForm.dst_field || "dst";
+  const popupField = baseProfile.popup_field || portalForm.popup_field || "popup";
+  const fieldWasDetected = (name) => !S.portal || detectedFields.has(name);
+  return Object.assign({}, baseProfile, {
     name: $("f_name").value.trim() || "profile",
     login_url: $("f_login_url").value.trim() || $("scanUrl").value.trim(),
     method: $("f_method").value,
@@ -829,8 +844,10 @@ function profileFromForm() {
     prefix: $("f_prefix").value.trim(),
     suffix: "",
     dst_value: $("f_dst").value.trim(),
-    send_dst: $("f_send_dst").checked,
-    send_popup: $("f_send_dst").checked,
+    dst_field: dstField,
+    popup_field: popupField,
+    send_dst: $("f_send_dst").checked && fieldWasDetected(dstField),
+    send_popup: $("f_send_dst").checked && fieldWasDetected(popupField),
     extra_fields: extras,
     success_words: words,
     /* the chap formula comes from the scanned page - but a SAVED profile knows
@@ -969,6 +986,9 @@ async function doScan() {
   $("f_method").value = (f.method || "post").toLowerCase() === "get" ? "get" : "post";
   $("f_user_field").value = f.user_field || "username";
   $("f_pass_field").value = f.pass_field || "password";
+  const detectedFields = new Set(f.all_fields || []);
+  $("f_send_dst").checked = detectedFields.has(f.dst_field) ||
+    detectedFields.has(f.popup_field);
   const dsts = res.portal.dst_candidates || [];
   $("f_dst").value = dsts.find((d) => d) || "";
   if (f.chap) $("f_pass_mode").value = "chap";
@@ -1011,6 +1031,14 @@ function previewFormat() {
     $("pvSpace").textContent = fmtSpace(res.space);
     $("pvSamples").innerHTML = (res.samples || [])
       .map((c) => "<span class='sample'>" + esc(c) + "</span>").join("");
+    const shape = res.request_shape;
+    if (shape) {
+      const body = (shape.body_field_names || []).length
+        ? " · body fields: " + shape.body_field_names.join(", ") : "";
+      $("pvRequest").textContent = shape.method + " " + shape.url + body;
+    } else {
+      $("pvRequest").textContent = "—";
+    }
     const box = $("pvProblems");
     const hard = (res.problems || []).filter((p) => p !== "space_is_astronomically_big");
     box.classList.toggle("hidden", !hard.length);
@@ -1099,9 +1127,13 @@ function renderCalibration(job, node) {
     const d = s.detail || {};
     if (s.id === "internet_state" && d.state) extra = " — " + t("internet_" + d.state);
     if (s.id === "reach_login_page" && d.ms) extra = " — HTTP " + d.status + " · " + d.ms + " ms";
-    if (s.id === "shape_tuned" && d.tuned)
+    if (s.id === "shape_tuned" && d.tuned) {
+      const trial = d.tuned.trial || {};
       extra = " — " + t("pm_" + d.tuned.mode, d.tuned.mode) +
-              (d.tuned.dst ? " · dst=" + esc(d.tuned.dst) : "");
+              (d.tuned.method ? " · " + d.tuned.method : "") +
+              (trial.url ? " · " + trial.url : "") +
+              (d.tuned.dst ? " · dst=" + d.tuned.dst : "");
+    }
     if (s.id === "shape_tuned" && d.wrong) extra = " — " + esc(t("prob_" + d.wrong, d.wrong));
     html += "<li class='" + cls + "'>" + mark + " " + t("cal_" + s.id, s.id) + ": " +
             t("cal_" + s.reason, s.reason) + esc(extra) + "</li>";
@@ -1114,18 +1146,31 @@ function renderCalibration(job, node) {
     html += "<div class='hint'>" + esc(t("known_card_tried")) + " " + d.tried +
             "</div><table class='why' style='margin-top:4px'><tbody>";
     d.trials.forEach((tr) => {
-      html += "<tr><td class='mono'>" + esc(t("pm_" + tr.mode, tr.mode)) +
-              "</td><td>" + (tr.status || "—") + "</td><td>" +
-              esc(codeLabel(tr.code)) + "</td><td class='why'>" +
+      const net = tr.internet_before || tr.internet_after
+        ? (tr.internet_before || "?") + " → " + (tr.internet_after || "?") +
+          (tr.online_transition ? " · " + t("online_transition") : "") : "";
+      const logout = tr.logout && tr.logout.internet_after
+        ? " · " + t("logout_state") + " → " + tr.logout.internet_after : "";
+      const bodyFields = (tr.body_field_names || []).length
+        ? "<br>body: " + esc(tr.body_field_names.join(", ")) : "";
+      html += "<tr><td class='mono'>" + esc((tr.method || "") + " " + (tr.mode || "")) +
+              (tr.url ? "<br>" + esc(tr.url) : "") + bodyFields + "</td><td>" +
+              (tr.status || "—") + (tr.response_bytes ? " · " + tr.response_bytes + " B" : "") +
+              "</td><td>" + esc(codeLabel(tr.code)) + "</td><td class='why'>" +
               esc(reasonLabel(tr.code, tr.reason, {})) +
-              (tr.word ? " «" + esc(tr.word) + "»" : "") + "</td></tr>";
+              (tr.word ? " «" + esc(tr.word) + "»" : "") +
+              (net ? "<br>" + esc(net) : "") + esc(logout) + "</td></tr>";
     });
     html += "</tbody></table><div class='warn'>" + esc(t("known_card_hint")) + "</div>";
   });
   if (r.success_words && r.success_words.length)
     html += "<div class='kv'><dt>" + t("f_words") + "</dt><dd>" +
             esc(r.success_words.join(", ")) + "</dd></div>";
-  if (r.error) html += "<div class='bad mono'>" + esc(r.error) + "</div>";
+  if (r.report_file)
+    html += "<div class='hint'><a target='_blank' rel='noopener' href='" +
+      esc(withToken("/api/report?name=" + encodeURIComponent(r.report_file))) + "'>" +
+      esc(t("download_calibration_report")) + "</a></div>";
+  if (r.error) html += "<div class='bad'>" + esc(t("cal_" + r.error, r.error)) + "</div>";
   node.innerHTML = html;
 }
 
@@ -1507,7 +1552,7 @@ function renderStop(st) {
   const calError = (st.calibration || {}).error || st.error || "";
   const stopForReview = ["blocked_already", "blocked_before_probes",
     "captcha_challenge", "known_card_not_proven",
-    "known_card_out_of_format"].includes(calError);
+    "known_card_out_of_format", "logout_unconfirmed"].includes(calError);
   if (st.stop_reason === "calibration_failed" && !stopForReview) {
     html += "<div class='row wrap' style='margin-top:8px'>" +
             "<button class='btn' id='retryNowBtn'>" + esc(t("retry_now")) + "</button></div>";

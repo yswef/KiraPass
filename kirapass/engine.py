@@ -65,8 +65,12 @@ def build_fields(p: dict, card: str) -> dict:
         fields[p["dst_field"]] = p.get("dst_value", "")
     if p.get("send_popup") and p.get("popup_field"):
         fields[p["popup_field"]] = "true"
+    special_fields = {p.get("user_field") or "username",
+                      p.get("pass_field") or "password",
+                      p.get("dst_field") or "dst",
+                      p.get("popup_field") or "popup"}
     for key, value in (p.get("extra_fields") or {}).items():
-        if key in fields:
+        if key in fields or key in special_fields:
             continue
         fields[key] = value
     return fields
@@ -93,24 +97,83 @@ def _without_query_fields(url: str, names) -> str:
         return url
 
 
-def send_login(session: Session, p: dict, card: str, timeout=None):
-    """One login attempt. Redirects are NOT followed: we must see the
-    Location header, because that is the proof the portal let us out."""
+def _get_request_url(p: dict, fields: dict) -> str:
+    """Build GET query pairs in the order the copied/form URL established.
+
+    Requests' `params=` appends fields in dictionary order (which used to put
+    password before username and added defaults before respecting the browser's
+    URL shape). Merge values into existing query slots, then append only truly
+    new fields.
+    """
+    url = portals.sanitize_login_url(
+        p.get("login_url", ""), p.get("user_field", "username"),
+        p.get("pass_field", "password"))
+    parts = urlsplit(url)
+    source = parse_qsl(parts.query, keep_blank_values=True)
+    submitted = {str(k): str(v) for k, v in fields.items()}
+    pairs, placed = [], set()
+    for key, value in source:
+        if key in submitted:
+            pairs.append((key, submitted[key]))
+            placed.add(key)
+        else:
+            pairs.append((key, value))
+    for key, value in fields.items():
+        if str(key) not in placed:
+            pairs.append((str(key), str(value)))
+    return urlunsplit((parts.scheme, parts.netloc, parts.path,
+                       urlencode(pairs, doseq=True), parts.fragment))
+
+
+def _request_components(p: dict, card: str):
     fields = build_fields(p, card)
     method = (p.get("method") or "post").lower()
     if method == "post":
-        # If the operator copied a successful browser URL, do not leave its
-        # old credentials in the action query while posting the new ones.
         url = _without_query_fields(
             p["login_url"], (p.get("user_field") or "username",
                              p.get("pass_field") or "password"))
+    else:
+        url = _get_request_url(p, fields)
+    return method, url, fields
+
+
+def _safe_url_shape(url: str, p: dict) -> str:
+    parts = urlsplit(url or "")
+    safe_pairs = []
+    user_name = (p.get("user_field") or "username").lower()
+    pass_name = (p.get("pass_field") or "password").lower()
+    for key, value in parse_qsl(parts.query, keep_blank_values=True):
+        low = key.lower()
+        if low == user_name:
+            shown = "[CARD]"
+        elif low == pass_name:
+            shown = "[EMPTY]" if not value else "[REDACTED]"
+        else:
+            shown = "[REDACTED]" if value else "[EMPTY]"
+        safe_pairs.append((key, shown))
+    # Strip URL userinfo as well as query values; it is never needed to
+    # explain the request shape and may contain credentials.
+    netloc = parts.netloc.rsplit("@", 1)[-1]
+    return urlunsplit((parts.scheme, netloc, parts.path,
+                       urlencode(safe_pairs, doseq=True), ""))
+
+
+def safe_request_shape(p: dict, card: str) -> dict:
+    """Describe the actual request without preserving card/token values."""
+    method, url, fields = _request_components(p, card)
+    return {"method": method.upper(), "url": _safe_url_shape(url, p),
+            "field_names": list(fields),
+            "body_field_names": list(fields) if method == "post" else []}
+
+
+def send_login(session: Session, p: dict, card: str, timeout=None):
+    """One login attempt. Redirects are NOT followed: we must see the
+    Location header, because that is the proof the portal let us out."""
+    method, url, fields = _request_components(p, card)
+    if method == "post":
         return session.request("POST", url, data=fields,
                                allow_redirects=False, timeout=timeout)
-    # GET fields belong in the query string. Replace any captured values;
-    # never append a second username/password/dst/token to the old URL.
-    url = _without_query_fields(p["login_url"], fields.keys())
-    return session.request("GET", url, params=fields,
-                           allow_redirects=False, timeout=timeout)
+    return session.request("GET", url, allow_redirects=False, timeout=timeout)
 
 
 def submitted_values(p: dict, card: str) -> list:
@@ -189,7 +252,9 @@ def absorb_form(p: dict, html: str, url: str) -> dict:
         out["user_field"] = form.user_field
     if form.pass_field:
         out["pass_field"] = form.pass_field
-    if form.dst_field and not p.get("dst_field"):
+    if form.dst_field:
+        # The freshly fetched form is authoritative: store.migrate supplies a
+        # legacy "dst" default that must not mask a discovered custom name.
         out["dst_field"] = form.dst_field
     if form.dst_value and not p.get("dst_value"):
         out["dst_value"] = form.dst_value
@@ -200,7 +265,8 @@ def absorb_form(p: dict, html: str, url: str) -> dict:
     extra = dict(p.get("extra_fields") or {})
     fresh = 0
     for name, value in (form.fields or {}).items():
-        if name in (out.get("user_field"), out.get("pass_field")):
+        if name in (out.get("user_field"), out.get("pass_field"),
+                    out.get("dst_field"), out.get("popup_field")):
             continue
         # Presence matters too: several portals require an empty hidden field
         # to exist in the submitted form.  Dropping it changes the request
@@ -385,6 +451,49 @@ def calibrate(profile: dict, known_card: str = "", keyword: str = "",
                  {**{k: v for k, v in cal.internet.items() if k != "state"},
                   "state": state})
 
+        # Use the explicitly supplied known card once, in the currently
+        # observed request shape, before sending any calibration guesses.
+        known_preflight = None
+        known_preflight_response = None
+        known_preflight_tuned = None
+        if known_card:
+            wrong = known_card_problem(p, known_card)
+            if wrong:
+                cal.error = "known_card_out_of_format"
+                cal.step("shape_tuned", False, "known_card_out_of_format", wrong)
+                return cal
+            p, known_preflight, known_preflight_tuned, preflight_error, \
+                known_preflight_response = _known_card_preflight(
+                    p, known_card, session, cal.internet, checks=checks)
+            cal.profile = p
+            if known_preflight.get("code") == "NET_ERROR":
+                cal.error = known_preflight.get("reason") or "network_error"
+                cal.step("shape_tuned", False, f"net_{cal.error}",
+                         {"tried": 1, "trials": [known_preflight]})
+                return cal
+            if preflight_error and preflight_error != "logout_unconfirmed":
+                cal.error = ("captcha_challenge" if preflight_error == "captcha_challenge"
+                             else "blocked_already")
+                cal.step("shape_tuned", False,
+                         "captcha_challenge" if preflight_error == "captcha_challenge"
+                         else "blocked_by_our_probes",
+                         {"tried": 1, "trials": [known_preflight]})
+                return cal
+            if preflight_error == "logout_unconfirmed":
+                cal.error = "logout_unconfirmed"
+                cal.step("shape_tuned", False, "logout_unconfirmed",
+                         {"tried": 1, "trials": [known_preflight]})
+                return cal
+            if known_preflight_tuned:
+                cal.tuned = known_preflight_tuned
+                cal.step("shape_tuned", True, "known_card_works",
+                         {"tuned": known_preflight_tuned, "tried": 1,
+                          "trials": [known_preflight]})
+            else:
+                cal.step("known_card_preflight", False,
+                         "internet_transition_not_seen",
+                         {"tried": 1, "trials": [known_preflight]})
+
         # --- 3. learn what a WRONG card looks like ----------------------
         probe_cards, replies = [], []
         for card in bench_cards(p, max(2, min(int(probes or 2), 4))):
@@ -465,33 +574,53 @@ def calibrate(profile: dict, known_card: str = "", keyword: str = "",
                                  {"exact": fp.exact, "samples": fp.samples})
                     break
 
-        # --- 4. tune the request shape with a known-good card -----------
-        if learn_known and known_card:
-            wrong = known_card_problem(p, known_card)
-            if wrong:
-                # the card does not even fit the format we were told to guess:
-                # say so before spending a single request on it
-                cal.step("shape_tuned", False, "known_card_out_of_format", wrong)
+        # --- 4. tune only if the exact known-card request did not verify ---
+        if known_preflight_response is not None and known_preflight:
+            first_judge = Judge(fp, p["login_url"])
+            first_verdict = first_judge.classify(
+                known_preflight_response, submitted_values(p, known_card))
+            known_preflight.update({"code": first_verdict.code,
+                                    "reason": first_verdict.reason})
+            if cal.tuned:
+                words = _new_words(known_preflight_response.text or "", fp.reject_text)
+                cal.success_words = words
+                p["success_words"] = words
+                for step in cal.steps:
+                    if step.get("id") == "shape_tuned" and step.get("ok"):
+                        step.setdefault("detail", {})["words"] = words[:6]
+        if learn_known and known_card and not cal.tuned:
+            preflight_trials = [known_preflight] if known_preflight else []
+            skip_shape = None
+            if known_preflight:
+                skip_shape = (known_preflight.get("method", "").lower(),
+                              p.get("dst_value", ""), p.get("pass_mode", "empty"),
+                              bool(p.get("send_dst")), bool(p.get("send_popup")))
+            p, words, tuned, trials = _tune_with_known_card(
+                p, known_card, fp, session, checks=checks,
+                internet_before=cal.internet,
+                initial_trials=preflight_trials,
+                skip_shape=skip_shape)
+            cal.profile = p
+            if words:
+                cal.success_words = words
+                p["success_words"] = words
+            if tuned:
+                cal.tuned = tuned
+                cal.step("shape_tuned", True, "known_card_works",
+                         {"tuned": tuned, "words": words[:6],
+                          "tried": len(trials),
+                          "trials": _summarise_trials(trials)})
             else:
-                p, words, tuned, trials = _tune_with_known_card(
-                    p, known_card, fp, session, checks=checks)
-                # the tuner refreshes one-use hidden tokens by returning new
-                # profile copies; keep Calibration pointed at the final one.
-                cal.profile = p
-                if words:
-                    cal.success_words = words
-                    p["success_words"] = words
-                if tuned:
-                    cal.tuned = tuned
-                    cal.step("shape_tuned", True, "known_card_works",
-                             {"tuned": tuned, "words": words[:6]})
-                else:
-                    # "could not prove it" is useless on its own: show what the
-                    # router answered for every shape we tried
-                    cal.step("shape_tuned", False, "known_card_not_proven",
-                             {"tried": len(trials),
-                              "trials": _summarise_trials(trials)})
-            verify.logout(session, p["login_url"])
+                logout_unconfirmed = any(
+                    (t.get("logout") or {}).get("internet_after") != "WALLED"
+                    for t in trials if t.get("logout"))
+                if logout_unconfirmed:
+                    cal.error = "logout_unconfirmed"
+                cal.step("shape_tuned", False,
+                         "logout_unconfirmed" if logout_unconfirmed
+                         else "known_card_not_proven",
+                         {"tried": len(trials),
+                          "trials": _summarise_trials(trials)})
             if shape_refused and not cal.tuned:
                 # Every learning probe and every known-card shape was rejected
                 # before the credentials were judged.  Do not start a run that
@@ -518,97 +647,135 @@ def calibrate(profile: dict, known_card: str = "", keyword: str = "",
 
 
 def _tune_with_known_card(p: dict, known_card: str, fp: Fingerprinter, session,
-                          checks=None):
+                          checks=None, internet_before=None, initial_trials=None,
+                          skip_shape=None):
     """Try the sensible (password value x dst) combinations for the good card.
 
-    Returns (profile, success_words, tuned).  A combination is accepted only
-    with positive evidence: a redirect out of the portal, real internet, or a
-    reply whose shape clearly differs from the rejection page.
+    Returns (profile, success_words, tuned, trials). Every trial is recorded
+    with a redacted request shape and a network-state check; a success is not
+    trusted until the logout restores the previously walled state.
     """
-    dsts = list(dict.fromkeys([p.get("dst_value", ""),
-                               "http://www.msftconnecttest.com/redirect",
-                               "http://connectivitycheck.gstatic.com/generate_204",
-                               ""]))
+    dsts = list(dict.fromkeys([p.get("dst_value", ""), ""]))
     modes = ["empty", "same", "omit", "chap", "chap_empty", "md5user"]
     if p.get("chap") is None:
         modes = [m for m in modes if not m.startswith("chap")]
     best = None
-    trials = []
-    # some portals take the card from the query string, some only from a
-    # form body - and a page whose form is built by javascript often gets
-    # scanned as "get".  Try both before saying the card does not work.
+    trials = list(initial_trials or [])
+    before_state = (internet_before or {}).get("state", "UNKNOWN")
     methods = [m for m in ((p.get("method") or "post").lower(), "get", "post")
                if m in ("get", "post")]
     methods = list(dict.fromkeys(methods))
-
     original = ((p.get("method") or "post").lower(),
-                p.get("dst_value", ""), p.get("pass_mode") or "empty")
+                p.get("dst_value", ""), p.get("pass_mode") or "empty",
+                bool(p.get("send_dst")), bool(p.get("send_popup")))
     modes = list(dict.fromkeys([original[2]] + modes))
-    candidates = [(method, dst, mode)
-                  for dst in dsts for mode in modes for method in methods]
-    # Spend the known card on the shape closest to what the page said first.
-    # In particular, try the alternate GET/POST on the second request instead
-    # of after every password/dst combination (which could fill a lockout).
+    flag_shapes = list(dict.fromkeys([
+        (original[3], original[4]), (False, False), (True, False),
+        (False, True), (True, True)]))
+    candidates = [(method, dst, mode, send_dst, send_popup)
+                  for method in methods for dst in dsts for mode in modes
+                  for send_dst, send_popup in flag_shapes]
     candidates.sort(key=lambda x: ((x[0] != original[0]) +
                                    (x[1] != original[1]) +
-                                   (x[2] != original[2]),
+                                   (x[2] != original[2]) +
+                                   (x[3] != original[3]) +
+                                   (x[4] != original[4]),
                                   methods.index(x[0]), dsts.index(x[1]),
-                                  modes.index(x[2])))
+                                  modes.index(x[2]), flag_shapes.index((x[3], x[4]))))
+    if skip_shape:
+        candidates = [x for x in candidates if x != tuple(skip_shape)]
 
-    for method, dst, mode in candidates[:config.KNOWN_CARD_TRIAL_LIMIT]:
+    remaining = max(0, config.KNOWN_CARD_TRIAL_LIMIT - len(trials))
+    for method, dst, mode, send_dst, send_popup in candidates[:remaining]:
         trial = dict(p)
         trial["pass_mode"] = mode
         trial["dst_value"] = dst
         trial["method"] = method
+        trial["send_dst"] = send_dst
+        trial["send_popup"] = send_popup
+        shape = safe_request_shape(trial, known_card)
         judge = Judge(fp, p["login_url"])
         try:
             r = send_login(session, trial, known_card)
         except Exception as exc:                         # noqa: BLE001
             err = classify(exc, trial.get("login_url", ""))
-            trials.append({"mode": mode, "method": method, "dst": dst,
+            trials.append({**shape, "mode": mode, "dst": _safe_url_shape(dst, trial),
                            "code": err.kind.upper(), "reason": err.kind,
-                           "status": None, "location": "", "word": ""})
-            # More request shapes cannot fix a transport failure.
+                           "status": None, "location": "", "word": "",
+                           "internet_before": before_state,
+                           "internet_after": "NOT_CHECKED"})
             break
         verdict = judge.classify(r, submitted_values(trial, known_card))
         body = (r.text or "").lower()
-        # Keep this session's fresh hidden token/cookie pair.  Some portals
-        # consume a CSRF token after every failed shape.
         p = absorb_form(trial, r.text or "", r.url or trial["login_url"])
-        trials.append({
-            "mode": mode, "method": method, "dst": dst, "status": r.status,
-            "code": verdict.code, "reason": verdict.reason,
-            "location": r.location,
-            "word": (verdict.data or {}).get("word")
-                    or find_phrase(body, config.REJECT_WORDS)
-                    or find_phrase(body, config.BAN_WORDS)})
-        if verdict.code in ("BANNED", "RATE_LIMITED", "CHALLENGE") or r.status in (403, 429):
-            # A real lockout is a hard stop, not a cue to keep trying shapes.
+        protective, protective_reason = _is_protective_reply(r, p["login_url"])
+        if protective:
+            verdict_code = ("CHALLENGE" if protective_reason == "captcha_challenge"
+                            else "RATE_LIMITED" if r.status == 429 else "BANNED")
+            trials.append({**shape, "mode": mode, "dst": _safe_url_shape(dst, trial),
+                           "status": r.status, "code": verdict_code,
+                           "reason": protective_reason,
+                           "response_bytes": r.length,
+                           "content_type": r.header("content-type").split(";")[0],
+                           "location": _safe_url_shape(r.location, trial) if r.location else "",
+                           "word": protective_reason,
+                           "internet_before": before_state,
+                           "internet_after": "NOT_CHECKED"})
             break
-        evidence = 0.0
+
+        time.sleep(max(0.0, config.KNOWN_CARD_VERIFY_DELAY_SECONDS))
+        online, info = verify.verify_online(session, checks=checks)
+        transition = before_state != "ONLINE" and online
+        evidence = 1.0 if transition else 0.0
         if r.is_redirect():
             host = (r.location.split("//")[-1].split("/")[0] or "").lower()
             if host and host != (p["login_url"].split("//")[-1]
                                  .split("/")[0].lower()):
-                evidence = 0.9
+                evidence = max(evidence, 0.9)
         if verdict.is_hit:
             evidence = max(evidence, verdict.confidence)
-        if not evidence:
-            continue
-        ok, info = verify.verify_online(session, checks=checks)
-        if ok:
-            evidence = 1.0
-        words = _new_words(r.text or "", fp.reject_text)
-        candidate = {"mode": mode, "method": method, "dst": dst,
-                     "evidence": evidence, "verified": ok,
-                     "internet": info.get("detail", ""),
-                     "location": r.location[:160], "words": words}
-        if best is None or candidate["evidence"] > best["evidence"]:
-            best = candidate
-        # A successful login puts this session "online": log out immediately
-        # and do not spend the known card on lower-ranked shapes.
-        verify.logout(session, p["login_url"])
-        if evidence >= 0.9:
+        logout_record = None
+        logout_state = "NOT_REQUIRED"
+        if transition or (evidence and before_state != "ONLINE"):
+            logout = verify.logout(session, p["login_url"])
+            post_logout = verify.probe_internet(session, checks=checks)
+            logout_state = post_logout.get("state", "UNKNOWN")
+            logout_record = {"request_ok": bool(logout.get("ok")),
+                             "status": logout.get("status"),
+                             "internet_after": logout_state}
+            if logout_state != "WALLED" or not transition:
+                # A redirect or changed page may suggest acceptance, but only
+                # a measured WALLED -> ONLINE transition proves this card.
+                evidence = 0.0
+        else:
+            evidence = 0.0
+        row = {**shape, "mode": mode, "dst": _safe_url_shape(dst, trial),
+               "status": r.status, "code": verdict.code,
+               "reason": verdict.reason, "response_bytes": r.length,
+               "content_type": r.header("content-type").split(";")[0],
+               "location": _safe_url_shape(r.location, trial) if r.location else "",
+               "word": (verdict.data or {}).get("word")
+                       or find_phrase(body, config.REJECT_WORDS)
+                       or find_phrase(body, config.BAN_WORDS),
+               "internet_before": before_state,
+               "internet_after": info.get("state", "UNKNOWN"),
+               "online_transition": transition, "logout": logout_record}
+        trials.append(row)
+        if logout_record and logout_state != "WALLED":
+            break
+        if evidence:
+            words = _new_words(r.text or "", fp.reject_text)
+            candidate = {"mode": mode, "method": method, "dst": dst,
+                         "send_dst": send_dst, "send_popup": send_popup,
+                         "trial": row, "evidence": evidence, "verified": transition,
+                         "internet": info.get("detail", ""),
+                         "internet_state": info.get("state", "UNKNOWN"),
+                         "logout": logout_record,
+                         "location": row["location"], "words": words}
+            if best is None or candidate["evidence"] > best["evidence"]:
+                best = candidate
+            break
+        if verdict.code in ("BANNED", "RATE_LIMITED", "CHALLENGE") or r.status in (403, 429):
             break
 
     if not best:
@@ -618,8 +785,87 @@ def _tune_with_known_card(p: dict, known_card: str, fp: Fingerprinter, session,
     p["dst_value"] = best["dst"]
     if best.get("method"):
         p["method"] = best["method"]
+    p["send_dst"] = bool(best.get("send_dst"))
+    p["send_popup"] = bool(best.get("send_popup"))
     tuned = {k: v for k, v in best.items() if k != "words"}
+    tuned["dst"] = _safe_url_shape(best.get("dst", ""), p)
     return p, best["words"], tuned, trials
+
+
+def _known_card_preflight(p: dict, card: str, session, internet_before: dict,
+                          checks=None):
+    """Try the submitted known card once, then verify actual network state.
+
+    The reply may be HTTP 200 without a success marker; a WALLED -> ONLINE
+    transition is stronger evidence than response text in that case.
+    """
+    shape = safe_request_shape(p, card)
+    try:
+        resp = send_login(session, p, card)
+    except Exception as exc:                              # noqa: BLE001
+        err = classify(exc, p.get("login_url", ""))
+        return p, {**shape, "status": None, "code": "NET_ERROR",
+                   "reason": err.kind, "response_bytes": 0,
+                   "content_type": "", "location": "",
+                   "internet_after": None, "logout": None}, None, "", None
+
+    protective, evidence = _is_protective_reply(resp, p.get("login_url", ""))
+    if protective:
+        code = "CHALLENGE" if evidence == "captcha_challenge" else (
+            "RATE_LIMITED" if resp.status == 429 else "BANNED")
+        return p, {**shape, "status": resp.status, "code": code,
+                   "reason": evidence, "response_bytes": resp.length,
+                   "content_type": resp.header("content-type").split(";")[0],
+                   "location": _safe_url_shape(resp.location, p) if resp.location else "",
+                   "internet_after": None, "logout": None}, None, evidence, resp
+
+    refreshed = absorb_form(p, resp.text or "", resp.url or p.get("login_url", ""))
+    before_state = (internet_before or {}).get("state", "UNKNOWN")
+    # Give a successful portal transition a moment to reach the router before
+    # probing; this is a short settling delay, not a lockout wait/retry.
+    time.sleep(max(0.0, config.KNOWN_CARD_VERIFY_DELAY_SECONDS))
+    is_online, after = verify.verify_online(session, checks=checks)
+    transition = before_state != "ONLINE" and is_online
+    trial = {**shape, "status": resp.status,
+             "code": "UNKNOWN", "reason": "pending_rejection_baseline",
+             "response_bytes": resp.length,
+             "content_type": resp.header("content-type").split(";")[0],
+             "location": _safe_url_shape(resp.location, p) if resp.location else "",
+             "internet_before": before_state,
+             "internet_after": after.get("state", "UNKNOWN"),
+             "internet_detail": after.get("detail", ""),
+             "online_transition": transition,
+             "logout": None}
+    redirect_out = False
+    if resp.is_redirect():
+        host = (resp.location.split("//")[-1].split("/")[0] or "").lower()
+        login_host = (p.get("login_url", "").split("//")[-1].split("/")[0]
+                      .lower())
+        redirect_out = bool(host and host != login_host)
+    if not transition and not redirect_out:
+        return refreshed, trial, None, "", resp
+
+    # Even if a redirect suggests success but the connectivity probe did not
+    # confirm it, restore the walled state before allowing any later request.
+    logout = verify.logout(session, refreshed.get("login_url", ""))
+    after_logout = verify.probe_internet(session, checks=checks)
+    trial["logout"] = {"request_ok": bool(logout.get("ok")),
+                       "status": logout.get("status"),
+                       "internet_after": after_logout.get("state", "UNKNOWN")}
+    if after_logout.get("state") != "WALLED":
+        return refreshed, trial, None, "logout_unconfirmed", resp
+    if not transition:
+        return refreshed, trial, None, "", resp
+    tuned = {"method": shape["method"].lower(),
+             "mode": p.get("pass_mode", "empty"),
+             "pass_mode": p.get("pass_mode", "empty"),
+             "dst": _safe_url_shape(p.get("dst_value", ""), p),
+             "send_dst": bool(p.get("send_dst")),
+             "send_popup": bool(p.get("send_popup")),
+             "verified": True, "internet": after.get("detail", ""),
+             "internet_state": after.get("state", "UNKNOWN"),
+             "trial": trial, "logout": trial["logout"]}
+    return refreshed, trial, tuned, "", resp
 
 
 def _new_words(page: str, reference: str, limit: int = 10) -> list:
@@ -1918,15 +2164,24 @@ def known_card_problem(p: dict, card: str) -> dict:
     return {}
 
 
-def _summarise_trials(trials: list, limit: int = 6) -> list:
-    """Keep what explains the failure: what we sent and what came back."""
+def _summarise_trials(trials: list, limit: int = 8) -> list:
+    """Keep safe request shapes and response evidence, in request order."""
     out = []
-    for t in trials:
-        out.append({"mode": t.get("mode", ""), "method": t.get("method", ""),
-                    "dst": (t.get("dst") or "")[:48],
-                    "status": t.get("status", 0), "code": t.get("code", ""),
-                    "reason": t.get("reason", ""), "word": t.get("word", ""),
-                    "location": (t.get("location") or "")[:60]})
-    # newest is not interesting - the most "alive" answers are
-    out.sort(key=lambda r: (r["code"] == "REJECTED", r["reason"]))
-    return out[:limit]
+    for t in trials[:limit]:
+        out.append({
+            "method": t.get("method", ""),
+            "url": t.get("url", ""),
+            "field_names": list(t.get("field_names") or []),
+            "body_field_names": list(t.get("body_field_names") or []),
+            "mode": t.get("mode", ""),
+            "dst": (t.get("dst") or "")[:120],
+            "status": t.get("status"), "code": t.get("code", ""),
+            "reason": t.get("reason", ""), "word": t.get("word", ""),
+            "response_bytes": t.get("response_bytes"),
+            "content_type": t.get("content_type", ""),
+            "location": (t.get("location") or "")[:160],
+            "internet_before": t.get("internet_before", ""),
+            "internet_after": t.get("internet_after", ""),
+            "online_transition": bool(t.get("online_transition")),
+            "logout": t.get("logout")})
+    return out

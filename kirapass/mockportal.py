@@ -69,7 +69,8 @@ class PortalState:
                  rate_limit_after=0, drop_every=0,
                  drop_after=0, chap=False, prefix="02", length=6,
                  error_text=None, hide_success=False, require_session=False,
-                 reject_shape=False, success_page=False):
+                 reject_shape=False, success_page=False,
+                 unknown_success_page=False):
         self.valid_cards = set(valid_cards)
         self.pass_mode = pass_mode          # same | empty | chap
         self.method = method
@@ -87,6 +88,10 @@ class PortalState:
         self.require_session = require_session
         self.reject_shape = reject_shape
         self.success_page = success_page
+        # The portal accepts the card and opens the network but replies with a
+        # different, unlabelled HTTP 200 page. This reproduces a success that
+        # a response-only classifier cannot prove without an internet check.
+        self.unknown_success_page = unknown_success_page
         self.tokens = {}
         self.bad_requests = 0
         self.rate_limit_after = rate_limit_after
@@ -275,6 +280,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 # logged in, but the reply is word for word a rejection page
                 st.bump("hidden_successes")
                 return self._login_page(base, fields, error=True)
+            if st.unknown_success_page:
+                return self._reply(
+                    200, "<html><body><h1>Portal session updated</h1>"
+                         "<p>Account settings were refreshed.</p></body></html>")
             if st.success_page:
                 return self._reply(302, "", {"Location": base + "/success"})
             return self._reply(302, "", {

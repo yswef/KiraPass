@@ -222,8 +222,10 @@ def migrate(raw: dict) -> dict:
         "prefix": prefix,
         "suffix": suffix,
         "method": "post" if str(raw.get("method", "2")) in ("2", "post") else "get",
-        "send_dst": bool(raw.get("extras", True)),
-        "send_popup": bool(raw.get("extras", True)),
+        "send_dst": bool(raw.get("send_dst")) if "send_dst" in raw
+                    else bool(raw.get("extras", True)),
+        "send_popup": bool(raw.get("send_popup")) if "send_popup" in raw
+                      else bool(raw.get("extras", True)),
         "dst_value": raw.get("dst_value", ""),
         "dst_field": raw.get("dst_field") or "dst",
         "popup_field": raw.get("popup_field") or "popup",
