@@ -7,9 +7,20 @@ const I18N = {
     /* interface */
     step_scan: "فحص الشبكة", step_format: "صيغة البطاقة",
     step_run: "التشغيل", step_results: "النتائج",
+    skip_content: "تجاوز إلى المحتوى",
+    brand_subtitle: "اختبار شبكات مصرح به",
+    license_link: "الترخيص",
+    progress_label: "تقدم التشغيل",
+    language_label: "تغيير اللغة",
+    steps_label: "خطوات الاستخدام",
+    banner_title: "استخدام مصرّح به فقط",
+    banner_text: "هذه الأداة للاختبار على شبكة تملكها أو لديك إذن كتابي من صاحبها. لا تستخدمها على شبكة غيرك.",
+    banner_more: "التفاصيل",
     scan_title: "1) افحص صفحة الدخول",
     scan_hint: "الصق رابط صفحة دخول الهوتسبوت كما تفتحها في المتصفح. إن كان الرابط نفسه يحتوي ?username=…&password= فالأداة تعرف أنه GET، وتحذف الكرت من طلب الفحص حتى لا تستهلكه ولا تكرر الاسم القديم. ثم تقرأ الصفحة وتكتشف الحقول تلقائياً.",
     scan_button: "افحص الآن",
+    scan_url_label: "رابط صفحة الدخول",
+    attempt_table: "سجل محاولات التشغيل",
     next_format: "التالي: صيغة البطاقة ←",
     next_run: "التالي: التشغيل ←",
     format_title: "2) صيغة البطاقة",
@@ -20,11 +31,14 @@ const I18N = {
     f_charset: "الحروف/الأرقام المتغيّرة", f_custom: "محارف مخصّصة",
     f_pass_mode: "قيمة كلمة المرور", f_dst: "قيمة dst (وجهة الضيف)",
     f_name: "اسم الملف التعريفي",
-    f_method: "طريقة الطلب", f_user_field: "اسم حقل المستخدم",
+    f_method: "طريقة الطلب", method_post: "POST (الأكثر توافقاً)", method_get: "GET",
+    f_user_field: "اسم حقل المستخدم",
     f_pass_field: "اسم حقل كلمة المرور", f_login_url: "رابط إرسال الدخول (action)",
     f_send_dst: "إرسال الحقول المخفية dst/popup",
     f_extra: "حقول ثابتة إضافية (name=value)",
     f_words: "كلمات النجاح (اختياري)",
+    f_words_clear: "مسح",
+    f_words_hint: "تُطابق هذه الكلمات نص الصفحة الظاهر فقط. امسحها إذا كانت قديمة أو غير صحيحة.",
     f_known: "بطاقة تعرف أنها تعمل (اختياري)",
     adv_open: "خيارات متقدمة (عادة لا تحتاجها)",
     p_space: "عدد الاحتمالات", p_samples: "أمثلة على البطاقات",
@@ -33,6 +47,7 @@ const I18N = {
     btn_capture: "افتح البوابة وسجّل دخولاً ناجحاً",
     capture_hint: "تُفتح البوابة داخل إطار معزول (بدون allow-same-origin) ولا يصل JavaScript الصفحة إلى واجهة KiraPass. سجّل دخولاً ناجحاً ثم علّم صفحات النجاح/الرفض/الإحصائيات.",
     capture_opened: "فُتح المسجّل في نافذة جديدة.",
+    capture_popup_blocked: "منع المتصفح فتح النافذة. اسمح بالنوافذ المنبثقة لهذا العنوان ثم حاول مجدداً.",
     capture_fail: "تعذّر بدء المسجّل",
     capture_blocked_title: "التخمين الآلي غير متاح لهذه البوابة",
     capture_blocked_body: "تحويل كلمة المرور يستخدم JavaScript مخصصاً غير معروف. لا ندّعي أنه قابل للأتمتة.",
@@ -296,9 +311,19 @@ const I18N = {
   },
   en: {
     step_scan: "Scan", step_format: "Card format", step_run: "Run", step_results: "Results",
+    skip_content: "Skip to content",
+    brand_subtitle: "Authorized network testing",
+    license_link: "License",
+    progress_label: "Run progress",
+    language_label: "Change language",
+    steps_label: "Workflow steps",
+    banner_title: "Authorized use only",
+    banner_text: "Use this tool only on a network you own or have written permission to test. Never test someone else's network.",
+    banner_more: "Details",
     scan_title: "1) Scan the login page",
     scan_hint: "Paste the hotspot login URL exactly as you open it in the browser. If it already contains ?username=…&password=, the tool recognises GET and removes that card from the scan request so it is neither consumed nor left as the old duplicate username. It then detects the fields automatically.",
-    scan_button: "Scan now", next_format: "Next: card format →", next_run: "Next: run →",
+    scan_button: "Scan now", scan_url_label: "Login page URL",
+    attempt_table: "Run attempt log", next_format: "Next: card format →", next_run: "Next: run →",
     format_title: "2) Card format",
     format_hint: "Describe the card: fixed prefix + full length. The variable part is what gets guessed. The preview shows how many combinations exist.",
     f_prefix: "Fixed prefix", f_length: "Full card length",
@@ -307,11 +332,14 @@ const I18N = {
     f_charset: "Variable characters", f_custom: "Custom characters",
     f_pass_mode: "Password value", f_dst: "dst value (guest destination)",
     f_name: "Profile name",
-    f_method: "Request method", f_user_field: "Username field",
+    f_method: "Request method", method_post: "POST (widest support)", method_get: "GET",
+    f_user_field: "Username field",
     f_pass_field: "Password field", f_login_url: "Form action URL",
     f_send_dst: "Send the hidden dst/popup fields",
     f_extra: "Extra fixed fields (name=value)",
     f_words: "Success words (optional)",
+    f_words_clear: "Clear",
+    f_words_hint: "Only visible page text is matched. Clear these if they came from an old or incorrect capture.",
     f_known: "A card you know works (optional)",
     adv_open: "Advanced options (usually not needed)",
     p_space: "Combinations", p_samples: "Sample cards",
@@ -320,6 +348,7 @@ const I18N = {
     btn_capture: "Open the portal and record a successful login",
     capture_hint: "The portal opens in an isolated frame (no allow-same-origin). Its JavaScript cannot reach the KiraPass API. Log in once, then mark the success / reject / statistics pages.",
     capture_opened: "The recorder opened in a new window.",
+    capture_popup_blocked: "Your browser blocked the new window. Allow pop-ups for this address, then try again.",
     capture_fail: "Could not start the recorder",
     capture_blocked_title: "Automated guessing is not available for this portal",
     capture_blocked_body: "The password transform uses unknown custom JavaScript. We do not claim it can be automated.",
@@ -631,6 +660,10 @@ function setLang(lang) {
     if (txt) node.textContent = txt;
   });
   $("langBtn").textContent = LANG === "ar" ? "EN" : "عربي";
+  $("langBtn").setAttribute("aria-label", t("language_label"));
+  $("langBtn").title = t("language_label");
+  $("steps").setAttribute("aria-label", t("steps_label"));
+  $("progressTrack").setAttribute("aria-label", t("progress_label"));
   buildSelects();
   $("footText").textContent = LANG === "ar"
     ? "KiraPass — أداة اختبار أمن الشبكات. الاستخدام بدون إذن صاحب الشبكة مخالف للقانون."
@@ -704,8 +737,12 @@ function fmtSpace(n) {
 function step(name) {
   document.querySelectorAll(".panel").forEach((p) =>
     p.classList.toggle("active", p.id === "panel-" + name));
-  document.querySelectorAll(".step").forEach((b) =>
-    b.classList.toggle("active", b.dataset.step === name));
+  document.querySelectorAll(".step").forEach((b) => {
+    const active = b.dataset.step === name;
+    b.classList.toggle("active", active);
+    if (active) b.setAttribute("aria-current", "step");
+    else b.removeAttribute("aria-current");
+  });
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
@@ -997,6 +1034,17 @@ async function waitJob(jobId, onTick) {
 async function startCapture() {
   const url = ($("f_login_url").value.trim() || $("scanUrl").value.trim());
   if (!url) { toast(t("scan_fail")); return; }
+  /* Open synchronously inside the click gesture. Opening only after awaiting
+     the API is blocked by many mobile browsers' popup protections. */
+  const popup = window.open("about:blank", "kp-capture");
+  if (!popup) {
+    modal(t("capture_fail"), "<p>" + esc(t("capture_popup_blocked")) + "</p>");
+    return;
+  }
+  try {
+    popup.document.title = "KiraPass — " + t("loading");
+    popup.document.body.textContent = t("loading");
+  } catch (e) { /* navigating below still works if the browser isolates it */ }
   const box = $("captureCard");
   if (box) {
     box.classList.remove("hidden");
@@ -1004,11 +1052,12 @@ async function startCapture() {
   }
   const res = await api("/api/capture/start", { url });
   if (!res.ok) {
+    popup.close();
     modal(t("capture_fail"), "<pre>" + esc(JSON.stringify(res, null, 2)) + "</pre>");
     return;
   }
   const view = res.view || ("/capture/view?id=" + encodeURIComponent(res.id));
-  window.open(withToken(view), "kp-capture");
+  popup.location.replace(withToken(view));
   toast(t("capture_opened"));
 }
 
@@ -1266,6 +1315,7 @@ function renderStatus(st, events) {
   const total = (st.progress || {}).total || 1;
   const pct = Math.min(100, ((st.progress || {}).attempts || 0) / total * 100);
   $("bar").style.width = pct.toFixed(1) + "%";
+  $("progressTrack").setAttribute("aria-valuenow", String(Math.round(pct)));
 
   /* counters */
   const order = ["ACCEPTED_VERIFIED", "ACCEPTED", "ACCEPTED_UNVERIFIED", "REJECTED",
@@ -1506,10 +1556,20 @@ function renderStop(st) {
 }
 
 /* ------------------------------------------------------------------ modal */
+let modalReturnFocus = null;
 function modal(title, html) {
+  if ($("modal").classList.contains("hidden")) modalReturnFocus = document.activeElement;
   $("modalTitle").textContent = title;
   $("modalBody").innerHTML = html;
   $("modal").classList.remove("hidden");
+  const target = $("modalBody").querySelector("input, button, a, [tabindex]") || $("modalClose");
+  if (target) target.focus();
+}
+function closeModal() {
+  $("modal").classList.add("hidden");
+  if (modalReturnFocus && typeof modalReturnFocus.focus === "function")
+    modalReturnFocus.focus();
+  modalReturnFocus = null;
 }
 
 async function cacheModal() {
@@ -1563,9 +1623,12 @@ function wire() {
     await api("/api/quit", {});
     modal(t("quit_tool"), "<div class='ok'>" + esc(t("quit_done")) + "</div>");
   });
-  $("modalClose").addEventListener("click", () => $("modal").classList.add("hidden"));
+  $("modalClose").addEventListener("click", closeModal);
   $("modal").addEventListener("click", (e) => {
-    if (e.target === $("modal")) $("modal").classList.add("hidden"); });
+    if (e.target === $("modal")) closeModal(); });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !$("modal").classList.contains("hidden")) closeModal();
+  });
   $("licenseOk").addEventListener("change", () =>
     $("startBtn").disabled = !$("licenseOk").checked);
   $("startBtn").addEventListener("click", startRun);
@@ -1577,6 +1640,10 @@ function wire() {
   $("lockoutBtn").addEventListener("click", runLockoutProbe);
   $("f_ua").addEventListener("change", () => {
     $("f_ua_custom_wrap").classList.toggle("hidden", $("f_ua").value !== "custom");
+  });
+  $("clearWordsBtn").addEventListener("click", () => {
+    $("f_words").value = "";
+    toast(LANG === "ar" ? "تم مسح كلمات النجاح" : "Success words cleared");
   });
   $("saveProfileBtn").addEventListener("click", async () => {
     const r = await api("/api/profiles/save", { profile: profileFromForm() });

@@ -11,11 +11,14 @@ from __future__ import annotations
 
 import json
 import os
+import re
+from pathlib import Path
 import shutil
 import sys
 import tempfile
 import time
 import unittest
+from html.parser import HTMLParser
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -55,6 +58,35 @@ for _fn in selftest.SCENARIOS:
 # ---------------------------------------------------------------------------
 # units
 # ---------------------------------------------------------------------------
+class UIIntegrityTests(unittest.TestCase):
+    def test_ui_ids_are_unique_and_static_translations_exist(self):
+        root = Path(__file__).resolve().parents[1]
+        html = (root / "kirapass" / "web" / "ui.html").read_text(encoding="utf-8")
+        js = (root / "kirapass" / "web" / "ui.js").read_text(encoding="utf-8")
+
+        class Markup(HTMLParser):
+            def __init__(self):
+                super().__init__()
+                self.ids, self.keys = [], []
+
+            def handle_starttag(self, tag, attrs):
+                attrs = dict(attrs)
+                if attrs.get("id"):
+                    self.ids.append(attrs["id"])
+                if attrs.get("data-i18n"):
+                    self.keys.append(attrs["data-i18n"])
+
+        markup = Markup()
+        markup.feed(html)
+        duplicates = sorted({item for item in markup.ids
+                             if markup.ids.count(item) > 1})
+        self.assertEqual(duplicates, [], "duplicate DOM ids break UI wiring")
+        missing = [key for key in set(markup.keys)
+                   if len(re.findall(r"\b" + re.escape(key) + r"\s*:", js)) < 2]
+        self.assertEqual(sorted(missing), [],
+                         "every static label needs Arabic and English text")
+
+
 class MaskingTests(unittest.TestCase):
     def test_dynamic_tokens_are_detected_and_masked(self):
         a = "<html>session abc123def456 card 0201242548</html>"

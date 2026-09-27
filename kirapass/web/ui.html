@@ -3,32 +3,36 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="color-scheme" content="dark light">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#080d17">
 <title>KiraPass — أداة اختبار شبكات الهوتسبوت</title>
 <link rel="stylesheet" href="/ui.css">
 </head>
 <body>
+<a class="skip-link" href="#panel-scan" data-i18n="skip_content">تجاوز إلى المحتوى</a>
 
 <header class="top">
   <div class="brand">
-    <span class="logo">K</span>
-    <span class="name">KiraPass</span>
+    <span class="logo" aria-hidden="true">K</span>
+    <span class="brand-copy"><span class="name">KiraPass</span>
+      <span class="tagline" data-i18n="brand_subtitle">اختبار شبكات مصرح به</span></span>
     <span class="ver" id="verPill">v5</span>
   </div>
   <div class="top-actions">
-    <span class="pill" id="statePill">جاهز</span>
-    <button class="btn ghost" id="langBtn" title="اللغة">EN</button>
-    <button class="btn ghost" id="cacheBtn" title="مسح الكاش">🧹</button>
+  <span class="pill" id="statePill" aria-live="polite">جاهز</span>
+  <button class="btn ghost" id="langBtn" title="اللغة" aria-label="تغيير اللغة">EN</button>
+  <button class="btn ghost icon-btn" id="cacheBtn" title="مسح الكاش" aria-label="مسح الكاش">🧹</button>
   </div>
 </header>
 
 <div class="banner" id="banner">
-  <strong id="bannerTitle">استخدام مصرّح به فقط</strong>
-  <span id="bannerText">هذه الأداة للاختبار على شبكة تملكها أو لديك إذن كتابي من صاحبها. لا تستخدمها على شبكة غيرك.</span>
-  <button class="btn tiny ghost" id="bannerMore">التفاصيل</button>
+  <span class="banner-icon" aria-hidden="true">!</span>
+  <strong id="bannerTitle" data-i18n="banner_title">استخدام مصرّح به فقط</strong>
+  <span id="bannerText" data-i18n="banner_text">هذه الأداة للاختبار على شبكة تملكها أو لديك إذن كتابي من صاحبها. لا تستخدمها على شبكة غيرك.</span>
+  <button class="btn tiny ghost" id="bannerMore" data-i18n="banner_more">التفاصيل</button>
 </div>
 
-<nav class="steps" id="steps">
+<nav class="steps" id="steps" aria-label="خطوات الاستخدام">
   <button class="step active" data-step="scan"><b>1</b><span data-i18n="step_scan">فحص الشبكة</span></button>
   <button class="step" data-step="format"><b>2</b><span data-i18n="step_format">صيغة البطاقة</span></button>
   <button class="step" data-step="run"><b>3</b><span data-i18n="step_run">التشغيل</span></button>
@@ -45,6 +49,7 @@
     بنفسها وتكتشف نوع الطلب (POST/GET) وأسماء الحقول من دون أي أسئلة.
   </p>
   <div class="row">
+    <label class="sr-only" for="scanUrl" data-i18n="scan_url_label">رابط صفحة الدخول</label>
     <input id="scanUrl" class="grow" type="url" inputmode="url" autocomplete="off"
            placeholder="http://10.5.50.1/login">
     <button class="btn primary" id="scanBtn" data-i18n="scan_button">افحص الآن</button>
@@ -112,8 +117,8 @@
     <div class="grid">
       <label><span data-i18n="f_method">طريقة الطلب</span>
         <select id="f_method">
-          <option value="post">POST (الأحدث والأكثر)</option>
-          <option value="get">GET</option>
+          <option value="post" data-i18n="method_post">POST (الأكثر توافقاً)</option>
+          <option value="get" data-i18n="method_get">GET</option>
         </select></label>
       <label><span data-i18n="f_user_field">اسم حقل المستخدم</span>
         <input id="f_user_field" value="username"></label>
@@ -137,7 +142,10 @@
       <label class="check"><input type="checkbox" id="f_referer" checked>
         <span data-i18n="f_referer">إرسال ترويسات المتصفح (Referer/Origin)</span></label>
       <label><span data-i18n="f_words">كلمات النجاح (اختياري)</span>
-        <input id="f_words" placeholder="You are logged in"></label>
+        <span class="input-action"><input id="f_words" placeholder="You are logged in">
+          <button type="button" class="btn tiny ghost" id="clearWordsBtn" data-i18n="f_words_clear">مسح</button></span>
+        <small class="hint" data-i18n="f_words_hint">تُطابق هذه الكلمات نص الصفحة الظاهر فقط. امسحها إذا كانت قديمة أو غير صحيحة.</small>
+      </label>
       <label><span data-i18n="f_known">بطاقة تعرف أنها تعمل (اختياري)</span>
         <input id="f_known" placeholder="0201242548"></label>
     </div>
@@ -221,7 +229,8 @@
     <div class="stat"><span data-i18n="s_state">الحالة</span><b id="stState">جاهز</b></div>
   </div>
 
-  <div class="progress"><div id="bar"></div></div>
+  <div class="progress" id="progressTrack" role="progressbar" aria-label="تقدم التشغيل"
+       aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="bar"></div></div>
   <div class="chips" id="counterChips"></div>
   <div class="card hidden" id="whyCard"></div>
   <div class="card hidden" id="throttleCard"></div>
@@ -229,6 +238,7 @@
 
   <div class="logwrap">
     <table class="log">
+      <caption class="sr-only" data-i18n="attempt_table">سجل محاولات التشغيل</caption>
       <thead><tr>
         <th>#</th><th data-i18n="t_card">البطاقة</th><th>HTTP</th>
         <th data-i18n="t_result">النتيجة</th><th data-i18n="t_why">السبب</th>
@@ -259,16 +269,16 @@
 <footer class="foot">
   <span id="footText">KiraPass — أداة اختبار أمن الشبكات. الاستخدام بدون إذن صاحب الشبكة مخالف للقانون.</span>
   <span class="dot">•</span>
-  <a href="#" id="licenseLink">الترخيص</a>
+  <a href="#" id="licenseLink" data-i18n="license_link">الترخيص</a>
   <span class="dot">•</span>
   <a href="#" id="quitLink" data-i18n="quit_tool">إيقاف الأداة</a>
 </footer>
 
-<div class="modal hidden" id="modal">
-  <div class="modal-box">
+<div class="modal hidden" id="modal" role="presentation">
+  <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <div class="modal-head">
       <b id="modalTitle">—</b>
-      <button class="btn ghost" id="modalClose">✕</button>
+      <button class="btn ghost" id="modalClose" aria-label="إغلاق">✕</button>
     </div>
     <div class="modal-body" id="modalBody"></div>
   </div>
