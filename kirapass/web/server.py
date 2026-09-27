@@ -22,7 +22,7 @@ from concurrent.futures import ThreadPoolExecutor
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
 
-from .. import config, engine, portals, store, verify
+from .. import capture, config, engine, portals, store, verify
 from ..httpclient import Session
 from ..version_helpers import package_dir
 
@@ -82,6 +82,7 @@ class KiraServer(ThreadingHTTPServer):
         self.engine = engine.Engine(self.store)
         self.jobs = {}
         self.jobs_lock = threading.Lock()
+        self.captures = capture.HUB
         self.pool = ThreadPoolExecutor(max_workers=2,
                                        thread_name_prefix="kirapass-job")
         self.started = time.time()
@@ -173,6 +174,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(b"", 204, "image/x-icon")
         if not self._authorized():
             return self._error("unauthorized", 401)
+        if route == "/capture/view":
+            return self._capture_view(parse_qs(urlsplit(self.path).query))
         try:
             return self._api_get(route, parse_qs(urlsplit(self.path).query))
         except Exception as exc:                          # noqa: BLE001
@@ -268,6 +271,11 @@ class Handler(BaseHTTPRequestHandler):
             except OSError:
                 names = []
             return self._json({"ok": True, "reports": names})
+        if route == "/api/capture/status":
+            return self._capture_status((query.get("id") or [""])[0])
+        if route == "/api/capture/report":
+            return self._capture_report((query.get("id") or [""])[0],
+                                        download=bool((query.get("download") or [""])[0]))
         return self._error("not_found", 404)
 
     # -- POST endpoints --------------------------------------------------
@@ -280,7 +288,8 @@ class Handler(BaseHTTPRequestHandler):
         if route == "/api/profiles/save":
             prof = store.migrate(data.get("profile") or {})
             problems = store.validate(prof)
-            hard = [p for p in problems if p != "space_is_astronomically_big"]
+            hard = [p for p in problems if p not in
+                    ("space_is_astronomically_big", "needs_browser_js")]
             if hard:
                 return self._json({"ok": False, "problems": problems}, 400)
             saved = srv.store.put(prof)
@@ -343,6 +352,14 @@ class Handler(BaseHTTPRequestHandler):
             if "lang" in data:
                 srv.store.set_setting("lang", str(data["lang"])[:5])
             return self._json({"ok": True, "settings": srv.store.settings})
+        if route == "/api/capture/start":
+            return self._capture_start(data)
+        if route == "/api/capture/step":
+            return self._capture_step(data)
+        if route == "/api/capture/mark":
+            return self._capture_mark(data)
+        if route == "/api/capture/finish":
+            return self._capture_finish(data)
         if route == "/api/quit":
             # phone users (Termux/Pydroid) have no Ctrl+C: let the page stop
             # the tool.  The shutdown runs from its own thread - calling it
@@ -382,6 +399,85 @@ class Handler(BaseHTTPRequestHandler):
                            "samples": store.sample_cards(prof, 4),
                            "problems": store.validate(prof),
                            "charset_size": len(set(prof.get("charset") or ""))})
+
+    def _guard(self) -> str:
+        host = self.headers.get("Host") or "127.0.0.1"
+        scheme = "https" if self.headers.get("X-Forwarded-Proto") == "https" else "http"
+        return f"{scheme}://{host}"
+
+    def _capture_start(self, data) -> None:
+        url = (data.get("url") or "").strip()
+        if not url:
+            return self._error("url_missing")
+        try:
+            cap = self.server.captures.start(url, guard=self._guard())
+        except ValueError as exc:
+            return self._error(str(exc))
+        except Exception as exc:                          # noqa: BLE001
+            from ..errors import classify
+            err = classify(exc, url)
+            return self._json({"ok": False, "error": f"net_{err.kind}",
+                               "detail": err.text[:200], "hint": err.short}, 200)
+        public = cap.as_public()
+        public["view"] = "/capture/view?id=" + cap.id
+        return self._json(public)
+
+    def _capture_step(self, data) -> None:
+        try:
+            result = self.server.captures.step(
+                data.get("id") or "", data, guard=self._guard())
+        except KeyError:
+            return self._error("capture_not_found", 404)
+        except ValueError as exc:
+            return self._error(str(exc))
+        return self._json(result, 200 if result.get("ok") else 400)
+
+    def _capture_mark(self, data) -> None:
+        try:
+            result = self.server.captures.mark(data.get("id") or "",
+                                               data.get("mark") or "")
+        except KeyError:
+            return self._error("capture_not_found", 404)
+        return self._json(result, 200 if result.get("ok") else 400)
+
+    def _capture_finish(self, data) -> None:
+        try:
+            result = self.server.captures.finish(
+                data.get("id") or "", self.server.store,
+                hints=data.get("profile") or {})
+        except KeyError:
+            return self._error("capture_not_found", 404)
+        return self._json(result)
+
+    def _capture_status(self, capture_id: str) -> None:
+        try:
+            return self._json(self.server.captures.status(capture_id))
+        except KeyError:
+            return self._error("capture_not_found", 404)
+
+    def _capture_report(self, capture_id: str, download: bool = False) -> None:
+        try:
+            report = self.server.captures.report_of(capture_id)
+        except KeyError:
+            return self._error("capture_not_found", 404)
+        body = json.dumps(report, ensure_ascii=False, indent=2).encode("utf-8")
+        extra = {}
+        if download:
+            extra["Content-Disposition"] = (
+                'attachment; filename="kirapass-capture.json"')
+        return self._send(body, 200, "application/json; charset=utf-8", extra)
+
+    def _capture_view(self, query) -> None:
+        capture_id = (query.get("id") or [""])[0]
+        try:
+            self.server.captures.get(capture_id)
+        except KeyError:
+            return self._error("capture_not_found", 404)
+        token = (self.headers.get("X-KiraPass-Token")
+                 or (query.get("token") or [""])[0]
+                 or self.server.token)
+        return self._send(capture.view_page(capture_id, token),
+                          200, "text/html; charset=utf-8")
 
 
 def _profile_brief(p: dict) -> dict:

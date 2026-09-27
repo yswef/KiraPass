@@ -9,6 +9,7 @@
     python3 tools/practice_portal.py --rate-limit 20 # answer 429 after 20
     python3 tools/practice_portal.py --drop-every 3  # cut one connection in 3
     python3 tools/practice_portal.py --session  # only a browser gets in (400)
+    python3 tools/practice_portal.py --success-page  # welcome + statistics pages
 
 It answers on 127.0.0.1 only, so it can never be reached from outside your
 machine. Point KiraPass at the printed URL and watch every verdict - this is
@@ -47,6 +48,10 @@ def main() -> int:
                          "request' to anything that does not carry them - a "
                          "browser asks for the page first, a bare script does "
                          "not, and that is the whole difference")
+    ap.add_argument("--success-page", action="store_true",
+                    help="after a valid card, show /success (You are logged in) "
+                         "and keep /status as the statistics page - for the "
+                         "browser recorder training journey")
     args = ap.parse_args()
 
     pass_mode = "chap" if args.chap else args.pass_mode
@@ -56,6 +61,7 @@ def main() -> int:
                         rate_limit_after=args.rate_limit,
                         drop_every=args.drop_every,
                         require_session=args.session,
+                        success_page=args.success_page,
                         dynamic=not args.static_page).start()
 
     print(f"""
@@ -70,6 +76,8 @@ def main() -> int:
     dropped    : every {args.drop_every or '-'} connection
     session    : {'required - a cookie + token from the page, or 400 "bad request"'
                   if args.session else 'not required (any script may post)'}
+    success    : {'/success welcome page + /status statistics'
+                  if args.success_page else '302 to a connectivity-check URL'}
 
   Point KiraPass at the login page above and start.
   Ctrl+C to stop.   (this server listens on 127.0.0.1 only)

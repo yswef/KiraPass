@@ -14,6 +14,7 @@ kirapass/
   engine.py                 calibration, threaded run, verdict accounting
   store.py                  profiles (+migration), reports, cache clearing
   mockportal.py             local mock router used by the self-test
+  capture.py                redacted browser-assisted portal recorder
   selftest.py               14 end-to-end scenarios
   cli.py, __main__.py       command line entry points
   web/server.py             JSON API + static assets (ThreadingHTTPServer)
@@ -60,7 +61,7 @@ tests/test_kirapass.py      unittest wrapper (scenarios + units)
 ## Tests
 
 ```bash
-python3 -m unittest discover -s tests -v     # 62 tests
+python3 -m unittest discover -s tests -v     # 66 tests
 python3 KiraPass.py --selftest               # the 14 scenarios, readable output
 python3 -m kirapass.selftest --keep          # keep the test data folder
 ```
@@ -98,6 +99,13 @@ touch a real network.
 | POST | `/api/run/start`, `/api/run/stop` | start/stop a run |
 | POST | `/api/cache/clear`, `/api/settings`, `/api/profiles/*` | housekeeping |
 | POST | `/api/quit` | shut the tool down (phone users have no Ctrl+C) |
+| POST | `/api/capture/start` | open a dedicated recorder session + fetch the portal |
+| POST | `/api/capture/step` | replay one form/GET/POST/fetch/XHR via the server Session |
+| POST | `/api/capture/mark` | operator marks success / reject / statistics |
+| POST | `/api/capture/finish` | save the redacted report + learned profile |
+| GET | `/api/capture/status` | current page (rewritten for the opaque iframe) |
+| GET | `/api/capture/report` | the redacted JSON (no card, password, cookie values, live tokens) |
+| GET | `/capture/view` | recorder UI: sandboxed iframe, no allow-same-origin |
 
 `/api/run/start` accepts `resume` (default true): when the profile carries
 `space_pos`/`walk_a`/`walk_b` the run continues from there; with `resume`

@@ -9,6 +9,7 @@ local mock routers, so no real network is touched.
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import sys
@@ -18,7 +19,7 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from kirapass import (config, engine, fingerprint, httpclient,  # noqa: E402
+from kirapass import (capture, config, engine, fingerprint, httpclient,  # noqa: E402
                      portals, selftest, store)
 from kirapass.mockportal import MockPortal                                     # noqa: E402
 
@@ -904,6 +905,104 @@ class PortalParsingTests(unittest.TestCase):
         self.assertIsNotNone(form.chap)
         self.assertEqual(form.chap["id"], "abc123")
         self.assertEqual(form.chap["challenge"], "def456")
+
+
+class CaptureTests(unittest.TestCase):
+    """Redacted browser-assisted recorder: secrets stay out of the report."""
+
+    def test_only_generalizable_password_patterns_are_learned(self):
+        html = "<form><input name='username'><input name='password'></form>"
+        same = capture.infer_pass_mode("0201", "0201", "0201", "0201", html,
+                                       ["username", "password"])
+        self.assertEqual(same["pass_mode"], "same")
+        self.assertFalse(same["needs_browser_js"])
+        empty = capture.infer_pass_mode("0201", "", "0201", "", html,
+                                        ["username", "password"])
+        self.assertEqual(empty["pass_mode"], "empty")
+        omit = capture.infer_pass_mode("0201", "x", "0201", "", html, ["username"])
+        self.assertEqual(omit["pass_mode"], "omit")
+        digest = capture._md5("0201")
+        md5user = capture.infer_pass_mode("0201", "0201", "0201", digest, html,
+                                          ["username", "password"])
+        self.assertEqual(md5user["pass_mode"], "md5user")
+        chap_html = ("<script>document.login.password.value = hexMD5('id12' +"
+                     " document.login.password.value + 'chal34');</script>"
+                     "<form><input name='username'><input name='password'></form>")
+        hashed = capture._md5("id12" + "0201" + "chal34")
+        chap = capture.infer_pass_mode("0201", "0201", "0201", hashed, chap_html,
+                                       ["username", "password"])
+        self.assertEqual(chap["pass_mode"], "chap")
+        self.assertFalse(chap["needs_browser_js"])
+
+    def test_unknown_js_password_transform_blocks_automation(self):
+        html = "<form><input name='username'><input name='password'></form>"
+        learned = capture.infer_pass_mode(
+            "020124042", "secret", "020124042", "deadbeefdeadbeefdeadbeefdeadbeef",
+            html, ["username", "password"])
+        self.assertTrue(learned["needs_browser_js"])
+        self.assertEqual(learned["reason"], "unknown_js_transform")
+        self.assertIn("JavaScript", learned["reason_ar"])
+        prof = store.new_profile(login_url="http://10.5.50.1/login",
+                                 charset="0123456789", length=10, prefix="02",
+                                 capture_needs_browser_js=True)
+        self.assertIn("needs_browser_js", store.validate(prof))
+
+    def test_http_200_is_not_success_or_reject_without_teaching(self):
+        self.assertEqual(capture.verdict_from_status(200), "unknown_http_200")
+        self.assertEqual(capture.verdict_from_status(200, "success"), "success")
+        self.assertEqual(capture.verdict_from_status(302), "redirect")
+
+    def test_report_never_contains_secrets(self):
+        card = "020124042"
+        with MockPortal(valid_cards={card}, pass_mode="same",
+                        require_session=True, success_page=True,
+                        dynamic=True) as portal:
+            hub = capture.Hub()
+            cap = hub.start(portal.url, guard="http://127.0.0.1:8770")
+            form = portals.parse_form(cap.html, cap.url)
+            fields = {
+                form.user_field: card,
+                form.pass_field: card,
+            }
+            for name, value in (form.fields or {}).items():
+                if name not in fields:
+                    fields[name] = value
+            hub.step(cap.id, {
+                "kind": "form", "method": form.method, "url": form.action,
+                "fields": fields, "fields_before": dict(fields),
+                "fields_after": dict(fields),
+            })
+            hub.mark(cap.id, "success")
+            hub.step(cap.id, {
+                "kind": "navigate", "method": "GET",
+                "url": portal.base + "/status",
+            })
+            hub.mark(cap.id, "status")
+            st = store.Store()
+            result = hub.finish(cap.id, st)
+            blob = json.dumps(result["report"], ensure_ascii=False)
+            self.assertNotIn(card, blob)
+            self.assertNotIn("portal_sid=", blob)
+            for value in (form.fields or {}).values():
+                if value and len(str(value)) >= 8:
+                    self.assertNotIn(str(value), blob)
+            self.assertTrue(result["report"]["cookie_names"])
+            self.assertNotIn("values", json.dumps(result["report"].get("cookie_names")))
+            self.assertEqual(capture.rewrite_html("<html><head></head></html>",
+                                                  portal.url, cap.id,
+                                                  "http://127.0.0.1:8770").count(
+                "allow-same-origin"), 0)
+            self.assertIn("sandbox=\"allow-scripts allow-forms\"",
+                          capture.view_page(cap.id).decode("utf-8"))
+            self.assertNotIn("allow-same-origin",
+                             capture.view_page(cap.id).decode("utf-8"))
+            self.assertTrue(os.path.exists(
+                os.path.join(config.RUN_DIR, result["report_name"])))
+            self.assertTrue(result["profile"]["login_url"])
+            self.assertIn("/api/capture/start", " ".join([
+                "/api/capture/start", "/api/capture/step", "/api/capture/mark",
+                "/api/capture/finish", "/api/capture/status",
+                "/api/capture/report", "/capture/view"]))
 
 
 if __name__ == "__main__":
