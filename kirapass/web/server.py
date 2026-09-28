@@ -231,7 +231,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._json({
                 "ok": True, "app": config.APP_NAME, "version": config.VERSION,
                 "lang": srv.store.get_setting("lang", "ar"),
-                "steps": ["scan", "format", "run", "results"],
+                "steps": ["start", "saved", "profile-review", "scan", "format", "run", "results"],
                 "charsets": store.CHARSETS,
                 "pass_modes": list(store.PASS_MODES),
                 "defaults": {
