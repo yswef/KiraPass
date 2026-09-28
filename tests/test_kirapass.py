@@ -407,6 +407,23 @@ class BlockFalsePositiveTests(unittest.TestCase):
         self.assertEqual(sess.request.call_count, 0)
 
 
+class NetworkFailureGuardTests(unittest.TestCase):
+    def test_transport_error_burst_stops_promptly_without_reconnect(self):
+        eng = engine.Engine(store.Store(), persist=False)
+        for _ in range(config.CONSECUTIVE_TRANSPORT_FAILURE_LIMIT - 1):
+            eng._record_transport_health("connect_timeout")
+        self.assertFalse(eng.stop_event.is_set())
+
+        # A real HTTP response proves the route is reachable and breaks the
+        # consecutive-failure streak; the tool must not infer a MAC/IP ban.
+        eng._record_transport_health()
+        self.assertFalse(eng.stop_event.is_set())
+        for _ in range(config.CONSECUTIVE_TRANSPORT_FAILURE_LIMIT):
+            eng._record_transport_health("connect_timeout")
+        self.assertTrue(eng.stop_event.is_set())
+        self.assertEqual(eng.stop_reason, "target_unreachable")
+
+
 class InternetWatchdogTests(unittest.TestCase):
     """The nastiest real case: the router logs the guest in and still answers
     with the rejection page, so no verdict ever looks like a hit.  The only

@@ -1176,9 +1176,11 @@ class Engine:
         self.verify_enabled = True
         self.auto_stop = True
         self._internet_before = {}
+        self._verification_serialized = False
         self._last_event_at = 0.0
         self._clean_streak = 0
         self._ban_count = 0
+        self._transport_error_streak = 0
         self._recent = deque(maxlen=config.WATCH_SUSPECTS)   # last cards tried
         self._since_check = []      # cards sent since the last check
         self._watch_thread = None
@@ -1292,9 +1294,12 @@ class Engine:
                      "delay_ms": int(delay_ms), "keyword": keyword,
                      "known_card": bool(known_card),
                      "known_card_preflight_only": bool(preflight_only),
-                     "verify": bool(verify_after), "resume": bool(resume)}
+                     "verify": bool(verify_after), "resume": bool(resume),
+                     "verification_serialized": False,
+                     "effective_threads": int(threads)}
         self.verify_enabled = bool(verify_after)
         self.auto_stop = bool(auto_stop)
+        self._verification_serialized = False
         self.counters = Counter()
         self.net_kinds = Counter()
         self.reason_counts = Counter()
@@ -1309,6 +1314,7 @@ class Engine:
         self.throttle.update({"delay_ms": int(delay_ms), "base_ms": int(delay_ms),
                               "reason": "", "events": []})
         self._ban_count = self._rate_count = self._unknown_saved = 0
+        self._transport_error_streak = 0
         self._recent.clear()
         self._since_check = []
         self._internet_opened = None
@@ -1374,6 +1380,20 @@ class Engine:
                 return
             self.profile = cal.profile
             self._internet_before = cal.internet or {}
+            # Connectivity verification is shared at the router/device level:
+            # one accepted card can make every concurrent session appear
+            # online. Serialize submissions from a WALLED baseline so that
+            # the internet transition can only be attributed to the card just
+            # sent, and prevent auto-pacing from reintroducing concurrency.
+            self._verification_serialized = bool(
+                self.verify_enabled and
+                self._internet_before.get("state") == "WALLED")
+            if self._verification_serialized:
+                threads = 1
+                self.plan["verification_serialized"] = True
+                self.plan["effective_threads"] = 1
+            else:
+                self.plan["effective_threads"] = int(threads)
             judge = cal.judge
             self.state = "running"
             self.emit("state", {"state": "running"})
@@ -1385,8 +1405,8 @@ class Engine:
                 self.profile["walk_a"] = _coprime(space)
                 self.profile["walk_b"] = random.randrange(max(space, 1)) if space else 0
             if start_pos:
-                # the user asked to continue: say it out loud instead of
-                # silently starting somewhere in the middle of the space
+                # Report resumed progress instead of silently starting
+                # somewhere in the middle of the card space.
                 self.emit("resume", {"from": min(start_pos, space) if space
                                              else start_pos,
                                      "space": space,
@@ -1426,6 +1446,7 @@ class Engine:
                             if live is None:
                                 with self.lock:
                                     self.net_kinds["no_session"] += 1
+                                self._record_transport_health("no_session")
                                 if not self._retry_later(item[0], item[1]):
                                     with self.lock:
                                         self._unevaluated += 1
@@ -1579,6 +1600,23 @@ class Engine:
                                 "trace": traceback.format_exc()[-800:]})
             self.emit("state", {"state": "done", "stop_reason": self.stop_reason})
 
+    def _record_transport_health(self, failure: str = "") -> None:
+        """Stop after a short burst of transport failures; never reconnect.
+
+        A run of connect timeouts/no-session results may indicate a link outage
+        or an administrator-enforced block. The tool cannot distinguish those
+        causes safely, so it stops and leaves diagnosis to the network admin.
+        """
+        with self.lock:
+            if failure:
+                self._transport_error_streak += 1
+            else:
+                self._transport_error_streak = 0
+            stop_now = (self._transport_error_streak >=
+                        config.CONSECUTIVE_TRANSPORT_FAILURE_LIMIT)
+        if stop_now:
+            self.stop("target_unreachable")
+
     # -- one attempt -----------------------------------------------------
     def _attempt(self, sess, judge, card: str, sent_index: int,
                  profile: dict = None) -> None:
@@ -1606,6 +1644,7 @@ class Engine:
 
         if resp is None:
             kind = last_err.kind if last_err else "unknown"
+            self._record_transport_health(kind)
             with self.lock:
                 self.net_kinds[kind] += 1
             # no answer at all: ask again before calling this card tested
@@ -1617,6 +1656,7 @@ class Engine:
             self._check_stop_rules()
             return
 
+        self._record_transport_health()
         elapsed_ms = (time.time() - started) * 1000
         verdict = judge.classify(resp, submitted_values(p, card))
         if profile is not None and (resp.text or "").strip():
@@ -1787,9 +1827,13 @@ class Engine:
         self.emit("hit", hit)
         strong = (verdict.code == "ACCEPTED_VERIFIED"
                   or verdict.confidence >= 0.85)
-        if self.auto_stop and strong:
-            self.stop("found_verified" if verdict.code == "ACCEPTED_VERIFIED"
-                      else "found_strong_evidence")
+        # Once internet access is confirmed, stop unconditionally: another
+        # credential attempt would run against an already-open shared gateway
+        # and could be falsely "verified" by the same network transition.
+        if verdict.code == "ACCEPTED_VERIFIED":
+            self.stop("found_verified")
+        elif self.auto_stop and strong:
+            self.stop("found_strong_evidence")
 
     def _save_unknown(self, card: str, verdict: Verdict, resp) -> None:
         with self.lock:
@@ -1878,7 +1922,7 @@ class Engine:
         self.emit("throttle", {"reason": note, "delay_ms": int(new)})
 
     def _maybe_decay_delay(self) -> None:
-        """Back to the pace the user asked for once the router calmed down."""
+        """Restore the configured delay after sustained clean responses."""
         base = self.throttle["base_ms"]
         with self.lock:
             current = self.throttle["delay_ms"]
@@ -1900,7 +1944,7 @@ class Engine:
         halve the rate.  The result is the best pace *this* router allows,
         found while the run is going - and the page says what it is doing.
         """
-        if not config.AUTO_PACE:
+        if not config.AUTO_PACE or self._verification_serialized:
             return
         now = time.time()
         with self.lock:

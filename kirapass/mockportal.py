@@ -70,7 +70,7 @@ class PortalState:
                  drop_after=0, chap=False, prefix="02", length=6,
                  error_text=None, hide_success=False, require_session=False,
                  reject_shape=False, success_page=False,
-                 unknown_success_page=False):
+                 unknown_success_page=False, global_online_login_page=False):
         self.valid_cards = set(valid_cards)
         self.pass_mode = pass_mode          # same | empty | chap
         self.method = method
@@ -92,6 +92,10 @@ class PortalState:
         # different, unlabelled HTTP 200 page. This reproduces a success that
         # a response-only classifier cannot prove without an internet check.
         self.unknown_success_page = unknown_success_page
+        # Some portals return the authenticated/status page for every later
+        # login request from the same device once its gateway session is open.
+        # This reproduces false per-card verification under concurrent runs.
+        self.global_online_login_page = global_online_login_page
         self.tokens = {}
         self.bad_requests = 0
         self.rate_limit_after = rate_limit_after
@@ -272,6 +276,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
         with st.lock:
             st.logins += 1
             st.asked_cards.append(card)
+            already_online = self.client_address[0] in st.online_ips
+        if st.global_online_login_page and already_online:
+            return self._reply(200, SUCCESS_PAGE)
 
         if self._is_valid(card, password):
             with st.lock:

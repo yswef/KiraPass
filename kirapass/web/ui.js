@@ -128,7 +128,7 @@ const I18N = {
     review_title: "ردود غير واضحة (تحتاج نظرة منك)",
     review_hint: "هذه ردود ليست مثل صفحة الرفض وليست نجاحاً مؤكداً. محفوظة لك لتفتحها وتقرأها بنفسك - الأداة لا تخمّن مكانك.",
     review_none: "لا شيء بعد.",
-    state_idle: "جاهز", state_calibrating: "جاري التعلّم", state_running: "يعمل",
+    state_idle: "جاهز", state_calibrating: "جارٍ فحص البطاقة وتحديث خط أساس الرفض", state_running: "يعمل",
     job_timeout: "انتهت مدة الانتظار - راجع السجل أسفل الشاشة",
     state_done: "انتهى", state_stopping: "يتوقف",
     preset_safe: "آمن (4 مسارات)", preset_normal: "عادي (12)",
@@ -258,7 +258,10 @@ const I18N = {
     stop_user_stop: "أوقفت التشغيل بنفسك.",
     stop_banned_by_router: "الراوتر حجب الطلبات. أوقف المحاولات واطلب من مسؤول الشبكة مراجعة الوصول وإعادة الخدمة.",
     stop_rate_limited_by_router: "الشبكة حدّت من الطلبات (429). أوقفت الأداة المحاولات؛ اطلب من مسؤول الشبكة مراجعة الوصول قبل المتابعة.",
-    stop_target_unreachable: "انقطع الوصول إلى الراوتر تماماً: تحقق من الشبكة.",
+    stop_target_unreachable: "توقفت بعد تكرر فشل الاتصال؛ قد يكون انقطاعاً أو حظراً ولا يمكن تمييزهما من التقرير. أوقفت الطلبات ولم أعد الاتصال تلقائياً. راجع مسؤول الشبكة قبل المحاولة.",
+    manual_resume_title: "يلزم تأكيد المشرف قبل الاستئناف",
+    manual_resume_hint: "لا تستأنف بعد حظر أو انقطاع إلا بعد مراجعة مسؤول الشبكة وتأكيده أن المتابعة مسموحة.",
+    manual_resume_ack: "راجعت مسؤول الشبكة وأكد أن الشبكة جاهزة وأن الاستئناف مسموح",
     why_title: "لماذا انتهت كل محاولة بهذه النتيجة؟",
     stop_attempts_done: "انتهى عدد المحاولات المطلوب. شغّل مرة أخرى - ستكمل من حيث توقفت.",
     stop_space_done: "غطّيت كل الاحتمالات في هذا النطاق.",
@@ -441,7 +444,7 @@ const I18N = {
     review_title: "Unclear replies (need your eyes)",
     review_hint: "Replies that are neither the rejection page nor a proven success. Saved for you to inspect - the tool does not guess.",
     review_none: "Nothing yet.",
-    state_idle: "Ready", state_calibrating: "Learning", state_running: "Running",
+    state_idle: "Ready", state_calibrating: "Checking card and refreshing rejection baseline", state_running: "Running",
     job_timeout: "timed out waiting - check the log",
     state_done: "Finished", state_stopping: "Stopping",
     preset_safe: "Safe (4 threads)", preset_normal: "Normal (12)",
@@ -558,7 +561,10 @@ const I18N = {
     stop_user_stop: "You stopped it.", 
     stop_banned_by_router: "The router blocked requests. Stop attempts and ask the network administrator to review access and restore service.",
     stop_rate_limited_by_router: "The network rate limited requests (429). The tool stopped; ask the network administrator to review access before continuing.",
-    stop_target_unreachable: "Lost contact with the router completely: check the network.",
+    stop_target_unreachable: "Stopped after repeated connection failures; this may be an outage or a block, which the report cannot distinguish. Requests stopped and no automatic reconnect was attempted. Ask the network admin before trying again.",
+    manual_resume_title: "Administrator confirmation required before resuming",
+    manual_resume_hint: "After a block or outage, resume only after the network administrator reviews it and confirms continuation is allowed.",
+    manual_resume_ack: "I checked with the network administrator; the network is ready and resuming is allowed",
         why_title: "Why each attempt ended the way it did",
 stop_attempts_done: "Requested attempts finished. Run again - it continues, it does not repeat.",
     stop_space_done: "Every combination in this range has been covered.",
@@ -624,7 +630,7 @@ const t = (key, fallback) => (I18N[LANG] && I18N[LANG][key]) || fallback || key;
 const S = { meta: null, lastSeq: 0, poll: null, running: false, rows: 0,
             lastReport: "", profile: {}, knownCard: "", portal: null,
             scanReady: false, scannedUrl: "", calibrationReady: false,
-            calibrationSignature: "",
+            calibrationSignature: "", manualResumeRequired: false,
             state: "idle" };
 
 const $ = (id) => document.getElementById(id);
@@ -1403,6 +1409,11 @@ function renderDiagnose(job, node) {
 
 /* ------------------------------------------------------------------ run */
 async function startRun() {
+  if (S.manualResumeRequired && !$("manualResumeAck")?.checked) {
+    modal(t("manual_resume_title"), "<p>" +
+      esc(t("manual_resume_hint")) + "</p>");
+    return;
+  }
   if (!S.calibrationReady) {
     step("scan");
     modal(t("calibration_required"), "<p>" + esc(t("calibration_required_hint")) + "</p>");
@@ -1442,8 +1453,11 @@ async function startRun() {
     resume: $("r_resume").checked,
   };
   S.lastStart = payload;
+  const clearanceUsed = S.manualResumeRequired;
+  S.manualResumeRequired = false;
   const res = await api("/api/run/start", payload);
   if (!res.ok) {
+    S.manualResumeRequired = clearanceUsed;
     modal(t("scan_fail"), "<pre>" + esc(JSON.stringify(res, null, 2)) + "</pre>");
     return;
   }
@@ -1723,6 +1737,15 @@ function renderStop(st) {
   const stopForReview = ["blocked_already", "blocked_before_probes",
     "captcha_challenge", "known_card_not_proven",
     "known_card_out_of_format", "logout_unconfirmed"].includes(calError);
+  const requiresManualClearance = ["target_unreachable", "banned_by_router",
+    "rate_limited_by_router", "captcha_challenge"].includes(st.stop_reason) ||
+    (st.stop_reason === "calibration_failed" && stopForReview);
+  if (requiresManualClearance) {
+    S.manualResumeRequired = true;
+    html += "<label class='check warn' style='display:flex;gap:8px;margin-top:10px'>" +
+      "<input id='manualResumeAck' type='checkbox'>" +
+      "<span>" + esc(t("manual_resume_ack")) + "</span></label>";
+  }
   if (st.stop_reason === "calibration_failed" && !stopForReview) {
     html += "<div class='row wrap' style='margin-top:8px'>" +
             "<button class='btn' id='retryNowBtn'>" + esc(t("retry_now")) + "</button></div>";

@@ -10,7 +10,7 @@ from __future__ import annotations
 import os
 
 APP_NAME = "KiraPass"
-VERSION = "5.8.4"
+VERSION = "5.8.5"
 
 # --------------------------------------------------------------------------
 # Folders
@@ -89,6 +89,9 @@ DEFAULT_DELAY_MS = 0
 # tested.
 SLOW_DIAG_AFTER = 8.0  # seconds: above this a router counts as slow
 BURST_LIMIT = 20
+# Stop early after repeated transport failures. No reconnect, wait-out, or
+# identity change follows this stop; the user should ask the network admin.
+CONSECUTIVE_TRANSPORT_FAILURE_LIMIT = 3
 SILENCE_SECONDS = 6.0
 
 # --------------------------------------------------------------------------
