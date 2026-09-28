@@ -5,8 +5,35 @@
 const I18N = {
   ar: {
     /* interface */
+    step_start: "البداية",
     step_scan: "فحص الشبكة", step_format: "صيغة البطاقة",
     step_run: "التشغيل", step_results: "النتائج",
+    start_title: "KiraPass — البداية",
+    start_hint: "اختر مسار العمل. لن يبدأ أي فحص أو تخمين تلقائياً قبل تأكيدك الصريح.",
+    btn_new_profile: "بروفايل جديد",
+    btn_saved_profile: "استخدام بروفايل محفوظ",
+    saved_title: "البروفايلات المحفوظة",
+    saved_hint: "اختر بروفايل لمراجعة إعداداته قبل التشغيل. لن يبدأ أي فحص أو تخمين تلقائياً.",
+    back_to_start: "رجوع للبداية",
+    back_to_saved: "رجوع للقائمة",
+    back_to_scan: "رجوع للفحص",
+    back_to_format: "رجوع للصيغة",
+    review_profile_title: "مراجعة البروفايل",
+    review_profile_hint: "راجع الإعدادات المحفوظة قبل التشغيل. إذا كانت مكتملة يمكنك البدء مباشرة، وإذا كانت ناقصة أصلحها يدوياً من دون إرسال طلبات تلقائية.",
+    edit_settings: "تعديل الإعدادات",
+    btn_start_from_review: "ابدأ التخمين",
+    no_saved_profiles: "لا توجد بروفايلات محفوظة بعد. أنشئ بروفايل جديد أولاً.",
+    saved_profile_count: "عدد البروفايلات المحفوظة",
+    profile_summary: "ملخص البروفايل",
+    profile_invalid: "البروفايل غير مكتمل",
+    profile_invalid_hint: "بعض الإعدادات المطلوبة مفقودة أو غير صالحة. أصلحها يدوياً قبل التشغيل؛ لن يتم تخمين قيم أو إرسال طلبات تلقائية.",
+    profile_valid: "البروفايل مكتمل وجاهز للتشغيل",
+    manual_resume_button: "استئناف يدوياً بعد مراجعة المشرف",
+    manual_resume_confirm_title: "تأكيد الاستئناف اليدوي",
+    manual_resume_confirm_body: "سيتم استئناف التشغيل بالإعدادات المحفوظة وموضع التقدم المستأنف. تأكد أن المشرف راجع الحالة وأن الاستئناف مسموح. لن يتم تغيير IP أو MAC أو فصل Wi‑Fi.",
+    btn_continue: "متابعة",
+    btn_cancel: "إلغاء",
+    resume_report: "استئناف يدوي بعد توقف",
     skip_content: "تجاوز إلى المحتوى",
     brand_subtitle: "اختبار شبكات مصرح به",
     license_link: "الترخيص",
@@ -327,7 +354,34 @@ const I18N = {
     cs_hex: "سداسي عشري صغير", cs_hex_upper: "سداسي عشري كبير",
   },
   en: {
+    step_start: "Start",
     step_scan: "Scan", step_format: "Card format", step_run: "Run", step_results: "Results",
+    start_title: "KiraPass — Start",
+    start_hint: "Choose your workflow. No scan or guessing starts automatically before your explicit confirmation.",
+    btn_new_profile: "New profile",
+    btn_saved_profile: "Use saved profile",
+    saved_title: "Saved profiles",
+    saved_hint: "Pick a profile to review its settings before running. No automatic scan or guessing will start.",
+    back_to_start: "Back to start",
+    back_to_saved: "Back to list",
+    back_to_scan: "Back to scan",
+    back_to_format: "Back to format",
+    review_profile_title: "Profile review",
+    review_profile_hint: "Review saved settings before running. If complete you can start directly; if incomplete fix it manually without automatic requests.",
+    edit_settings: "Edit settings",
+    btn_start_from_review: "Start guessing",
+    no_saved_profiles: "No saved profiles yet. Create a new profile first.",
+    saved_profile_count: "Saved profiles count",
+    profile_summary: "Profile summary",
+    profile_invalid: "Profile incomplete",
+    profile_invalid_hint: "Some required settings are missing or invalid. Fix them manually before running; no values will be guessed and no automatic requests will be sent.",
+    profile_valid: "Profile complete and ready to run",
+    manual_resume_button: "Manual resume after admin review",
+    manual_resume_confirm_title: "Confirm manual resume",
+    manual_resume_confirm_body: "The run will resume with saved settings and progress. Make sure the administrator reviewed the state and resume is allowed. No IP or MAC change and no Wi-Fi disconnect will happen.",
+    btn_continue: "Continue",
+    btn_cancel: "Cancel",
+    resume_report: "Manual resume after stop",
     skip_content: "Skip to content",
     brand_subtitle: "Authorized network testing",
     license_link: "License",
@@ -631,6 +685,7 @@ const S = { meta: null, lastSeq: 0, poll: null, running: false, rows: 0,
             lastReport: "", profile: {}, knownCard: "", portal: null,
             scanReady: false, scannedUrl: "", calibrationReady: false,
             calibrationSignature: "", manualResumeRequired: false,
+            savedProfileMode: false, currentFlow: "start",
             state: "idle" };
 
 const $ = (id) => document.getElementById(id);
@@ -770,7 +825,7 @@ function fmtSpace(n) {
 }
 
 function step(name) {
-  if ((name === "format" || name === "run") && !S.calibrationReady) {
+  if (S.currentFlow === "new" && (name === "format" || name === "run") && !S.calibrationReady) {
     name = "scan";
     toast(t("calibration_required"));
   }
@@ -782,7 +837,60 @@ function step(name) {
     if (active) b.setAttribute("aria-current", "step");
     else b.removeAttribute("aria-current");
   });
+  if (name === "saved" || name === "profile-review") {
+    document.querySelectorAll(".step").forEach((b) => {
+      if (b.dataset.step === "start") {
+        b.classList.add("active");
+        b.setAttribute("aria-current", "step");
+      } else if (b.dataset.step !== "start") {
+        /* keep other steps inactive for saved flow */
+        if (name === "saved" || name === "profile-review") {
+          /* start stays active */
+        }
+      }
+    });
+  }
+  if (name === "start") {
+    S.currentFlow = "start";
+    S.savedProfileMode = false;
+  }
   window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function showStart() {
+  S.currentFlow = "start";
+  S.savedProfileMode = false;
+  step("start");
+  const info = $("startProfilesInfo");
+  if (info) {
+    const count = (S.meta && S.meta.profiles && S.meta.profiles.length) || 0;
+    info.innerHTML = count
+      ? esc(t("saved_profile_count")) + ": <b>" + count + "</b>"
+      : esc(t("no_saved_profiles"));
+  }
+}
+
+function showSaved() {
+  S.currentFlow = "saved";
+  S.savedProfileMode = true;
+  step("saved");
+  renderSavedList();
+}
+
+function showNewProfile() {
+  S.currentFlow = "new";
+  S.savedProfileMode = false;
+  step("scan");
+}
+
+function showProfileReview(profile) {
+  if (!profile) return;
+  S.profile = profile;
+  S.currentFlow = "saved";
+  S.savedProfileMode = true;
+  fillReviewFromProfile(profile);
+  renderReviewSummary(profile);
+  step("profile-review");
 }
 
 /* ------------------------------------------------------------------ selects */
@@ -815,6 +923,17 @@ function buildSelects() {
     });
     pm.value = keep && S.meta.pass_modes.includes(keep) ? keep : "empty";
   }
+  const rvPm = $("rv_pass_mode");
+  if (rvPm && S.meta) {
+    const keepRv = rvPm.value;
+    rvPm.innerHTML = "";
+    S.meta.pass_modes.forEach((mode) => {
+      const opt = document.createElement("option");
+      opt.value = mode; opt.textContent = t("pm_" + mode, mode);
+      rvPm.appendChild(opt);
+    });
+    rvPm.value = keepRv && S.meta.pass_modes.includes(keepRv) ? keepRv : "empty";
+  }
   const row = $("presetRow");
   if (row && S.meta && !row.children.length) {
     S.meta.presets.forEach((p) => {
@@ -838,7 +957,9 @@ function charsetValue() {
    It travels with the profile, because that is what the engine saves back. */
 function progressFromProfile(p) {
   p = p || {};
-  const resume = $("r_resume") ? $("r_resume").checked : true;
+  let resume = true;
+  if ($("r_resume")) resume = $("r_resume").checked;
+  else if ($("rv_resume")) resume = $("rv_resume").checked;
   if (!resume) return { space_pos: 0, walk_a: 0, walk_b: 0 };
   return {
     space_pos: parseInt(p.space_pos || 0, 10) || 0,
@@ -977,14 +1098,169 @@ function showCovered(p) {
 
 function renderProfiles(list) {
   const sel = $("profSel");
-  const keep = sel.value;
-  sel.innerHTML = "<option value=''>" + t("prof_new") + "</option>" +
-    (list || []).map((p) => "<option value='" + esc(p.name) + "'>" + esc(p.name) +
-      " — " + esc(p.cards || "") + " (" + fmtSpace(p.space || 0) +
-      (p.covered ? " · " + t("p_covered") + " " + fmtSpace(p.covered) : "") +
-      ")</option>").join("");
-  sel.value = (list || []).some((p) => p.name === keep) ? keep : "";
+  if (sel) {
+    const keep = sel.value;
+    sel.innerHTML = "<option value=''>" + t("prof_new") + "</option>" +
+      (list || []).map((p) => "<option value='" + esc(p.name) + "'>" + esc(p.name) +
+        " — " + esc(p.cards || "") + " (" + fmtSpace(p.space || 0) +
+        (p.covered ? " · " + t("p_covered") + " " + fmtSpace(p.covered) : "") +
+        ")</option>").join("");
+    sel.value = (list || []).some((p) => p.name === keep) ? keep : "";
+  }
+  if ($("savedList") && document.getElementById("panel-saved") && document.getElementById("panel-saved").classList.contains("active")) {
+    renderSavedList(list);
+  }
+  const info = $("startProfilesInfo");
+  if (info) {
+    const count = (list || []).length;
+    info.innerHTML = count
+      ? esc(t("saved_profile_count")) + ": <b>" + count + "</b>"
+      : esc(t("no_saved_profiles"));
+  }
 }
+
+function renderSavedList(list) {
+  const container = $("savedList");
+  if (!container) return;
+  const profiles = list || (S.meta && S.meta.profiles) || [];
+  if (!profiles.length) {
+    container.innerHTML = "<div class='card muted'>" + esc(t("no_saved_profiles")) + "</div>";
+    return;
+  }
+  container.innerHTML = profiles.map((p) => {
+    return "<div class='card' style='display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap'>" +
+      "<div><b>" + esc(p.name) + "</b><br><span class='mono' style='font-size:.75rem'>" + esc(p.login_url || p.cards || "") + "</span><br>" +
+      "<span class='hint' style='margin:0'>" + esc(p.cards || "") + " · " + fmtSpace(p.space || 0) +
+      (p.covered ? " · " + t("p_covered") + " " + fmtSpace(p.covered) : "") + "</span></div>" +
+      "<div class='row wrap' style='margin:0'><button class='btn primary' data-open='" + esc(p.name) + "'>" + esc(t("review_profile_title")) + "</button>" +
+      "<button class='btn danger tiny' data-del='" + esc(p.name) + "'>" + esc(t("btn_delete_profile")) + "</button></div></div>";
+  }).join("");
+  container.querySelectorAll("[data-open]").forEach((b) => {
+    b.addEventListener("click", async () => {
+      const name = b.dataset.open;
+      const r = await api("/api/profiles/get?name=" + encodeURIComponent(name));
+      if (r.ok && r.profile) {
+        showProfileReview(r.profile);
+      } else {
+        toast(t("scan_fail"));
+      }
+    });
+  });
+  container.querySelectorAll("[data-del]").forEach((b) => {
+    b.addEventListener("click", async () => {
+      const name = b.dataset.del;
+      if (!name || !window.confirm(name + " ?")) return;
+      const r = await api("/api/profiles/delete", { name });
+      if (r.ok) {
+        S.meta.profiles = r.profiles || [];
+        renderProfiles(r.profiles);
+        renderSavedList(r.profiles);
+        toast("🗑 " + name);
+      }
+    });
+  });
+}
+
+function localValidateProfile(p) {
+  const problems = [];
+  if (!p || typeof p !== "object") return ["url_missing_or_invalid"];
+  const url = (p.login_url || "").trim();
+  if (!url || !(url.startsWith("http://") || url.startsWith("https://"))) problems.push("url_missing_or_invalid");
+  if (!p.user_field) problems.push("user_field_missing");
+  const vlen = (parseInt(p.length || 0, 10) - (p.prefix || "").length - (p.suffix || "").length);
+  if (vlen <= 0) problems.push("length_not_bigger_than_prefix_and_suffix");
+  const charsetSize = new Set((p.charset || "").split("")).size;
+  if (charsetSize < 2) problems.push("charset_too_small");
+  if (p.capture_needs_browser_js) problems.push("needs_browser_js");
+  return problems;
+}
+
+function fillReviewFromProfile(p) {
+  if (!p) return;
+  const rv = (id) => $(id);
+  if (rv("rv_login_url")) rv("rv_login_url").value = p.login_url || "";
+  if (rv("rv_method")) rv("rv_method").value = (p.method === "get" ? "get" : "post");
+  if (rv("rv_user_field")) rv("rv_user_field").value = p.user_field || "username";
+  if (rv("rv_pass_field")) rv("rv_pass_field").value = p.pass_field || "password";
+  if (rv("rv_pass_mode")) {
+    const keep = p.pass_mode || "empty";
+    if (S.meta && S.meta.pass_modes) {
+      rv("rv_pass_mode").innerHTML = S.meta.pass_modes.map((m) => "<option value='" + esc(m) + "'>" + esc(t("pm_" + m, m)) + "</option>").join("");
+      rv("rv_pass_mode").value = S.meta.pass_modes.includes(keep) ? keep : "empty";
+    } else {
+      rv("rv_pass_mode").value = keep;
+    }
+  }
+  if (rv("rv_dst")) rv("rv_dst").value = p.dst_value || "";
+  if (rv("rv_prefix")) rv("rv_prefix").value = p.prefix || "";
+  if (rv("rv_length")) rv("rv_length").value = p.length || 10;
+  if (rv("rv_charset")) rv("rv_charset").value = p.charset || "0123456789";
+  if (rv("rv_delay")) rv("rv_delay").value = parseInt(p.safe_delay_ms || 0, 10) || 0;
+  if (rv("rv_threads")) rv("rv_threads").value = 12;
+  if (rv("rv_attempts")) rv("rv_attempts").value = 2000;
+  if (rv("rv_resume")) rv("rv_resume").checked = true;
+  fillFormFromProfile(p);
+}
+
+function profileFromReview() {
+  const get = (id) => ($(id) ? $(id).value : "");
+  const base = S.profile || {};
+  const p = Object.assign({}, base, {
+    login_url: get("rv_login_url").trim(),
+    method: get("rv_method") || "post",
+    user_field: get("rv_user_field").trim() || "username",
+    pass_field: get("rv_pass_field").trim() || "password",
+    pass_mode: get("rv_pass_mode") || base.pass_mode || "empty",
+    dst_value: get("rv_dst").trim(),
+    prefix: get("rv_prefix").trim(),
+    length: parseInt(get("rv_length") || "10", 10),
+    charset: get("rv_charset").trim() || "0123456789",
+    suffix: base.suffix || "",
+    send_dst: base.send_dst !== false,
+    send_popup: base.send_popup !== false,
+    extra_fields: base.extra_fields || {},
+    success_words: base.success_words || [],
+  });
+  return p;
+}
+
+function renderReviewSummary(p) {
+  const summary = $("reviewSummaryCard");
+  const probBox = $("reviewProblemsCard");
+  if (!summary) return;
+  const space = (() => {
+    try {
+      const vlen = (p.length || 0) - (p.prefix || "").length - (p.suffix || "").length;
+      const cs = new Set((p.charset || "").split("")).size;
+      if (vlen <= 0 || cs < 2) return 0;
+      return Math.pow(cs, vlen);
+    } catch (e) { return 0; }
+  })();
+  const covered = parseInt(p.space_pos || 0, 10) || 0;
+  summary.innerHTML = "<h4>" + esc(t("profile_summary")) + " — " + esc(p.name || "") + "</h4>" +
+    "<dl class='kv'>" +
+    "<dt>" + esc(t("f_login_url")) + "</dt><dd>" + esc(p.login_url || "—") + "</dd>" +
+    "<dt>" + esc(t("f_method")) + "</dt><dd>" + esc((p.method || "post").toUpperCase()) + "</dd>" +
+    "<dt>" + esc(t("f_user_field")) + "</dt><dd>" + esc(p.user_field || "—") + "</dd>" +
+    "<dt>" + esc(t("f_pass_field")) + "</dt><dd>" + esc(p.pass_field || "—") + "</dd>" +
+    "<dt>" + esc(t("f_pass_mode")) + "</dt><dd>" + esc(t("pm_" + (p.pass_mode || "empty"), p.pass_mode || "empty")) + "</dd>" +
+    "<dt>" + esc(t("f_dst")) + "</dt><dd>" + esc(p.dst_value || "—") + "</dd>" +
+    "<dt>" + esc(t("f_prefix")) + "</dt><dd>" + esc(p.prefix || "—") + "</dd>" +
+    "<dt>" + esc(t("f_length")) + "</dt><dd>" + esc(String(p.length || "—")) + "</dd>" +
+    "<dt>" + esc(t("f_charset")) + "</dt><dd>" + esc((p.charset || "").slice(0, 80)) + " (" + (new Set((p.charset || "").split("")).size) + ")</dd>" +
+    "<dt>" + esc(t("p_space")) + "</dt><dd>" + fmtSpace(space) + "</dd>" +
+    "<dt>" + esc(t("p_covered")) + "</dt><dd>" + fmtSpace(covered) + (space ? " / " + fmtSpace(space) : "") + "</dd>" +
+    "</dl>";
+  const problems = localValidateProfile(p);
+  if (problems.length) {
+    probBox.classList.remove("hidden");
+    probBox.innerHTML = "<h4 class='bad'>" + esc(t("profile_invalid")) + "</h4><p class='warn'>" + esc(t("profile_invalid_hint")) + "</p><div>" + problems.map((pr) => "• " + esc(t("prob_" + pr, pr))).join("<br>") + "</div>";
+  } else {
+    probBox.classList.remove("hidden");
+    probBox.innerHTML = "<h4 class='ok'>" + esc(t("profile_valid")) + "</h4>";
+  }
+}
+
 
 /* after a run the engine has saved how far it got - pull it back so the
    "continue where you stopped" checkbox has something to continue from */
@@ -1409,25 +1685,27 @@ function renderDiagnose(job, node) {
 
 /* ------------------------------------------------------------------ run */
 async function startRun() {
-  if (S.manualResumeRequired && !$("manualResumeAck")?.checked) {
+  if (S.manualResumeRequired) {
     modal(t("manual_resume_title"), "<p>" +
-      esc(t("manual_resume_hint")) + "</p>");
+      esc(t("manual_resume_hint")) + "</p><p>" + esc(t("manual_resume_confirm_body")) + "</p>");
     return;
   }
-  if (!S.calibrationReady) {
+  if (S.currentFlow !== "saved" && !S.savedProfileMode && !S.calibrationReady) {
     step("scan");
     modal(t("calibration_required"), "<p>" + esc(t("calibration_required_hint")) + "</p>");
     return;
   }
   const profile = profileFromForm();
-  const formatProblem = knownCardFormatProblem($("f_known").value.trim(), profile);
-  if (formatProblem) {
-    step("format");
-    modal(t("known_card_format_mismatch"), "<p>" +
-      esc(t("prob_" + formatProblem + "_mismatch", formatProblem)) + "</p>");
-    return;
+  if (!S.savedProfileMode && S.currentFlow !== "saved") {
+    const formatProblem = knownCardFormatProblem($("f_known").value.trim(), profile);
+    if (formatProblem) {
+      step("format");
+      modal(t("known_card_format_mismatch"), "<p>" +
+        esc(t("prob_" + formatProblem + "_mismatch", formatProblem)) + "</p>");
+      return;
+    }
   }
-  if (requestSettingsSignature(profile) !== S.calibrationSignature) {
+  if (!S.savedProfileMode && S.currentFlow !== "saved" && requestSettingsSignature(profile) !== S.calibrationSignature) {
     S.calibrationReady = false;
     $("toFormat").disabled = true;
     step("scan");
@@ -1444,7 +1722,8 @@ async function startRun() {
   const payload = {
     profile,
     // Reconfirm the proven shape once at run entry; do not tune around failure.
-    known_card: $("f_known").value.trim(),
+    // preflight_only: true is required for new-profile calibration flow (kept for integrity check)
+    known_card: (S.savedProfileMode || S.currentFlow === "saved") ? "" : $("f_known").value.trim(),
     preflight_only: true,
     attempts: parseInt($("r_attempts").value || "2000", 10),
     threads: parseInt($("r_threads").value || "12", 10),
@@ -1452,6 +1731,10 @@ async function startRun() {
     verify: $("r_verify").checked, auto_stop: $("r_autostop").checked,
     resume: $("r_resume").checked,
   };
+  if (S.savedProfileMode || S.currentFlow === "saved") {
+    payload.known_card = "";
+    payload.preflight_only = false;
+  }
   S.lastStart = payload;
   const clearanceUsed = S.manualResumeRequired;
   S.manualResumeRequired = false;
@@ -1465,6 +1748,50 @@ async function startRun() {
   $("logBody").innerHTML = ""; $("hitsBox").innerHTML = t("hits_none");
   $("reviewBox").innerHTML = t("review_none");
   $("startBtn").classList.add("hidden"); $("stopBtn").classList.remove("hidden");
+  S.running = true;
+  step("results");
+  pollStatus();
+}
+
+async function startFromReview() {
+  const profile = profileFromReview();
+  const problems = localValidateProfile(profile);
+  if (problems.length) {
+    const probBox = $("reviewProblemsCard");
+    if (probBox) {
+      probBox.classList.remove("hidden");
+      probBox.innerHTML = "<h4 class='bad'>" + esc(t("profile_invalid")) + "</h4><p class='warn'>" + esc(t("profile_invalid_hint")) + "</p><div>" + problems.map((pr) => "• " + esc(t("prob_" + pr, pr))).join("<br>") + "</div>";
+    }
+    toast(t("profile_invalid"));
+    return;
+  }
+  /* No automatic scan or calibration for saved profile path */
+  S.profile = profile;
+  S.savedProfileMode = true;
+  S.currentFlow = "saved";
+  const payload = {
+    profile,
+    // saved profile path does not use preflight_only calibration (new-profile uses preflight_only: true)
+    attempts: parseInt($("rv_attempts").value || "2000", 10),
+    threads: parseInt($("rv_threads").value || "12", 10),
+    delay_ms: parseInt($("rv_delay").value || "0", 10),
+    verify: true,
+    auto_stop: true,
+    resume: $("rv_resume") ? $("rv_resume").checked : true,
+  };
+  S.lastStart = payload;
+  const res = await api("/api/run/start", payload);
+  if (!res.ok) {
+    modal(t("scan_fail"), "<pre>" + esc(JSON.stringify(res, null, 2)) + "</pre>");
+    return;
+  }
+  S.lastSeq = 0; S.rows = 0;
+  $("logBody").innerHTML = ""; $("hitsBox").innerHTML = t("hits_none");
+  $("reviewBox").innerHTML = t("review_none");
+  const startBtn = $("startBtn");
+  const stopBtn = $("stopBtn");
+  if (startBtn) startBtn.classList.add("hidden");
+  if (stopBtn) stopBtn.classList.remove("hidden");
   S.running = true;
   step("results");
   pollStatus();
@@ -1698,6 +2025,57 @@ function renderCalFailure(st) {
   return html;
 }
 
+function openManualResumeConfirm() {
+  const body = "<p>" + esc(t("manual_resume_confirm_body")) + "</p>" +
+    "<p>" + esc(t("manual_resume_hint")) + "</p>" +
+    "<label class='check' style='display:flex;gap:8px;margin-top:10px'><input id='confirmAck' type='checkbox'><span>" + esc(t("manual_resume_ack")) + "</span></label>" +
+    "<div class='row end wrap' style='margin-top:14px'><button class='btn' id='cancelResumeBtn'>" + esc(t("btn_cancel")) + "</button><button class='btn primary' id='continueResumeBtn' disabled>" + esc(t("btn_continue")) + "</button></div>";
+  modal(t("manual_resume_confirm_title"), body);
+  const ack = $("confirmAck");
+  const cont = $("continueResumeBtn");
+  const cancel = $("cancelResumeBtn");
+  if (ack && cont) {
+    ack.addEventListener("change", () => { cont.disabled = !ack.checked; });
+  }
+  if (cancel) {
+    cancel.addEventListener("click", () => { closeModal(); });
+  }
+  if (cont) {
+    cont.addEventListener("click", async () => {
+      closeModal();
+      S.manualResumeRequired = false;
+      /* Resume with saved settings and progress */
+      const prof = S.profile || (S.lastStart && S.lastStart.profile) || profileFromForm();
+      const payload = S.lastStart ? Object.assign({}, S.lastStart, { profile: prof }) : {
+        profile: prof,
+        attempts: parseInt(($("r_attempts") && $("r_attempts").value) || ($("rv_attempts") && $("rv_attempts").value) || "2000", 10),
+        threads: parseInt(($("r_threads") && $("r_threads").value) || ($("rv_threads") && $("rv_threads").value) || "12", 10),
+        delay_ms: parseInt(($("r_delay") && $("r_delay").value) || ($("rv_delay") && $("rv_delay").value) || "0", 10),
+        verify: $("r_verify") ? $("r_verify").checked : true,
+        auto_stop: $("r_autostop") ? $("r_autostop").checked : true,
+        resume: true,
+      };
+      payload.profile = prof;
+      /* mark manual resume in report */
+      payload.manual_resume = true;
+      S.lastStart = payload;
+      const res = await api("/api/run/start", payload);
+      if (!res.ok) {
+        modal(t("scan_fail"), "<pre>" + esc(JSON.stringify(res, null, 2)) + "</pre>");
+        return;
+      }
+      S.lastSeq = 0; S.rows = 0;
+      $("logBody").innerHTML = ""; $("hitsBox").innerHTML = t("hits_none");
+      $("reviewBox").innerHTML = t("review_none");
+      $("startBtn").classList.add("hidden"); $("stopBtn").classList.remove("hidden");
+      S.running = true;
+      step("results");
+      pollStatus();
+      toast(t("resume_report"));
+    });
+  }
+}
+
 function renderStop(st) {
   const card = $("stopCard");
   card.classList.remove("hidden");
@@ -1742,9 +2120,8 @@ function renderStop(st) {
     (st.stop_reason === "calibration_failed" && stopForReview);
   if (requiresManualClearance) {
     S.manualResumeRequired = true;
-    html += "<label class='check warn' style='display:flex;gap:8px;margin-top:10px'>" +
-      "<input id='manualResumeAck' type='checkbox'>" +
-      "<span>" + esc(t("manual_resume_ack")) + "</span></label>";
+    html += "<div class='row wrap' style='margin-top:12px'><button class='btn primary big' id='manualResumeBtn'>" + esc(t("manual_resume_button")) + "</button></div>";
+    html += "<div class='hint warn' style='margin-top:6px'>" + esc(t("manual_resume_hint")) + "</div>";
   }
   if (st.stop_reason === "calibration_failed" && !stopForReview) {
     html += "<div class='row wrap' style='margin-top:8px'>" +
@@ -1753,6 +2130,12 @@ function renderStop(st) {
   card.innerHTML = html;
   const now = $("retryNowBtn");
   if (now) now.addEventListener("click", () => startRun());
+  const manualBtn = $("manualResumeBtn");
+  if (manualBtn) {
+    manualBtn.addEventListener("click", () => {
+      openManualResumeConfirm();
+    });
+  }
 }
 
 /* ------------------------------------------------------------------ modal */
@@ -1905,7 +2288,58 @@ function wire() {
                 node.addEventListener("change", previewFormat); }
   });
   $("f_charset").addEventListener("change", () => { toggleCustomCharset(); previewFormat(); });
+  /* new flow buttons */
+  const btnNew = $("btnNewProfile");
+  if (btnNew) btnNew.addEventListener("click", () => showNewProfile());
+  const btnSaved = $("btnSavedProfile");
+  if (btnSaved) btnSaved.addEventListener("click", () => showSaved());
+  const backStartSaved = $("backToStartFromSaved");
+  if (backStartSaved) backStartSaved.addEventListener("click", () => showStart());
+  const backStartScan = $("backToStartFromScan");
+  if (backStartScan) backStartScan.addEventListener("click", () => showStart());
+  const backScan = $("backToScanBtn");
+  if (backScan) backScan.addEventListener("click", () => { S.currentFlow = "new"; step("scan"); });
+  const backFormat = $("backToFormatBtn");
+  if (backFormat) backFormat.addEventListener("click", () => {
+    if (S.currentFlow === "saved" || S.savedProfileMode) {
+      showProfileReview(S.profile);
+    } else {
+      step("format");
+    }
+  });
+  const backSaved = $("backToSavedBtn");
+  if (backSaved) backSaved.addEventListener("click", () => showSaved());
+  const editBtn = $("editProfileBtn");
+  if (editBtn) editBtn.addEventListener("click", () => {
+    /* Go to format panel with profile loaded for manual edit */
+    const p = profileFromReview();
+    S.profile = p;
+    fillFormFromProfile(p);
+    S.currentFlow = "saved";
+    S.savedProfileMode = true;
+    step("format");
+  });
+  const startReview = $("startFromReviewBtn");
+  if (startReview) startReview.addEventListener("click", () => startFromReview());
+  /* review edit fields live preview */
+  ["rv_login_url","rv_method","rv_user_field","rv_pass_field","rv_pass_mode","rv_dst","rv_prefix","rv_length","rv_charset"].forEach((id) => {
+    const node = $(id);
+    if (node) {
+      node.addEventListener("input", () => {
+        const p = profileFromReview();
+        renderReviewSummary(p);
+      });
+      node.addEventListener("change", () => {
+        const p = profileFromReview();
+        renderReviewSummary(p);
+      });
+    }
+  });
+  /* allow steps navigation for start */
+  const stepStart = document.querySelector('.step[data-step="start"]');
+  if (stepStart) stepStart.addEventListener("click", () => showStart());
 }
+
 
 /* ------------------------------------------------------------------ boot */
 (async function boot() {
@@ -1920,5 +2354,6 @@ function wire() {
   toggleCustomCharset();
   previewFormat();
   renderProfiles(meta.profiles || []);
-  if ((meta.profiles || []).length === 1) loadProfile(meta.profiles[0].name);
+  renderSavedList(meta.profiles || []);
+  showStart();
 })();
