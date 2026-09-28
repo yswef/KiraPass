@@ -86,6 +86,12 @@ class UIIntegrityTests(unittest.TestCase):
                    if len(re.findall(r"\b" + re.escape(key) + r"\s*:", js)) < 2]
         self.assertEqual(sorted(missing), [],
                          "every static label needs Arabic and English text")
+        scan_panel = html.index('id="panel-scan"')
+        format_panel = html.index('id="panel-format"')
+        self.assertLess(html.index('id="calibrateBtn"'), format_panel)
+        self.assertGreater(html.index('id="calibrateBtn"'), scan_panel)
+        self.assertIn("S.calibrationReady", js)
+        self.assertIn("known_card_tested: true", js)
 
 
 class MaskingTests(unittest.TestCase):
@@ -547,6 +553,22 @@ class KnownCardTests(unittest.TestCase):
                 return s
         return None
 
+    def test_pretested_known_card_is_excluded_without_being_resubmitted(self):
+        with MockPortal(valid_cards={"020124042"}, pass_mode="empty") as portal:
+            info = selftest.scan(portal.url)
+            p = selftest.make_profile(portal.url, prefix="020124", length=9,
+                                      portal_info=info, pass_mode="empty")
+            cal = engine.calibrate(p, known_card="020124042", learn_known=False,
+                                   checks=selftest.mock_checks(portal))
+            self.assertTrue(cal.ok, cal.as_dict())
+            self.assertNotIn("020124042", portal.state.asked_cards)
+
+    def test_rejection_baseline_never_uses_the_known_card(self):
+        p = store.new_profile(prefix="02", length=4, charset="0123456789")
+        cards = engine.bench_cards(p, count=4, seed=3, exclude=("0200",))
+        self.assertEqual(len(cards), 4)
+        self.assertNotIn("0200", cards)
+
     def test_a_card_that_does_not_fit_the_format_is_named(self):
         p = {"prefix": "0201", "length": 9, "suffix": "", "charset": "0123456789"}
         self.assertEqual(engine.known_card_problem(p, "020124042"), {})
@@ -575,6 +597,10 @@ class KnownCardTests(unittest.TestCase):
         self.assertEqual(step["reason"], "known_card_works")
         self.assertTrue(cal.tuned and cal.tuned.get("verified"), cal.tuned)
         self.assertEqual(cal.tuned.get("internet"), "expected_answer")
+        applied = cal.as_dict().get("applied_settings")
+        self.assertTrue(applied and applied.get("method") == "post", applied)
+        self.assertEqual(applied.get("pass_mode"), "empty")
+        self.assertNotIn("020124042", json.dumps(cal.as_dict()))
         trial = cal.tuned.get("trial") or {}
         self.assertEqual(trial.get("status"), 200)
         self.assertEqual(trial.get("code"), "UNKNOWN")
@@ -856,8 +882,9 @@ class LostAnswerTests(unittest.TestCase):
             real_bench = engine.bench_cards
             lost = {"left": 2}
 
-            def deterministic_bench(profile, count=3, seed=0):
-                return ["0200", "0201", "0202"][:count]
+            def deterministic_bench(profile, count=3, seed=0, exclude=()):
+                return [card for card in ("0200", "0201", "0202")
+                        if card not in set(exclude)][:count]
 
             def silent_twice(session, prof, card, *a, **k):
                 # "refused" is not retryable on the spot, so without the
@@ -943,6 +970,7 @@ class StoreTests(unittest.TestCase):
         safe = _safe_calibration_report({
             "steps": [{"detail": {"card_hint": "020124...",
                                     "sample_cards": ["020124001"],
+                                    "extra_fields": {"tok": "private-token"},
                                     "url": "https://u:p@portal.invalid/login?token=private"}}],
         }, profile)
         blob = json.dumps(safe)

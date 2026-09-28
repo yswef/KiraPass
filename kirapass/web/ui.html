@@ -63,6 +63,17 @@
   <div class="card hidden" id="internetCard"></div>
   <div class="card hidden" id="portalCard"></div>
 
+  <div class="card" id="calibrationSetup">
+    <h3 data-i18n="calibration_setup_title">اختبار البطاقة المعروفة وتعلّم الطلب</h3>
+    <p class="hint" data-i18n="calibration_setup_hint">أدخل بطاقة مصرحاً بها وتعرف أنها تعمل. لن تُفتح إعدادات التخمين قبل أن يثبت الاختبار انتقال الإنترنت ثم تأكيد الخروج.</p>
+    <div class="row wrap">
+      <label class="grow"><span data-i18n="f_known">بطاقة تعرف أنها تعمل</span>
+        <input id="f_known" autocomplete="off" inputmode="text"></label>
+      <button class="btn primary" id="calibrateBtn" disabled data-i18n="btn_calibrate">اختبر البطاقة وتعلّم شكل الطلب</button>
+    </div>
+  </div>
+  <div class="card hidden" id="calibCard"></div>
+
   <div class="row end">
     <button class="btn primary" id="toFormat" disabled data-i18n="next_format">
       التالي: صيغة البطاقة ←
@@ -129,7 +140,9 @@
       <label><span data-i18n="f_login_url">رابط إرسال الدخول (action)</span>
         <input id="f_login_url" placeholder="http://10.5.50.1/login"></label>
       <label class="check"><input type="checkbox" id="f_send_dst" checked>
-        <span data-i18n="f_send_dst">إرسال الحقول المخفية dst/popup</span></label>
+        <span data-i18n="f_send_dst">إرسال حقل dst</span></label>
+      <label class="check"><input type="checkbox" id="f_send_popup" checked>
+        <span data-i18n="f_send_popup">إرسال حقل popup</span></label>
       <label><span data-i18n="f_extra">حقول ثابتة إضافية (name=value)</span>
         <input id="f_extra" placeholder="mac=AA:BB:CC:DD:EE:FF"></label>
       <label><span data-i18n="f_ua">هوية المتصفح User-Agent</span>
@@ -148,16 +161,10 @@
           <button type="button" class="btn tiny ghost" id="clearWordsBtn" data-i18n="f_words_clear">مسح</button></span>
         <small class="hint" data-i18n="f_words_hint">تُطابق هذه الكلمات نص الصفحة الظاهر فقط. امسحها إذا كانت قديمة أو غير صحيحة.</small>
       </label>
-      <label><span data-i18n="f_known">بطاقة تعرف أنها تعمل (اختياري)</span>
-        <input id="f_known" placeholder="0201242548"></label>
     </div>
-    <button class="btn" id="calibrateBtn" data-i18n="btn_calibrate">
-      تعلّم من البطاقة المعروفة + قياس الشبكة
-    </button>
     <button class="btn" id="captureBtn" data-i18n="btn_capture">
       افتح البوابة وسجّل دخولاً ناجحاً
     </button>
-    <div class="card hidden" id="calibCard"></div>
     <div class="card hidden" id="captureCard"></div>
   </details>
 

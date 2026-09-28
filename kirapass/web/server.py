@@ -32,7 +32,8 @@ STATIC = package_dir("web")
 def _safe_calibration_report(value, profile, key=""):
     """Redact card hints and sensitive URL/query material from report text."""
     sensitive_names = {"card_hint", "sample_cards", "cookie", "cookies",
-                       "token", "csrf", "challenge", "password", "pass_fixed"}
+                       "token", "csrf", "challenge", "password", "pass_fixed",
+                       "extra_fields"}
     if isinstance(value, dict):
         out = {}
         for name, item in value.items():
@@ -46,7 +47,8 @@ def _safe_calibration_report(value, profile, key=""):
     if isinstance(value, list):
         return [_safe_calibration_report(item, profile, key) for item in value]
     if isinstance(value, str):
-        if key in {"url", "login_url", "final_url", "location", "dst"}:
+        if key in {"url", "login_url", "final_url", "location", "dst",
+                   "dst_value"}:
             return engine._safe_url_shape(value, profile)
         if key == "text":
             return "[REDACTED]"
@@ -369,6 +371,7 @@ class Handler(BaseHTTPRequestHandler):
                 delay_ms=int(data.get("delay_ms") or 0),
                 keyword=(data.get("keyword") or "").strip(),
                 known_card=(data.get("known_card") or "").strip(),
+                known_card_tested=bool(data.get("known_card_tested", False)),
                 verify_after=bool(data.get("verify", True)),
                 auto_stop=bool(data.get("auto_stop", True)),
                 resume=data.get("resume", True) is not False)

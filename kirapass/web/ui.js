@@ -16,15 +16,23 @@ const I18N = {
     banner_title: "استخدام مصرّح به فقط",
     banner_text: "هذه الأداة للاختبار على شبكة تملكها أو لديك إذن كتابي من صاحبها. لا تستخدمها على شبكة غيرك.",
     banner_more: "التفاصيل",
-    scan_title: "1) افحص صفحة الدخول",
-    scan_hint: "الصق رابط صفحة دخول الهوتسبوت كما تفتحها في المتصفح. إن كان الرابط نفسه يحتوي ?username=…&password= فالأداة تعرف أنه GET، وتحذف الكرت من طلب الفحص حتى لا تستهلكه ولا تكرر الاسم القديم. ثم تقرأ الصفحة وتكتشف الحقول تلقائياً.",
+    scan_title: "1) فحص الشبكة واختبار البطاقة المعروفة",
+    scan_hint: "الصق رابط صفحة دخول الهوتسبوت كما تفتحه في المتصفح. بعد الفحص أدخل بطاقة مصرحاً بها تعرف أنها تعمل واختبرها هنا؛ لن تنتقل لصيغة التخمين حتى يُثبت الاختبار فتح الإنترنت وتأكيد الخروج.",
     scan_button: "افحص الآن",
     scan_url_label: "رابط صفحة الدخول",
+    calibration_setup_title: "اختبار البطاقة المعروفة وتعلّم الطلب",
+    calibration_setup_hint: "أدخل بطاقة مصرحاً بها وتعرف أنها تعمل. لن تُفتح إعدادات التخمين قبل أن يثبت الاختبار انتقال الإنترنت ثم تأكيد الخروج.",
+    calibration_required: "يجب إكمال الاختبار أولاً",
+    calibration_required_hint: "ارجع إلى فحص الشبكة، أدخل بطاقة مصرحاً بها تعمل، ثم نفّذ الاختبار. ستُطبّق إعدادات الطلب التي أثبتت نجاحها على الصفحة التالية.",
+    calibration_shape_changed: "تغيّر شكل الطلب بعد الاختبار",
+    calibration_shape_changed_hint: "لن يبدأ التشغيل بإعدادات لم تُختبر. ارجع إلى فحص الشبكة وأعد اختبار البطاقة بعد مراجعة إعدادات الطلب.",
+    calibration_applied: "نجح الاختبار وطُبّق شكل الطلب على الإعدادات",
+    known_card_format_mismatch: "صيغة البطاقة في الصفحة الثانية لا تطابق البطاقة التي اختُبرت؛ صحّح الطول والبادئة والمحارف قبل التشغيل.",
     attempt_table: "سجل محاولات التشغيل",
     next_format: "التالي: صيغة البطاقة ←",
     next_run: "التالي: التشغيل ←",
     format_title: "2) صيغة البطاقة",
-    format_hint: "اكتب شكل الكرت: البادئة الثابتة + طول الكرت الكامل. الأرقام المتغيّرة هي التي سيتم تخمينها. المعاينة تحت تخبرك فوراً بعدد الاحتمالات.",
+    format_hint: "اكتب شكل الكرت: البادئة الثابتة + طول الكرت الكامل. شكل طلب الدخول المعروض أدناه تعلّمناه واختبرناه في الخطوة السابقة؛ إذا غيّرت إعدادات الطلب المتقدمة سيُطلب اختبارها من جديد قبل التشغيل.",
     f_prefix: "البادئة الثابتة", f_length: "طول الكرت الكامل",
     saved_profiles: "الملف التعريفي المحفوظ", prof_new: "— جديد —",
     btn_delete_profile: "حذف هذا الملف",
@@ -34,18 +42,19 @@ const I18N = {
     f_method: "طريقة الطلب", method_post: "POST (الأكثر توافقاً)", method_get: "GET",
     f_user_field: "اسم حقل المستخدم",
     f_pass_field: "اسم حقل كلمة المرور", f_login_url: "رابط إرسال الدخول (action)",
-    f_send_dst: "إرسال الحقول المخفية dst/popup",
+    f_send_dst: "إرسال حقل dst",
+    f_send_popup: "إرسال حقل popup",
     f_extra: "حقول ثابتة إضافية (name=value)",
     f_words: "كلمات النجاح (اختياري)",
     f_words_clear: "مسح",
     f_words_hint: "تُطابق هذه الكلمات نص الصفحة الظاهر فقط. امسحها إذا كانت قديمة أو غير صحيحة.",
-    f_known: "بطاقة تعرف أنها تعمل (اختياري)",
+    f_known: "بطاقة مصرح بها تعرف أنها تعمل",
     adv_open: "خيارات متقدمة (عادة لا تحتاجها)",
     p_space: "عدد الاحتمالات", p_samples: "أمثلة على البطاقات",
     p_request_shape: "شكل الطلب المتوقع (القيم الحساسة مخفية)",
     online_transition: "انتقال إلى الإنترنت", logout_state: "حالة ما بعد الخروج",
     p_covered: "مغطى سابقاً",
-    btn_calibrate: "تعلّم من البطاقة المعروفة + قياس الشبكة",
+    btn_calibrate: "اختبر البطاقة وتعلّم شكل الطلب",
     btn_capture: "افتح البوابة وسجّل دخولاً ناجحاً",
     capture_hint: "تُفتح البوابة داخل إطار معزول (بدون allow-same-origin) ولا يصل JavaScript الصفحة إلى واجهة KiraPass. سجّل دخولاً ناجحاً ثم علّم صفحات النجاح/الرفض/الإحصائيات.",
     capture_opened: "فُتح المسجّل في نافذة جديدة.",
@@ -60,7 +69,7 @@ const I18N = {
     capture_finish: "إنهاء + تنزيل التقرير",
     btn_save: "احفظ الملف التعريفي",
     run_title: "3) التشغيل",
-    run_hint: "اختر قوة مناسبة: كل ما زادت السرعة زاد احتمال أن يقطع الراوتر الاتصال أو يحجبك. الأداة تخبرك داخل النتائج بسبب كل توقف.",
+    run_hint: "اختر قوة مناسبة: كل ما زادت السرعة زاد احتمال أن يقطع الراوتر الاتصال أو يحجبك. بعد الاختبار الأساسي، يبدأ التشغيل بشكل الطلب الذي أثبت نجاحه ويحدّث صفحة الرفض بجلسة جديدة دون إعادة إرسال البطاقة المعروفة.",
     r_threads: "عدد المسارات (Threads)", r_attempts: "عدد المحاولات",
     r_delay: "الانتظار بين الطلبات (ms)",
     r_verify: "تأكيد الإنترنت بعد أي بطاقة مقبولة",
@@ -325,12 +334,20 @@ const I18N = {
     banner_title: "Authorized use only",
     banner_text: "Use this tool only on a network you own or have written permission to test. Never test someone else's network.",
     banner_more: "Details",
-    scan_title: "1) Scan the login page",
-    scan_hint: "Paste the hotspot login URL exactly as you open it in the browser. If it already contains ?username=…&password=, the tool recognises GET and removes that card from the scan request so it is neither consumed nor left as the old duplicate username. It then detects the fields automatically.",
+    scan_title: "1) Check the network and test the known card",
+    scan_hint: "Paste the hotspot login URL as it opens in your browser. After scanning, enter an authorized card you know works and test it here. You cannot continue to card-format settings until the test confirms internet access and logout.",
     scan_button: "Scan now", scan_url_label: "Login page URL",
+    calibration_setup_title: "Test the known card and learn the request",
+    calibration_setup_hint: "Enter an authorized card you know works. Card-format settings stay locked until the test confirms internet access and a successful logout.",
+    calibration_required: "Calibration is required first",
+    calibration_required_hint: "Return to Network Check, enter an authorized working card, and run the test. Its proven request settings will be applied on the next page.",
+    calibration_shape_changed: "The request shape changed after calibration",
+    calibration_shape_changed_hint: "The run will not start with untested request settings. Return to Network Check and calibrate again after reviewing the request settings.",
+    calibration_applied: "Test passed; request settings applied",
+    known_card_format_mismatch: "The card format on Step 2 does not match the tested card. Correct its length, prefix, and character set before running.",
     attempt_table: "Run attempt log", next_format: "Next: card format →", next_run: "Next: run →",
     format_title: "2) Card format",
-    format_hint: "Describe the card: fixed prefix + full length. The variable part is what gets guessed. The preview shows how many combinations exist.",
+    format_hint: "Describe the card with its fixed prefix and full length. The login request shown below was learned and tested in the previous step; changing advanced request settings requires another successful test before running.",
     f_prefix: "Fixed prefix", f_length: "Full card length",
     saved_profiles: "Saved profile", prof_new: "- new -",
     btn_delete_profile: "Delete this profile",
@@ -340,18 +357,19 @@ const I18N = {
     f_method: "Request method", method_post: "POST (widest support)", method_get: "GET",
     f_user_field: "Username field",
     f_pass_field: "Password field", f_login_url: "Form action URL",
-    f_send_dst: "Send the hidden dst/popup fields",
+    f_send_dst: "Send the dst field",
+    f_send_popup: "Send the popup field",
     f_extra: "Extra fixed fields (name=value)",
     f_words: "Success words (optional)",
     f_words_clear: "Clear",
     f_words_hint: "Only visible page text is matched. Clear these if they came from an old or incorrect capture.",
-    f_known: "A card you know works (optional)",
+    f_known: "An authorized card you know works",
     adv_open: "Advanced options (usually not needed)",
     p_space: "Combinations", p_samples: "Sample cards",
     p_request_shape: "Expected request shape (sensitive values hidden)",
     online_transition: "transition to online", logout_state: "state after logout",
     p_covered: "covered",
-    btn_calibrate: "Learn from the known card + measure the network",
+    btn_calibrate: "Test card and learn request shape",
     btn_capture: "Open the portal and record a successful login",
     capture_hint: "The portal opens in an isolated frame (no allow-same-origin). Its JavaScript cannot reach the KiraPass API. Log in once, then mark the success / reject / statistics pages.",
     capture_opened: "The recorder opened in a new window.",
@@ -366,7 +384,7 @@ const I18N = {
     capture_finish: "Finish + download the report",
     btn_save: "Save profile",
     run_title: "3) Run",
-    run_hint: "Pick the load: faster means more chance the router cuts you off or blocks you. Results always tell you why a run stopped.",
+    run_hint: "Choose a safe load: faster settings increase the chance of a disconnect or network block. After the required test, the run uses the proven request shape and refreshes its rejection baseline in a new session without resubmitting the known card.",
     r_threads: "Threads", r_attempts: "Attempts", r_delay: "Delay between requests (ms)",
     r_verify: "Verify internet after any accepted card",
     r_autostop: "Auto-stop on the first strong result",
@@ -605,6 +623,8 @@ const t = (key, fallback) => (I18N[LANG] && I18N[LANG][key]) || fallback || key;
 /* ------------------------------------------------------------------ state */
 const S = { meta: null, lastSeq: 0, poll: null, running: false, rows: 0,
             lastReport: "", profile: {}, knownCard: "", portal: null,
+            scanReady: false, scannedUrl: "", calibrationReady: false,
+            calibrationSignature: "",
             state: "idle" };
 
 const $ = (id) => document.getElementById(id);
@@ -744,6 +764,10 @@ function fmtSpace(n) {
 }
 
 function step(name) {
+  if ((name === "format" || name === "run") && !S.calibrationReady) {
+    name = "scan";
+    toast(t("calibration_required"));
+  }
   document.querySelectorAll(".panel").forEach((p) =>
     p.classList.toggle("active", p.id === "panel-" + name));
   document.querySelectorAll(".step").forEach((b) => {
@@ -847,7 +871,7 @@ function profileFromForm() {
     dst_field: dstField,
     popup_field: popupField,
     send_dst: $("f_send_dst").checked && fieldWasDetected(dstField),
-    send_popup: $("f_send_dst").checked && fieldWasDetected(popupField),
+    send_popup: $("f_send_popup").checked && fieldWasDetected(popupField),
     extra_fields: extras,
     success_words: words,
     /* the chap formula comes from the scanned page - but a SAVED profile knows
@@ -857,6 +881,46 @@ function profileFromForm() {
     user_agent: uaFromForm(),
     send_referer: $("f_referer").checked,
   }, progressFromProfile(S.profile));
+}
+
+function calibrationProfileFromForm(knownCard) {
+  const p = profileFromForm();
+  const card = String(knownCard || "");
+  // The calibration card is supplied before the guessing format is configured.
+  // Use a temporary broad format only for the bounded known-card experiment.
+  p.prefix = "";
+  p.suffix = "";
+  p.length = card.length;
+  p.charset = Array.from(new Set("0123456789" + card)).join("");
+  return p;
+}
+
+function requestSettingsSignature(p) {
+  const extras = Object.entries(p.extra_fields || {}).sort(([a], [b]) => a.localeCompare(b));
+  return JSON.stringify({
+    login_url: p.login_url || "", method: p.method || "post",
+    user_field: p.user_field || "username", pass_field: p.pass_field || "password",
+    pass_mode: p.pass_mode || "empty", dst_field: p.dst_field || "dst",
+    dst_value: p.dst_value || "", popup_field: p.popup_field || "popup",
+    send_dst: !!p.send_dst, send_popup: !!p.send_popup,
+    extra_fields: extras, user_agent: p.user_agent || "",
+    send_referer: p.send_referer !== false,
+  });
+}
+
+function knownCardFormatProblem(card, p) {
+  const value = String(card || "");
+  const length = parseInt(p.length || "0", 10);
+  if (length && value.length !== length) return "length";
+  const prefix = p.prefix || "";
+  const suffix = p.suffix || "";
+  if (prefix && !value.startsWith(prefix)) return "prefix";
+  if (suffix && !value.endsWith(suffix)) return "suffix";
+  const end = suffix ? value.length - suffix.length : value.length;
+  const variable = value.slice(prefix.length, end);
+  const charset = new Set(Array.from(p.charset || ""));
+  if (Array.from(variable).some((ch) => !charset.has(ch))) return "charset";
+  return "";
 }
 
 function fillFormFromProfile(p) {
@@ -875,6 +939,7 @@ function fillFormFromProfile(p) {
   $("f_length").value = p.length || 10;
   $("f_dst").value = p.dst_value || "";
   $("f_send_dst").checked = p.send_dst !== false;
+  $("f_send_popup").checked = p.send_popup !== false;
   $("f_words").value = (p.success_words || []).join(", ");
   const extras = Object.entries(p.extra_fields || {}).map(([k, v]) => k + "=" + v);
   $("f_extra").value = extras.join(", ");
@@ -948,6 +1013,12 @@ function toggleCustomCharset() {
 async function doScan() {
   const url = $("scanUrl").value.trim();
   if (!url) return;
+  S.scanReady = false;
+  S.calibrationReady = false;
+  S.calibrationSignature = "";
+  $("calibrateBtn").disabled = true;
+  $("toFormat").disabled = true;
+  $("calibCard").classList.add("hidden");
   $("scanBtn").disabled = true; $("scanBtn").textContent = t("loading");
   const res = await api("/api/scan", { url });
   $("scanBtn").disabled = false; $("scanBtn").textContent = t("scan_button");
@@ -962,6 +1033,9 @@ async function doScan() {
     return;
   }
   S.portal = res.portal;
+  S.scannedUrl = url;
+  S.scanReady = true;
+  $("calibrateBtn").disabled = !$("f_known").value.trim();
   renderInternet(res.internet, net);
 
   const f = res.portal.form || {};
@@ -987,8 +1061,8 @@ async function doScan() {
   $("f_user_field").value = f.user_field || "username";
   $("f_pass_field").value = f.pass_field || "password";
   const detectedFields = new Set(f.all_fields || []);
-  $("f_send_dst").checked = detectedFields.has(f.dst_field) ||
-    detectedFields.has(f.popup_field);
+  $("f_send_dst").checked = detectedFields.has(f.dst_field);
+  $("f_send_popup").checked = detectedFields.has(f.popup_field);
   const dsts = res.portal.dst_candidates || [];
   $("f_dst").value = dsts.find((d) => d) || "";
   if (f.chap) $("f_pass_mode").value = "chap";
@@ -1005,7 +1079,8 @@ async function doScan() {
   const same = ((S.meta || {}).profiles || []).find((p) => p.name === $("f_name").value);
   if (same) await loadProfile(same.name);
   else { S.profile = null; showCovered(null); }
-  $("toFormat").disabled = false;
+  $("toFormat").disabled = true;
+  $("calibrateBtn").disabled = !$("f_known").value.trim();
   previewFormat();
 }
 
@@ -1090,18 +1165,91 @@ async function startCapture() {
 }
 
 async function runCalibration() {
-  const btn = $("calibrateBtn"); btn.disabled = true;
-  const card = $("calibCard"); card.classList.remove("hidden");
-  card.innerHTML = "<h4>" + t("loading") + "</h4>";
+  const btn = $("calibrateBtn");
+  const card = $("calibCard");
   const known = $("f_known").value.trim();
-  const res = await api("/api/calibrate", { profile: profileFromForm(),
-                                            known_card: known });
-  if (!res.ok) { card.innerHTML = "<div class='bad'>" + esc(res.error) + "</div>"; btn.disabled = false; return; }
+  if (!S.scanReady || !known) {
+    toast(t("calibration_required"));
+    return;
+  }
+  btn.disabled = true;
+  S.calibrationReady = false;
+  S.calibrationSignature = "";
+  $("toFormat").disabled = true;
+  card.classList.remove("hidden");
+  card.innerHTML = "<h4>" + t("loading") + "</h4>";
+  const res = await api("/api/calibrate", {
+    profile: calibrationProfileFromForm(known), known_card: known,
+  });
+  if (!res.ok) {
+    card.innerHTML = "<div class='bad'>" + esc(res.error) + "</div>";
+    btn.disabled = !S.scanReady || !known;
+    return;
+  }
   const job = await waitJob(res.job.id);
-  btn.disabled = false;
-  if (!job) { card.innerHTML = "<div class='bad'>job lost</div>"; return; }
+  if (!job) {
+    card.innerHTML = "<div class='bad'>job lost</div>";
+    btn.disabled = !S.scanReady || !known;
+    return;
+  }
   renderCalibration(job, card);
-  if (known) S.knownCard = known;
+  const result = job.result || {};
+  if (job.state !== "error" && result.ok && result.applied_settings &&
+      result.tuned && result.tuned.verified) {
+    applyCalibrationSettings(result.applied_settings, known);
+    S.calibrationReady = true;
+    S.calibrationSignature = requestSettingsSignature(profileFromForm());
+    $("toFormat").disabled = false;
+    S.knownCard = known;
+    toast(t("calibration_applied"));
+  } else {
+    S.calibrationReady = false;
+    $("toFormat").disabled = true;
+  }
+  btn.disabled = !S.scanReady || !known;
+}
+
+function applyCalibrationSettings(settings, knownCard) {
+  if ((!S.profile || !S.profile.length) && knownCard)
+    $("f_length").value = String(knownCard.length);
+  if (settings.login_url) $("f_login_url").value = settings.login_url;
+  if (settings.method) $("f_method").value = settings.method.toLowerCase();
+  if (settings.user_field) $("f_user_field").value = settings.user_field;
+  if (settings.pass_field) $("f_pass_field").value = settings.pass_field;
+  if (settings.pass_mode && $("f_pass_mode").querySelector(
+      "option[value='" + settings.pass_mode + "']"))
+    $("f_pass_mode").value = settings.pass_mode;
+  if (settings.dst_value != null) $("f_dst").value = settings.dst_value;
+  $("f_send_dst").checked = !!settings.send_dst;
+  $("f_send_popup").checked = !!settings.send_popup;
+  if (settings.extra_field_names && settings.extra_field_names.length) {
+    const extras = {};
+    ($("f_extra").value || "").split(",").forEach((part) => {
+      const i = part.indexOf("=");
+      if (i > 0) extras[part.slice(0, i).trim()] = part.slice(i + 1).trim();
+    });
+    settings.extra_field_names.forEach((name) => {
+      if (!(name in extras)) extras[name] = "";
+    });
+    $("f_extra").value = Object.entries(extras)
+      .map(([key, value]) => key + "=" + value).join(", ");
+  }
+  if (S.portal && settings.field_names) {
+    S.portal.form = Object.assign({}, S.portal.form || {}, {
+      action: settings.login_url || S.portal.form.action,
+      method: settings.method || S.portal.form.method,
+      user_field: settings.user_field || S.portal.form.user_field,
+      pass_field: settings.pass_field || S.portal.form.pass_field,
+      dst_field: settings.dst_field || S.portal.form.dst_field,
+      popup_field: settings.popup_field || S.portal.form.popup_field,
+      all_fields: settings.field_names.slice(),
+    });
+  }
+  const profileSettings = Object.assign({}, settings);
+  delete profileSettings.extra_field_names;
+  delete profileSettings.field_names;
+  S.profile = Object.assign({}, S.profile || {}, profileSettings);
+  previewFormat();
 }
 
 function renderCalibration(job, node) {
@@ -1255,16 +1403,38 @@ function renderDiagnose(job, node) {
 
 /* ------------------------------------------------------------------ run */
 async function startRun() {
+  if (!S.calibrationReady) {
+    step("scan");
+    modal(t("calibration_required"), "<p>" + esc(t("calibration_required_hint")) + "</p>");
+    return;
+  }
   const profile = profileFromForm();
+  const formatProblem = knownCardFormatProblem($("f_known").value.trim(), profile);
+  if (formatProblem) {
+    step("format");
+    modal(t("known_card_format_mismatch"), "<p>" +
+      esc(t("prob_" + formatProblem + "_mismatch", formatProblem)) + "</p>");
+    return;
+  }
+  if (requestSettingsSignature(profile) !== S.calibrationSignature) {
+    S.calibrationReady = false;
+    $("toFormat").disabled = true;
+    step("scan");
+    modal(t("calibration_shape_changed"), "<p>" +
+      esc(t("calibration_shape_changed_hint")) + "</p>");
+    return;
+  }
   if (profile.capture_needs_browser_js) {
     modal(t("capture_blocked_title"),
       "<p>" + esc(t("capture_blocked_body")) + "</p><p>" +
       esc(profile.capture_block_reason || t("capture_blocked_next")) + "</p>");
     return;
   }
-  const known = $("f_known").value.trim();
   const payload = {
-    profile, known_card: known,
+    profile,
+    // Preserve it only as an exclusion from the baseline; do not submit it again.
+    known_card: $("f_known").value.trim(),
+    known_card_tested: true,
     attempts: parseInt($("r_attempts").value || "2000", 10),
     threads: parseInt($("r_threads").value || "12", 10),
     delay_ms: parseInt($("r_delay").value || "0", 10),
@@ -1612,6 +1782,23 @@ function wire() {
   document.querySelectorAll(".step").forEach((b) =>
     b.addEventListener("click", () => step(b.dataset.step)));
   $("scanBtn").addEventListener("click", doScan);
+  $("scanUrl").addEventListener("input", () => {
+    if (S.scanReady && $("scanUrl").value.trim() !== S.scannedUrl) {
+      S.scanReady = false;
+      S.calibrationReady = false;
+      $("calibrateBtn").disabled = true;
+      $("toFormat").disabled = true;
+    }
+  });
+  $("f_known").addEventListener("input", () => {
+    const known = $("f_known").value.trim();
+    $("calibrateBtn").disabled = !S.scanReady || !known;
+    if (S.calibrationReady && known !== S.knownCard) {
+      S.calibrationReady = false;
+      S.calibrationSignature = "";
+      $("toFormat").disabled = true;
+    }
+  });
   $("scanUrl").addEventListener("keydown", (e) => { if (e.key === "Enter") doScan(); });
   document.querySelectorAll(".chip[data-url]").forEach((c) =>
     c.addEventListener("click", () => { $("scanUrl").value = c.dataset.url; doScan(); }));
