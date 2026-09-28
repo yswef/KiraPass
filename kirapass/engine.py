@@ -395,7 +395,7 @@ def bench_cards(p: dict, count: int = 3, seed: int = 0, exclude=()) -> list:
 
 def calibrate(profile: dict, known_card: str = "", keyword: str = "",
               learn_known: bool = True, log=None, checks=None,
-              probes: int = 3) -> Calibration:
+              probes: int = 3, preflight_only: bool = False) -> Calibration:
     p = store.migrate(profile)
     cal = Calibration()
     cal.profile = p
@@ -518,6 +518,11 @@ def calibrate(profile: dict, known_card: str = "", keyword: str = "",
                 cal.step("known_card_preflight", False,
                          "internet_transition_not_seen",
                          {"tried": 1, "trials": [known_preflight]})
+                if preflight_only:
+                    cal.error = "known_card_not_proven"
+                    cal.step("shape_tuned", False, "known_card_not_proven",
+                             {"tried": 1, "trials": [known_preflight]})
+                    return cal
 
         # --- 3. learn what a WRONG card looks like ----------------------
         probe_cards, replies = [], []
@@ -1269,7 +1274,7 @@ class Engine:
     def start(self, profile: dict, attempts: int, threads: int, delay_ms: int = 0,
               keyword: str = "", known_card: str = "", verify_after: bool = True,
               auto_stop: bool = True, resume: bool = True,
-              known_card_tested: bool = False) -> dict:
+              preflight_only: bool = False) -> dict:
         if self.state == "running":
             return {"ok": False, "error": "already_running"}
         p = store.migrate(profile)
@@ -1285,8 +1290,9 @@ class Engine:
         self.profile = p
         self.plan = {"attempts": int(attempts), "threads": int(threads),
                      "delay_ms": int(delay_ms), "keyword": keyword,
-                     "known_card": bool(known_card), "verify": bool(verify_after),
-                     "resume": bool(resume)}
+                     "known_card": bool(known_card),
+                     "known_card_preflight_only": bool(preflight_only),
+                     "verify": bool(verify_after), "resume": bool(resume)}
         self.verify_enabled = bool(verify_after)
         self.auto_stop = bool(auto_stop)
         self.counters = Counter()
@@ -1328,30 +1334,30 @@ class Engine:
         self.emit("state", {"state": "calibrating"})
         self.thread = threading.Thread(
             target=self._run, args=(p, int(attempts), int(threads), delay_ms,
-                                    keyword, known_card, bool(known_card_tested)),
+                                    keyword, known_card, bool(preflight_only)),
             daemon=True, name="kirapass-engine")
         self.thread.start()
         return {"ok": True}
 
     # -- the run ---------------------------------------------------------
     def _run(self, p, attempts, threads, delay_ms, keyword, known_card,
-             known_card_tested=False) -> None:
+             preflight_only=False) -> None:
         try:
             cal = calibrate(p, known_card=known_card, keyword=keyword,
-                            learn_known=not known_card_tested,
                             checks=self.checks,
-                            probes=config.CALIBRATION_PROBES)
+                            probes=config.CALIBRATION_PROBES,
+                            preflight_only=preflight_only)
             if not cal.ok and calibration_retryable(cal.error):
                 # one hiccup must not cost the user the whole run
                 self.emit("note", {"message": "retrying_learning",
                                    "after": cal.error})
                 time.sleep(1.0)
                 cal = calibrate(p, known_card=known_card, keyword=keyword,
-                                learn_known=not known_card_tested,
                                 checks=self.checks,
-                                probes=config.CALIBRATION_PROBES)
+                                probes=config.CALIBRATION_PROBES,
+                                preflight_only=preflight_only)
             known_card_failure = False
-            if known_card and not known_card_tested:
+            if known_card:
                 shape_step = next((item for item in cal.steps
                                    if item.get("id") == "shape_tuned"), None)
                 known_card_failure = bool(shape_step and not shape_step.get("ok"))

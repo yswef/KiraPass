@@ -10,7 +10,7 @@ from __future__ import annotations
 import os
 
 APP_NAME = "KiraPass"
-VERSION = "5.8.3"
+VERSION = "5.8.4"
 
 # --------------------------------------------------------------------------
 # Folders

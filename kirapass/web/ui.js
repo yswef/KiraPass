@@ -69,7 +69,7 @@ const I18N = {
     capture_finish: "إنهاء + تنزيل التقرير",
     btn_save: "احفظ الملف التعريفي",
     run_title: "3) التشغيل",
-    run_hint: "اختر قوة مناسبة: كل ما زادت السرعة زاد احتمال أن يقطع الراوتر الاتصال أو يحجبك. بعد الاختبار الأساسي، يبدأ التشغيل بشكل الطلب الذي أثبت نجاحه ويحدّث صفحة الرفض بجلسة جديدة دون إعادة إرسال البطاقة المعروفة.",
+    run_hint: "اختر قوة مناسبة: كل ما زادت السرعة زاد احتمال أن يقطع الراوتر الاتصال أو يحجبك. عند بدء التشغيل يعيد البرنامج اختبار البطاقة المعروفة مرة واحدة بنفس الإعدادات؛ إذا لم يثبت الإنترنت يتوقف قبل التخمين. بعد النجاح يسجّل الخروج ثم يحدّث خط أساس الرفض دون إعادة إرسال البطاقة.",
     r_threads: "عدد المسارات (Threads)", r_attempts: "عدد المحاولات",
     r_delay: "الانتظار بين الطلبات (ms)",
     r_verify: "تأكيد الإنترنت بعد أي بطاقة مقبولة",
@@ -384,7 +384,7 @@ const I18N = {
     capture_finish: "Finish + download the report",
     btn_save: "Save profile",
     run_title: "3) Run",
-    run_hint: "Choose a safe load: faster settings increase the chance of a disconnect or network block. After the required test, the run uses the proven request shape and refreshes its rejection baseline in a new session without resubmitting the known card.",
+    run_hint: "Choose a safe load: faster settings increase the chance of a disconnect or network block. At run entry, the tool retests the known card once with the applied settings and stops before guessing if internet access is not proven. After confirmation it logs out, then refreshes the rejection baseline without resubmitting the card.",
     r_threads: "Threads", r_attempts: "Attempts", r_delay: "Delay between requests (ms)",
     r_verify: "Verify internet after any accepted card",
     r_autostop: "Auto-stop on the first strong result",
@@ -1432,9 +1432,9 @@ async function startRun() {
   }
   const payload = {
     profile,
-    // Preserve it only as an exclusion from the baseline; do not submit it again.
+    // Reconfirm the proven shape once at run entry; do not tune around failure.
     known_card: $("f_known").value.trim(),
-    known_card_tested: true,
+    preflight_only: true,
     attempts: parseInt($("r_attempts").value || "2000", 10),
     threads: parseInt($("r_threads").value || "12", 10),
     delay_ms: parseInt($("r_delay").value || "0", 10),

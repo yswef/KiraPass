@@ -371,7 +371,7 @@ class Handler(BaseHTTPRequestHandler):
                 delay_ms=int(data.get("delay_ms") or 0),
                 keyword=(data.get("keyword") or "").strip(),
                 known_card=(data.get("known_card") or "").strip(),
-                known_card_tested=bool(data.get("known_card_tested", False)),
+                preflight_only=bool(data.get("preflight_only", False)),
                 verify_after=bool(data.get("verify", True)),
                 auto_stop=bool(data.get("auto_stop", True)),
                 resume=data.get("resume", True) is not False)

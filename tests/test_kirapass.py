@@ -91,7 +91,7 @@ class UIIntegrityTests(unittest.TestCase):
         self.assertLess(html.index('id="calibrateBtn"'), format_panel)
         self.assertGreater(html.index('id="calibrateBtn"'), scan_panel)
         self.assertIn("S.calibrationReady", js)
-        self.assertIn("known_card_tested: true", js)
+        self.assertIn("preflight_only: true", js)
 
 
 class MaskingTests(unittest.TestCase):
@@ -552,6 +552,30 @@ class KnownCardTests(unittest.TestCase):
             if s["id"] == "shape_tuned":
                 return s
         return None
+
+    def test_run_preflight_only_verifies_exact_request_once_before_baseline(self):
+        with MockPortal(valid_cards={"020124042"}, pass_mode="empty",
+                        unknown_success_page=True) as portal:
+            info = selftest.scan(portal.url)
+            p = selftest.make_profile(portal.url, prefix="020124", length=9,
+                                      portal_info=info, pass_mode="empty")
+            cal = engine.calibrate(p, known_card="020124042", preflight_only=True,
+                                   checks=selftest.mock_checks(portal))
+            self.assertTrue(cal.ok and cal.tuned and cal.tuned.get("verified"),
+                            cal.as_dict())
+            self.assertEqual(portal.state.asked_cards.count("020124042"), 1)
+            self.assertEqual(cal.tuned["logout"]["internet_after"], "WALLED")
+
+    def test_run_preflight_only_stops_before_probes_when_known_card_fails(self):
+        with MockPortal(valid_cards={"020124042"}, pass_mode="empty") as portal:
+            info = selftest.scan(portal.url)
+            p = selftest.make_profile(portal.url, prefix="020124", length=9,
+                                      portal_info=info, pass_mode="empty")
+            cal = engine.calibrate(p, known_card="020124000", preflight_only=True,
+                                   checks=selftest.mock_checks(portal))
+            self.assertFalse(cal.ok, cal.as_dict())
+            self.assertEqual(cal.error, "known_card_not_proven")
+            self.assertEqual(portal.state.asked_cards, ["020124000"])
 
     def test_pretested_known_card_is_excluded_without_being_resubmitted(self):
         with MockPortal(valid_cards={"020124042"}, pass_mode="empty") as portal:
