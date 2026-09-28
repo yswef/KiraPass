@@ -69,7 +69,8 @@ class PortalState:
                  rate_limit_after=0, drop_every=0,
                  drop_after=0, chap=False, prefix="02", length=6,
                  error_text=None, hide_success=False, require_session=False,
-                 reject_shape=False, success_page=False):
+                 reject_shape=False, success_page=False,
+                 unknown_success_page=False, global_online_login_page=False):
         self.valid_cards = set(valid_cards)
         self.pass_mode = pass_mode          # same | empty | chap
         self.method = method
@@ -87,6 +88,14 @@ class PortalState:
         self.require_session = require_session
         self.reject_shape = reject_shape
         self.success_page = success_page
+        # The portal accepts the card and opens the network but replies with a
+        # different, unlabelled HTTP 200 page. This reproduces a success that
+        # a response-only classifier cannot prove without an internet check.
+        self.unknown_success_page = unknown_success_page
+        # Some portals return the authenticated/status page for every later
+        # login request from the same device once its gateway session is open.
+        # This reproduces false per-card verification under concurrent runs.
+        self.global_online_login_page = global_online_login_page
         self.tokens = {}
         self.bad_requests = 0
         self.rate_limit_after = rate_limit_after
@@ -215,9 +224,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
             online = self.client_address[0] in st.online_ips
             if not online:
                 return self._reply(302, "", {"Location": base + "/login"})
-            return self._reply(200, "<html><title>Status</title>You are logged in"
-                                    ", session uptime 0:01:20 remaining 3h 59m"
-                                    " <a href='/logout'>logout</a></html>")
+            return self._reply(200, "<html><head><title>Status</title></head><body>"
+                                    "You are logged in, session uptime 0:01:20 "
+                                    "remaining 3h 59m <a href='/logout'>logout</a>"
+                                    "<form action='/status'><input type='hidden' "
+                                    "name='erase-cookie' value='1'></form></body></html>")
 
         if not parts.path.startswith("/login"):
             return self._reply(404, "<html>not found</html>")
@@ -265,6 +276,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
         with st.lock:
             st.logins += 1
             st.asked_cards.append(card)
+            already_online = self.client_address[0] in st.online_ips
+        if st.global_online_login_page and already_online:
+            return self._reply(200, SUCCESS_PAGE)
 
         if self._is_valid(card, password):
             with st.lock:
@@ -273,6 +287,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 # logged in, but the reply is word for word a rejection page
                 st.bump("hidden_successes")
                 return self._login_page(base, fields, error=True)
+            if st.unknown_success_page:
+                return self._reply(
+                    200, "<html><body><h1>Portal session updated</h1>"
+                         "<p>Account settings were refreshed.</p></body></html>")
             if st.success_page:
                 return self._reply(302, "", {"Location": base + "/success"})
             return self._reply(302, "", {

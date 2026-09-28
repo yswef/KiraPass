@@ -132,8 +132,10 @@ UI can ask for the token.
   rejection form is absorbed immediately regardless. `0` means page once.
 * `KIRAPASS_AUTO_PACE=0` - disable the AIMD pace/thread tuner and hold exactly
   the operator's delay/thread settings.
-* `KIRAPASS_BLOCK_PATIENCE` - how many temporary lockouts a long run waits out
-  before stopping (default 3).
+* Explicit router block and rate-limit replies now stop a run immediately;
+  the engine never waits for expiry or resumes automatically.
+* The optional lockout diagnostic is capped at eight login requests and stops
+  on the first block response without polling or retrying.
 * `--host 0.0.0.0 --token <secret>` - serve the page to the LAN (phone on the
   same Wi-Fi). Non-loopback API calls then need the token.
 

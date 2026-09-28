@@ -14,6 +14,7 @@ rejects everything, and the tool looks broken.
 
 from __future__ import annotations
 
+import html as htmlmod
 import re
 from urllib.parse import parse_qs, parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
 
@@ -36,7 +37,9 @@ def _attrs(tag: str) -> dict:
         value = value.strip()
         if len(value) >= 2 and value[0] in "\"'" and value[-1] == value[0]:
             value = value[1:-1]
-        out[name.lower()] = value
+        # HTML serializes ampersands as &amp; in attributes. Decode before
+        # joining/parsing the URL, otherwise the browser's URL shape changes.
+        out[name.lower()] = htmlmod.unescape(value)
     return out
 
 
@@ -119,6 +122,7 @@ def parse_form(html: str, base_url: str) -> FormInfo:
     and the most login-looking one wins; fields are then read from inside it.
     """
     html = html or ""
+    base_url = htmlmod.unescape(str(base_url or ""))
     action, method = base_url, "post"
     body = html
 
@@ -218,6 +222,10 @@ def parse_form(html: str, base_url: str) -> FormInfo:
     if not info.popup_field:
         info.popup_field = "popup"
 
+    # Persist a URL with the same query keys/order but empty user/password
+    # values. GET submission code supplies the fresh values for each attempt.
+    info.action = sanitize_login_url(info.action, info.user_field, info.pass_field)
+
     # MikroTik chap: hexMD5('id' + password + 'challenge')
     cm = CHAP_CALL_RE.search(html)
     if cm:
@@ -265,8 +273,29 @@ class Portal:
 
 
 
+def sanitize_login_url(url: str, user_field: str = "username",
+                       pass_field: str = "password") -> str:
+    """Canonicalize a login URL and remove credential values from its query.
+
+    Keep the query keys and their order (some portals depend on the URL shape),
+    but never persist a card or password/hash copied from a submitted GET link.
+    """
+    value = htmlmod.unescape(str(url or "")).strip()
+    try:
+        parts = urlsplit(value)
+        secret_keys = {str(user_field or "username").lower(),
+                       str(pass_field or "password").lower()}
+        query = [(key, "" if key.lower() in secret_keys else item)
+                 for key, item in parse_qsl(parts.query, keep_blank_values=True)]
+        return urlunsplit((parts.scheme, parts.netloc, parts.path,
+                           urlencode(query, doseq=True), parts.fragment))
+    except Exception:
+        return value
+
+
 def _copied_login_query(url: str) -> tuple:
     """(looks like a submitted GET login, credential field names)."""
+    url = htmlmod.unescape(str(url or ""))
     pairs = parse_qsl(urlsplit(url).query, keep_blank_values=True)
     names = {name.lower(): name for name, _ in pairs}
     users = {original for low, original in names.items()
@@ -279,6 +308,7 @@ def _copied_login_query(url: str) -> tuple:
 
 def _safe_page_url(url: str) -> str:
     """Open the login *page*, never spend the card embedded in a copied URL."""
+    url = htmlmod.unescape(str(url or "")).strip()
     copied, credential_names = _copied_login_query(url)
     if not copied:
         return url
@@ -296,6 +326,7 @@ def discover(session, url: str, timeout=None) -> Portal:
     and password before opening it: scanning must never consume a real card.
     The original query still teaches us that this is a GET portal.
     """
+    url = htmlmod.unescape(str(url or "")).strip()
     page_url = _safe_page_url(url)
     resp = session.get(page_url, allow_redirects=True, timeout=timeout)
     base = resp.url or page_url

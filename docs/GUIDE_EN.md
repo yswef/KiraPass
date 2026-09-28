@@ -89,8 +89,8 @@ Every attempt is classified, colour-coded and explained:
 | **Accepted, unverified** | the router accepted, but the internet proof was not possible (you were already online, or the network blocks the check) | open the portal status page, or retest from the walled state |
 | **Rejected** | byte-identical to the rejection page | keep going |
 | **Unclear reply** | different, but nothing proves acceptance | open the saved page in *review pages* and read it |
-| **Blocked by router** | an explicit block page | stop, change IP, use the safe preset |
-| **Rate limited** | 429 / "slow down" | the tool slowed itself down and told you why |
+| **Blocked by router** | an explicit block page | stop attempts and ask the network administrator to review access and restore service |
+| **Rate limited** | 429 / "slow down" | the tool stops; ask the network administrator to review access before continuing |
 | **Network error** | cut connection, refused, timeout, DNS | the exact kind is shown; retried automatically |
 
 Live counters, latency, current slowdown (with reason), a per-attempt log, the
@@ -122,7 +122,7 @@ less certain.
 |---|---|---|
 | everything rejected | correct shape, no valid card in that range | widen the range (longer length) or another prefix |
 | many "unclear reply" | the portal page changes a lot | run diagnostics, and use a known-good card so the shape is learned |
-| blocked after a while | the router protects itself | restart the router / reconnect for a new IP, safe preset, add delay |
+| blocked after a while | the router protects itself | stop attempts and ask the network administrator to review access and restore service |
 | offline mid-run | wifi dropped or router rebooted | reconnect; the run resumes where it stopped |
 | stops after 1–2 attempts | (in the old version: a bug) now every stop has a printed reason | read "why it stopped" |
 

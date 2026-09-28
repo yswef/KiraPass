@@ -222,8 +222,10 @@ def migrate(raw: dict) -> dict:
         "prefix": prefix,
         "suffix": suffix,
         "method": "post" if str(raw.get("method", "2")) in ("2", "post") else "get",
-        "send_dst": bool(raw.get("extras", True)),
-        "send_popup": bool(raw.get("extras", True)),
+        "send_dst": bool(raw.get("send_dst")) if "send_dst" in raw
+                    else bool(raw.get("extras", True)),
+        "send_popup": bool(raw.get("send_popup")) if "send_popup" in raw
+                      else bool(raw.get("extras", True)),
         "dst_value": raw.get("dst_value", ""),
         "dst_field": raw.get("dst_field") or "dst",
         "popup_field": raw.get("popup_field") or "popup",
@@ -238,6 +240,12 @@ def migrate(raw: dict) -> dict:
     })
     if (raw.get("walk") or {}).get("pos"):
         p["space_pos"] = int(raw["walk"]["pos"])
+    # Legacy profiles may contain a copied successful GET URL with the actual
+    # card and password hash in its query. Keep its request shape, not secrets.
+    from .portals import sanitize_login_url
+    p["login_url"] = sanitize_login_url(
+        p.get("login_url", ""), p.get("user_field", "username"),
+        p.get("pass_field", "password"))
     return p
 
 

@@ -157,19 +157,28 @@ def t_find_card():
                       f"counters={st.get('counters')}")
 
 
+def t_verified_hit_stops_before_shared_online_false_hits():
+    """One device-wide online transition must not verify later wrong cards."""
+    with MockPortal(valid_cards={"0242"}, pass_mode="empty",
+                    global_online_login_page=True) as portal:
+        info = scan(portal.url)
+        p = make_profile(portal.url, portal_info=info, pass_mode="empty",
+                         walk_a=1, walk_b=24, space_pos=0)
+        st, eng = run_engine(p, attempts=20, threads=8, reset=False,
+                             checks=mock_checks(portal), known_card="0242",
+                             auto_stop=False)
+        hits = st.get("hits", [])
+        ok = (len(hits) == 1 and hits[0]["code"] == "ACCEPTED_VERIFIED"
+              and st.get("stop_reason") == "found_verified"
+              and st.get("plan", {}).get("verification_serialized") is True
+              and st.get("progress", {}).get("threads") == 1)
+        return Result("shared_online_state_does_not_create_extra_verified_hits",
+                      ok, f"hits={len(hits)} stop={st.get('stop_reason')} "
+                      f"plan={st.get('plan')} counters={st.get('counters')}")
+
+
 def t_ban_is_reported():
     """A ban must be named as a ban - never as a hit or as 'tested'."""
-    from . import config as _cfg
-    saved = (_cfg.BLOCK_PATIENCE, _cfg.BLOCK_WAIT_SECONDS)
-    # the self-test must not sit through real lockouts
-    _cfg.BLOCK_PATIENCE, _cfg.BLOCK_WAIT_SECONDS = 1, 1
-    try:
-        return _t_ban_is_reported()
-    finally:
-        _cfg.BLOCK_PATIENCE, _cfg.BLOCK_WAIT_SECONDS = saved
-
-
-def _t_ban_is_reported():
     with MockPortal(valid_cards={"0299"}, ban_after=5, pass_mode="empty") as portal:
         info = scan(portal.url)
         p = make_profile(portal.url, prefix="03", length=4, portal_info=info)
@@ -184,7 +193,7 @@ def _t_ban_is_reported():
                       f"stop={st.get('stop_reason')}")
 
 
-def t_rate_limit_slows_down():
+def t_rate_limit_stops():
     with MockPortal(valid_cards={"0299"}, rate_limit_after=4,
                     pass_mode="empty") as portal:
         info = scan(portal.url)
@@ -199,8 +208,9 @@ def t_rate_limit_slows_down():
         st = eng.status()
         c = st.get("counters", {})
         delay = (st.get("throttle") or {}).get("delay_ms", 0)
-        ok = c.get("RATE_LIMITED", 0) >= 1 and delay > 0
-        return Result("rate_limit_is_reported_and_slows_down", ok,
+        ok = (c.get("RATE_LIMITED", 0) >= 1 and delay > 0
+              and st.get("stop_reason") == "rate_limited_by_router")
+        return Result("rate_limit_is_reported_and_stops_the_run", ok,
                       f"rate_limited={c.get('RATE_LIMITED', 0)} delay={delay}ms "
                       f"reason={(st.get('throttle') or {}).get('reason')}")
 
@@ -233,7 +243,7 @@ def t_dead_target_stops():
                               checks=mock_checks(portal), timeout=60)
         c = st.get("counters", {})
         ok = (st.get("stop_reason") == "target_unreachable"
-              and c.get("NET_ERROR", 0) >= 10
+              and c.get("NET_ERROR", 0) >= config.CONSECUTIVE_TRANSPORT_FAILURE_LIMIT
               and not any(k.startswith("ACCEPTED") for k in c))
         return Result("dead_target_is_detected_and_stops_the_run", ok,
                       f"stop={st.get('stop_reason')} counters={dict(c)} "
@@ -373,8 +383,9 @@ SCENARIOS = (
     t_calibration,
     t_no_false_hits,
     t_find_card,
+    t_verified_hit_stops_before_shared_online_false_hits,
     t_ban_is_reported,
-    t_rate_limit_slows_down,
+    t_rate_limit_stops,
     t_dropped_connections,
     t_dead_target_stops,
     t_chap_portal,

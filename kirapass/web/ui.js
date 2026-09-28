@@ -7,32 +7,58 @@ const I18N = {
     /* interface */
     step_scan: "فحص الشبكة", step_format: "صيغة البطاقة",
     step_run: "التشغيل", step_results: "النتائج",
-    scan_title: "1) افحص صفحة الدخول",
-    scan_hint: "الصق رابط صفحة دخول الهوتسبوت كما تفتحها في المتصفح. إن كان الرابط نفسه يحتوي ?username=…&password= فالأداة تعرف أنه GET، وتحذف الكرت من طلب الفحص حتى لا تستهلكه ولا تكرر الاسم القديم. ثم تقرأ الصفحة وتكتشف الحقول تلقائياً.",
+    skip_content: "تجاوز إلى المحتوى",
+    brand_subtitle: "اختبار شبكات مصرح به",
+    license_link: "الترخيص",
+    progress_label: "تقدم التشغيل",
+    language_label: "تغيير اللغة",
+    steps_label: "خطوات الاستخدام",
+    banner_title: "استخدام مصرّح به فقط",
+    banner_text: "هذه الأداة للاختبار على شبكة تملكها أو لديك إذن كتابي من صاحبها. لا تستخدمها على شبكة غيرك.",
+    banner_more: "التفاصيل",
+    scan_title: "1) فحص الشبكة واختبار البطاقة المعروفة",
+    scan_hint: "الصق رابط صفحة دخول الهوتسبوت كما تفتحه في المتصفح. بعد الفحص أدخل بطاقة مصرحاً بها تعرف أنها تعمل واختبرها هنا؛ لن تنتقل لصيغة التخمين حتى يُثبت الاختبار فتح الإنترنت وتأكيد الخروج.",
     scan_button: "افحص الآن",
+    scan_url_label: "رابط صفحة الدخول",
+    calibration_setup_title: "اختبار البطاقة المعروفة وتعلّم الطلب",
+    calibration_setup_hint: "أدخل بطاقة مصرحاً بها وتعرف أنها تعمل. لن تُفتح إعدادات التخمين قبل أن يثبت الاختبار انتقال الإنترنت ثم تأكيد الخروج.",
+    calibration_required: "يجب إكمال الاختبار أولاً",
+    calibration_required_hint: "ارجع إلى فحص الشبكة، أدخل بطاقة مصرحاً بها تعمل، ثم نفّذ الاختبار. ستُطبّق إعدادات الطلب التي أثبتت نجاحها على الصفحة التالية.",
+    calibration_shape_changed: "تغيّر شكل الطلب بعد الاختبار",
+    calibration_shape_changed_hint: "لن يبدأ التشغيل بإعدادات لم تُختبر. ارجع إلى فحص الشبكة وأعد اختبار البطاقة بعد مراجعة إعدادات الطلب.",
+    calibration_applied: "نجح الاختبار وطُبّق شكل الطلب على الإعدادات",
+    known_card_format_mismatch: "صيغة البطاقة في الصفحة الثانية لا تطابق البطاقة التي اختُبرت؛ صحّح الطول والبادئة والمحارف قبل التشغيل.",
+    attempt_table: "سجل محاولات التشغيل",
     next_format: "التالي: صيغة البطاقة ←",
     next_run: "التالي: التشغيل ←",
     format_title: "2) صيغة البطاقة",
-    format_hint: "اكتب شكل الكرت: البادئة الثابتة + طول الكرت الكامل. الأرقام المتغيّرة هي التي سيتم تخمينها. المعاينة تحت تخبرك فوراً بعدد الاحتمالات.",
+    format_hint: "اكتب شكل الكرت: البادئة الثابتة + طول الكرت الكامل. شكل طلب الدخول المعروض أدناه تعلّمناه واختبرناه في الخطوة السابقة؛ إذا غيّرت إعدادات الطلب المتقدمة سيُطلب اختبارها من جديد قبل التشغيل.",
     f_prefix: "البادئة الثابتة", f_length: "طول الكرت الكامل",
     saved_profiles: "الملف التعريفي المحفوظ", prof_new: "— جديد —",
     btn_delete_profile: "حذف هذا الملف",
     f_charset: "الحروف/الأرقام المتغيّرة", f_custom: "محارف مخصّصة",
     f_pass_mode: "قيمة كلمة المرور", f_dst: "قيمة dst (وجهة الضيف)",
     f_name: "اسم الملف التعريفي",
-    f_method: "طريقة الطلب", f_user_field: "اسم حقل المستخدم",
+    f_method: "طريقة الطلب", method_post: "POST (الأكثر توافقاً)", method_get: "GET",
+    f_user_field: "اسم حقل المستخدم",
     f_pass_field: "اسم حقل كلمة المرور", f_login_url: "رابط إرسال الدخول (action)",
-    f_send_dst: "إرسال الحقول المخفية dst/popup",
+    f_send_dst: "إرسال حقل dst",
+    f_send_popup: "إرسال حقل popup",
     f_extra: "حقول ثابتة إضافية (name=value)",
     f_words: "كلمات النجاح (اختياري)",
-    f_known: "بطاقة تعرف أنها تعمل (اختياري)",
+    f_words_clear: "مسح",
+    f_words_hint: "تُطابق هذه الكلمات نص الصفحة الظاهر فقط. امسحها إذا كانت قديمة أو غير صحيحة.",
+    f_known: "بطاقة مصرح بها تعرف أنها تعمل",
     adv_open: "خيارات متقدمة (عادة لا تحتاجها)",
     p_space: "عدد الاحتمالات", p_samples: "أمثلة على البطاقات",
+    p_request_shape: "شكل الطلب المتوقع (القيم الحساسة مخفية)",
+    online_transition: "انتقال إلى الإنترنت", logout_state: "حالة ما بعد الخروج",
     p_covered: "مغطى سابقاً",
-    btn_calibrate: "تعلّم من البطاقة المعروفة + قياس الشبكة",
+    btn_calibrate: "اختبر البطاقة وتعلّم شكل الطلب",
     btn_capture: "افتح البوابة وسجّل دخولاً ناجحاً",
     capture_hint: "تُفتح البوابة داخل إطار معزول (بدون allow-same-origin) ولا يصل JavaScript الصفحة إلى واجهة KiraPass. سجّل دخولاً ناجحاً ثم علّم صفحات النجاح/الرفض/الإحصائيات.",
     capture_opened: "فُتح المسجّل في نافذة جديدة.",
+    capture_popup_blocked: "منع المتصفح فتح النافذة. اسمح بالنوافذ المنبثقة لهذا العنوان ثم حاول مجدداً.",
     capture_fail: "تعذّر بدء المسجّل",
     capture_blocked_title: "التخمين الآلي غير متاح لهذه البوابة",
     capture_blocked_body: "تحويل كلمة المرور يستخدم JavaScript مخصصاً غير معروف. لا ندّعي أنه قابل للأتمتة.",
@@ -43,7 +69,7 @@ const I18N = {
     capture_finish: "إنهاء + تنزيل التقرير",
     btn_save: "احفظ الملف التعريفي",
     run_title: "3) التشغيل",
-    run_hint: "اختر قوة مناسبة: كل ما زادت السرعة زاد احتمال أن يقطع الراوتر الاتصال أو يحجبك. الأداة تخبرك داخل النتائج بسبب كل توقف.",
+    run_hint: "اختر قوة مناسبة: كل ما زادت السرعة زاد احتمال أن يقطع الراوتر الاتصال أو يحجبك. عند بدء التشغيل يعيد البرنامج اختبار البطاقة المعروفة مرة واحدة بنفس الإعدادات؛ إذا لم يثبت الإنترنت يتوقف قبل التخمين. بعد النجاح يسجّل الخروج ثم يحدّث خط أساس الرفض دون إعادة إرسال البطاقة.",
     r_threads: "عدد المسارات (Threads)", r_attempts: "عدد المحاولات",
     r_delay: "الانتظار بين الطلبات (ms)",
     r_verify: "تأكيد الإنترنت بعد أي بطاقة مقبولة",
@@ -56,12 +82,13 @@ const I18N = {
     cal_internet_unknown: "حالة الشبكة غير معروفة",
     cal_known_card_out_of_format: "الكرت لا يطابق صيغة البطاقات",
     cal_known_card_not_proven: "لم أستطع إثبات أن هذا الكرت يعمل",
+    cal_logout_unconfirmed: "لم أستطع تأكيد تسجيل الخروج؛ أوقفت أي محاولات أخرى",
     prob_length_mismatch: "طول الكرت لا يساوي الطول المضبوط",
     prob_prefix_mismatch: "الكرت لا يبدأ بالبادئة المضبوطة",
     prob_suffix_mismatch: "الكرت لا ينتهي باللاحقة المضبوطة",
     prob_charset_mismatch: "الكرت فيه رموز ليست ضمن الأبجدية المختارة",
     known_card_tried: "جرّبنا هذا الكرت بعدة أشكال للطلب، وكان رد الراوتر:",
-    known_card_hint: "→ HTTP 400/405/415/422 يعني أن الراوتر رفض شكل الطلب قبل فحص الكرت. الأداة الآن تجدّد الكوكي والرمز المخفي؛ اختر أيضاً هوية نفس متصفحك. أما «مثل صفحة الرفض» مع HTTP 200 فالكرت منتهي/مستخدم أو كلمة المرور/الحقول ناقصة. وإن كان «محجوب»: أعد الاتصال ثم أعد المحاولة.",
+    known_card_hint: "→ HTTP 400/405/415/422 يعني أن الراوتر رفض شكل الطلب قبل فحص الكرت. راجع الطريقة والرابط والحقول المعروضة، وطابقها مع طلب المتصفح الناجح. أما HTTP 200 المشابه لصفحة الرفض فلا يثبت نجاحاً. عند ظهور حجب: أوقف المحاولات واطلب من مسؤول الشبكة مراجعة الوصول؛ لا تعاود الاتصال تلقائياً.",
     s_eta: "الوقت المتبقي",
     th_auto_slowed_router_complaining: "أبطأت تلقائياً: الراوتر بدأ يشتكي (أخطاء/تقييد)",
     th_auto_sped_up: "أسرعت تلقائياً: الراوتر يستجيب بلا أخطاء",
@@ -76,17 +103,18 @@ const I18N = {
     ua_hint: "غيّرها فقط إذا كان الكرت يعمل في متصفح هاتفك لكن الراوتر يرفض شكل طلب الأداة.",
     f_referer: "إرسال ترويسات المتصفح (Referer/Origin)",
     btn_lockout: "قِس حدّ الحظر",
-    lockout_measuring: "جارٍ قياس حدّ الحظر (قد يستغرق دقائق)...",
+    lockout_measuring: "يجري فحص محدود (بحد أقصى ٨ طلبات) ويتوقف فور ظهور الحجب...",
+    lockout_confirm: "هذا الفحص الاختياري يرسل حتى ٨ محاولات دخول خاطئة وقد يفعّل حجب الشبكة. هل تريد المتابعة؟ إذا كانت الشبكة تحجبك الآن، ألغِ الفحص واتصل بمسؤول الشبكة.",
     lockout_after: "الراوتر يحجب بعد",
     lockout_clears: "ويفكّ الحظر بعد",
-    lockout_never: "لم يحجبك الراوتر بعد",
-    lockout_never_clears: "ولم يفتح الحظر خلال الانتظار",
+    lockout_never: "لم يظهر حجب ضمن الحد الآمن من المحاولات",
+    lockout_stopped_after_block: "توقفت الأداة فور ظهور الحجب؛ لم تنتظر زواله ولم ترسل طلبات أخرى. أوقف المحاولات واطلب من مسؤول الشبكة مراجعة الوصول.",
     lockout_pace: "أسرع وتيرة آمنة: محاولة كل",
     lockout_pace_hint: "ضع هذه المهلة في خانة «مهلة بين المحاولات» واستخدم خيطاً واحداً أو اثنين.",
     lockout_impossible: "على هذا الراوتر لا يمكن التخمين دون حظر متكرر: إما مهلة طويلة جداً، أو تعديل الإعداد من الراوتر نفسه.",
     seconds: "ثانية",
     attempt: "محاولة",
-    netadvice_blocked_from_the_start: "الراوتر حاجب هذا الجهاز قبل أن نقيس: أعد الاتصال لتغيير الـ IP أو أعد تشغيل الراوتر، ثم قِس من جديد.",
+    netadvice_blocked_from_the_start: "الشبكة كانت تحجب هذا الجهاز قبل القياس. أوقف المحاولات واطلب من مسؤول الشبكة مراجعة الوصول وإعادة الخدمة.",
     btn_diagnose: "تشخيص الشبكة أولاً",
     btn_clear_review: "مسح صفحات المراجعة",
     license_check: "أتعهّد بأنني أملك هذه الشبكة أو لدي إذن كتابي من صاحبها لاختبارها.",
@@ -100,7 +128,7 @@ const I18N = {
     review_title: "ردود غير واضحة (تحتاج نظرة منك)",
     review_hint: "هذه ردود ليست مثل صفحة الرفض وليست نجاحاً مؤكداً. محفوظة لك لتفتحها وتقرأها بنفسك - الأداة لا تخمّن مكانك.",
     review_none: "لا شيء بعد.",
-    state_idle: "جاهز", state_calibrating: "جاري التعلّم", state_running: "يعمل",
+    state_idle: "جاهز", state_calibrating: "جارٍ فحص البطاقة وتحديث خط أساس الرفض", state_running: "يعمل",
     job_timeout: "انتهت مدة الانتظار - راجع السجل أسفل الشاشة",
     state_done: "انتهى", state_stopping: "يتوقف",
     preset_safe: "آمن (4 مسارات)", preset_normal: "عادي (12)",
@@ -135,6 +163,7 @@ const I18N = {
     review_diff: "كلمات ظهرت في هذا الرد ولم تظهر في صفحة الرفض",
     missing_words: "كلمات كانت في صفحة الرفض واختفت",
     report_saved: "حُفظ التقرير",
+    download_calibration_report: "تنزيل تقرير المعايرة المنقّح",
     confirm_clear_all: "سيتم مسح كل شيء بما فيها الملفات التعريفية. متأكد؟",
     confirm_profiles: "سيتم مسح الملفات التعريفية. متأكد؟",
     yes: "نعم", no: "إلغاء", close: "إغلاق",
@@ -147,7 +176,7 @@ const I18N = {
     /* why nothing was tried: the initial learning failed */
     cal_failed_title: "لم أبدأ التخمين: فشل التعلّم الأولي",
     cal_failed_hint: "لم تُجرَ أي محاولة لأن الأداة لم تستطع تعلّم شكل صفحة الرفض. هذا ما فعله الراوتر:",
-    no_attempt_was_made: "المحاولات التي أُجريت فعلاً: صفر - لم يتم تخمين أي بطاقة.",
+    no_attempt_was_made: "لم يبدأ تخمين نطاق البطاقات؛ طلبات المعايرة (إن وجدت) ظاهرة أعلاه.",
     netadvice_refused: "تأكد أنك متصل بشبكة هذا الراوتر وأن الرابط صحيح (البورت مقفل أو الحماية رفضت جهازك).",
     netadvice_dns: "اسم العنوان لم يُترجم: اكتب IP الراوتر بدل الاسم (مثل 10.5.50.1).",
     netadvice_no_session: "صفحة الدخول لم تعطِ جلسة: تأكد من الرابط، ثم اختر هوية نفس متصفح هاتفك وأعد الفحص. لم تُحسب البطاقات كمجرّبة.",
@@ -161,9 +190,9 @@ const I18N = {
     netadvice_too_many_redirects: "الراوتر يحوّل الطلب بلا نهاية: انسخ الرابط النهائي من المتصفح.",
     netadvice_proto: "الرابط غير مدعوم: يجب أن يبدأ بـ http:// أو https://",
     netadvice_unknown: "خطأ غير متوقع: أعد المحاولة، وإن تكرر شغّل «تشخيص الشبكة أولاً».",
-    netadvice_blocked_already: "الراوتر حاجب جهازك الآن: أعد تشغيل الراوتر أو أعد الاتصال لتغيير الـ IP، ثم ابدأ من جديد.",
-    netadvice_blocked_before_probes: "الحجب سابق علينا: أعد الاتصال بالشبكة لتغيير الـ IP (أو فعّل «عنوان MAC عشوائي/خاص» لهذه الشبكة في إعدادات الهاتف) أو أعد تشغيل الراوتر، ثم ابدأ من جديد.",
-    netadvice_blocked_by_our_probes: "نحن من ملأنا عداد الفشل: الأداة تنتظر ٤٥ ثانية ثم تعيد التعلّم ببطاقتي تجربة بدل ثلاث. إن تكرّر: أعد الاتصال لتغيير الـ IP، وقلّل عدد الخيوط وأضف مهلة بين المحاولات.",
+    netadvice_blocked_already: "الشبكة تحجب هذا الجهاز. أوقف المحاولات واطلب من مسؤول الشبكة/الراوتر مراجعة الحجب وإعادة الخدمة.",
+    netadvice_blocked_before_probes: "ظهر الحجب قبل أي بطاقة تجربة. لا تحاول تجاوزه؛ اطلب من مسؤول الشبكة/الراوتر مراجعة الوصول وإعادة الخدمة.",
+    netadvice_blocked_by_our_probes: "ظهر رد حجب أثناء المعايرة، فتوقفت الأداة دون إعادة المحاولة. أوقف المحاولات واطلب من مسؤول الشبكة/الراوتر مراجعة الوصول وإعادة الخدمة.",
     netadvice_no_rejection_baseline: "لم يصل أي رد على بطاقات التجربة: تحقق من الاتصال بالشبكة.",
     netadvice_card_space_empty: "صيغة البطاقة لا تترك شيئاً للتخمين: البادئة + اللاحقة أطول من طول الكرت، أو المحارف المتغيّرة قليلة جداً.",
     netadvice_calibration_failed: "أصلح السبب أعلاه، ثم اضغط «ابدأ التخمين» من جديد.",
@@ -174,8 +203,6 @@ const I18N = {
     internet_opened_hint: "الراوتر أدخلك ولم يرد برد نجاح واضح، فلم نستطع تسمية الكرت من الرد وحده. أوقف الجلسة ثم جرّب هذه الكروت واحداً واحداً في صفحة الدخول - أحدها هو الذي فتح الشبكة. الأحدث في الآخر.",
     stop_internet_opened: "توقف لأن الإنترنت فتح أثناء التشغيل: أحد آخر الكروت المجربة هو الصحيح.",
     retry_now: "↻ أعد المحاولة الآن",
-    retry_after_wait: "⏳ أعد المحاولة بعد ٤٥ ثانية",
-    block_wait: "الراوتر حجبنا بعد بطاقات التجربة - انتظار",
     /* verdicts */
     v_ACCEPTED_VERIFIED: "مقبولة ومؤكدة",
     v_ACCEPTED: "مقبولة",
@@ -229,9 +256,12 @@ const I18N = {
     stop_found_verified: "وجدت بطاقة تعمل وتحقّقت من الإنترنت فعلياً.",
     stop_found_strong_evidence: "ظهرت بطاقة بدليل قوي (تحويل خارج البوابة) وتوقفت.",
     stop_user_stop: "أوقفت التشغيل بنفسك.",
-    stop_banned_by_router: "الراوتر حجبك. غيّر الـ IP (أعد تشغيل الراوتر أو أعد الاتصال) وقلّل المسارات.",
-    stop_rate_limited_by_router: "الشبكة تحدّ من الطلبات (429). قلّل المسارات أو أضف انتظاراً.",
-    stop_target_unreachable: "انقطع الوصول إلى الراوتر تماماً: تحقق من الشبكة.",
+    stop_banned_by_router: "الراوتر حجب الطلبات. أوقف المحاولات واطلب من مسؤول الشبكة مراجعة الوصول وإعادة الخدمة.",
+    stop_rate_limited_by_router: "الشبكة حدّت من الطلبات (429). أوقفت الأداة المحاولات؛ اطلب من مسؤول الشبكة مراجعة الوصول قبل المتابعة.",
+    stop_target_unreachable: "توقفت بعد تكرر فشل الاتصال؛ قد يكون انقطاعاً أو حظراً ولا يمكن تمييزهما من التقرير. أوقفت الطلبات ولم أعد الاتصال تلقائياً. راجع مسؤول الشبكة قبل المحاولة.",
+    manual_resume_title: "يلزم تأكيد المشرف قبل الاستئناف",
+    manual_resume_hint: "لا تستأنف بعد حظر أو انقطاع إلا بعد مراجعة مسؤول الشبكة وتأكيده أن المتابعة مسموحة.",
+    manual_resume_ack: "راجعت مسؤول الشبكة وأكد أن الشبكة جاهزة وأن الاستئناف مسموح",
     why_title: "لماذا انتهت كل محاولة بهذه النتيجة؟",
     stop_attempts_done: "انتهى عدد المحاولات المطلوب. شغّل مرة أخرى - ستكمل من حيث توقفت.",
     stop_space_done: "غطّيت كل الاحتمالات في هذا النطاق.",
@@ -240,15 +270,16 @@ const I18N = {
     stop_captcha_challenge: "ظهرت كابتشا، والتخمين بعدها بلا فائدة.",
     stop_found_unverified: "قبل الراوتر البطاقة لكن لم أستطع تأكيد الإنترنت.",
     /* throttle */
-    th_rate_limited_slowing_down: "أبطأت الطلبات بسبب تحديد المعدل (429)",
-    th_ban_page_slowing_down: "أبطأت الطلبات بسبب ظهور صفحة حجب",
+    th_rate_limited_slowing_down: "أوقفت الطلبات بعد رد تحديد المعدل (429)",
+    th_ban_page_slowing_down: "أوقفت الطلبات بعد ظهور صفحة حجب",
     th_connections_refused_slowing_down: "أبطأت الطلبات لأن الراوتر يرفض الاتصالات",
     th_network_errors_slowing_down: "أبطأت الطلبات بسبب أخطاء شبكة متكررة",
     th_recovering_speed: "الشبكة هدأت - أعيد رفع السرعة تدريجياً",
     /* calibration + diagnostics */
-    cal_blocked_already: "الراوتر حاجب جهازك (ظهرت صفحة حجب قبل أي محاولة)",
+    cal_blocked_already: "الراوتر يرفض الطلبات بسبب حجب نشط (توقفت الأداة دون إعادة المحاولة)",
     cal_blocked_before_probes: "صفحة الحجب ظهرت قبل أن نجرّب أي بطاقة: الراوتر حاجب هذا الجهاز من قبل",
-    cal_blocked_by_our_probes: "بطاقات التجربة ملأت عداد المحاولات الفاشلة عند الراوتر، فحجبنا قبل أن نبدأ",
+    cal_blocked_by_our_probes: "ظهر رد حجب أثناء المعايرة فتوقفت الأداة دون انتظار أو إعادة محاولة",
+    cal_captcha_challenge: "ظهرت كابتشا أو خطوة تحقق؛ توقفت الأداة ولن تتابع الطلبات",
     cal_card_space_empty: "صيغة البطاقة لا تترك شيئاً للتخمين",
     cal_no_rejection_baseline: "لم يصل أي رد من الراوتر على بطاقات التجربة",
     cal_request_shape_rejected: "الراوتر رفض شكل الطلب قبل أن يفحص الكرت (HTTP 400/405/415/422). الأداة أخذت الكوكي والرمز المخفي؛ جرّب هوية نفس متصفحك، وإن استمر فالصفحة تنفّذ JavaScript خاصاً يحتاج تسجيل الطلب الناجح.",
@@ -262,6 +293,7 @@ const I18N = {
     cal_learned: "تم التعلّم بنجاح",
     cal_known_card_works: "البطاقة المعروفة تعمل مع هذا الشكل",
     cal_known_card_not_proven: "لم أستطع إثبات أن البطاقة المعروفة تعمل بهذه الإعدادات",
+    cal_logout_unconfirmed: "لم أستطع تأكيد تسجيل الخروج؛ أوقفت أي محاولات أخرى",
     cal_browser_trace: "افتح F12 في المتصفح وانسخ بيانات نموذج الدخول وأرسلها لي",
     dyn_tokens: "رموز متغيّرة تم تجاهلها", exact_mode: "مقارنة دقيقة جاهزة",
     shape_mode: "مقارنة بالشكل (الصفحة تتغير وحدها)",
@@ -270,7 +302,7 @@ const I18N = {
     diag_ban_check: "فحص الحجب",
     diag_ok: "سليم", diag_errors_present: "توجد أخطاء", diag_errors_rising: "الأخطاء تزيد مع السرعة",
     diag_no_ban_seen: "لا يوجد حجب", diag_ban_page_seen: "ظهرت صفحة حجب",
-    advice_blocked_already: "أنت محجوب بالفعل: أعد تشغيل الراوتر أو أعد الاتصال لتغيير الـ IP.",
+    advice_blocked_already: "الشبكة تحجب هذا الجهاز. أوقف المحاولات واطلب من مسؤول الشبكة مراجعة الوصول وإعادة الخدمة.",
     advice_router_pressure: "الأخطاء سببها ضغط على الراوتر: قلّل عدد المسارات.",
     advice_slow_router: "الراوتر بطيء في الرد: استخدم مسارات أقل وانتظاراً أطول.",
     advice_already_online_no_captive_portal: "أنت متصل بالإنترنت فعلاً - تأكد أنك على شبكة الضيف الصحيحة.",
@@ -296,30 +328,55 @@ const I18N = {
   },
   en: {
     step_scan: "Scan", step_format: "Card format", step_run: "Run", step_results: "Results",
-    scan_title: "1) Scan the login page",
-    scan_hint: "Paste the hotspot login URL exactly as you open it in the browser. If it already contains ?username=…&password=, the tool recognises GET and removes that card from the scan request so it is neither consumed nor left as the old duplicate username. It then detects the fields automatically.",
-    scan_button: "Scan now", next_format: "Next: card format →", next_run: "Next: run →",
+    skip_content: "Skip to content",
+    brand_subtitle: "Authorized network testing",
+    license_link: "License",
+    progress_label: "Run progress",
+    language_label: "Change language",
+    steps_label: "Workflow steps",
+    banner_title: "Authorized use only",
+    banner_text: "Use this tool only on a network you own or have written permission to test. Never test someone else's network.",
+    banner_more: "Details",
+    scan_title: "1) Check the network and test the known card",
+    scan_hint: "Paste the hotspot login URL as it opens in your browser. After scanning, enter an authorized card you know works and test it here. You cannot continue to card-format settings until the test confirms internet access and logout.",
+    scan_button: "Scan now", scan_url_label: "Login page URL",
+    calibration_setup_title: "Test the known card and learn the request",
+    calibration_setup_hint: "Enter an authorized card you know works. Card-format settings stay locked until the test confirms internet access and a successful logout.",
+    calibration_required: "Calibration is required first",
+    calibration_required_hint: "Return to Network Check, enter an authorized working card, and run the test. Its proven request settings will be applied on the next page.",
+    calibration_shape_changed: "The request shape changed after calibration",
+    calibration_shape_changed_hint: "The run will not start with untested request settings. Return to Network Check and calibrate again after reviewing the request settings.",
+    calibration_applied: "Test passed; request settings applied",
+    known_card_format_mismatch: "The card format on Step 2 does not match the tested card. Correct its length, prefix, and character set before running.",
+    attempt_table: "Run attempt log", next_format: "Next: card format →", next_run: "Next: run →",
     format_title: "2) Card format",
-    format_hint: "Describe the card: fixed prefix + full length. The variable part is what gets guessed. The preview shows how many combinations exist.",
+    format_hint: "Describe the card with its fixed prefix and full length. The login request shown below was learned and tested in the previous step; changing advanced request settings requires another successful test before running.",
     f_prefix: "Fixed prefix", f_length: "Full card length",
     saved_profiles: "Saved profile", prof_new: "- new -",
     btn_delete_profile: "Delete this profile",
     f_charset: "Variable characters", f_custom: "Custom characters",
     f_pass_mode: "Password value", f_dst: "dst value (guest destination)",
     f_name: "Profile name",
-    f_method: "Request method", f_user_field: "Username field",
+    f_method: "Request method", method_post: "POST (widest support)", method_get: "GET",
+    f_user_field: "Username field",
     f_pass_field: "Password field", f_login_url: "Form action URL",
-    f_send_dst: "Send the hidden dst/popup fields",
+    f_send_dst: "Send the dst field",
+    f_send_popup: "Send the popup field",
     f_extra: "Extra fixed fields (name=value)",
     f_words: "Success words (optional)",
-    f_known: "A card you know works (optional)",
+    f_words_clear: "Clear",
+    f_words_hint: "Only visible page text is matched. Clear these if they came from an old or incorrect capture.",
+    f_known: "An authorized card you know works",
     adv_open: "Advanced options (usually not needed)",
     p_space: "Combinations", p_samples: "Sample cards",
+    p_request_shape: "Expected request shape (sensitive values hidden)",
+    online_transition: "transition to online", logout_state: "state after logout",
     p_covered: "covered",
-    btn_calibrate: "Learn from the known card + measure the network",
+    btn_calibrate: "Test card and learn request shape",
     btn_capture: "Open the portal and record a successful login",
     capture_hint: "The portal opens in an isolated frame (no allow-same-origin). Its JavaScript cannot reach the KiraPass API. Log in once, then mark the success / reject / statistics pages.",
     capture_opened: "The recorder opened in a new window.",
+    capture_popup_blocked: "Your browser blocked the new window. Allow pop-ups for this address, then try again.",
     capture_fail: "Could not start the recorder",
     capture_blocked_title: "Automated guessing is not available for this portal",
     capture_blocked_body: "The password transform uses unknown custom JavaScript. We do not claim it can be automated.",
@@ -330,7 +387,7 @@ const I18N = {
     capture_finish: "Finish + download the report",
     btn_save: "Save profile",
     run_title: "3) Run",
-    run_hint: "Pick the load: faster means more chance the router cuts you off or blocks you. Results always tell you why a run stopped.",
+    run_hint: "Choose a safe load: faster settings increase the chance of a disconnect or network block. At run entry, the tool retests the known card once with the applied settings and stops before guessing if internet access is not proven. After confirmation it logs out, then refreshes the rejection baseline without resubmitting the card.",
     r_threads: "Threads", r_attempts: "Attempts", r_delay: "Delay between requests (ms)",
     r_verify: "Verify internet after any accepted card",
     r_autostop: "Auto-stop on the first strong result",
@@ -342,12 +399,13 @@ const I18N = {
     cal_internet_unknown: "network state unknown",
     cal_known_card_out_of_format: "the card does not match the card format",
     cal_known_card_not_proven: "this card could not be proven to work",
+    cal_logout_unconfirmed: "could not confirm logout; stopped further attempts",
     prob_length_mismatch: "the card length does not match the profile length",
     prob_prefix_mismatch: "the card does not start with the prefix",
     prob_suffix_mismatch: "the card does not end with the suffix",
     prob_charset_mismatch: "the card has characters outside the chosen charset",
     known_card_tried: "we tried this card in several request shapes; the router answered:",
-    known_card_hint: "→ HTTP 400/405/415/422 means the router rejected the request before judging the card. Cookies and hidden tokens are now refreshed; also select the same browser identity. A 200 that still matches the rejection page means an expired/used card or a missing field/password. If blocked, reconnect and retry.",
+    known_card_hint: "→ HTTP 400/405/415/422 means the router rejected the request shape before judging the card. Compare the displayed method, URL, and fields with the successful browser request. HTTP 200 matching the rejection page does not prove success. If blocked, stop attempts and ask the network administrator to review access; do not automatically reconnect.",
     s_eta: "time left",
     th_auto_slowed_router_complaining: "slowed down automatically: the router started complaining (errors/limits)",
     th_auto_sped_up: "sped up automatically: the router is answering cleanly",
@@ -362,17 +420,18 @@ const I18N = {
     ua_hint: "Change this only when a card works in your phone browser but the router rejects the tool's request shape.",
     f_referer: "send browser headers (Referer/Origin)",
     btn_lockout: "measure the lock-out",
-    lockout_measuring: "measuring the lock-out (this can take minutes)...",
+    lockout_measuring: "running a bounded check (up to 8 requests); it stops at the first block...",
+    lockout_confirm: "This optional check sends up to 8 failed login attempts and may trigger a network block. Continue only if authorized. If the network is already blocking you, cancel and contact its administrator.",
     lockout_after: "the router blocks after",
     lockout_clears: "and the block clears after",
-    lockout_never: "the router never blocked us in",
-    lockout_never_clears: "and the block never cleared while we waited",
+    lockout_never: "no block appeared within the safe attempt limit",
+    lockout_stopped_after_block: "The tool stopped as soon as the block appeared; it did not wait for expiry or send more requests. Stop attempts and ask the network administrator to review access.",
     lockout_pace: "fastest pace that stays under the limit: one attempt every",
     lockout_pace_hint: "put that in the delay box and use one or two threads.",
     lockout_impossible: "guessing on this router means getting blocked over and over: either a very long delay, or change the setting in the router itself.",
     seconds: "seconds",
     attempt: "attempt",
-    netadvice_blocked_from_the_start: "the router was already blocking this device: reconnect for a new IP or restart the router, then measure again.",
+    netadvice_blocked_from_the_start: "The network was already blocking this device before the check. Stop attempts and ask the network administrator to review access and restore service.",
     btn_diagnose: "Diagnose the network first", btn_clear_review: "Clear review pages",
     license_check: "I confirm I own this network or hold written permission from its owner.",
     btn_start: "Start guessing", btn_stop: "Stop",
@@ -385,7 +444,7 @@ const I18N = {
     review_title: "Unclear replies (need your eyes)",
     review_hint: "Replies that are neither the rejection page nor a proven success. Saved for you to inspect - the tool does not guess.",
     review_none: "Nothing yet.",
-    state_idle: "Ready", state_calibrating: "Learning", state_running: "Running",
+    state_idle: "Ready", state_calibrating: "Checking card and refreshing rejection baseline", state_running: "Running",
     job_timeout: "timed out waiting - check the log",
     state_done: "Finished", state_stopping: "Stopping",
     preset_safe: "Safe (4 threads)", preset_normal: "Normal (12)",
@@ -417,6 +476,7 @@ const I18N = {
     review_diff: "Words in this reply that are not on the rejection page",
     missing_words: "Words that were on the rejection page and are gone",
     report_saved: "Report saved",
+    download_calibration_report: "Download redacted calibration report",
     confirm_clear_all: "Everything will be deleted, including profiles. Sure?",
     confirm_profiles: "Profiles will be deleted. Sure?",
     yes: "Yes", no: "Cancel", close: "Close", loading: "Working...",
@@ -427,7 +487,7 @@ const I18N = {
     server_gone: "Lost contact with the tool. If you stopped it, that is expected - start it again to continue.",
     cal_failed_title: "Nothing was tried: the initial learning failed",
     cal_failed_hint: "No attempt was made because the tool could not learn what a rejected card looks like. This is what the router did:",
-    no_attempt_was_made: "Attempts actually made: zero - no card was guessed.",
+    no_attempt_was_made: "The card-space guessing run did not start; any calibration requests are listed above.",
     netadvice_refused: "Check that you are on this router's network and the URL is right (the port is closed or the router refused your device).",
     netadvice_dns: "The host name did not resolve: use the router's IP instead (like 10.5.50.1).",
     netadvice_no_session: "The login page gave no session: verify the URL, pick the same browser identity as your phone and scan again. Cards were not counted as tested.",
@@ -441,9 +501,9 @@ const I18N = {
     netadvice_too_many_redirects: "Endless redirect loop: copy the final URL from the browser.",
     netadvice_proto: "Unsupported URL: it must start with http:// or https://",
     netadvice_unknown: "Unexpected error: try again, and if it repeats run \"diagnose the network first\".",
-    netadvice_blocked_already: "The router is blocking your device right now: restart the router or reconnect to change your IP, then start again.",
-    netadvice_blocked_before_probes: "The block is older than we are: reconnect to the network to change your IP (or turn on the per-network \"randomized / private MAC\" in the phone settings), or restart the router, then start again.",
-    netadvice_blocked_by_our_probes: "We filled the failure counter ourselves: the tool waits 45s, then relearns with two test cards instead of three. If it repeats: reconnect to change your IP, lower the threads and add a delay between attempts.",
+    netadvice_blocked_already: "The network is blocking this device. Stop attempts and ask the network/router administrator to review access and restore service.",
+    netadvice_blocked_before_probes: "The block appeared before any test card. Do not try to bypass it; ask the network/router administrator to review access and restore service.",
+    netadvice_blocked_by_our_probes: "A block reply appeared during calibration, so the tool stopped without retrying. Stop attempts and ask the network/router administrator to review access and restore service.",
     netadvice_no_rejection_baseline: "No answer at all to the test cards: check the connection to the network.",
     netadvice_card_space_empty: "The card format leaves nothing to guess: prefix + suffix are longer than the card, or there are too few variable characters.",
     netadvice_calibration_failed: "Fix the reason above, then press \"start guessing\" again.",
@@ -454,8 +514,6 @@ const I18N = {
     internet_opened_hint: "the router let us in but never answered with a clear success page, so the card could not be named from the reply alone. End the session and try these cards one by one in the login page - one of them opened the network. Newest last.",
     stop_internet_opened: "stopped because the internet opened during the run: one of the last cards tried is the working one.",
     retry_now: "↻ Try again now",
-    retry_after_wait: "⏳ Try again after 45 seconds",
-    block_wait: "the router locked us after the test cards - waiting",
     v_ACCEPTED_VERIFIED: "Accepted & verified",
     v_ACCEPTED: "Accepted",
     v_ACCEPTED_UNVERIFIED: "Router accepted (internet check failed)",
@@ -501,9 +559,12 @@ const I18N = {
     stop_found_verified: "Found a working card and verified real internet access.",
     stop_found_strong_evidence: "A card produced strong evidence (redirect out of the portal).",
     stop_user_stop: "You stopped it.", 
-    stop_banned_by_router: "The router blocked you. Change your IP (restart the router / reconnect) and lower the threads.",
-    stop_rate_limited_by_router: "The network is rate limiting (429). Lower the threads or add a delay.",
-    stop_target_unreachable: "Lost contact with the router completely: check the network.",
+    stop_banned_by_router: "The router blocked requests. Stop attempts and ask the network administrator to review access and restore service.",
+    stop_rate_limited_by_router: "The network rate limited requests (429). The tool stopped; ask the network administrator to review access before continuing.",
+    stop_target_unreachable: "Stopped after repeated connection failures; this may be an outage or a block, which the report cannot distinguish. Requests stopped and no automatic reconnect was attempted. Ask the network admin before trying again.",
+    manual_resume_title: "Administrator confirmation required before resuming",
+    manual_resume_hint: "After a block or outage, resume only after the network administrator reviews it and confirms continuation is allowed.",
+    manual_resume_ack: "I checked with the network administrator; the network is ready and resuming is allowed",
         why_title: "Why each attempt ended the way it did",
 stop_attempts_done: "Requested attempts finished. Run again - it continues, it does not repeat.",
     stop_space_done: "Every combination in this range has been covered.",
@@ -511,14 +572,15 @@ stop_attempts_done: "Requested attempts finished. Run again - it continues, it d
     stop_engine_error: "Internal error - see the log.",
     stop_captcha_challenge: "A captcha appeared; guessing is pointless after that.",
     stop_found_unverified: "The router accepted the card but the internet check failed.",
-    th_rate_limited_slowing_down: "Slowed down because of rate limiting (429)",
-    th_ban_page_slowing_down: "Slowed down because a block page appeared",
+    th_rate_limited_slowing_down: "Stopped further requests after a rate-limit response (429)",
+    th_ban_page_slowing_down: "Stopped further requests after a block page appeared",
     th_connections_refused_slowing_down: "Slowed down because the router refuses connections",
     th_network_errors_slowing_down: "Slowed down because of repeated network errors",
     th_recovering_speed: "Network calmed down - raising the speed again",
-    cal_blocked_already: "the router is blocking this device (a block page came back before any attempt)",
+    cal_blocked_already: "the router is refusing requests due to an active block (the tool stopped without retrying)",
     cal_blocked_before_probes: "the block page was already there before we tried any card - the router blocked this device earlier",
-    cal_blocked_by_our_probes: "our own test cards filled the router's failed-login counter, so it locked us before the run started",
+    cal_blocked_by_our_probes: "a block reply appeared during calibration, so the tool stopped without waiting or retrying",
+    cal_captcha_challenge: "a CAPTCHA or verification challenge appeared; the tool stopped sending requests",
     cal_card_space_empty: "the card format leaves nothing to guess",
     cal_no_rejection_baseline: "no reply came back for the test cards",
     cal_request_shape_rejected: "The router rejected the request before judging the card (HTTP 400/405/415/422). Cookies and hidden tokens were refreshed; try the same browser identity, otherwise the page uses custom JavaScript and a successful request must be captured.",
@@ -539,7 +601,7 @@ stop_attempts_done: "Requested attempts finished. Run again - it continues, it d
     diag_ban_check: "Block check",
     diag_ok: "clean", diag_errors_present: "errors present", diag_errors_rising: "errors rise with speed",
     diag_no_ban_seen: "no blocking seen", diag_ban_page_seen: "a block page appeared",
-    advice_blocked_already: "You are already blocked: restart the router or reconnect to change your IP.",
+    advice_blocked_already: "The network is blocking this device. Stop attempts and ask the network administrator to review access and restore service.",
     advice_router_pressure: "The errors come from router pressure: lower the thread count.",
     advice_slow_router: "The router answers slowly: fewer threads and more delay.",
     advice_already_online_no_captive_portal: "You are online already - make sure you are on the guest network.",
@@ -567,6 +629,8 @@ const t = (key, fallback) => (I18N[LANG] && I18N[LANG][key]) || fallback || key;
 /* ------------------------------------------------------------------ state */
 const S = { meta: null, lastSeq: 0, poll: null, running: false, rows: 0,
             lastReport: "", profile: {}, knownCard: "", portal: null,
+            scanReady: false, scannedUrl: "", calibrationReady: false,
+            calibrationSignature: "", manualResumeRequired: false,
             state: "idle" };
 
 const $ = (id) => document.getElementById(id);
@@ -631,6 +695,10 @@ function setLang(lang) {
     if (txt) node.textContent = txt;
   });
   $("langBtn").textContent = LANG === "ar" ? "EN" : "عربي";
+  $("langBtn").setAttribute("aria-label", t("language_label"));
+  $("langBtn").title = t("language_label");
+  $("steps").setAttribute("aria-label", t("steps_label"));
+  $("progressTrack").setAttribute("aria-label", t("progress_label"));
   buildSelects();
   $("footText").textContent = LANG === "ar"
     ? "KiraPass — أداة اختبار أمن الشبكات. الاستخدام بدون إذن صاحب الشبكة مخالف للقانون."
@@ -702,10 +770,18 @@ function fmtSpace(n) {
 }
 
 function step(name) {
+  if ((name === "format" || name === "run") && !S.calibrationReady) {
+    name = "scan";
+    toast(t("calibration_required"));
+  }
   document.querySelectorAll(".panel").forEach((p) =>
     p.classList.toggle("active", p.id === "panel-" + name));
-  document.querySelectorAll(".step").forEach((b) =>
-    b.classList.toggle("active", b.dataset.step === name));
+  document.querySelectorAll(".step").forEach((b) => {
+    const active = b.dataset.step === name;
+    b.classList.toggle("active", active);
+    if (active) b.setAttribute("aria-current", "step");
+    else b.removeAttribute("aria-current");
+  });
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
@@ -780,7 +856,13 @@ function profileFromForm() {
   });
   const words = ($("f_words").value || "").split(/[,;\n]/).map((w) => w.trim())
     .filter(Boolean);
-  return Object.assign({}, S.profile || {}, {
+  const baseProfile = S.profile || {};
+  const portalForm = (S.portal || {}).form || {};
+  const detectedFields = new Set(portalForm.all_fields || []);
+  const dstField = baseProfile.dst_field || portalForm.dst_field || "dst";
+  const popupField = baseProfile.popup_field || portalForm.popup_field || "popup";
+  const fieldWasDetected = (name) => !S.portal || detectedFields.has(name);
+  return Object.assign({}, baseProfile, {
     name: $("f_name").value.trim() || "profile",
     login_url: $("f_login_url").value.trim() || $("scanUrl").value.trim(),
     method: $("f_method").value,
@@ -792,8 +874,10 @@ function profileFromForm() {
     prefix: $("f_prefix").value.trim(),
     suffix: "",
     dst_value: $("f_dst").value.trim(),
-    send_dst: $("f_send_dst").checked,
-    send_popup: $("f_send_dst").checked,
+    dst_field: dstField,
+    popup_field: popupField,
+    send_dst: $("f_send_dst").checked && fieldWasDetected(dstField),
+    send_popup: $("f_send_popup").checked && fieldWasDetected(popupField),
     extra_fields: extras,
     success_words: words,
     /* the chap formula comes from the scanned page - but a SAVED profile knows
@@ -803,6 +887,46 @@ function profileFromForm() {
     user_agent: uaFromForm(),
     send_referer: $("f_referer").checked,
   }, progressFromProfile(S.profile));
+}
+
+function calibrationProfileFromForm(knownCard) {
+  const p = profileFromForm();
+  const card = String(knownCard || "");
+  // The calibration card is supplied before the guessing format is configured.
+  // Use a temporary broad format only for the bounded known-card experiment.
+  p.prefix = "";
+  p.suffix = "";
+  p.length = card.length;
+  p.charset = Array.from(new Set("0123456789" + card)).join("");
+  return p;
+}
+
+function requestSettingsSignature(p) {
+  const extras = Object.entries(p.extra_fields || {}).sort(([a], [b]) => a.localeCompare(b));
+  return JSON.stringify({
+    login_url: p.login_url || "", method: p.method || "post",
+    user_field: p.user_field || "username", pass_field: p.pass_field || "password",
+    pass_mode: p.pass_mode || "empty", dst_field: p.dst_field || "dst",
+    dst_value: p.dst_value || "", popup_field: p.popup_field || "popup",
+    send_dst: !!p.send_dst, send_popup: !!p.send_popup,
+    extra_fields: extras, user_agent: p.user_agent || "",
+    send_referer: p.send_referer !== false,
+  });
+}
+
+function knownCardFormatProblem(card, p) {
+  const value = String(card || "");
+  const length = parseInt(p.length || "0", 10);
+  if (length && value.length !== length) return "length";
+  const prefix = p.prefix || "";
+  const suffix = p.suffix || "";
+  if (prefix && !value.startsWith(prefix)) return "prefix";
+  if (suffix && !value.endsWith(suffix)) return "suffix";
+  const end = suffix ? value.length - suffix.length : value.length;
+  const variable = value.slice(prefix.length, end);
+  const charset = new Set(Array.from(p.charset || ""));
+  if (Array.from(variable).some((ch) => !charset.has(ch))) return "charset";
+  return "";
 }
 
 function fillFormFromProfile(p) {
@@ -821,6 +945,7 @@ function fillFormFromProfile(p) {
   $("f_length").value = p.length || 10;
   $("f_dst").value = p.dst_value || "";
   $("f_send_dst").checked = p.send_dst !== false;
+  $("f_send_popup").checked = p.send_popup !== false;
   $("f_words").value = (p.success_words || []).join(", ");
   const extras = Object.entries(p.extra_fields || {}).map(([k, v]) => k + "=" + v);
   $("f_extra").value = extras.join(", ");
@@ -894,6 +1019,12 @@ function toggleCustomCharset() {
 async function doScan() {
   const url = $("scanUrl").value.trim();
   if (!url) return;
+  S.scanReady = false;
+  S.calibrationReady = false;
+  S.calibrationSignature = "";
+  $("calibrateBtn").disabled = true;
+  $("toFormat").disabled = true;
+  $("calibCard").classList.add("hidden");
   $("scanBtn").disabled = true; $("scanBtn").textContent = t("loading");
   const res = await api("/api/scan", { url });
   $("scanBtn").disabled = false; $("scanBtn").textContent = t("scan_button");
@@ -908,6 +1039,9 @@ async function doScan() {
     return;
   }
   S.portal = res.portal;
+  S.scannedUrl = url;
+  S.scanReady = true;
+  $("calibrateBtn").disabled = !$("f_known").value.trim();
   renderInternet(res.internet, net);
 
   const f = res.portal.form || {};
@@ -932,6 +1066,9 @@ async function doScan() {
   $("f_method").value = (f.method || "post").toLowerCase() === "get" ? "get" : "post";
   $("f_user_field").value = f.user_field || "username";
   $("f_pass_field").value = f.pass_field || "password";
+  const detectedFields = new Set(f.all_fields || []);
+  $("f_send_dst").checked = detectedFields.has(f.dst_field);
+  $("f_send_popup").checked = detectedFields.has(f.popup_field);
   const dsts = res.portal.dst_candidates || [];
   $("f_dst").value = dsts.find((d) => d) || "";
   if (f.chap) $("f_pass_mode").value = "chap";
@@ -948,7 +1085,8 @@ async function doScan() {
   const same = ((S.meta || {}).profiles || []).find((p) => p.name === $("f_name").value);
   if (same) await loadProfile(same.name);
   else { S.profile = null; showCovered(null); }
-  $("toFormat").disabled = false;
+  $("toFormat").disabled = true;
+  $("calibrateBtn").disabled = !$("f_known").value.trim();
   previewFormat();
 }
 
@@ -974,6 +1112,14 @@ function previewFormat() {
     $("pvSpace").textContent = fmtSpace(res.space);
     $("pvSamples").innerHTML = (res.samples || [])
       .map((c) => "<span class='sample'>" + esc(c) + "</span>").join("");
+    const shape = res.request_shape;
+    if (shape) {
+      const body = (shape.body_field_names || []).length
+        ? " · body fields: " + shape.body_field_names.join(", ") : "";
+      $("pvRequest").textContent = shape.method + " " + shape.url + body;
+    } else {
+      $("pvRequest").textContent = "—";
+    }
     const box = $("pvProblems");
     const hard = (res.problems || []).filter((p) => p !== "space_is_astronomically_big");
     box.classList.toggle("hidden", !hard.length);
@@ -997,6 +1143,17 @@ async function waitJob(jobId, onTick) {
 async function startCapture() {
   const url = ($("f_login_url").value.trim() || $("scanUrl").value.trim());
   if (!url) { toast(t("scan_fail")); return; }
+  /* Open synchronously inside the click gesture. Opening only after awaiting
+     the API is blocked by many mobile browsers' popup protections. */
+  const popup = window.open("about:blank", "kp-capture");
+  if (!popup) {
+    modal(t("capture_fail"), "<p>" + esc(t("capture_popup_blocked")) + "</p>");
+    return;
+  }
+  try {
+    popup.document.title = "KiraPass — " + t("loading");
+    popup.document.body.textContent = t("loading");
+  } catch (e) { /* navigating below still works if the browser isolates it */ }
   const box = $("captureCard");
   if (box) {
     box.classList.remove("hidden");
@@ -1004,27 +1161,101 @@ async function startCapture() {
   }
   const res = await api("/api/capture/start", { url });
   if (!res.ok) {
+    popup.close();
     modal(t("capture_fail"), "<pre>" + esc(JSON.stringify(res, null, 2)) + "</pre>");
     return;
   }
   const view = res.view || ("/capture/view?id=" + encodeURIComponent(res.id));
-  window.open(withToken(view), "kp-capture");
+  popup.location.replace(withToken(view));
   toast(t("capture_opened"));
 }
 
 async function runCalibration() {
-  const btn = $("calibrateBtn"); btn.disabled = true;
-  const card = $("calibCard"); card.classList.remove("hidden");
-  card.innerHTML = "<h4>" + t("loading") + "</h4>";
+  const btn = $("calibrateBtn");
+  const card = $("calibCard");
   const known = $("f_known").value.trim();
-  const res = await api("/api/calibrate", { profile: profileFromForm(),
-                                            known_card: known });
-  if (!res.ok) { card.innerHTML = "<div class='bad'>" + esc(res.error) + "</div>"; btn.disabled = false; return; }
+  if (!S.scanReady || !known) {
+    toast(t("calibration_required"));
+    return;
+  }
+  btn.disabled = true;
+  S.calibrationReady = false;
+  S.calibrationSignature = "";
+  $("toFormat").disabled = true;
+  card.classList.remove("hidden");
+  card.innerHTML = "<h4>" + t("loading") + "</h4>";
+  const res = await api("/api/calibrate", {
+    profile: calibrationProfileFromForm(known), known_card: known,
+  });
+  if (!res.ok) {
+    card.innerHTML = "<div class='bad'>" + esc(res.error) + "</div>";
+    btn.disabled = !S.scanReady || !known;
+    return;
+  }
   const job = await waitJob(res.job.id);
-  btn.disabled = false;
-  if (!job) { card.innerHTML = "<div class='bad'>job lost</div>"; return; }
+  if (!job) {
+    card.innerHTML = "<div class='bad'>job lost</div>";
+    btn.disabled = !S.scanReady || !known;
+    return;
+  }
   renderCalibration(job, card);
-  if (known) S.knownCard = known;
+  const result = job.result || {};
+  if (job.state !== "error" && result.ok && result.applied_settings &&
+      result.tuned && result.tuned.verified) {
+    applyCalibrationSettings(result.applied_settings, known);
+    S.calibrationReady = true;
+    S.calibrationSignature = requestSettingsSignature(profileFromForm());
+    $("toFormat").disabled = false;
+    S.knownCard = known;
+    toast(t("calibration_applied"));
+  } else {
+    S.calibrationReady = false;
+    $("toFormat").disabled = true;
+  }
+  btn.disabled = !S.scanReady || !known;
+}
+
+function applyCalibrationSettings(settings, knownCard) {
+  if ((!S.profile || !S.profile.length) && knownCard)
+    $("f_length").value = String(knownCard.length);
+  if (settings.login_url) $("f_login_url").value = settings.login_url;
+  if (settings.method) $("f_method").value = settings.method.toLowerCase();
+  if (settings.user_field) $("f_user_field").value = settings.user_field;
+  if (settings.pass_field) $("f_pass_field").value = settings.pass_field;
+  if (settings.pass_mode && $("f_pass_mode").querySelector(
+      "option[value='" + settings.pass_mode + "']"))
+    $("f_pass_mode").value = settings.pass_mode;
+  if (settings.dst_value != null) $("f_dst").value = settings.dst_value;
+  $("f_send_dst").checked = !!settings.send_dst;
+  $("f_send_popup").checked = !!settings.send_popup;
+  if (settings.extra_field_names && settings.extra_field_names.length) {
+    const extras = {};
+    ($("f_extra").value || "").split(",").forEach((part) => {
+      const i = part.indexOf("=");
+      if (i > 0) extras[part.slice(0, i).trim()] = part.slice(i + 1).trim();
+    });
+    settings.extra_field_names.forEach((name) => {
+      if (!(name in extras)) extras[name] = "";
+    });
+    $("f_extra").value = Object.entries(extras)
+      .map(([key, value]) => key + "=" + value).join(", ");
+  }
+  if (S.portal && settings.field_names) {
+    S.portal.form = Object.assign({}, S.portal.form || {}, {
+      action: settings.login_url || S.portal.form.action,
+      method: settings.method || S.portal.form.method,
+      user_field: settings.user_field || S.portal.form.user_field,
+      pass_field: settings.pass_field || S.portal.form.pass_field,
+      dst_field: settings.dst_field || S.portal.form.dst_field,
+      popup_field: settings.popup_field || S.portal.form.popup_field,
+      all_fields: settings.field_names.slice(),
+    });
+  }
+  const profileSettings = Object.assign({}, settings);
+  delete profileSettings.extra_field_names;
+  delete profileSettings.field_names;
+  S.profile = Object.assign({}, S.profile || {}, profileSettings);
+  previewFormat();
 }
 
 function renderCalibration(job, node) {
@@ -1050,9 +1281,13 @@ function renderCalibration(job, node) {
     const d = s.detail || {};
     if (s.id === "internet_state" && d.state) extra = " — " + t("internet_" + d.state);
     if (s.id === "reach_login_page" && d.ms) extra = " — HTTP " + d.status + " · " + d.ms + " ms";
-    if (s.id === "shape_tuned" && d.tuned)
+    if (s.id === "shape_tuned" && d.tuned) {
+      const trial = d.tuned.trial || {};
       extra = " — " + t("pm_" + d.tuned.mode, d.tuned.mode) +
-              (d.tuned.dst ? " · dst=" + esc(d.tuned.dst) : "");
+              (d.tuned.method ? " · " + d.tuned.method : "") +
+              (trial.url ? " · " + trial.url : "") +
+              (d.tuned.dst ? " · dst=" + d.tuned.dst : "");
+    }
     if (s.id === "shape_tuned" && d.wrong) extra = " — " + esc(t("prob_" + d.wrong, d.wrong));
     html += "<li class='" + cls + "'>" + mark + " " + t("cal_" + s.id, s.id) + ": " +
             t("cal_" + s.reason, s.reason) + esc(extra) + "</li>";
@@ -1065,18 +1300,31 @@ function renderCalibration(job, node) {
     html += "<div class='hint'>" + esc(t("known_card_tried")) + " " + d.tried +
             "</div><table class='why' style='margin-top:4px'><tbody>";
     d.trials.forEach((tr) => {
-      html += "<tr><td class='mono'>" + esc(t("pm_" + tr.mode, tr.mode)) +
-              "</td><td>" + (tr.status || "—") + "</td><td>" +
-              esc(codeLabel(tr.code)) + "</td><td class='why'>" +
+      const net = tr.internet_before || tr.internet_after
+        ? (tr.internet_before || "?") + " → " + (tr.internet_after || "?") +
+          (tr.online_transition ? " · " + t("online_transition") : "") : "";
+      const logout = tr.logout && tr.logout.internet_after
+        ? " · " + t("logout_state") + " → " + tr.logout.internet_after : "";
+      const bodyFields = (tr.body_field_names || []).length
+        ? "<br>body: " + esc(tr.body_field_names.join(", ")) : "";
+      html += "<tr><td class='mono'>" + esc((tr.method || "") + " " + (tr.mode || "")) +
+              (tr.url ? "<br>" + esc(tr.url) : "") + bodyFields + "</td><td>" +
+              (tr.status || "—") + (tr.response_bytes ? " · " + tr.response_bytes + " B" : "") +
+              "</td><td>" + esc(codeLabel(tr.code)) + "</td><td class='why'>" +
               esc(reasonLabel(tr.code, tr.reason, {})) +
-              (tr.word ? " «" + esc(tr.word) + "»" : "") + "</td></tr>";
+              (tr.word ? " «" + esc(tr.word) + "»" : "") +
+              (net ? "<br>" + esc(net) : "") + esc(logout) + "</td></tr>";
     });
     html += "</tbody></table><div class='warn'>" + esc(t("known_card_hint")) + "</div>";
   });
   if (r.success_words && r.success_words.length)
     html += "<div class='kv'><dt>" + t("f_words") + "</dt><dd>" +
             esc(r.success_words.join(", ")) + "</dd></div>";
-  if (r.error) html += "<div class='bad mono'>" + esc(r.error) + "</div>";
+  if (r.report_file)
+    html += "<div class='hint'><a target='_blank' rel='noopener' href='" +
+      esc(withToken("/api/report?name=" + encodeURIComponent(r.report_file))) + "'>" +
+      esc(t("download_calibration_report")) + "</a></div>";
+  if (r.error) html += "<div class='bad'>" + esc(t("cal_" + r.error, r.error)) + "</div>";
   node.innerHTML = html;
 }
 
@@ -1094,11 +1342,12 @@ async function runDiagnose() {
 }
 
 async function runLockoutProbe() {
+  if (!window.confirm(t("lockout_confirm"))) return;
   const btn = $("lockoutBtn"); btn.disabled = true;
   const card = $("lockoutCard"); card.classList.remove("hidden");
   card.innerHTML = "<h4>" + t("lockout_measuring") + "</h4>";
   const res = await api("/api/lockout", { profile: profileFromForm(),
-                                          max_failures: 30, wait_limit: 240 });
+                                          max_failures: 8 });
   if (!res.ok) {
     card.innerHTML = "<div class='bad'>" + esc(res.error) + "</div>";
     btn.disabled = false; return;
@@ -1128,33 +1377,9 @@ function renderLockout(job, node) {
   } else {
     html += "<div class='bad'>" + t("lockout_after") + ": <b>" + r.ban_after +
             "</b></div>";
-    if (r.clears_after != null) {
-      html += "<div class='ok'>" + t("lockout_clears") + ": <b>" + r.clears_after +
-              "</b> " + t("seconds") + "</div>";
-    } else {
-      html += "<div class='bad'>" + t("lockout_never_clears") + " (" +
-              esc(String(r.waited || 0)) + " " + t("seconds") + ")</div>";
-    }
-  }
-  if (r.safe_delay_ms) {
-    html += "<div class='warn' style='margin-top:6px'>→ " + t("lockout_pace") +
-            ": <b>" + (r.safe_delay_ms / 1000).toFixed(1) + "</b> " + t("seconds") +
-            " / " + t("attempt") + "</div>" +
-            "<div class='hint'>" + t("lockout_pace_hint") + "</div>" +
-            "<div class='row wrap' style='margin-top:6px'>" +
-            "<button class='btn' id='applyPaceBtn'>" + esc(t("lockout_apply")) +
-            "</button></div>";
-  } else if (r.ban_after != null) {
-    html += "<div class='warn' style='margin-top:6px'>→ " +
-            t("lockout_impossible") + "</div>";
+    html += "<div class='warn'>" + t("lockout_stopped_after_block") + "</div>";
   }
   node.innerHTML = html;
-  const apply = $("applyPaceBtn");
-  if (apply) apply.addEventListener("click", () => {
-    $("r_delay").value = r.safe_delay_ms;
-    $("r_threads").value = Math.min(2, parseInt($("r_threads").value || "2", 10));
-    toast("✓ " + t("lockout_applied"));
-  });
 }
 
 function renderDiagnose(job, node) {
@@ -1184,16 +1409,43 @@ function renderDiagnose(job, node) {
 
 /* ------------------------------------------------------------------ run */
 async function startRun() {
+  if (S.manualResumeRequired && !$("manualResumeAck")?.checked) {
+    modal(t("manual_resume_title"), "<p>" +
+      esc(t("manual_resume_hint")) + "</p>");
+    return;
+  }
+  if (!S.calibrationReady) {
+    step("scan");
+    modal(t("calibration_required"), "<p>" + esc(t("calibration_required_hint")) + "</p>");
+    return;
+  }
   const profile = profileFromForm();
+  const formatProblem = knownCardFormatProblem($("f_known").value.trim(), profile);
+  if (formatProblem) {
+    step("format");
+    modal(t("known_card_format_mismatch"), "<p>" +
+      esc(t("prob_" + formatProblem + "_mismatch", formatProblem)) + "</p>");
+    return;
+  }
+  if (requestSettingsSignature(profile) !== S.calibrationSignature) {
+    S.calibrationReady = false;
+    $("toFormat").disabled = true;
+    step("scan");
+    modal(t("calibration_shape_changed"), "<p>" +
+      esc(t("calibration_shape_changed_hint")) + "</p>");
+    return;
+  }
   if (profile.capture_needs_browser_js) {
     modal(t("capture_blocked_title"),
       "<p>" + esc(t("capture_blocked_body")) + "</p><p>" +
       esc(profile.capture_block_reason || t("capture_blocked_next")) + "</p>");
     return;
   }
-  const known = $("f_known").value.trim();
   const payload = {
-    profile, known_card: known,
+    profile,
+    // Reconfirm the proven shape once at run entry; do not tune around failure.
+    known_card: $("f_known").value.trim(),
+    preflight_only: true,
     attempts: parseInt($("r_attempts").value || "2000", 10),
     threads: parseInt($("r_threads").value || "12", 10),
     delay_ms: parseInt($("r_delay").value || "0", 10),
@@ -1201,8 +1453,11 @@ async function startRun() {
     resume: $("r_resume").checked,
   };
   S.lastStart = payload;
+  const clearanceUsed = S.manualResumeRequired;
+  S.manualResumeRequired = false;
   const res = await api("/api/run/start", payload);
   if (!res.ok) {
+    S.manualResumeRequired = clearanceUsed;
     modal(t("scan_fail"), "<pre>" + esc(JSON.stringify(res, null, 2)) + "</pre>");
     return;
   }
@@ -1263,9 +1518,10 @@ function renderStatus(st, events) {
   }
   $("stLatency").textContent = ((st.latency || {}).avg_ms || 0) + " ms";
   $("stDelay").textContent = ((st.throttle || {}).delay_ms || 0) + " ms";
-  const total = (st.progress || {}).total || 1;
-  const pct = Math.min(100, ((st.progress || {}).attempts || 0) / total * 100);
+  const pct = Math.max(0, Math.min(100,
+    Number((st.progress || {}).percent) || 0));
   $("bar").style.width = pct.toFixed(1) + "%";
+  $("progressTrack").setAttribute("aria-valuenow", String(Math.round(pct)));
 
   /* counters */
   const order = ["ACCEPTED_VERIFIED", "ACCEPTED", "ACCEPTED_UNVERIFIED", "REJECTED",
@@ -1319,10 +1575,6 @@ function renderStatus(st, events) {
     else if (ev.kind === "report") S.lastReport = ev.data.file;
     else if (ev.kind === "internet_opened")
       toast("\uD83C\uDF10 " + t("internet_opened_title"));
-    else if (ev.kind === "block_wait") {
-      S.retryWait = (ev.data || {}).seconds || 45;
-      toast("⏳ " + t("block_wait") + " " + S.retryWait + "s");
-    }
   });
   if (st.review && st.review.length) renderReview(st.review);
   if (st.hits && st.hits.length) renderHits(null, st.hits);
@@ -1479,37 +1731,45 @@ function renderStop(st) {
   if (S.lastReport)
     html += "<div class='hint'>" + t("report_saved") + ": <span class='mono'>" +
             esc(S.lastReport) + "</span></div>";
-  /* a run that never started can simply be tried again - straight away, or
-     after the router's lockout has passed */
-  if (st.stop_reason === "calibration_failed") {
+  /* Do not offer an automatic retry for explicit network blocks or an
+     unproven known card; those need operator review before any more requests. */
+  const calError = (st.calibration || {}).error || st.error || "";
+  const stopForReview = ["blocked_already", "blocked_before_probes",
+    "captcha_challenge", "known_card_not_proven",
+    "known_card_out_of_format", "logout_unconfirmed"].includes(calError);
+  const requiresManualClearance = ["target_unreachable", "banned_by_router",
+    "rate_limited_by_router", "captcha_challenge"].includes(st.stop_reason) ||
+    (st.stop_reason === "calibration_failed" && stopForReview);
+  if (requiresManualClearance) {
+    S.manualResumeRequired = true;
+    html += "<label class='check warn' style='display:flex;gap:8px;margin-top:10px'>" +
+      "<input id='manualResumeAck' type='checkbox'>" +
+      "<span>" + esc(t("manual_resume_ack")) + "</span></label>";
+  }
+  if (st.stop_reason === "calibration_failed" && !stopForReview) {
     html += "<div class='row wrap' style='margin-top:8px'>" +
-            "<button class='btn' id='retryNowBtn'>" + esc(t("retry_now")) + "</button>" +
-            "<button class='btn' id='retryWaitBtn'>" + esc(t("retry_after_wait")) +
-            "</button></div>";
+            "<button class='btn' id='retryNowBtn'>" + esc(t("retry_now")) + "</button></div>";
   }
   card.innerHTML = html;
   const now = $("retryNowBtn");
   if (now) now.addEventListener("click", () => startRun());
-  const wait = $("retryWaitBtn");
-  if (wait) wait.addEventListener("click", () => {
-    let left = S.retryWait || 45;
-    wait.disabled = true;
-    if (now) now.disabled = true;
-    const tick = () => {
-      if (left <= 0) { startRun(); return; }
-      wait.textContent = t("retry_after_wait") + " (" + left + ")";
-      left -= 1;
-      setTimeout(tick, 1000);
-    };
-    tick();
-  });
 }
 
 /* ------------------------------------------------------------------ modal */
+let modalReturnFocus = null;
 function modal(title, html) {
+  if ($("modal").classList.contains("hidden")) modalReturnFocus = document.activeElement;
   $("modalTitle").textContent = title;
   $("modalBody").innerHTML = html;
   $("modal").classList.remove("hidden");
+  const target = $("modalBody").querySelector("input, button, a, [tabindex]") || $("modalClose");
+  if (target) target.focus();
+}
+function closeModal() {
+  $("modal").classList.add("hidden");
+  if (modalReturnFocus && typeof modalReturnFocus.focus === "function")
+    modalReturnFocus.focus();
+  modalReturnFocus = null;
 }
 
 async function cacheModal() {
@@ -1545,6 +1805,23 @@ function wire() {
   document.querySelectorAll(".step").forEach((b) =>
     b.addEventListener("click", () => step(b.dataset.step)));
   $("scanBtn").addEventListener("click", doScan);
+  $("scanUrl").addEventListener("input", () => {
+    if (S.scanReady && $("scanUrl").value.trim() !== S.scannedUrl) {
+      S.scanReady = false;
+      S.calibrationReady = false;
+      $("calibrateBtn").disabled = true;
+      $("toFormat").disabled = true;
+    }
+  });
+  $("f_known").addEventListener("input", () => {
+    const known = $("f_known").value.trim();
+    $("calibrateBtn").disabled = !S.scanReady || !known;
+    if (S.calibrationReady && known !== S.knownCard) {
+      S.calibrationReady = false;
+      S.calibrationSignature = "";
+      $("toFormat").disabled = true;
+    }
+  });
   $("scanUrl").addEventListener("keydown", (e) => { if (e.key === "Enter") doScan(); });
   document.querySelectorAll(".chip[data-url]").forEach((c) =>
     c.addEventListener("click", () => { $("scanUrl").value = c.dataset.url; doScan(); }));
@@ -1563,9 +1840,12 @@ function wire() {
     await api("/api/quit", {});
     modal(t("quit_tool"), "<div class='ok'>" + esc(t("quit_done")) + "</div>");
   });
-  $("modalClose").addEventListener("click", () => $("modal").classList.add("hidden"));
+  $("modalClose").addEventListener("click", closeModal);
   $("modal").addEventListener("click", (e) => {
-    if (e.target === $("modal")) $("modal").classList.add("hidden"); });
+    if (e.target === $("modal")) closeModal(); });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !$("modal").classList.contains("hidden")) closeModal();
+  });
   $("licenseOk").addEventListener("change", () =>
     $("startBtn").disabled = !$("licenseOk").checked);
   $("startBtn").addEventListener("click", startRun);
@@ -1577,6 +1857,10 @@ function wire() {
   $("lockoutBtn").addEventListener("click", runLockoutProbe);
   $("f_ua").addEventListener("change", () => {
     $("f_ua_custom_wrap").classList.toggle("hidden", $("f_ua").value !== "custom");
+  });
+  $("clearWordsBtn").addEventListener("click", () => {
+    $("f_words").value = "";
+    toast(LANG === "ar" ? "تم مسح كلمات النجاح" : "Success words cleared");
   });
   $("saveProfileBtn").addEventListener("click", async () => {
     const r = await api("/api/profiles/save", { profile: profileFromForm() });

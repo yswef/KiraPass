@@ -1,10 +1,7 @@
-"""Proof, not guesswork: is the guest really online?
+"""Check captive-portal and internet connectivity states.
 
-The user's complaint - "the connection test connects but the tool does not
-recognise it" - is exactly this: the portal answered 302 to the internet
-check URL and the old code had no rule that called that a success.
-
-Three questions are answered here, and each answer says *why*:
+The helpers distinguish an open internet connection, a captive-portal redirect,
+and an unavailable network, and preserve the evidence behind each result.
 
     internet_state()      before we touch any card:  ONLINE / WALLED / OFFLINE
     verify_online()       after a card looked accepted: does internet work?
