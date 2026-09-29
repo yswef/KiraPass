@@ -121,6 +121,14 @@ class MaskingTests(unittest.TestCase):
         v = judge.classify(_FakeReply(ban, status=403))
         self.assertIn(v.code, ("BANNED", "RATE_LIMITED"), v.as_dict())
 
+    def test_arabic_ban_phrase_is_detected(self):
+        from kirapass import config
+        page = "<html><body><h1>تم حظرك</h1><p>جهازك محظور مؤقتا</p></body></html>"
+        self.assertTrue(fingerprint.find_phrase(page.lower(), config.BAN_WORDS))
+        # French phrase too
+        fr = "<html><body>trop de tentatives de connexion</body></html>"
+        self.assertTrue(fingerprint.find_phrase(fr.lower(), config.BAN_WORDS))
+
     def test_a_redirect_inside_the_portal_is_not_a_hit(self):
         """Some routers bounce you between their own pages - every bounce
         used to be reported as "the router let us out"."""
@@ -1111,6 +1119,62 @@ class StoreTests(unittest.TestCase):
         self.assertIn("hello", st.read_review(saved["file"]))
         st.clear_cache("temp")
 
+    def test_review_body_redacts_mac_and_ip(self):
+        body = ("<html><body>client AA:BB:CC:DD:EE:FF at 10.5.50.42 "
+                "and also aa-bb-cc-dd-ee-ff</body></html>")
+        red = store.redact_review_body(body)
+        self.assertNotIn("AA:BB:CC:DD:EE:FF", red)
+        self.assertNotIn("10.5.50.42", red)
+        self.assertIn("[mac-redacted]", red)
+        self.assertIn("[ip-redacted]", red)
+        st = store.Store()
+        saved = st.save_review(2, "card1",
+                               {"code": "UNKNOWN", "reason": "x", "data": {}},
+                               body)
+        content = st.read_review(saved["file"])
+        self.assertNotIn("AA:BB:CC", content)
+        self.assertNotIn("10.5.50.42", content)
+        st.clear_cache("temp")
+
+    def test_sha_password_modes_are_replayable(self):
+        from kirapass import engine
+        p = store.new_profile(pass_mode="sha1user")
+        self.assertEqual(engine.password_value(p, "0201"),
+                         capture._sha1("0201"))
+        p["pass_mode"] = "sha256user"
+        self.assertEqual(engine.password_value(p, "0201"),
+                         capture._sha256("0201"))
+        self.assertIn("sha1user", store.PASS_MODES)
+        self.assertIn("sha256user", store.PASS_MODES)
+
+    def test_ban_evidence_structure(self):
+        from kirapass import engine
+
+        class R:
+            status = 403
+            text = "<html><body>you are blocked</body></html>"
+
+        stop, word, evidence = engine._is_protective_reply(
+            R(), "http://10.5.50.1/login")
+        self.assertTrue(stop)
+        self.assertIsInstance(evidence, dict)
+        self.assertIn("status", evidence)
+        self.assertIn("has_form", evidence)
+        self.assertIn("kind_hint", evidence)
+        self.assertEqual(evidence["status"], 403)
+
+    def test_custom_internet_checks_parse(self):
+        from kirapass import verify
+        checks = verify.resolve_internet_checks(
+            "http://example.test/ok|200|OK")
+        self.assertEqual(len(checks), 1)
+        self.assertEqual(checks[0][0], "http://example.test/ok")
+        self.assertEqual(checks[0][1], 200)
+        self.assertEqual(checks[0][2], "OK")
+        # empty falls back to defaults
+        defaults = verify.resolve_internet_checks("")
+        self.assertTrue(len(defaults) >= 1)
+
 
 class HttpTests(unittest.TestCase):
     def test_connect_timeout_is_not_a_read_timeout(self):
@@ -1221,6 +1285,16 @@ class CaptureTests(unittest.TestCase):
         md5user = capture.infer_pass_mode("0201", "0201", "0201", digest, html,
                                           ["username", "password"])
         self.assertEqual(md5user["pass_mode"], "md5user")
+        sha1 = capture.infer_pass_mode(
+            "0201", "0201", "0201", capture._sha1("0201"), html,
+            ["username", "password"])
+        self.assertEqual(sha1["pass_mode"], "sha1user")
+        self.assertFalse(sha1["needs_browser_js"])
+        sha256 = capture.infer_pass_mode(
+            "0201", "0201", "0201", capture._sha256("0201"), html,
+            ["username", "password"])
+        self.assertEqual(sha256["pass_mode"], "sha256user")
+        self.assertFalse(sha256["needs_browser_js"])
         chap_html = ("<script>document.login.password.value = hexMD5('id12' +"
                      " document.login.password.value + 'chal34');</script>"
                      "<form><input name='username'><input name='password'></form>")

@@ -32,7 +32,7 @@
   <button class="btn tiny ghost" id="bannerMore" data-i18n="banner_more">التفاصيل</button>
 </div>
 
-<nav class="steps" id="steps" aria-label="خطوات الاستخدام">
+<nav class="steps steps-hidden" id="steps" aria-label="خطوات الاستخدام" hidden>
   <button class="step" data-step="start"><b>•</b><span data-i18n="step_start">البداية</span></button>
   <button class="step" data-step="scan"><b>1</b><span data-i18n="step_scan">فحص الشبكة</span></button>
   <button class="step" data-step="format"><b>2</b><span data-i18n="step_format">صيغة البطاقة</span></button>
@@ -51,12 +51,30 @@
     <button class="btn big" id="btnSavedProfile" data-i18n="btn_saved_profile">استخدام بروفايل محفوظ</button>
   </div>
   <div class="card muted" id="startProfilesInfo"></div>
+  <div class="card" id="startProbeCard">
+    <h3 data-i18n="probe_link_title">فحص الاتصال بالراوتر</h3>
+    <p class="hint" data-i18n="probe_link_hint">طلب GET واحد فقط للرابط — يعرض النتيجة دون تخمين أو إرسال بطاقات.</p>
+    <div class="row wrap">
+      <input id="probeUrl" class="grow" type="url" inputmode="url" autocomplete="off"
+             placeholder="http://10.5.50.1/login">
+      <button class="btn" id="probeLinkBtn" data-i18n="probe_link_button">افحص الاتصال</button>
+    </div>
+    <div class="hidden" id="probeLinkResult"></div>
+  </div>
+  <div class="card hidden" id="lanWarningCard"></div>
 </section>
 
 <!-- ============ SAVED LIST ============ -->
 <section class="panel" id="panel-saved">
   <h2 data-i18n="saved_title">البروفايلات المحفوظة</h2>
   <p class="hint" data-i18n="saved_hint">اختر بروفايل لمراجعة إعداداته قبل التشغيل. لن يبدأ أي فحص أو تخمين تلقائياً.</p>
+  <div class="row wrap">
+    <label class="grow"><span class="sr-only" data-i18n="saved_search">بحث في البروفايلات</span>
+      <input id="savedSearch" type="search" autocomplete="off"
+             data-i18n-placeholder="saved_search_ph" placeholder="ابحث بالاسم أو الرابط…"></label>
+    <button class="btn" id="importProfileBtn" data-i18n="btn_import_profile">استيراد JSON</button>
+    <input type="file" id="importProfileFile" accept="application/json,.json" class="hidden">
+  </div>
   <div id="savedList"></div>
   <div class="row end wrap">
     <button class="btn" id="backToStartFromSaved" data-i18n="back_to_start">رجوع للبداية</button>
@@ -84,8 +102,17 @@
     <label><span data-i18n="r_attempts">عدد المحاولات</span><input id="rv_attempts" type="number" min="1" max="20000000" value="2000"></label>
     <label class="check"><input type="checkbox" id="rv_resume" checked><span data-i18n="r_resume">المتابعة من حيث توقفت (بلا تكرار)</span></label>
   </div>
+  <div class="card" id="rvPreviewCard">
+    <div class="preview"><span data-i18n="p_space">عدد الاحتمالات</span>:
+      <b id="rvPvSpace">—</b></div>
+    <div class="preview"><span data-i18n="p_samples">أمثلة على البطاقات</span>:
+      <span id="rvPvSamples" class="mono">—</span></div>
+    <div class="preview warn hidden" id="rvPvProblems"></div>
+    <div class="preview warn hidden" id="rvLoadWarn"></div>
+  </div>
   <div class="row wrap">
     <button class="btn" id="editProfileBtn" data-i18n="edit_settings">تعديل الإعدادات</button>
+    <button class="btn ghost" id="exportProfileBtn" data-i18n="btn_export_profile">تصدير JSON</button>
     <button class="btn ghost" id="backToSavedBtn" data-i18n="back_to_saved">رجوع للقائمة</button>
     <button class="btn primary big" id="startFromReviewBtn" data-i18n="btn_start_from_review">ابدأ التخمين</button>
   </div>
@@ -250,6 +277,24 @@
     <label class="check"><input type="checkbox" id="r_resume" checked>
       <span data-i18n="r_resume">المتابعة من حيث توقفت (بلا تكرار)</span></label>
   </div>
+  <div class="card warn hidden" id="runLoadWarn"></div>
+  <div class="card warn hidden" id="onlineAlreadyWarn"></div>
+
+  <details class="adv">
+    <summary data-i18n="adv_run_open">خيارات متقدمة للتشغيل والشبكة</summary>
+    <div class="grid">
+      <label><span data-i18n="f_internet_check">رابط اختبار الإنترنت المخصص</span>
+        <input id="f_internet_check" placeholder="http://example.com/generate_204|204"
+               autocomplete="off">
+        <small class="hint" data-i18n="f_internet_check_hint">يُستخدم بدل روابط Google/Microsoft/Apple عندما تحظرها الشبكة. الصيغة: url|status|نص اختياري</small></label>
+      <label><span data-i18n="f_connect_timeout">مهلة فتح الاتصال (ثوانٍ)</span>
+        <input id="f_connect_timeout" type="number" min="0.5" max="120" step="0.5" value="4">
+        <small class="hint" data-i18n="f_connect_timeout_hint">ارفعها للراوترات البطيئة (RADIUS). القيمة تُحفظ محلياً.</small></label>
+      <label><span data-i18n="f_read_timeout">مهلة انتظار الرد (ثوانٍ)</span>
+        <input id="f_read_timeout" type="number" min="0.5" max="120" step="0.5" value="8"></label>
+      <button type="button" class="btn" id="saveNetSettingsBtn" data-i18n="btn_save_net_settings">احفظ إعدادات الشبكة</button>
+    </div>
+  </details>
 
   <div class="row wrap small">
     <button class="btn" id="diagnoseBtn" data-i18n="btn_diagnose">تشخيص الشبكة أولاً</button>

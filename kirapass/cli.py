@@ -148,6 +148,15 @@ def main(argv=None) -> int:
     if host not in ("127.0.0.1", "localhost"):
         token = secrets.token_urlsafe(9) if args.token == "auto" else \
             ("" if args.token == "off" else args.token)
+        print(
+            "\n  ⚠  WARNING / تحذير:\n"
+            "  --host 0.0.0.0 opens the UI on the LAN over plain HTTP.\n"
+            "  The access token is sent without TLS — use only on a network\n"
+            "  you trust. Prefer 127.0.0.1 when possible.\n"
+            "  فتح الواجهة على 0.0.0.0 يرسل الرمز بدون تشفير؛ استخدمه فقط\n"
+            "  على شبكة تثق بها.\n",
+            flush=True,
+        )
     elif args.token not in ("auto", "off"):
         token = args.token
 

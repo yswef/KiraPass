@@ -32,6 +32,8 @@ SECRET_NAME_RE = re.compile(
 TOKEN_NAME_RE = re.compile(
     r"(token|csrf|nonce|session|chap|challenge|tok$|authenticity)", re.I)
 HEX32_RE = re.compile(r"^[0-9a-fA-F]{32}$")
+HEX40_RE = re.compile(r"^[0-9a-fA-F]{40}$")
+HEX64_RE = re.compile(r"^[0-9a-fA-F]{64}$")
 WORD_RE = re.compile(r"[A-Za-z\u0600-\u06FF]{4,}")
 SKIP_WORDS = {
     "html", "head", "body", "div", "span", "form", "input", "script", "style",
@@ -47,16 +49,24 @@ STANDARD_HEADERS = {
     "referer", "origin", "upgrade-insecure-requests", "cache-control",
     "pragma", "accept-charset",
 }
-KNOWN_PASS_MODES = ("same", "empty", "omit", "md5user", "chap", "chap_empty")
+KNOWN_PASS_MODES = ("same", "empty", "omit", "md5user", "sha1user",
+                    "sha256user", "chap", "chap_empty")
 
 AR_UNKNOWN_JS = (
     "تحويل كلمة المرور في الصفحة يستخدم JavaScript مخصصاً غير معروف، "
     "لذلك لا يمكن تشغيل التخمين الآلي بأمان."
 )
 AR_NEXT_UNKNOWN = (
-    "الخطوة التالية: سجّل الدخول يدوياً عند الحاجة، ولا تشغّل التخمين الآلي "
-    "على هذه البوابة حتى يُعرف نمط التحويل. التقرير المنقّح لا يحتوي رقم "
-    "البطاقة ولا كلمة المرور."
+    "الخطوة التالية: سجّل الدخول يدوياً عند الحاجة عبر المتصفح، وافتح دليل "
+    "المسجل في docs/GUIDE_AR.md (قسم «المسجل اليدوي») إن أردت تعلّم شكل "
+    "الطلب. التقرير المنقّح لا يحتوي رقم البطاقة ولا كلمة المرور، ويمكن "
+    "تصدير أمر curl منقّح من المسجل لمراجعته يدوياً."
+)
+AR_NEXT_UNKNOWN_EN = (
+    "Next: log in by hand in a browser when needed, and open docs/GUIDE_EN.md "
+    "(section «Manual recorder») if you want to learn the request shape. "
+    "The redacted report contains neither the card nor the password; the "
+    "recorder can also export a redacted curl command for manual review."
 )
 AR_HTTP200 = (
     "HTTP 200 وحده ليس دليلاً على نجاح أو رفض. علّم الصفحة بنفسك "
@@ -150,11 +160,21 @@ def _md5(text: str) -> str:
     return hashlib.md5((text or "").encode("utf-8", "replace")).hexdigest()
 
 
+def _sha1(text: str) -> str:
+    return hashlib.sha1((text or "").encode("utf-8", "replace")).hexdigest()
+
+
+def _sha256(text: str) -> str:
+    return hashlib.sha256((text or "").encode("utf-8", "replace")).hexdigest()
+
+
 def infer_pass_mode(user_before, pass_before, user_after, pass_after,
                     html: str, sent_keys) -> dict:
     """Learn only the patterns KiraPass can replay without a browser.
 
     Anything else sets needs_browser_js and must not be claimed automatable.
+    sha1(user) and sha256(user) are learned the same way as md5user when the
+    captured password hex matches those digests — no arbitrary JS is executed.
     """
     sent = {str(k) for k in (sent_keys or [])}
     user_b = "" if user_before is None else str(user_before)
@@ -200,6 +220,18 @@ def infer_pass_mode(user_before, pass_before, user_after, pass_after,
                 "reason": "md5user",
                 "reason_ar": "كلمة المرور = MD5 للبطاقة."}
 
+    if pass_a is not None and user and HEX40_RE.match(pass_a) and \
+            pass_a.lower() == _sha1(user):
+        return {"pass_mode": "sha1user", "needs_browser_js": False,
+                "reason": "sha1user",
+                "reason_ar": "كلمة المرور = SHA1 للبطاقة."}
+
+    if pass_a is not None and user and HEX64_RE.match(pass_a) and \
+            pass_a.lower() == _sha256(user):
+        return {"pass_mode": "sha256user", "needs_browser_js": False,
+                "reason": "sha256user",
+                "reason_ar": "كلمة المرور = SHA256 للبطاقة."}
+
     if pass_a == "":
         return {"pass_mode": "empty", "needs_browser_js": False,
                 "reason": "empty", "reason_ar": "كلمة المرور أُرسلت فارغة."}
@@ -219,6 +251,7 @@ def infer_pass_mode(user_before, pass_before, user_after, pass_after,
             "reason": "unknown_js_transform",
             "reason_ar": AR_UNKNOWN_JS,
             "next_ar": AR_NEXT_UNKNOWN,
+            "next_en": AR_NEXT_UNKNOWN_EN,
         }
     if pass_a is None and not sent:
         return {"pass_mode": "empty", "needs_browser_js": False,
@@ -1078,6 +1111,7 @@ class Hub:
             "reason": cap.pass_learn.get("reason") or "",
             "reason_ar": cap.pass_learn.get("reason_ar") or "",
             "next_ar": cap.pass_learn.get("next_ar") or "",
+            "next_en": cap.pass_learn.get("next_en") or "",
             "success_words": list(cap.success_words),
             "success_url_contains": cap.success_url_contains,
             "stats_url": cap.stats_url,
@@ -1088,6 +1122,7 @@ class Hub:
             "form_fields": [i["name"] for i in redact_fields(
                 cap.form.fields if cap.form else {})],
             "http_200_policy": "never_success_or_reject_without_mark_or_evidence",
+            "curl_export": export_curl(cap),
         }
         try:
             scrubbed = _scrub(json.dumps(report, ensure_ascii=False),
@@ -1133,6 +1168,35 @@ class Hub:
 def os_basename(path: str) -> str:
     import os
     return os.path.basename(path)
+
+
+def export_curl(cap: "Capture") -> str:
+    """Build a redacted curl sketch of the last login request (no secrets).
+
+    Values that look like secrets/tokens are replaced with placeholders so the
+    operator can study the request shape without storing credentials.
+    """
+    method = (cap.method or "POST").upper()
+    url = _safe_page_url(cap.url or cap.start_url or "")
+    parts = [f"curl -X {method} '{url}'"]
+    for name in (cap.custom_headers or []):
+        parts.append(f"  -H '{name}: <redacted>'")
+    fields = []
+    raw = getattr(cap, "_last_raw_fields", None) or {}
+    if not raw and cap.form and getattr(cap.form, "fields", None):
+        raw = dict(cap.form.fields)
+    for name, value in (raw or {}).items():
+        key = str(name)
+        if looks_secret_name(key) or looks_token_name(key) or looks_live_token(
+                "" if value is None else str(value)):
+            fields.append(f"{key}=<redacted>")
+        else:
+            fields.append(f"{key}={value}")
+    if fields:
+        body = "&".join(fields)
+        parts.append(f"  --data-raw '{body}'")
+    parts.append("  # secrets redacted — for manual review only")
+    return " \\\n".join(parts)
 
 
 def _scrub(blob: str, values) -> str:

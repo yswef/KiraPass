@@ -170,6 +170,10 @@ button { -webkit-tap-highlight-color: transparent; }
   scrollbar-width: thin;
   background: linear-gradient(var(--bg), rgba(8,13,23,.94));
 }
+.steps.steps-hidden,
+.steps[hidden] {
+  display: none !important;
+}
 .step {
   position: relative;
   display: flex;
