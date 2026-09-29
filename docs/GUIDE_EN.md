@@ -149,3 +149,45 @@ python3 KiraPass.py --clear-cache [temp|results|profiles|all]
 ```bash
 python3 KiraPass.py --selftest     # 13 scenarios against local mock routers
 ```
+
+---
+
+## Manual recorder (custom JavaScript portals)
+
+Some portals transform the password in the browser (SHA/AES/custom JS). If
+you see `needs_browser_js` or “Automated guessing is not available”:
+
+1. Do not start automated guessing on that portal.
+2. Under Advanced on the format step: **Open the portal and record a successful login**.
+3. Log in by hand in the popup, then mark the page (success / reject).
+4. The redacted report never stores the card or password. A redacted `curl`
+   sketch is included in the capture report for manual review.
+5. If the transform is `sha1(card)`, `sha256(card)`, `md5(card)`, or MikroTik
+   CHAP, KiraPass learns it automatically. Anything else stays manual.
+
+---
+
+## Custom internet-check URL
+
+Some networks block google/msft/apple. Under **Advanced run & network options**:
+
+- **Custom internet-check URL** as `url|status|optional text`
+  e.g. `http://intranet.local/generate_204|204`
+- Or via env: `KIRAPASS_INTERNET_CHECKS="http://a/ok|200|OK"`
+
+## Connect timeout
+
+For slow RADIUS routers raise **Connect timeout** in advanced options, or set
+`KIRAPASS_CONNECT_TIMEOUT=10`.
+
+## Connectivity check on the start screen
+
+**Check link** sends a single GET and shows the result — no guessing, no cards.
+
+## Export / import profiles
+
+From the saved-profile list: import JSON. From profile review: export JSON
+(no live secrets).
+
+> **Warning for `--host 0.0.0.0`:** the token is sent without TLS. Use only on
+> a network you trust.

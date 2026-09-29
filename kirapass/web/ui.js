@@ -28,6 +28,42 @@ const I18N = {
     profile_invalid: "البروفايل غير مكتمل",
     profile_invalid_hint: "بعض الإعدادات المطلوبة مفقودة أو غير صالحة. أصلحها يدوياً قبل التشغيل؛ لن يتم تخمين قيم أو إرسال طلبات تلقائية.",
     profile_valid: "البروفايل مكتمل وجاهز للتشغيل",
+    probe_link_title: "فحص الاتصال بالراوتر",
+    probe_link_hint: "طلب GET واحد فقط للرابط — يعرض النتيجة دون تخمين أو إرسال بطاقات.",
+    probe_link_button: "افحص الاتصال",
+    probe_reachable: "الرابط يستجيب",
+    probe_unreachable: "تعذّر الوصول للرابط",
+    probe_has_form: "صفحة الدخول ظاهرة",
+    probe_no_form: "لا يوجد نموذج دخول واضح",
+    saved_search: "بحث في البروفايلات",
+    saved_search_ph: "ابحث بالاسم أو الرابط…",
+    btn_export_profile: "تصدير JSON",
+    btn_import_profile: "استيراد JSON",
+    import_ok: "تم استيراد البروفايل",
+    import_fail: "فشل الاستيراد",
+    export_ok: "تم تنزيل البروفايل",
+    lan_warning_title: "تحذير: الواجهة مفتوحة على الشبكة المحلية",
+    lan_warning_body: "التوكن يُرسل بدون تشفير (HTTP). استخدم فقط على شبكة تثق بها، وفضّل 127.0.0.1 إن أمكن.",
+    f_internet_check: "رابط اختبار الإنترنت المخصص",
+    f_internet_check_hint: "يُستخدم بدل روابط Google/Microsoft/Apple عندما تحظرها الشبكة. الصيغة: url|status|نص اختياري",
+    f_connect_timeout: "مهلة فتح الاتصال (ثوانٍ)",
+    f_connect_timeout_hint: "ارفعها للراوترات البطيئة (RADIUS). القيمة تُحفظ محلياً.",
+    f_read_timeout: "مهلة انتظار الرد (ثوانٍ)",
+    btn_save_net_settings: "احفظ إعدادات الشبكة",
+    adv_run_open: "خيارات متقدمة للتشغيل والشبكة",
+    net_settings_saved: "تم حفظ إعدادات الشبكة",
+    warn_fast_preset: "الإعداد السريع قد يحظر جهازك بسرعة. راجع مسؤول الشبكة قبل المتابعة. هل أنت متأكد؟",
+    warn_big_space: "عدد الاحتمالات ضخم جداً — قد يستغرق وقتاً طويلاً ويزيد ضغط الراوتر.",
+    warn_many_threads: "عدد المسارات مرتفع وقد يؤدي إلى حظر سريع. قلّله إن أمكن.",
+    online_already_banner: "جهازك متصل بالإنترنت مسبقاً — التحقق من نجاح البطاقة محدود ويعتمد على تحويل الراوتر وصفحة الحالة.",
+    ban_evidence_label: "دليل الحظر للمشرف",
+    ban_evidence_status: "حالة HTTP",
+    ban_evidence_word: "العبارة المكتشفة",
+    ban_evidence_form: "نموذج الدخول لا يزال ظاهراً",
+    ban_evidence_kind: "تصنيف مبدئي",
+    capture_guide_link: "دليل المسجل اليدوي",
+    capture_curl_label: "أمر curl منقّح (بدون أسرار)",
+    target_unreachable_doc: "target_unreachable يعني انقطاعاً أو حظراً إدارياً لا يمكن تمييزهما تلقائياً — راجع المشرف يدوياً قبل أي استئناف.",
     manual_resume_button: "استئناف يدوياً بعد مراجعة المشرف",
     manual_resume_confirm_title: "تأكيد الاستئناف اليدوي",
     manual_resume_confirm_body: "سيتم استئناف التشغيل بالإعدادات المحفوظة وموضع التقدم المستأنف. تأكد أن المشرف راجع الحالة وأن الاستئناف مسموح. لن يتم تغيير IP أو MAC أو فصل Wi‑Fi.",
@@ -348,6 +384,8 @@ const I18N = {
     pm_fixed: "قيمة ثابتة", pm_chap: "MD5 تشفير ميكروتك (chap) للبطاقة",
     pm_chap_empty: "chap على قيمة فارغة",
     pm_md5user: "MD5 للبطاقة فقط",
+    pm_sha1user: "SHA1 للبطاقة فقط",
+    pm_sha256user: "SHA256 للبطاقة فقط",
     /* charsets */
     cs_digits: "أرقام فقط", cs_lower: "حروف صغيرة", cs_upper: "حروف كبيرة",
     cs_alnum: "أرقام وحروف صغيرة", cs_alnum_upper: "أرقام وحروف كبيرة",
@@ -376,6 +414,42 @@ const I18N = {
     profile_invalid: "Profile incomplete",
     profile_invalid_hint: "Some required settings are missing or invalid. Fix them manually before running; no values will be guessed and no automatic requests will be sent.",
     profile_valid: "Profile complete and ready to run",
+    probe_link_title: "Check router connectivity",
+    probe_link_hint: "A single GET to the URL — shows the result with no guessing and no card posts.",
+    probe_link_button: "Check link",
+    probe_reachable: "URL is reachable",
+    probe_unreachable: "URL could not be reached",
+    probe_has_form: "login form is present",
+    probe_no_form: "no clear login form",
+    saved_search: "Search profiles",
+    saved_search_ph: "Search by name or URL…",
+    btn_export_profile: "Export JSON",
+    btn_import_profile: "Import JSON",
+    import_ok: "Profile imported",
+    import_fail: "Import failed",
+    export_ok: "Profile downloaded",
+    lan_warning_title: "Warning: UI is open on the LAN",
+    lan_warning_body: "The access token is sent without TLS (plain HTTP). Use only on a network you trust; prefer 127.0.0.1 when possible.",
+    f_internet_check: "Custom internet-check URL",
+    f_internet_check_hint: "Used instead of Google/Microsoft/Apple when the network blocks them. Format: url|status|optional text",
+    f_connect_timeout: "Connect timeout (seconds)",
+    f_connect_timeout_hint: "Raise this for slow RADIUS routers. The value is stored locally.",
+    f_read_timeout: "Read timeout (seconds)",
+    btn_save_net_settings: "Save network settings",
+    adv_run_open: "Advanced run & network options",
+    net_settings_saved: "Network settings saved",
+    warn_fast_preset: "The fast preset can lock your device out quickly. Confirm with the network admin before continuing. Are you sure?",
+    warn_big_space: "The combination space is huge — it may take a long time and put pressure on the router.",
+    warn_many_threads: "Thread count is high and may trigger a quick lockout. Lower it if you can.",
+    online_already_banner: "Your device is already online — card verification is limited and relies on the portal redirect and status page.",
+    ban_evidence_label: "Block evidence for the admin",
+    ban_evidence_status: "HTTP status",
+    ban_evidence_word: "Matched phrase",
+    ban_evidence_form: "Login form still visible",
+    ban_evidence_kind: "Soft classification",
+    capture_guide_link: "Manual recorder guide",
+    capture_curl_label: "Redacted curl command (no secrets)",
+    target_unreachable_doc: "target_unreachable means an outage or an admin block that cannot be told apart automatically — ask the admin to review before any resume.",
     manual_resume_button: "Manual resume after admin review",
     manual_resume_confirm_title: "Confirm manual resume",
     manual_resume_confirm_body: "The run will resume with saved settings and progress. Make sure the administrator reviewed the state and resume is allowed. No IP or MAC change and no Wi-Fi disconnect will happen.",
@@ -671,6 +745,8 @@ stop_attempts_done: "Requested attempts finished. Run again - it continues, it d
     pm_same: "same as card", pm_empty: "empty", pm_omit: "field omitted",
     pm_fixed: "fixed value", pm_chap: "MikroTik MD5 (chap) of the card",
     pm_chap_empty: "chap over an empty value", pm_md5user: "MD5 of the card only",
+    pm_sha1user: "SHA1 of the card only",
+    pm_sha256user: "SHA256 of the card only",
     cs_digits: "digits", cs_lower: "lowercase", cs_upper: "uppercase",
     cs_alnum: "digits + lowercase", cs_alnum_upper: "digits + uppercase",
     cs_hex: "hex lowercase", cs_hex_upper: "hex uppercase",
@@ -749,6 +825,11 @@ function setLang(lang) {
     const txt = t(key);
     if (txt) node.textContent = txt;
   });
+  document.querySelectorAll("[data-i18n-placeholder]").forEach((node) => {
+    const key = node.getAttribute("data-i18n-placeholder");
+    const txt = t(key);
+    if (txt) node.setAttribute("placeholder", txt);
+  });
   $("langBtn").textContent = LANG === "ar" ? "EN" : "عربي";
   $("langBtn").setAttribute("aria-label", t("language_label"));
   $("langBtn").title = t("language_label");
@@ -824,6 +905,22 @@ function fmtSpace(n) {
   return n.toLocaleString(LANG === "ar" ? "ar-EG" : "en-US");
 }
 
+function updateStepsVisibility(name) {
+  const nav = $("steps");
+  if (!nav) return;
+  /* Hide the 5-step bar on start / saved list / profile review — it confuses
+     the saved-profile path. Show it only for the guided new-profile flow. */
+  const hide = (name === "start" || name === "saved" || name === "profile-review"
+                || (S.savedProfileMode && name !== "results" && name !== "run"
+                    && name !== "format"));
+  const showForNew = S.currentFlow === "new" ||
+    ["scan", "format", "run", "results"].includes(name);
+  const shouldShow = !hide && showForNew && name !== "start";
+  nav.classList.toggle("steps-hidden", !shouldShow);
+  if (shouldShow) nav.removeAttribute("hidden");
+  else nav.setAttribute("hidden", "");
+}
+
 function step(name) {
   if (S.currentFlow === "new" && (name === "format" || name === "run") && !S.calibrationReady) {
     name = "scan";
@@ -842,11 +939,6 @@ function step(name) {
       if (b.dataset.step === "start") {
         b.classList.add("active");
         b.setAttribute("aria-current", "step");
-      } else if (b.dataset.step !== "start") {
-        /* keep other steps inactive for saved flow */
-        if (name === "saved" || name === "profile-review") {
-          /* start stays active */
-        }
       }
     });
   }
@@ -854,6 +946,7 @@ function step(name) {
     S.currentFlow = "start";
     S.savedProfileMode = false;
   }
+  updateStepsVisibility(name);
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
@@ -1082,7 +1175,9 @@ function fillFormFromProfile(p) {
     capBox.classList.remove("hidden");
     capBox.innerHTML = "<h4 class='warn'>" + t("capture_blocked_title") + "</h4><p>" +
       esc(p.capture_block_reason || t("capture_blocked_body")) + "</p><p>" +
-      esc(t("capture_blocked_next")) + "</p>";
+      esc(t("capture_blocked_next")) + "</p>" +
+      "<p class='hint'>" + esc(t("capture_guide_link")) +
+      ": docs/GUIDE_" + (LANG === "ar" ? "AR" : "EN") + ".md</p>";
   }
 }
 
@@ -1122,9 +1217,18 @@ function renderProfiles(list) {
 function renderSavedList(list) {
   const container = $("savedList");
   if (!container) return;
-  const profiles = list || (S.meta && S.meta.profiles) || [];
+  let profiles = list || (S.meta && S.meta.profiles) || [];
+  const q = (($("savedSearch") && $("savedSearch").value) || "").trim().toLowerCase();
+  if (q) {
+    profiles = profiles.filter((p) => {
+      const hay = ((p.name || "") + " " + (p.login_url || "") + " " +
+                   (p.cards || "")).toLowerCase();
+      return hay.includes(q);
+    });
+  }
   if (!profiles.length) {
-    container.innerHTML = "<div class='card muted'>" + esc(t("no_saved_profiles")) + "</div>";
+    container.innerHTML = "<div class='card muted'>" + esc(
+      q ? t("no_saved_profiles") : t("no_saved_profiles")) + "</div>";
     return;
   }
   container.innerHTML = profiles.map((p) => {
@@ -1237,6 +1341,7 @@ function renderReviewSummary(p) {
     } catch (e) { return 0; }
   })();
   const covered = parseInt(p.space_pos || 0, 10) || 0;
+  const remaining = Math.max(0, space - covered);
   summary.innerHTML = "<h4>" + esc(t("profile_summary")) + " — " + esc(p.name || "") + "</h4>" +
     "<dl class='kv'>" +
     "<dt>" + esc(t("f_login_url")) + "</dt><dd>" + esc(p.login_url || "—") + "</dd>" +
@@ -1249,7 +1354,8 @@ function renderReviewSummary(p) {
     "<dt>" + esc(t("f_length")) + "</dt><dd>" + esc(String(p.length || "—")) + "</dd>" +
     "<dt>" + esc(t("f_charset")) + "</dt><dd>" + esc((p.charset || "").slice(0, 80)) + " (" + (new Set((p.charset || "").split("")).size) + ")</dd>" +
     "<dt>" + esc(t("p_space")) + "</dt><dd>" + fmtSpace(space) + "</dd>" +
-    "<dt>" + esc(t("p_covered")) + "</dt><dd>" + fmtSpace(covered) + (space ? " / " + fmtSpace(space) : "") + "</dd>" +
+    "<dt>" + esc(t("p_covered")) + "</dt><dd>" + fmtSpace(covered) + (space ? " / " + fmtSpace(space) : "") +
+      (space ? " · left " + fmtSpace(remaining) : "") + "</dd>" +
     "</dl>";
   const problems = localValidateProfile(p);
   if (problems.length) {
@@ -1259,6 +1365,51 @@ function renderReviewSummary(p) {
     probBox.classList.remove("hidden");
     probBox.innerHTML = "<h4 class='ok'>" + esc(t("profile_valid")) + "</h4>";
   }
+  previewReviewFormat();
+  updateLoadWarnings(p, $("rv_threads") ? parseInt($("rv_threads").value || "12", 10) : 12,
+                     $("rvLoadWarn"));
+}
+
+let reviewPreviewTimer = null;
+function previewReviewFormat() {
+  clearTimeout(reviewPreviewTimer);
+  reviewPreviewTimer = setTimeout(async () => {
+    if (!$("rvPvSpace")) return;
+    const p = profileFromReview();
+    const res = await api("/api/format/preview", { profile: p });
+    if (!res.ok) return;
+    $("rvPvSpace").textContent = fmtSpace(res.space);
+    $("rvPvSamples").innerHTML = (res.samples || [])
+      .map((c) => "<span class='sample'>" + esc(c) + "</span>").join("") || "—";
+    const box = $("rvPvProblems");
+    if (box) {
+      const hard = (res.problems || []).filter((x) => x !== "space_is_astronomically_big");
+      box.classList.toggle("hidden", !hard.length);
+      box.innerHTML = hard.map((x) => "• " + t("prob_" + x, x)).join("<br>");
+    }
+    updateLoadWarnings(p, parseInt(($("rv_threads") || {}).value || "12", 10),
+                       $("rvLoadWarn"), res.space);
+  }, 350);
+}
+
+function updateLoadWarnings(profile, threads, node, space) {
+  if (!node) return;
+  const warnSpace = (S.meta && S.meta.defaults && S.meta.defaults.warn_space) || 1e9;
+  const warnThreads = (S.meta && S.meta.defaults && S.meta.defaults.warn_threads) || 50;
+  let spaceVal = space;
+  if (spaceVal == null && profile) {
+    try {
+      const vlen = (profile.length || 0) - (profile.prefix || "").length -
+                   (profile.suffix || "").length;
+      const cs = new Set((profile.charset || "").split("")).size;
+      spaceVal = (vlen > 0 && cs >= 2) ? Math.pow(cs, vlen) : 0;
+    } catch (e) { spaceVal = 0; }
+  }
+  const msgs = [];
+  if (spaceVal > warnSpace) msgs.push(t("warn_big_space"));
+  if ((threads || 0) > warnThreads) msgs.push(t("warn_many_threads"));
+  node.classList.toggle("hidden", !msgs.length);
+  node.innerHTML = msgs.map((m) => "⚠ " + esc(m)).join("<br>");
 }
 
 
@@ -1376,6 +1527,15 @@ function renderInternet(info, node) {
                                t("net_" + (info.detail || ""), info.detail || "")) +
     "</dt><dd>" + esc(info.url || "") + (info.location ? " → " + esc(info.location) : "") +
     "</dd></div>";
+  const banner = $("onlineAlreadyWarn");
+  if (banner) {
+    if (state === "ONLINE") {
+      banner.classList.remove("hidden");
+      banner.innerHTML = "⚠ " + esc(t("online_already_banner"));
+    } else {
+      banner.classList.add("hidden");
+    }
+  }
 }
 
 /* ------------------------------------------------------------------ preview */
@@ -1716,7 +1876,9 @@ async function startRun() {
   if (profile.capture_needs_browser_js) {
     modal(t("capture_blocked_title"),
       "<p>" + esc(t("capture_blocked_body")) + "</p><p>" +
-      esc(profile.capture_block_reason || t("capture_blocked_next")) + "</p>");
+      esc(profile.capture_block_reason || t("capture_blocked_next")) + "</p>" +
+      "<p class='hint'>" + esc(t("capture_guide_link")) +
+      ": docs/GUIDE_" + (LANG === "ar" ? "AR" : "EN") + ".md</p>");
     return;
   }
   const payload = {
@@ -2076,11 +2238,27 @@ function openManualResumeConfirm() {
   }
 }
 
+function renderBanEvidence(ev) {
+  if (!ev || typeof ev !== "object") return "";
+  return "<div class='card' style='margin-top:8px'><h4>" + esc(t("ban_evidence_label")) +
+    "</h4><dl class='kv'>" +
+    "<dt>" + esc(t("ban_evidence_status")) + "</dt><dd>" + esc(String(ev.status || "—")) + "</dd>" +
+    "<dt>" + esc(t("ban_evidence_word")) + "</dt><dd class='mono'>" + esc(ev.word || "—") + "</dd>" +
+    "<dt>" + esc(t("ban_evidence_form")) + "</dt><dd>" + esc(ev.has_form ? "yes" : "no") + "</dd>" +
+    "<dt>" + esc(t("ban_evidence_kind")) + "</dt><dd>" + esc(ev.kind_hint || "—") + "</dd>" +
+    "</dl></div>";
+}
+
 function renderStop(st) {
   const card = $("stopCard");
   card.classList.remove("hidden");
   let html = "<h4>" + t("why_stopped") + "</h4><div>" +
     t("stop_" + st.stop_reason, st.stop_reason || "") + "</div>";
+  if (st.stop_reason === "target_unreachable") {
+    html += "<div class='hint warn' style='margin-top:6px'>" +
+      esc(t("target_unreachable_doc")) + "</div>";
+  }
+  if (st.ban_evidence) html += renderBanEvidence(st.ban_evidence);
   const tried = (st.progress || {}).attempts || 0;
   if ((st.calibration && st.calibration.ok === false) ||
       st.stop_reason === "calibration_failed") {
@@ -2277,9 +2455,18 @@ function wire() {
     if (!id || !S.meta) return;
     const p = S.meta.presets.find((x) => x.id === id);
     if (!p) return;
+    if (id === "fast" && !window.confirm(t("warn_fast_preset"))) return;
     $("r_threads").value = p.threads;
     $("r_attempts").value = p.attempts;
     $("r_delay").value = p.delay_ms;
+    updateLoadWarnings(profileFromForm(), p.threads, $("runLoadWarn"));
+  });
+  ["r_threads", "r_attempts"].forEach((id) => {
+    const node = $(id);
+    if (node) node.addEventListener("input", () => {
+      updateLoadWarnings(profileFromForm(),
+        parseInt(($("r_threads") || {}).value || "12", 10), $("runLoadWarn"));
+    });
   });
   ["f_prefix", "f_length", "f_custom", "f_pass_mode", "f_charset", "f_login_url",
    "f_method", "f_user_field", "f_pass_field", "f_name"].forEach((id) => {
@@ -2322,7 +2509,7 @@ function wire() {
   const startReview = $("startFromReviewBtn");
   if (startReview) startReview.addEventListener("click", () => startFromReview());
   /* review edit fields live preview */
-  ["rv_login_url","rv_method","rv_user_field","rv_pass_field","rv_pass_mode","rv_dst","rv_prefix","rv_length","rv_charset"].forEach((id) => {
+  ["rv_login_url","rv_method","rv_user_field","rv_pass_field","rv_pass_mode","rv_dst","rv_prefix","rv_length","rv_charset","rv_threads","rv_attempts","rv_delay"].forEach((id) => {
     const node = $(id);
     if (node) {
       node.addEventListener("input", () => {
@@ -2338,6 +2525,120 @@ function wire() {
   /* allow steps navigation for start */
   const stepStart = document.querySelector('.step[data-step="start"]');
   if (stepStart) stepStart.addEventListener("click", () => showStart());
+
+  /* probe link on start screen */
+  const probeBtn = $("probeLinkBtn");
+  if (probeBtn) probeBtn.addEventListener("click", () => probeLink());
+  const savedSearch = $("savedSearch");
+  if (savedSearch) {
+    savedSearch.addEventListener("input", () => renderSavedList());
+    const ph = t("saved_search_ph");
+    if (ph) savedSearch.placeholder = ph;
+  }
+  const exportBtn = $("exportProfileBtn");
+  if (exportBtn) exportBtn.addEventListener("click", () => exportCurrentProfile());
+  const importBtn = $("importProfileBtn");
+  const importFile = $("importProfileFile");
+  if (importBtn && importFile) {
+    importBtn.addEventListener("click", () => importFile.click());
+    importFile.addEventListener("change", () => importProfileFromFile(importFile));
+  }
+  const saveNet = $("saveNetSettingsBtn");
+  if (saveNet) saveNet.addEventListener("click", () => saveNetSettings());
+}
+
+async function probeLink() {
+  const url = (($("probeUrl") && $("probeUrl").value) ||
+               ($("scanUrl") && $("scanUrl").value) || "").trim();
+  const box = $("probeLinkResult");
+  if (!url) { toast(t("scan_fail")); return; }
+  if (box) { box.classList.remove("hidden"); box.innerHTML = t("loading"); }
+  const res = await api("/api/probe-link", { url });
+  if (!box) return;
+  if (res.ok && res.reachable) {
+    box.innerHTML = "<h4 class='ok'>" + esc(t("probe_reachable")) + "</h4>" +
+      "<div class='kv'><dt>HTTP " + esc(String(res.status)) + " · " +
+      esc(String(res.ms)) + " ms</dt><dd>" + esc(res.final_url || url) + "</dd>" +
+      "<dt>" + esc(res.has_login_form ? t("probe_has_form") : t("probe_no_form")) +
+      "</dt><dd></dd></div>";
+  } else {
+    box.innerHTML = "<h4 class='bad'>" + esc(t("probe_unreachable")) + "</h4>" +
+      "<div class='kv'><dt>" + esc(t("net_" + (res.error || res.hint || ""),
+                                    res.error || res.hint || "")) +
+      "</dt><dd>" + esc(res.detail || "") + "</dd></div>";
+  }
+}
+
+async function exportCurrentProfile() {
+  const p = S.profile || profileFromReview();
+  const name = (p && p.name) || "";
+  if (!name) { toast(t("scan_fail")); return; }
+  const r = await api("/api/profiles/export", { name });
+  if (!r.ok || !r.profile) { toast(t("scan_fail")); return; }
+  const blob = new Blob([JSON.stringify(r.profile, null, 2)],
+                        { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = (name || "profile") + ".kirapass.json";
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast(t("export_ok"));
+}
+
+async function importProfileFromFile(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+    const profile = data.profile || data;
+    const r = await api("/api/profiles/import", { profile });
+    if (!r.ok) {
+      toast(t("import_fail"));
+      modal(t("import_fail"), "<pre>" + esc(JSON.stringify(r.problems || r, null, 2)) + "</pre>");
+      return;
+    }
+    S.meta.profiles = r.profiles || [];
+    renderProfiles(r.profiles);
+    renderSavedList(r.profiles);
+    toast(t("import_ok"));
+    if (r.profile) showProfileReview(r.profile);
+  } catch (e) {
+    toast(t("import_fail"));
+  }
+  input.value = "";
+}
+
+async function saveNetSettings() {
+  const payload = {
+    internet_check_url: ($("f_internet_check") || {}).value || "",
+    connect_timeout: parseFloat(($("f_connect_timeout") || {}).value || "4"),
+    read_timeout: parseFloat(($("f_read_timeout") || {}).value || "8"),
+  };
+  const r = await api("/api/settings", payload);
+  if (r.ok) {
+    if (S.meta) S.meta.settings = r.settings || payload;
+    toast(t("net_settings_saved"));
+  } else {
+    toast(t("scan_fail"));
+  }
+}
+
+function applyNetSettingsFromMeta(meta) {
+  const s = (meta && meta.settings) || {};
+  const d = (meta && meta.defaults) || {};
+  if ($("f_internet_check"))
+    $("f_internet_check").value = s.internet_check_url || "";
+  if ($("f_connect_timeout"))
+    $("f_connect_timeout").value = s.connect_timeout || d.connect_timeout || 4;
+  if ($("f_read_timeout"))
+    $("f_read_timeout").value = s.read_timeout || d.read_timeout || 8;
+  const lan = $("lanWarningCard");
+  if (lan && meta && meta.lan_open) {
+    lan.classList.remove("hidden");
+    lan.innerHTML = "<h4 class='warn'>" + esc(t("lan_warning_title")) + "</h4><p>" +
+      esc(t("lan_warning_body")) + "</p>";
+  }
 }
 
 
@@ -2353,6 +2654,7 @@ function wire() {
   wire();
   toggleCustomCharset();
   previewFormat();
+  applyNetSettingsFromMeta(meta);
   renderProfiles(meta.profiles || []);
   renderSavedList(meta.profiles || []);
   showStart();

@@ -15,6 +15,23 @@ from urllib.parse import urlsplit
 from . import config
 
 
+def resolve_internet_checks(custom=None) -> tuple:
+    """Build the check list from an optional custom URL string or env default.
+
+    `custom` accepts the same pipe format as KIRAPASS_INTERNET_CHECKS, e.g.
+    ``http://example.com/generate_204|204`` or a bare URL (expects HTTP 204).
+    """
+    if custom is None or custom == "":
+        return config.INTERNET_CHECKS
+    if isinstance(custom, (list, tuple)):
+        return tuple(custom) if custom else config.INTERNET_CHECKS
+    raw = str(custom).strip()
+    if not raw:
+        return config.INTERNET_CHECKS
+    parsed = config._parse_internet_checks(raw)
+    return parsed or config.INTERNET_CHECKS
+
+
 def probe_internet(session, checks=None, timeout=(3.0, 6.0)) -> dict:
     """-> {state, label, detail, status, location}
 

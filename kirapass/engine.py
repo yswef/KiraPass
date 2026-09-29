@@ -47,6 +47,10 @@ def password_value(p: dict, card: str):
         return p.get("pass_fixed", "")
     if mode == "md5user":
         return hashlib.md5(card.encode()).hexdigest()
+    if mode == "sha1user":
+        return hashlib.sha1(card.encode()).hexdigest()
+    if mode == "sha256user":
+        return hashlib.sha256(card.encode()).hexdigest()
     if mode in ("chap", "chap_empty"):
         raw = card if mode == "chap" else ""
         chap = p.get("chap") or {}
@@ -301,17 +305,55 @@ def warm_up(session, p: dict, tries: int = 2) -> dict:
     return None
 
 
+def _ban_evidence(resp, login_url: str, word: str = "", stop: bool = False,
+                  reason: str = "") -> dict:
+    """Structured stop evidence for the operator — never a bypass hint."""
+    body = resp.text or ""
+    has_form = bool(portals.parse_form(body, login_url).inputs)
+    status = getattr(resp, "status", 0) or 0
+    return {
+        "status": status,
+        "word": word or reason or "",
+        "has_form": has_form,
+        "stop": bool(stop),
+        "reason": reason or word or (f"HTTP {status}" if status else ""),
+        # Soft classification for admin diagnostics only — not used to resume.
+        "kind_hint": (
+            "captcha" if reason == "captcha_challenge" else
+            "rate_limit" if status == 429 or (word and ("rate" in word
+                                                        or "slow down" in word
+                                                        or "محاولات" in word)) else
+            "http_block" if status in (403, 503) else
+            "page_block" if word else
+            "unknown"
+        ),
+    }
+
+
 def _is_protective_reply(resp, login_url: str) -> tuple:
-    """Return (stop, evidence) for explicit blocks, limits, or CAPTCHA pages."""
+    """Return (stop, evidence_str, evidence_dict) for blocks / limits / CAPTCHA.
+
+    The string form keeps older call sites working; the dict is the structured
+    ban_evidence written into stop reports for the network admin.
+    """
+    body = resp.text or ""
+    raw = body.lower()
     if resp.status in (403, 429):
-        return True, f"HTTP {resp.status}"
-    raw = (resp.text or "").lower()
-    if any(word in raw for word in ("captcha", "g-recaptcha", "hcaptcha")):
-        return True, "captcha_challenge"
+        reason = f"HTTP {resp.status}"
+        evidence = _ban_evidence(resp, login_url, reason=reason, stop=True)
+        return True, reason, evidence
+    if any(word in raw for word in ("captcha", "g-recaptcha", "hcaptcha",
+                                    "recaptcha", "cf-turnstile")):
+        evidence = _ban_evidence(resp, login_url, reason="captcha_challenge",
+                                 stop=True)
+        return True, "captcha_challenge", evidence
     word = find_phrase(raw, config.BAN_WORDS)
-    if word and not portals.parse_form(resp.text or "", login_url).inputs:
-        return True, word
-    return False, word
+    has_form = bool(portals.parse_form(body, login_url).inputs)
+    if word and not has_form:
+        evidence = _ban_evidence(resp, login_url, word=word, stop=True)
+        return True, word, evidence
+    evidence = _ban_evidence(resp, login_url, word=word, stop=False)
+    return False, word, evidence
 
 
 # ---------------------------------------------------------------------------
@@ -446,13 +488,14 @@ def calibrate(profile: dict, known_card: str = "", keyword: str = "",
         # "slow down" in a warning) - calling that a block used to stop every
         # run on networks that were perfectly reachable.  A real block page
         # replaces the form.
-        page_block, page_evidence = _is_protective_reply(resp, p["login_url"])
+        page_block, page_evidence, page_ban = _is_protective_reply(resp, p["login_url"])
         if page_block:
             is_challenge = page_evidence == "captcha_challenge"
             cal.error = "captcha_challenge" if is_challenge else "blocked_already"
             cal.step("reach_login_page", False,
                      "captcha_challenge" if is_challenge else "blocked_before_probes",
                      {"status": resp.status, "word": page_evidence,
+                      "ban_evidence": page_ban,
                       "advice": "stop_and_contact_network_admin"})
             return cal
         page_word = find_phrase((resp.text or "").lower(), config.BAN_WORDS)
@@ -538,7 +581,7 @@ def calibrate(profile: dict, known_card: str = "", keyword: str = "",
                 return cal
             probe_cards.append(card)
             replies.append(r)
-            protective, evidence = _is_protective_reply(r, p["login_url"])
+            protective, evidence, ban_ev = _is_protective_reply(r, p["login_url"])
             if protective:
                 cal.error = ("captcha_challenge" if evidence == "captcha_challenge"
                              else "blocked_already")
@@ -547,6 +590,7 @@ def calibrate(profile: dict, known_card: str = "", keyword: str = "",
                          else "blocked_by_our_probes",
                          {"advice": "stop_and_contact_network_admin",
                           "status": r.status, "word": evidence,
+                          "ban_evidence": ban_ev,
                           "probes_sent": len(replies)})
                 return cal
             # Rejection pages often rotate a one-use CSRF token.  A browser
@@ -688,7 +732,8 @@ def _tune_with_known_card(p: dict, known_card: str, fp: Fingerprinter, session,
     trusted until the logout restores the previously walled state.
     """
     dsts = list(dict.fromkeys([p.get("dst_value", ""), ""]))
-    modes = ["empty", "same", "omit", "chap", "chap_empty", "md5user"]
+    modes = ["empty", "same", "omit", "chap", "chap_empty",
+             "md5user", "sha1user", "sha256user"]
     if p.get("chap") is None:
         modes = [m for m in modes if not m.startswith("chap")]
     best = None
@@ -740,7 +785,7 @@ def _tune_with_known_card(p: dict, known_card: str, fp: Fingerprinter, session,
         verdict = judge.classify(r, submitted_values(trial, known_card))
         body = (r.text or "").lower()
         p = absorb_form(trial, r.text or "", r.url or trial["login_url"])
-        protective, protective_reason = _is_protective_reply(r, p["login_url"])
+        protective, protective_reason, ban_ev = _is_protective_reply(r, p["login_url"])
         if protective:
             verdict_code = ("CHALLENGE" if protective_reason == "captcha_challenge"
                             else "RATE_LIMITED" if r.status == 429 else "BANNED")
@@ -751,6 +796,7 @@ def _tune_with_known_card(p: dict, known_card: str, fp: Fingerprinter, session,
                            "content_type": r.header("content-type").split(";")[0],
                            "location": _safe_url_shape(r.location, trial) if r.location else "",
                            "word": protective_reason,
+                           "ban_evidence": ban_ev,
                            "internet_before": before_state,
                            "internet_after": "NOT_CHECKED"})
             break
@@ -841,7 +887,7 @@ def _known_card_preflight(p: dict, card: str, session, internet_before: dict,
                    "content_type": "", "location": "",
                    "internet_after": None, "logout": None}, None, "", None
 
-    protective, evidence = _is_protective_reply(resp, p.get("login_url", ""))
+    protective, evidence, ban_ev = _is_protective_reply(resp, p.get("login_url", ""))
     if protective:
         code = "CHALLENGE" if evidence == "captcha_challenge" else (
             "RATE_LIMITED" if resp.status == 429 else "BANNED")
@@ -849,6 +895,7 @@ def _known_card_preflight(p: dict, card: str, session, internet_before: dict,
                    "reason": evidence, "response_bytes": resp.length,
                    "content_type": resp.header("content-type").split(";")[0],
                    "location": _safe_url_shape(resp.location, p) if resp.location else "",
+                   "ban_evidence": ban_ev,
                    "internet_after": None, "logout": None}, None, evidence, resp
 
     refreshed = absorb_form(p, resp.text or "", resp.url or p.get("login_url", ""))
@@ -945,10 +992,11 @@ def diagnose(profile: dict, threads: int = 0, log=None, checks=None) -> dict:
         t0 = time.time()
         try:
             r = session.get(p["login_url"], allow_redirects=True)
-            blocked, evidence = _is_protective_reply(r, p["login_url"])
+            blocked, evidence, ban_ev = _is_protective_reply(r, p["login_url"])
             if blocked:
                 step("reach", False, "blocked_before_diagnostic_probes",
-                     {"status": r.status, "evidence": evidence})
+                     {"status": r.status, "evidence": evidence,
+                      "ban_evidence": ban_ev})
                 out["advice"].append({"reason": "blocked_already",
                                       "fix": "stop_and_contact_network_admin"})
                 out["ok"] = False
@@ -1043,7 +1091,7 @@ def _sample(session: Session, p: dict, count: int, threads: int) -> dict:
                 stats["errors"] += 1
                 stats["kinds"][err.kind] += 1
             return live
-        blocked, _evidence = _is_protective_reply(r, live["login_url"])
+        blocked, _evidence, _ban_ev = _is_protective_reply(r, live["login_url"])
         fresh = absorb_form(live, r.text or "", r.url or live["login_url"])
         with lock:
             stats["sent"] += 1
@@ -1072,7 +1120,8 @@ def _sample(session: Session, p: dict, count: int, threads: int) -> dict:
                 except Exception:                       # noqa: BLE001
                     page = None
                 if page is not None:
-                    blocked, _evidence = _is_protective_reply(page, p["login_url"])
+                    blocked, _evidence, _ban_ev = _is_protective_reply(
+                        page, p["login_url"])
                     if blocked:
                         halt.set()
                         with lock:
@@ -1180,6 +1229,7 @@ class Engine:
         self._last_event_at = 0.0
         self._clean_streak = 0
         self._ban_count = 0
+        self._last_ban_evidence = None
         self._transport_error_streak = 0
         self._recent = deque(maxlen=config.WATCH_SUSPECTS)   # last cards tried
         self._since_check = []      # cards sent since the last check
@@ -1242,6 +1292,7 @@ class Engine:
                 "review": self.review[-40:],
                 "review_count": len(self.review),
                 "stop_reason": self.stop_reason,
+                "ban_evidence": self._last_ban_evidence,
                 "progress": progress,
                 "speed": round(self.speed, 2),
                 "elapsed": round(elapsed, 1),
@@ -1314,6 +1365,7 @@ class Engine:
         self.throttle.update({"delay_ms": int(delay_ms), "base_ms": int(delay_ms),
                               "reason": "", "events": []})
         self._ban_count = self._rate_count = self._unknown_saved = 0
+        self._last_ban_evidence = None
         self._transport_error_streak = 0
         self._recent.clear()
         self._since_check = []
@@ -1688,14 +1740,30 @@ class Engine:
             # every worker thread touches these counters, so they are only
             # ever changed while holding the lock (a lost update here would
             # mean a ban page that never stops the run)
+            ban_ev = _ban_evidence(
+                resp, self.profile.get("login_url", ""),
+                word=(verdict.data or {}).get("word") or "",
+                reason=verdict.reason or "", stop=True)
             with self.lock:
                 self._ban_count += 1
+                self._last_ban_evidence = ban_ev
             self._apply_delay_pressure("banned")
         elif verdict.code == "RATE_LIMITED":
+            ban_ev = _ban_evidence(
+                resp, self.profile.get("login_url", ""),
+                word=(verdict.data or {}).get("word") or "",
+                reason=verdict.reason or f"HTTP {getattr(resp, 'status', 0)}",
+                stop=True)
             with self.lock:
                 self._rate_count += 1
+                self._last_ban_evidence = ban_ev
             self._apply_delay_pressure("rate_limited", resp)
         elif verdict.code == "CHALLENGE":
+            ban_ev = _ban_evidence(
+                resp, self.profile.get("login_url", ""),
+                reason="captcha_challenge", stop=True)
+            with self.lock:
+                self._last_ban_evidence = ban_ev
             self.stop("captcha_challenge")
 
         with self.lock:
@@ -2079,6 +2147,7 @@ class Engine:
             "plan": self.plan,
             "result": {"stop_reason": self.stop_reason, "hits": self.hits,
                        "state": self.state, "error": self.error},
+            "ban_evidence": self._last_ban_evidence,
             "counters": status["counters"],
             "reason_counts": status.get("reason_counts", {}),
             "net_kinds": status["net_kinds"],
@@ -2159,14 +2228,16 @@ def probe_lockout(profile: dict, checks=None, max_failures: int = 30,
 
         def blocked(r) -> tuple:
             """Protective block/rate-limit/CAPTCHA page, with evidence."""
-            return _is_protective_reply(r, p["login_url"])
+            stop, word, ban_ev = _is_protective_reply(r, p["login_url"])
+            return stop, word, ban_ev
 
-        is_block, word = blocked(resp)
+        is_block, word, ban_ev = blocked(resp)
         if is_block:
             out["error"] = ("captcha_challenge" if word == "captcha_challenge"
                             else "blocked_from_the_start")
             step_row("reach_login_page", False, out["error"],
-                     {"status": resp.status, "word": word})
+                     {"status": resp.status, "word": word,
+                      "ban_evidence": ban_ev})
             return out
         step_row("reach_login_page", True, "http_ok", {"status": resp.status})
 
@@ -2186,21 +2257,24 @@ def probe_lockout(profile: dict, checks=None, max_failures: int = 30,
                          {"text": err.text[:160], "failures": failures})
                 return out
             failures += 1
-            is_block, word = blocked(r)
+            is_block, word, ban_ev = blocked(r)
             if is_block:
                 # The request returning the protective page was not judged.
                 # Record it and stop; never poll for expiry or test another card.
                 out["tried"] = failures
+                out["ban_evidence"] = ban_ev
                 if word == "captcha_challenge":
                     out["error"] = "captcha_challenge"
                     step_row("failures", False, "captcha_challenge",
-                             {"failures": failures, "status": r.status})
+                             {"failures": failures, "status": r.status,
+                              "ban_evidence": ban_ev})
                     return out
                 out["ban_after"] = max(0, failures - 1)
                 out["ok"] = True
                 step_row("failures", True, "blocked_after",
                          {"failures": failures, "forgiven": out["ban_after"],
-                          "status": r.status, "word": word})
+                          "status": r.status, "word": word,
+                          "ban_evidence": ban_ev})
                 step_row("recovery", False, "not_probed_after_lockout",
                          {"advice": "stop_and_contact_network_admin"})
                 return out

@@ -10,7 +10,7 @@ from __future__ import annotations
 import os
 
 APP_NAME = "KiraPass"
-VERSION = "5.8.5"
+VERSION = "5.9.0"
 
 # --------------------------------------------------------------------------
 # Folders
@@ -71,10 +71,23 @@ BASE_HEADERS = {
     "Upgrade-Insecure-Requests": "1",
 }
 
-CONNECT_TIMEOUT = 4.0      # seconds to open the TCP connection
-READ_TIMEOUT = 8.0         # seconds to wait for a page (scan/calibration)
-ATTACK_READ_TIMEOUT = 5.0  # a login POST that takes longer than this is dead
-                           # weight in a guessing loop: count it and move on
+# Timeouts can be raised for very slow RADIUS routers via env vars:
+#   KIRAPASS_CONNECT_TIMEOUT=8
+#   KIRAPASS_READ_TIMEOUT=15
+def _env_float(name: str, default: float) -> float:
+    raw = os.environ.get(name, "")
+    if not raw:
+        return default
+    try:
+        value = float(raw)
+    except ValueError:
+        return default
+    return max(0.5, min(value, 120.0))
+
+
+CONNECT_TIMEOUT = _env_float("KIRAPASS_CONNECT_TIMEOUT", 4.0)
+READ_TIMEOUT = _env_float("KIRAPASS_READ_TIMEOUT", 8.0)
+ATTACK_READ_TIMEOUT = _env_float("KIRAPASS_ATTACK_READ_TIMEOUT", 5.0)
 VERIFY_TLS = False         # captive portals use self-signed certificates
 
 DEFAULT_THREADS = 12
@@ -151,12 +164,25 @@ REJECT_WORDS = (
 )
 
 # Pages/replies carrying these words mean "the router started blocking us".
+# Keep Arabic / French phrases short so whole-word matching still works, and
+# never use ban detection alone when a login form is still on the page (see
+# engine._is_protective_reply) so ordinary rejection text is not a false ban.
 BAN_WORDS = (
     "you are blocked", "your ip is blocked", "ip has been blocked",
     "address is blocked", "access blocked", "<title>blocked", "blocked.html",
     "too many attempts", "too many login attempts", "too many failed",
     "banned", "temporarily blocked", "rate limit", "slow down",
-    "محظور", "تم حظر",
+    "device is blocked", "client is blocked", "mac is blocked",
+    "mac address blocked", "session blocked", "login attempts exceeded",
+    "maximum login attempts", "try again later", "access temporarily denied",
+    # Arabic captive-portal block pages
+    "محظور", "تم حظر", "تم حظرك", "الحظر", "محجوب", "تم حجبك",
+    "جهازك محظور", "تم حظر الجهاز", "تم حظر عنوان", "محظور مؤقتا",
+    "تجاوزت عدد المحاولات", "محاولات كثيرة", "حاول لاحقا",
+    # French captive-portal block pages
+    "vous êtes bloqué", "vous etes bloque", "accès bloqué", "acces bloque",
+    "ip bloquée", "ip bloquee", "temporairement bloqué", "temporairement bloque",
+    "trop de tentatives", "tentatives de connexion",
 )
 
 # Positive words: card accepted
@@ -224,3 +250,11 @@ DEFAULT_PREFIX = ""
 
 # Sampling used when the tool has to talk about the space size.
 BIG_SPACE = 10 ** 12
+# Soft UI warnings (never hard-block): large spaces and aggressive thread counts
+# raise the chance of a router lockout on authorized tests.
+WARN_SPACE = 10 ** 9
+WARN_THREADS = 50
+# Optional automatic cleanup of run reports older than this many days.
+# 0 disables. Override with KIRAPASS_REPORT_RETENTION_DAYS.
+REPORT_RETENTION_DAYS = max(0, int(os.environ.get(
+    "KIRAPASS_REPORT_RETENTION_DAYS", "30") or "0"))

@@ -238,16 +238,23 @@ class Handler(BaseHTTPRequestHandler):
                     "threads": config.DEFAULT_THREADS,
                     "attempts": config.DEFAULT_ATTEMPTS,
                     "delay_ms": config.DEFAULT_DELAY_MS,
+                    "connect_timeout": config.CONNECT_TIMEOUT,
+                    "read_timeout": config.READ_TIMEOUT,
+                    "warn_space": config.WARN_SPACE,
+                    "warn_threads": config.WARN_THREADS,
                 },
                 "presets": [
                     {"id": "safe", "threads": 4, "attempts": 500, "delay_ms": 60},
                     {"id": "normal", "threads": 12, "attempts": 2000, "delay_ms": 0},
                     {"id": "fast", "threads": 40, "attempts": 10000, "delay_ms": 0},
                 ],
+                "settings": dict(srv.store.settings or {}),
                 "cache": srv.store.cache_info(),
                 "data_dir": config.DATA_DIR,
                 "profiles": [_profile_brief(p) for p in srv.store.all()],
                 "license": "authorized_use_only",
+                "lan_open": self.server.server_address[0] not in (
+                    "127.0.0.1", "localhost", "::1"),
             })
         if route == "/api/profiles":
             return self._json({"ok": True,
@@ -328,17 +335,21 @@ class Handler(BaseHTTPRequestHandler):
         if route == "/api/diagnose":
             prof = store.migrate(data.get("profile") or {})
             threads = int(data.get("threads") or 0)
+            checks = self._internet_checks()
             job = srv.submit("diagnose",
-                             lambda: engine.diagnose(prof, threads=threads))
+                             lambda: engine.diagnose(prof, threads=threads,
+                                                     checks=checks))
             return self._json({"ok": True, "job": job.as_dict()})
         if route == "/api/calibrate":
             prof = store.migrate(data.get("profile") or {})
             known = (data.get("known_card") or "").strip()
             keyword = (data.get("keyword") or "").strip()
+            checks = self._internet_checks()
 
             def run_calibration():
                 result = engine.calibrate(prof, known_card=known,
-                                          keyword=keyword).as_dict()
+                                          keyword=keyword,
+                                          checks=checks).as_dict()
                 report = {
                     "tool": config.APP_NAME, "version": config.VERSION,
                     "finished": time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -357,13 +368,30 @@ class Handler(BaseHTTPRequestHandler):
             # Explicitly opted-in, capped check; the engine stops on the first
             # block response and never waits for expiry or retries afterward.
             prof = store.migrate(data.get("profile") or {})
+            checks = self._internet_checks()
             job = srv.submit("lockout",
                              lambda: engine.probe_lockout(
                                  prof,
-                                 max_failures=int(data.get("max_failures") or 8)))
+                                 max_failures=int(data.get("max_failures") or 8),
+                                 checks=checks))
             return self._json({"ok": True, "job": job.as_dict()})
         if route == "/api/run/start":
             prof = store.migrate(data.get("profile") or {})
+            # Apply the operator's custom internet-check URL for this run.
+            srv.engine.checks = self._internet_checks()
+            # Honour advanced connect timeout from settings when present.
+            ct = srv.store.get_setting("connect_timeout")
+            if ct:
+                try:
+                    config.CONNECT_TIMEOUT = float(ct)
+                except (TypeError, ValueError):
+                    pass
+            rt = srv.store.get_setting("read_timeout")
+            if rt:
+                try:
+                    config.READ_TIMEOUT = float(rt)
+                except (TypeError, ValueError):
+                    pass
             result = srv.engine.start(
                 prof,
                 attempts=int(data.get("attempts") or config.DEFAULT_ATTEMPTS),
@@ -392,7 +420,61 @@ class Handler(BaseHTTPRequestHandler):
         if route == "/api/settings":
             if "lang" in data:
                 srv.store.set_setting("lang", str(data["lang"])[:5])
+            if "internet_check_url" in data:
+                raw = str(data.get("internet_check_url") or "").strip()[:400]
+                srv.store.set_setting("internet_check_url", raw)
+            if "connect_timeout" in data:
+                try:
+                    value = float(data.get("connect_timeout") or 0)
+                    if 0.5 <= value <= 120:
+                        srv.store.set_setting("connect_timeout", value)
+                        config.CONNECT_TIMEOUT = value
+                except (TypeError, ValueError):
+                    pass
+            if "read_timeout" in data:
+                try:
+                    value = float(data.get("read_timeout") or 0)
+                    if 0.5 <= value <= 120:
+                        srv.store.set_setting("read_timeout", value)
+                        config.READ_TIMEOUT = value
+                except (TypeError, ValueError):
+                    pass
             return self._json({"ok": True, "settings": srv.store.settings})
+        if route == "/api/probe-link":
+            return self._probe_link(data)
+        if route == "/api/profiles/export":
+            name = (data.get("name") or "").strip()
+            prof = srv.store.get(name) if name else None
+            if not prof:
+                return self._error("profile_not_found", 404)
+            safe = engine.safe_profile_snapshot(prof)
+            return self._json({"ok": True, "profile": safe})
+        if route == "/api/profiles/import":
+            raw = data.get("profile") or {}
+            if not isinstance(raw, dict):
+                return self._error("bad_profile", 400)
+            prof = store.migrate(raw)
+            # Never import live secrets from a hand-edited file.
+            if prof.get("pass_fixed"):
+                prof["pass_fixed"] = ""
+            problems = store.validate(prof)
+            hard = [p for p in problems if p not in
+                    ("space_is_astronomically_big", "needs_browser_js")]
+            if hard and not data.get("force"):
+                return self._json({"ok": False, "problems": problems}, 400)
+            saved = srv.store.put(prof)
+            return self._json({"ok": True, "profile": saved,
+                               "profiles": [_profile_brief(p)
+                                            for p in srv.store.all()]})
+        if route == "/api/cache/cleanup-old":
+            days = data.get("days")
+            try:
+                days = int(days) if days is not None else None
+            except (TypeError, ValueError):
+                days = None
+            result = srv.store.cleanup_old_reports(days=days)
+            return self._json({"ok": True, "cleanup": result,
+                               "cache": srv.store.cache_info()})
         if route == "/api/capture/start":
             return self._capture_start(data)
         if route == "/api/capture/step":
@@ -410,6 +492,48 @@ class Handler(BaseHTTPRequestHandler):
         return self._error("not_found", 404)
 
     # -- helpers ---------------------------------------------------------
+    def _internet_checks(self):
+        custom = (self.server.store.get_setting("internet_check_url", "")
+                  or "").strip()
+        return verify.resolve_internet_checks(custom or None)
+
+    def _probe_link(self, data) -> None:
+        """Single GET to the login URL — connectivity check, no guessing."""
+        url = (data.get("url") or "").strip()
+        if not url:
+            return self._error("url_required", 400)
+        if not url.startswith(("http://", "https://")):
+            url = "http://" + url.lstrip("/")
+        session = Session(allow_redirects=True)
+        t0 = time.time()
+        try:
+            resp = session.get(url, allow_redirects=True)
+            ms = round((time.time() - t0) * 1000)
+            form = portals.parse_form(resp.text or "", resp.url or url)
+            return self._json({
+                "ok": True,
+                "reachable": True,
+                "status": resp.status,
+                "ms": ms,
+                "final_url": resp.url or url,
+                "has_login_form": bool(form and form.inputs),
+                "length": resp.length,
+                "hint": "reachable",
+            })
+        except Exception as exc:                              # noqa: BLE001
+            from ..errors import classify
+            err = classify(exc, url)
+            return self._json({
+                "ok": False,
+                "reachable": False,
+                "error": err.kind,
+                "detail": err.text[:200],
+                "hint": err.kind,
+                "ms": round((time.time() - t0) * 1000),
+            })
+        finally:
+            session.close()
+
     def _scan(self, data) -> None:
         url = (data.get("url") or "").strip()
         if not url.startswith(("http://", "https://")):
@@ -425,7 +549,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json({"ok": False, "error": f"net_{err.kind}",
                                    "detail": err.text[:200],
                                    "hint": err.short}, 200)
-            internet = verify.probe_internet(session)
+            internet = verify.probe_internet(session,
+                                             checks=self._internet_checks())
             return self._json({"ok": True, "portal": portal.as_dict(),
                                "internet": internet,
                                "ms": round((time.time() - t0) * 1000)})

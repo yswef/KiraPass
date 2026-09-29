@@ -28,7 +28,7 @@ CHARSETS = {
     "hex_upper": "0123456789ABCDEF",
 }
 PASS_MODES = ("same", "empty", "omit", "fixed", "chap", "chap_empty",
-              "md5user")
+              "md5user", "sha1user", "sha256user")
 
 
 def ensure_dirs() -> None:
@@ -325,7 +325,7 @@ class Store:
         path = os.path.join(config.REVIEW_DIR, name)
         try:
             with open(path, "w", encoding="utf-8") as fh:
-                fh.write(body[:400000])
+                fh.write(redact_review_body(body or "")[:400000])
         except OSError:
             return {}
         try:
@@ -356,10 +356,39 @@ class Store:
 
     def save_run(self, report: dict) -> str:
         ensure_dirs()
+        self.cleanup_old_reports()
         name = time.strftime("%Y%m%d_%H%M%S") + "_" + clean(report.get("profile", "run"), 24)
         path = os.path.join(config.RUN_DIR, name + ".json")
         atomic_write(path, json.dumps(report, ensure_ascii=False, indent=2))
         return path
+
+    def cleanup_old_reports(self, days: int = None) -> dict:
+        """Delete run reports older than `days` (default from config).
+
+        Optional and never touches hits/profiles. Returns how many files went.
+        """
+        retain = config.REPORT_RETENTION_DAYS if days is None else int(days)
+        if retain <= 0:
+            return {"removed": 0, "freed_bytes": 0, "days": retain}
+        cutoff = time.time() - retain * 86400
+        removed, freed = 0, 0
+        try:
+            names = os.listdir(config.RUN_DIR)
+        except OSError:
+            return {"removed": 0, "freed_bytes": 0, "days": retain}
+        for name in names:
+            if not name.endswith(".json"):
+                continue
+            path = os.path.join(config.RUN_DIR, name)
+            try:
+                if os.path.getmtime(path) < cutoff:
+                    size = os.path.getsize(path)
+                    os.remove(path)
+                    removed += 1
+                    freed += size
+            except OSError:
+                continue
+        return {"removed": removed, "freed_bytes": freed, "days": retain}
 
     def append_hit(self, line: str) -> None:
         ensure_dirs()
@@ -471,6 +500,26 @@ def _remove_path(path: str) -> int:
         return size
     except OSError:
         return 0
+
+
+# MAC / IPv4 patterns used when scrubbing review HTML before it hits disk.
+_REVIEW_MAC_RE = re.compile(
+    r"\b(?:[0-9a-fA-F]{2}[:-]){5}[0-9a-fA-F]{2}\b")
+_REVIEW_IP_RE = re.compile(
+    r"\b(?:(?:25[0-5]|2[0-4]\d|[01]?\d?\d)\.){3}"
+    r"(?:25[0-5]|2[0-4]\d|[01]?\d?\d)\b")
+
+
+def redact_review_body(body: str) -> str:
+    """Strip client MAC/IP addresses from review pages before saving.
+
+    Review HTML can echo the guest device identity; keep the page shape for
+    the operator without storing those identifiers on disk.
+    """
+    text = body or ""
+    text = _REVIEW_MAC_RE.sub("[mac-redacted]", text)
+    text = _REVIEW_IP_RE.sub("[ip-redacted]", text)
+    return text
 
 
 def human_size(num: int) -> str:

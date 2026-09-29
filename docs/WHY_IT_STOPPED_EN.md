@@ -150,3 +150,19 @@ python3 tools/practice_portal.py --card 0201240007 --ban-after 300
 The practice portal is the same code path as the mock routers in the self-test,
 so what you watch on `http://127.0.0.1:8899/login` is exactly what the tool does
 on a real hotspot.
+
+---
+
+## target_unreachable — outage or block?
+
+When the tool stops with `target_unreachable`, several requests in a row got
+no HTTP answer at all. An outage and an admin-level block **cannot be told
+apart automatically**. Required safe behaviour:
+
+1. Immediate stop — no reconnect, no IP/MAC change.
+2. Manual review by the network administrator.
+3. Resume only via “Manual resume after admin review” after confirmation.
+
+Stop reports include `ban_evidence` (status / word / has_form / kind_hint)
+when the cause is a block or rate-limit page, to help the admin diagnose —
+never to suggest a bypass.
