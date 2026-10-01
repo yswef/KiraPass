@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ملف capture.py · KiraPass</title>
+<link rel="stylesheet" href="../assets/docs.css">
+
+</head>
+<body>
+<div id="kp-layout">
+<main class="doc">
+<h1>ملف <code>capture.py</code></h1>
+<p class="lead">المسجّل اليدوي: اعتراض البوابة وتنقيح الأسرار — <code>kirapass/capture.py</code></p>
+<div class="card info"><b>هذه الصفحة مولّدة آلياً</b> من مصدر الكود مباشرة (<code>tools/docs/build_docs.py</code>). إن غيّرت الكود فأعد توليدها: <code>python3 tools/docs/build_docs.py</code>. الشرح اليدوي الأوسع في <a href="../architecture.html">المعمارية</a> و<a href="../editing.html">دليل التعديل</a> و<a href="../danger.html">أماكن الخطر</a>.</div>
+<div class="grid3"><div class="card"><b>1232</b><br>سطراً</div><div class="card"><b>46</b><br>دالة</div><div class="card"><b>3</b><br>صنف</div></div>
+<div class="note"><b>ملخّص المؤلف للملف (نصه الأصلي بالإنجليزية):</b> <span class="muted">Interactive, redacted browser-assisted portal recorder.</span></div>
+<p><a class="btn primary" href="../src/capture.html">افتح المصدر كاملاً مرقّماً</a></p>
+<h2 id="imports">الاستيرادات</h2><table class="t compact"><thead><tr><th>السطر</th><th>الاستيراد</th><th>لماذا</th></tr></thead><tbody>
+<tr><td class="mono">14</td><td class="mono">from __future__ import annotations</td><td>استيراد annotations من الوحدة __future__</td></tr>
+<tr><td class="mono">16</td><td class="mono">import hashlib</td><td>استيراد الوحدة hashlib من المكتبة</td></tr>
+<tr><td class="mono">17</td><td class="mono">import html</td><td>استيراد الوحدة html من المكتبة</td></tr>
+<tr><td class="mono">18</td><td class="mono">from html.parser import HTMLParser</td><td>استيراد HTMLParser من الوحدة html.parser</td></tr>
+<tr><td class="mono">19</td><td class="mono">import json</td><td>استيراد الوحدة json من المكتبة</td></tr>
+<tr><td class="mono">20</td><td class="mono">import re</td><td>استيراد الوحدة re من المكتبة</td></tr>
+<tr><td class="mono">21</td><td class="mono">import threading</td><td>استيراد الوحدة threading من المكتبة</td></tr>
+<tr><td class="mono">22</td><td class="mono">import time</td><td>استيراد الوحدة time من المكتبة</td></tr>
+<tr><td class="mono">23</td><td class="mono">import uuid</td><td>استيراد الوحدة uuid من المكتبة</td></tr>
+<tr><td class="mono">24</td><td class="mono">from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit</td><td>استيراد parse_qsl, urlencode, urljoin, urlsplit, urlunsplit من الوحدة urllib.parse</td></tr>
+<tr><td class="mono">26</td><td class="mono">from . import portals, store</td><td>استيراد portals, store من الوحدة .</td></tr>
+<tr><td class="mono">27</td><td class="mono">from .httpclient import MAX_REDIRECTS, Session</td><td>استيراد MAX_REDIRECTS, Session من الوحدة httpclient</td></tr>
+</tbody></table>
+<h2 id="vars">متغيرات وثوابت على مستوى الوحدة</h2><div class="scroll-x"><table class="t compact"><thead><tr><th>الاسم</th><th>السطر</th><th>القيمة</th><th>الشرح</th></tr></thead><tbody>
+<tr><td class="mono"><span class="tag var">SECRET_NAME_RE</span></td><td class="mono"><a href="../src/capture.html#L29">29</a></td><td class="mono">re.compile(&#x27;(pass|passwd|pwd|pin|user|username|login|card|voucher|acco</td><td>إسناد نتيجة استدعاء re.compile (2 معاملات) إلى SECRET_NAME_RE</td></tr>
+<tr><td class="mono"><span class="tag var">TOKEN_NAME_RE</span></td><td class="mono"><a href="../src/capture.html#L33">33</a></td><td class="mono">re.compile(&#x27;(token|csrf|nonce|session|chap|challenge|tok$|authenticity</td><td>إسناد نتيجة استدعاء re.compile (2 معاملات) إلى TOKEN_NAME_RE</td></tr>
+<tr><td class="mono"><span class="tag var">HEX32_RE</span></td><td class="mono"><a href="../src/capture.html#L35">35</a></td><td class="mono">re.compile(&#x27;^[0-9a-fA-F]{32}$&#x27;)</td><td>إسناد نتيجة استدعاء re.compile (معامل واحد) إلى HEX32_RE</td></tr>
+<tr><td class="mono"><span class="tag var">HEX40_RE</span></td><td class="mono"><a href="../src/capture.html#L36">36</a></td><td class="mono">re.compile(&#x27;^[0-9a-fA-F]{40}$&#x27;)</td><td>إسناد نتيجة استدعاء re.compile (معامل واحد) إلى HEX40_RE</td></tr>
+<tr><td class="mono"><span class="tag var">HEX64_RE</span></td><td class="mono"><a href="../src/capture.html#L37">37</a></td><td class="mono">re.compile(&#x27;^[0-9a-fA-F]{64}$&#x27;)</td><td>إسناد نتيجة استدعاء re.compile (معامل واحد) إلى HEX64_RE</td></tr>
+<tr><td class="mono"><span class="tag var">WORD_RE</span></td><td class="mono"><a href="../src/capture.html#L38">38</a></td><td class="mono">re.compile(&#x27;[A-Za-z\\u0600-\\u06FF]{4,}&#x27;)</td><td>إسناد نتيجة استدعاء re.compile (معامل واحد) إلى WORD_RE</td></tr>
+<tr><td class="mono"><span class="tag var">SKIP_WORDS</span></td><td class="mono"><a href="../src/capture.html#L39">39</a></td><td class="mono">{&#x27;html&#x27;, &#x27;head&#x27;, &#x27;body&#x27;, &#x27;div&#x27;, &#x27;span&#x27;, &#x27;form&#x27;, &#x27;input&#x27;, &#x27;script&#x27;, &#x27;st</td><td>إسناد مجموعة فريدة إلى SKIP_WORDS</td></tr>
+<tr><td class="mono"><span class="tag var">STANDARD_HEADERS</span></td><td class="mono"><a href="../src/capture.html#L47">47</a></td><td class="mono">{&#x27;host&#x27;, &#x27;user-agent&#x27;, &#x27;cookie&#x27;, &#x27;content-type&#x27;, &#x27;content-length&#x27;, &#x27;ac</td><td>إسناد مجموعة فريدة إلى STANDARD_HEADERS</td></tr>
+<tr><td class="mono"><span class="tag var">KNOWN_PASS_MODES</span></td><td class="mono"><a href="../src/capture.html#L53">53</a></td><td class="mono">(&#x27;same&#x27;, &#x27;empty&#x27;, &#x27;omit&#x27;, &#x27;md5user&#x27;, &#x27;sha1user&#x27;, &#x27;sha256user&#x27;, &#x27;chap&#x27;,</td><td>إسناد مجموعة إلى KNOWN_PASS_MODES</td></tr>
+<tr><td class="mono"><span class="tag var">AR_UNKNOWN_JS</span></td><td class="mono"><a href="../src/capture.html#L56">56</a></td><td class="mono">&#x27;تحويل كلمة المرور في الصفحة يستخدم JavaScript مخصصاً غير معروف، لذلك </td><td>إسناد القيمة الثابتة AR_UNKNOWN_JS</td></tr>
+<tr><td class="mono"><span class="tag var">AR_NEXT_UNKNOWN</span></td><td class="mono"><a href="../src/capture.html#L60">60</a></td><td class="mono">&#x27;الخطوة التالية: سجّل الدخول يدوياً عند الحاجة عبر المتصفح، وافتح دليل</td><td>إسناد القيمة الثابتة AR_NEXT_UNKNOWN</td></tr>
+<tr><td class="mono"><span class="tag var">AR_NEXT_UNKNOWN_EN</span></td><td class="mono"><a href="../src/capture.html#L66">66</a></td><td class="mono">&#x27;Next: log in by hand in a browser when needed, and open docs/GUIDE_EN</td><td>إسناد القيمة الثابتة AR_NEXT_UNKNOWN_EN</td></tr>
+<tr><td class="mono"><span class="tag var">AR_HTTP200</span></td><td class="mono"><a href="../src/capture.html#L72">72</a></td><td class="mono">&#x27;HTTP 200 وحده ليس دليلاً على نجاح أو رفض. علّم الصفحة بنفسك (نجاح / ر</td><td>إسناد القيمة الثابتة AR_HTTP200</td></tr>
+<tr><td class="mono"><span class="tag var">INTERCEPTOR</span></td><td class="mono"><a href="../src/capture.html#L445">445</a></td><td class="mono">&#x27;\n(function () {\n  var CFG = window.__KP__ || {};\n  var parentWin =</td><td></td></tr>
+<tr><td class="mono"><span class="tag var">VIEW_PAGE</span></td><td class="mono"><a href="../src/capture.html#L663">663</a></td><td class="mono">&#x27;&lt;!DOCTYPE html&gt;\n&lt;html lang=&quot;ar&quot; dir=&quot;rtl&quot;&gt;\n&lt;head&gt;\n&lt;meta charset=&quot;u</td><td></td></tr>
+<tr><td class="mono"><span class="tag var">HUB</span></td><td class="mono"><a href="../src/capture.html#L1231">1231</a></td><td class="mono">Hub()</td><td>إسناد نتيجة استدعاء Hub إلى HUB</td></tr>
+</tbody></table></div>
+<h2 id="classes">الأصناف</h2>
+<div class="sym head" id="c-_VisibleBodyText"><span class="tag mod">صنف</span> <b>_VisibleBodyText</b> يرث من HTMLParser <a class="tag api" href="../src/capture.html#L307">سطر 307</a><div>تعريف الصنف _VisibleBodyText يرث من HTMLParser</div></div>
+<div class="sym body">دواله: <a href="#f-_VisibleBodyText.__init__"><code>__init__</code></a> · <a href="#f-_VisibleBodyText.handle_starttag"><code>handle_starttag</code></a> · <a href="#f-_VisibleBodyText.handle_endtag"><code>handle_endtag</code></a> · <a href="#f-_VisibleBodyText.handle_data"><code>handle_data</code></a></div>
+<div class="sym head" id="c-Capture"><span class="tag mod">صنف</span> <b>Capture</b> <a class="tag api" href="../src/capture.html#L797">سطر 797</a><div>تعريف الصنف Capture</div></div>
+<div class="sym body">دواله: <a href="#f-Capture.__init__"><code>__init__</code></a> · <a href="#f-Capture.close"><code>close</code></a> · <a href="#f-Capture.as_public"><code>as_public</code></a></div>
+<div class="sym head" id="c-Hub"><span class="tag mod">صنف</span> <b>Hub</b> <a class="tag api" href="../src/capture.html#L856">سطر 856</a><div>تعريف الصنف Hub</div></div>
+<div class="sym body">دواله: <a href="#f-Hub.__init__"><code>__init__</code></a> · <a href="#f-Hub.get"><code>get</code></a> · <a href="#f-Hub._remember"><code>_remember</code></a> · <a href="#f-Hub.start"><code>start</code></a> · <a href="#f-Hub.step"><code>step</code></a> · <a href="#f-Hub.mark"><code>mark</code></a> · <a href="#f-Hub.finish"><code>finish</code></a> · <a href="#f-Hub.status"><code>status</code></a> · <a href="#f-Hub.report_of"><code>report_of</code></a> · <a href="#f-Hub._learn_password"><code>_learn_password</code></a> · <a href="#f-Hub._exchange"><code>_exchange</code></a> · <a href="#f-Hub._build_report"><code>_build_report</code></a> · <a href="#f-Hub._build_profile"><code>_build_profile</code></a></div>
+<h2 id="funcs">الدوال — واحدة واحدة</h2>
+<div class="sym head" id="f-_safe_page_url"><span class="tag fn">دالة</span> <b>_safe_page_url(url)</b>
+ <span class="muted">→ str</span>
+ <a class="tag api" href="../src/capture.html#L78">سطر 78–79</a>
+<div>تعريف الدالة _safe_page_url(url) ترجع str</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/portals.html#f-_safe_page_url"><code>_safe_page_url</code></a><span class="muted">×1 سطر 79</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/capture.html#f-Capture.__init__"><code>Capture.__init__</code></a> <span class="muted">(capture.py:800)</span> <a href="../files/capture.html#f-export_curl"><code>export_curl</code></a> <span class="muted">(capture.py:1198)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-is_kirapass_url"><span class="tag fn">دالة</span> <b>is_kirapass_url(url, guard)</b>
+ <span class="muted">→ bool</span>
+ <a class="tag api" href="../src/capture.html#L83">سطر 83–105</a>
+<div>يمنع كود البوابة من الوصول إلى واجهة الأداة المحلية (SSRF محلي). <span class="muted">(نص المؤلف الأصلي في docstring: True when the portal is trying to talk to this KiraPass process.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>7 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>ghost, guard_p, host, local, path, target</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/capture.html#f-Hub._exchange"><code>Hub._exchange</code></a> <span class="muted">(capture.py:1068)</span> <a href="../files/capture.html#f-Hub.start"><code>Hub.start</code></a> <span class="muted">(capture.py:880)</span> <a href="../files/capture.html#f-Hub.step"><code>Hub.step</code></a> <span class="muted">(capture.py:898)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-looks_secret_name"><span class="tag fn">دالة</span> <b>looks_secret_name(name)</b>
+ <span class="muted">→ bool</span>
+ <a class="tag api" href="../src/capture.html#L108">سطر 108–109</a>
+<div>تعريف الدالة looks_secret_name(name) ترجع bool</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/capture.html#f-Hub.step"><code>Hub.step</code></a> <span class="muted">(capture.py:913)</span> <a href="../files/capture.html#f-custom_header_names"><code>custom_header_names</code></a> <span class="muted">(capture.py:402)</span> <a href="../files/capture.html#f-export_curl"><code>export_curl</code></a> <span class="muted">(capture.py:1208)</span> <a href="../files/capture.html#f-extra_fields_for_profile"><code>extra_fields_for_profile</code></a> <span class="muted">(capture.py:412)</span> <a href="../files/capture.html#f-infer_pass_mode"><code>infer_pass_mode</code></a> <span class="muted">(capture.py:193)</span> <a href="../files/capture.html#f-redact_fields"><code>redact_fields</code></a> <span class="muted">(capture.py:157)</span> <a href="../files/capture.html#f-safe_url"><code>safe_url</code></a> <span class="muted">(capture.py:290)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-looks_token_name"><span class="tag fn">دالة</span> <b>looks_token_name(name)</b>
+ <span class="muted">→ bool</span>
+ <a class="tag api" href="../src/capture.html#L112">سطر 112–113</a>
+<div>تعريف الدالة looks_token_name(name) ترجع bool</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/capture.html#f-export_curl"><code>export_curl</code></a> <span class="muted">(capture.py:1208)</span> <a href="../files/capture.html#f-extra_fields_for_profile"><code>extra_fields_for_profile</code></a> <span class="muted">(capture.py:414)</span> <a href="../files/capture.html#f-redact_fields"><code>redact_fields</code></a> <span class="muted">(capture.py:158)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-looks_live_token"><span class="tag fn">دالة</span> <b>looks_live_token(value)</b>
+ <span class="muted">→ bool</span>
+ <a class="tag api" href="../src/capture.html#L117">سطر 117–127</a>
+<div>قيمة طويلة بشكل hex أو base64 ⇒ تُعتبر رمزاً حياً وتُحذف.</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>5 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>value</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/capture.html#f-export_curl"><code>export_curl</code></a> <span class="muted">(capture.py:1208)</span> <a href="../files/capture.html#f-extra_fields_for_profile"><code>extra_fields_for_profile</code></a> <span class="muted">(capture.py:414)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-field_shape"><span class="tag fn">دالة</span> <b>field_shape(value)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/capture.html#L130">سطر 130–146</a>
+<div>تعريف الدالة field_shape(value) ترجع dict</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>classes, value</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/capture.html#f-redact_fields"><code>redact_fields</code></a> <span class="muted">(capture.py:156)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-redact_fields"><span class="tag fn">دالة</span> <b>redact_fields(fields)</b>
+ <span class="muted">→ list</span>
+ <a class="tag api" href="../src/capture.html#L150">سطر 150–160</a>
+<div>كل حقل باسم سرّي ⇒ يُحفظ طوله وتصنيفه فقط، ولا قيمته.</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>item, out, value</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/capture.html#f-looks_secret_name"><code>looks_secret_name</code></a><span class="muted">×1 سطر 157 (نفس الملف)</span> · <a href="../files/capture.html#f-looks_token_name"><code>looks_token_name</code></a><span class="muted">×1 سطر 158 (نفس الملف)</span> · <a href="../files/capture.html#f-field_shape"><code>field_shape</code></a><span class="muted">×1 سطر 156 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/capture.html#f-Hub._build_report"><code>Hub._build_report</code></a> <span class="muted">(capture.py:1138)</span> <a href="../files/capture.html#f-Hub.step"><code>Hub.step</code></a> <span class="muted">(capture.py:910)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-_md5"><span class="tag fn">دالة</span> <b>_md5(text)</b>
+ <span class="muted">→ str</span>
+ <a class="tag api" href="../src/capture.html#L163">سطر 163–164</a>
+<div>تعريف الدالة _md5(text) ترجع str</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/capture.html#f-infer_pass_mode"><code>infer_pass_mode</code></a> <span class="muted">(capture.py:216)</span> <a href="../files/capture.html#f-infer_pass_mode"><code>infer_pass_mode</code></a> <span class="muted">(capture.py:225)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-_sha1"><span class="tag fn">دالة</span> <b>_sha1(text)</b>
+ <span class="muted">→ str</span>
+ <a class="tag api" href="../src/capture.html#L167">سطر 167–168</a>
+<div>تعريف الدالة _sha1(text) ترجع str</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/capture.html#f-infer_pass_mode"><code>infer_pass_mode</code></a> <span class="muted">(capture.py:232)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-_sha256"><span class="tag fn">دالة</span> <b>_sha256(text)</b>
+ <span class="muted">→ str</span>
+ <a class="tag api" href="../src/capture.html#L171">سطر 171–172</a>
+<div>تعريف الدالة _sha256(text) ترجع str</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/capture.html#f-infer_pass_mode"><code>infer_pass_mode</code></a> <span class="muted">(capture.py:239)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-infer_pass_mode"><span class="tag fn">دالة</span> <b>infer_pass_mode(user_before, pass_before, user_after, pass_after, html, sent_keys)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/capture.html#L177">سطر 177–269</a>
+<div>يستنتج وضع كلمة المرور من كود البوابة. تحويل JS مجهول ⇒ needs_browser_js = True والأداة ترفض الأتمتة بدل أن تدّعي ما لا تعرفه. <span class="muted">(نص المؤلف الأصلي في docstring: Learn only the patterns KiraPass can replay without a browser.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>10 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>chap, custom_constant, form, mode, pass_a, pass_b, pass_field_sent, raw_candidates, sent, transformed, user, user_a, user_b</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/capture.html#f-_md5"><code>_md5</code></a><span class="muted">×2 سطر 225 (نفس الملف)</span> · <a href="../files/portals.html#f-parse_form"><code>parse_form</code></a><span class="muted">×1 سطر 203</span> · <a href="../files/capture.html#f-_sha1"><code>_sha1</code></a><span class="muted">×1 سطر 232 (نفس الملف)</span> · <a href="../files/capture.html#f-_sha256"><code>_sha256</code></a><span class="muted">×1 سطر 239 (نفس الملف)</span> · <a href="../files/capture.html#f-looks_secret_name"><code>looks_secret_name</code></a><span class="muted">×1 سطر 193 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/capture.html#f-Hub._learn_password"><code>Hub._learn_password</code></a> <span class="muted">(capture.py:1035)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-verdict_from_status"><span class="tag fn">دالة</span> <b>verdict_from_status(status, marked)</b>
+ <span class="muted">→ str</span>
+ <a class="tag api" href="../src/capture.html#L272">سطر 272–284</a>
+<div>تعريف الدالة verdict_from_status(status, marked) ترجع str <span class="muted">(نص المؤلف الأصلي في docstring: HTTP 200 is not success or rejection without a mark or other evidence.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>6 موضع <code>return</code></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-safe_url"><span class="tag fn">دالة</span> <b>safe_url(url)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/capture.html#L287">سطر 287–296</a>
+<div>تعريف الدالة safe_url(url) ترجع dict</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>keys, parts</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/capture.html#f-looks_secret_name"><code>looks_secret_name</code></a><span class="muted">×1 سطر 290 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/capture.html#f-Hub._build_report"><code>Hub._build_report</code></a> <span class="muted">(capture.py:1121)</span> <a href="../files/capture.html#f-Hub._build_report"><code>Hub._build_report</code></a> <span class="muted">(capture.py:1122)</span> <a href="../files/capture.html#f-Hub.mark"><code>Hub.mark</code></a> <span class="muted">(capture.py:963)</span> <a href="../files/capture.html#f-_strip_hop"><code>_strip_hop</code></a> <span class="muted">(capture.py:430)</span> <a href="../files/capture.html#f-_strip_hop"><code>_strip_hop</code></a> <span class="muted">(capture.py:431)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-success_url_hint"><span class="tag fn">دالة</span> <b>success_url_hint(url)</b>
+ <span class="muted">→ str</span>
+ <a class="tag api" href="../src/capture.html#L299">سطر 299–304</a>
+<div>تعريف الدالة success_url_hint(url) ترجع str</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>parts, path</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/capture.html#f-Hub.mark"><code>Hub.mark</code></a> <span class="muted">(capture.py:974)</span> <a href="../files/capture.html#f-Hub.mark"><code>Hub.mark</code></a> <span class="muted">(capture.py:980)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-_VisibleBodyText.__init__"><span class="tag fn">دالة</span> <b>_VisibleBodyText.__init__(self)</b>
+ <a class="tag api" href="../src/capture.html#L312">سطر 312–316</a>
+<div>تعريف الدالة __init__(self)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>يُسند إلى</th><td><code>self.ignored, self.in_body, self.parts</code></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-_VisibleBodyText.handle_starttag"><span class="tag fn">دالة</span> <b>_VisibleBodyText.handle_starttag(self, tag, attrs)</b>
+ <a class="tag api" href="../src/capture.html#L318">سطر 318–323</a>
+<div>تعريف الدالة handle_starttag(self, tag, attrs)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>يُسند إلى</th><td><code>self.in_body, tag</code></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-_VisibleBodyText.handle_endtag"><span class="tag fn">دالة</span> <b>_VisibleBodyText.handle_endtag(self, tag)</b>
+ <a class="tag api" href="../src/capture.html#L325">سطر 325–330</a>
+<div>تعريف الدالة handle_endtag(self, tag)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>يُسند إلى</th><td><code>self.in_body, tag</code></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-_VisibleBodyText.handle_data"><span class="tag fn">دالة</span> <b>_VisibleBodyText.handle_data(self, data)</b>
+ <a class="tag api" href="../src/capture.html#L332">سطر 332–334</a>
+<div>تعريف الدالة handle_data(self, data)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-_visible_body_text"><span class="tag fn">دالة</span> <b>_visible_body_text(document)</b>
+ <span class="muted">→ str</span>
+ <a class="tag api" href="../src/capture.html#L337">سطر 337–347</a>
+<div>تعريف الدالة _visible_body_text(document) ترجع str <span class="muted">(نص المؤلف الأصلي في docstring: Return body text only, never tags/attributes/head/script/style contents.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>parser</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/capture.html#f-_VisibleBodyText"><code>_VisibleBodyText</code></a><span class="muted">×1 سطر 339 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/capture.html#f-learn_words"><code>learn_words</code></a> <span class="muted">(capture.py:374)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-_is_login_form"><span class="tag fn">دالة</span> <b>_is_login_form(form)</b>
+ <span class="muted">→ bool</span>
+ <a class="tag api" href="../src/capture.html#L350">سطر 350–365</a>
+<div>تعريف الدالة _is_login_form(form) ترجع bool <span class="muted">(نص المؤلف الأصلي في docstring: Require real username and password inputs, not a status-page action form.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>has_password, has_user, inputs, pass_kind, pass_name, user_kind, user_name</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/capture.html#f-Hub._exchange"><code>Hub._exchange</code></a> <span class="muted">(capture.py:1097)</span> <a href="../files/capture.html#f-Hub._learn_password"><code>Hub._learn_password</code></a> <span class="muted">(capture.py:1025)</span> <a href="../files/capture.html#f-Hub.mark"><code>Hub.mark</code></a> <span class="muted">(capture.py:953)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-learn_words"><span class="tag fn">دالة</span> <b>learn_words(text, strip_values)</b>
+ <span class="muted">→ list</span>
+ <a class="tag api" href="../src/capture.html#L370">سطر 370–387</a>
+<div>كلمات النجاح من نص body المرئي فقط (لا script ولا style ولا meta)، وتُحذف منها القيم التي أدخلها المستخدم حتى لا تُتعلَّم بطاقته ككلمة نجاح.</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>blob, low</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/capture.html#f-_visible_body_text"><code>_visible_body_text</code></a><span class="muted">×1 سطر 374 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/capture.html#f-Hub.mark"><code>Hub.mark</code></a> <span class="muted">(capture.py:962)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-cookie_names_from_session"><span class="tag fn">دالة</span> <b>cookie_names_from_session(session)</b>
+ <span class="muted">→ list</span>
+ <a class="tag api" href="../src/capture.html#L390">سطر 390–395</a>
+<div>تعريف الدالة cookie_names_from_session(session) ترجع list</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>jar, names</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/httpclient.html#f-CookieStore.names"><code>CookieStore.names</code></a><span class="muted">×1 سطر 393</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/capture.html#f-Hub._exchange"><code>Hub._exchange</code></a> <span class="muted">(capture.py:1084)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-custom_header_names"><span class="tag fn">دالة</span> <b>custom_header_names(headers)</b>
+ <span class="muted">→ list</span>
+ <a class="tag api" href="../src/capture.html#L398">سطر 398–405</a>
+<div>تعريف الدالة custom_header_names(headers) ترجع list</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>low, out</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/capture.html#f-looks_secret_name"><code>looks_secret_name</code></a><span class="muted">×1 سطر 402 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/capture.html#f-_strip_hop"><code>_strip_hop</code></a> <span class="muted">(capture.py:436)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-extra_fields_for_profile"><span class="tag fn">دالة</span> <b>extra_fields_for_profile(fields)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/capture.html#L408">سطر 408–417</a>
+<div>تعريف الدالة extra_fields_for_profile(fields) ترجع dict</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>extras, low</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/capture.html#f-looks_secret_name"><code>looks_secret_name</code></a><span class="muted">×1 سطر 412 (نفس الملف)</span> · <a href="../files/capture.html#f-looks_token_name"><code>looks_token_name</code></a><span class="muted">×1 سطر 414 (نفس الملف)</span> · <a href="../files/capture.html#f-looks_live_token"><code>looks_live_token</code></a><span class="muted">×1 سطر 414 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/capture.html#f-Hub._build_profile"><code>Hub._build_profile</code></a> <span class="muted">(capture.py:1156)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-_strip_hop"><span class="tag fn">دالة</span> <b>_strip_hop(resp)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/capture.html#L420">سطر 420–438</a>
+<div>تعريف الدالة _strip_hop(resp) ترجع dict</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>cookie_names, piece, set_cookie</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/capture.html#f-safe_url"><code>safe_url</code></a><span class="muted">×2 سطر 430 (نفس الملف)</span> · <a href="../files/capture.html#f-custom_header_names"><code>custom_header_names</code></a><span class="muted">×1 سطر 436 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/capture.html#f-Hub._exchange"><code>Hub._exchange</code></a> <span class="muted">(capture.py:1077)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-rewrite_html"><span class="tag fn">دالة</span> <b>rewrite_html(page_html, base_url, capture_id, guard)</b>
+ <span class="muted">→ str</span>
+ <a class="tag api" href="../src/capture.html#L643">سطر 643–659</a>
+<div>يعيد كتابة صفحة البوابة لتعمل داخل إطار معزول: CSP + base + اعتراض النماذج.</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>base, cfg, inject, raw</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/capture.html#f-Capture.as_public"><code>Capture.as_public</code></a> <span class="muted">(capture.py:844)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-view_page"><span class="tag fn">دالة</span> <b>view_page(capture_id, token)</b>
+ <span class="muted">→ bytes</span>
+ <a class="tag api" href="../src/capture.html#L788">سطر 788–794</a>
+<div>تعريف الدالة view_page(capture_id, token) ترجع bytes</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>page</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/server.html#f-Handler._capture_view"><code>Handler._capture_view</code></a> <span class="muted">(server.py:666)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Capture.__init__"><span class="tag fn">دالة</span> <b>Capture.__init__(self, url, guard)</b>
+ <a class="tag api" href="../src/capture.html#L798">سطر 798–830</a>
+<div>تعريف الدالة __init__(self, url, guard)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>يُسند إلى</th><td><code>self._last_raw_fields, self._strip_values, self.content_types, self.cookie_names, self.created, self.custom_headers, self.events, self.form, self.guard, self.hint_ar, self.html, self.id, self.last_fields_redacted, self.last_status, self.login_html, self.marks…</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/capture.html#f-_safe_page_url"><code>_safe_page_url</code></a><span class="muted">×1 سطر 800 (نفس الملف)</span> · <a href="../files/httpclient.html#f-Session"><code>Session</code></a><span class="muted">×1 سطر 802</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Capture.close"><span class="tag fn">دالة</span> <b>Capture.close(self)</b>
+ <a class="tag api" href="../src/capture.html#L832">سطر 832–836</a>
+<div>تعريف الدالة close(self)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/capture.html#f-Capture.close"><code>Capture.close</code></a><span class="muted">×1 سطر 834 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/capture.html#f-Capture.close"><code>Capture.close</code></a> <span class="muted">(capture.py:834)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Capture.as_public"><span class="tag fn">دالة</span> <b>Capture.as_public(self)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/capture.html#L838">سطر 838–853</a>
+<div>تعريف الدالة as_public(self) ترجع dict</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/capture.html#f-Hub.get"><code>Hub.get</code></a><span class="muted">×4 سطر 845 (نفس الملف)</span> · <a href="../files/capture.html#f-rewrite_html"><code>rewrite_html</code></a><span class="muted">×1 سطر 844 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/capture.html#f-Hub.status"><code>Hub.status</code></a> <span class="muted">(capture.py:1013)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Hub.__init__"><span class="tag fn">دالة</span> <b>Hub.__init__(self)</b>
+ <a class="tag api" href="../src/capture.html#L857">سطر 857–859</a>
+<div>تعريف الدالة __init__(self)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>يُسند إلى</th><td><code>self._items, self._lock</code></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Hub.get"><span class="tag fn">دالة</span> <b>Hub.get(self, capture_id)</b>
+ <span class="muted">→ Capture</span>
+ <a class="tag api" href="../src/capture.html#L861">سطر 861–866</a>
+<div>تعريف الدالة get(self, capture_id) ترجع Capture</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يرفع استثناء</th><td>1 موضع <code>raise</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>cap</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/capture.html#f-Hub.get"><code>Hub.get</code></a><span class="muted">×1 سطر 863 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/capture.html#f-Capture.as_public"><code>Capture.as_public</code></a> <span class="muted">(capture.py:845)</span> <a href="../files/capture.html#f-Capture.as_public"><code>Capture.as_public</code></a> <span class="muted">(capture.py:846)</span> <a href="../files/capture.html#f-Capture.as_public"><code>Capture.as_public</code></a> <span class="muted">(capture.py:847)</span> <a href="../files/capture.html#f-Capture.as_public"><code>Capture.as_public</code></a> <span class="muted">(capture.py:848)</span> <a href="../files/capture.html#f-Hub.finish"><code>Hub.finish</code></a> <span class="muted">(capture.py:986)</span> <a href="../files/capture.html#f-Hub.get"><code>Hub.get</code></a> <span class="muted">(capture.py:863)</span> <a href="../files/capture.html#f-Hub.mark"><code>Hub.mark</code></a> <span class="muted">(capture.py:946)</span> <a href="../files/capture.html#f-Hub.report_of"><code>Hub.report_of</code></a> <span class="muted">(capture.py:1016)</span> <a href="../files/capture.html#f-Hub.status"><code>Hub.status</code></a> <span class="muted">(capture.py:1013)</span> <a href="../files/capture.html#f-Hub.step"><code>Hub.step</code></a> <span class="muted">(capture.py:888)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Hub._remember"><span class="tag fn">دالة</span> <b>Hub._remember(self, cap)</b>
+ <span class="muted">→ None</span>
+ <a class="tag api" href="../src/capture.html#L868">سطر 868–875</a>
+<div>تعريف الدالة _remember(self, cap) ترجع None</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>يُسند إلى</th><td><code>oldest</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/capture.html#f-Hub.start"><code>Hub.start</code></a> <span class="muted">(capture.py:884)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Hub.start"><span class="tag fn">دالة</span> <b>Hub.start(self, url, guard)</b>
+ <span class="muted">→ Capture</span>
+ <a class="tag api" href="../src/capture.html#L877">سطر 877–885</a>
+<div>تعريف الدالة start(self, url, guard) ترجع Capture</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يرفع استثناء</th><td>1 موضع <code>raise</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>cap, url</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/capture.html#f-is_kirapass_url"><code>is_kirapass_url</code></a><span class="muted">×1 سطر 880 (نفس الملف)</span> · <a href="../files/capture.html#f-Capture"><code>Capture</code></a><span class="muted">×1 سطر 882 (نفس الملف)</span> · <a href="../files/capture.html#f-Hub._exchange"><code>Hub._exchange</code></a><span class="muted">×1 سطر 883 (نفس الملف)</span> · <a href="../files/capture.html#f-Hub._remember"><code>Hub._remember</code></a><span class="muted">×1 سطر 884 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Hub.step"><span class="tag fn">دالة</span> <b>Hub.step(self, capture_id, payload, guard)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/capture.html#L887">سطر 887–941</a>
+<div>تعريف الدالة step(self, capture_id, payload, guard) ترجع dict</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>_last_raw_fields, after, before, body, cap, content_type, data, fields, frame_kind, guard, headers, kind, last_fields_redacted, method, parsed, public…</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/capture.html#f-Hub.get"><code>Hub.get</code></a><span class="muted">×1 سطر 888 (نفس الملف)</span> · <a href="../files/capture.html#f-is_kirapass_url"><code>is_kirapass_url</code></a><span class="muted">×1 سطر 898 (نفس الملف)</span> · <a href="../files/capture.html#f-Hub._exchange"><code>Hub._exchange</code></a><span class="muted">×1 سطر 925 (نفس الملف)</span> · <a href="../files/capture.html#f-Hub._learn_password"><code>Hub._learn_password</code></a><span class="muted">×1 سطر 907 (نفس الملف)</span> · <a href="../files/capture.html#f-redact_fields"><code>redact_fields</code></a><span class="muted">×1 سطر 910 (نفس الملف)</span> · <a href="../files/capture.html#f-looks_secret_name"><code>looks_secret_name</code></a><span class="muted">×1 سطر 913 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Hub.mark"><span class="tag fn">دالة</span> <b>Hub.mark(self, capture_id, mark)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/capture.html#L945">سطر 945–982</a>
+<div>تعليم صفحة كنجاح/حالة مرفوض إن كان فيها نموذج دخول: وإلا تُتعلَّم صفحة الدخول نفسها كصفحة نجاح فيصبح كل رفض نجاحاً.</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>4 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>cap, current_form, entry, mark, msg, reject_words, stats_url, success_url_contains, success_words, words</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/capture.html#f-success_url_hint"><code>success_url_hint</code></a><span class="muted">×2 سطر 974 (نفس الملف)</span> · <a href="../files/capture.html#f-Hub.get"><code>Hub.get</code></a><span class="muted">×1 سطر 946 (نفس الملف)</span> · <a href="../files/portals.html#f-parse_form"><code>parse_form</code></a><span class="muted">×1 سطر 952</span> · <a href="../files/capture.html#f-learn_words"><code>learn_words</code></a><span class="muted">×1 سطر 962 (نفس الملف)</span> · <a href="../files/capture.html#f-_is_login_form"><code>_is_login_form</code></a><span class="muted">×1 سطر 953 (نفس الملف)</span> · <a href="../files/capture.html#f-safe_url"><code>safe_url</code></a><span class="muted">×1 سطر 963 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Hub.finish"><span class="tag fn">دالة</span> <b>Hub.finish(self, capture_id, st, hints)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/capture.html#L984">سطر 984–1010</a>
+<div>تعريف الدالة finish(self, capture_id, st, hints) ترجع dict</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>cap, path, profile, public, report, report_name, saved</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/capture.html#f-Hub.get"><code>Hub.get</code></a><span class="muted">×1 سطر 986 (نفس الملف)</span> · <a href="../files/capture.html#f-Hub._build_report"><code>Hub._build_report</code></a><span class="muted">×1 سطر 987 (نفس الملف)</span> · <a href="../files/capture.html#f-Hub._build_profile"><code>Hub._build_profile</code></a><span class="muted">×1 سطر 989 (نفس الملف)</span> · <a href="../files/capture.html#f-os_basename"><code>os_basename</code></a><span class="muted">×1 سطر 993 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Hub.status"><span class="tag fn">دالة</span> <b>Hub.status(self, capture_id)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/capture.html#L1012">سطر 1012–1013</a>
+<div>تعريف الدالة status(self, capture_id) ترجع dict</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/capture.html#f-Capture.as_public"><code>Capture.as_public</code></a><span class="muted">×1 سطر 1013 (نفس الملف)</span> · <a href="../files/capture.html#f-Hub.get"><code>Hub.get</code></a><span class="muted">×1 سطر 1013 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Hub.report_of"><span class="tag fn">دالة</span> <b>Hub.report_of(self, capture_id)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/capture.html#L1015">سطر 1015–1019</a>
+<div>تعريف الدالة report_of(self, capture_id) ترجع dict</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>cap, report</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/capture.html#f-Hub.get"><code>Hub.get</code></a><span class="muted">×1 سطر 1016 (نفس الملف)</span> · <a href="../files/capture.html#f-Hub._build_report"><code>Hub._build_report</code></a><span class="muted">×1 سطر 1018 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Hub._learn_password"><span class="tag fn">دالة</span> <b>Hub._learn_password(self, cap, before, after, sent_keys)</b>
+ <span class="muted">→ None</span>
+ <a class="tag api" href="../src/capture.html#L1022">سطر 1022–1039</a>
+<div>-- الداخليات -------------------------------------------------------</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>يُسند إلى</th><td><code>entered, form, learned, pass_learn</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/capture.html#f-infer_pass_mode"><code>infer_pass_mode</code></a><span class="muted">×1 سطر 1035 (نفس الملف)</span> · <a href="../files/capture.html#f-_is_login_form"><code>_is_login_form</code></a><span class="muted">×1 سطر 1025 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/capture.html#f-Hub.step"><code>Hub.step</code></a> <span class="muted">(capture.py:907)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Hub._exchange"><span class="tag fn">دالة</span> <b>Hub._exchange(self, cap, method, url, data, headers, content_type, kind)</b>
+ <a class="tag api" href="../src/capture.html#L1041">سطر 1041–1113</a>
+<div>تعريف الدالة _exchange(self, cap, method, url, data, headers, content_type, kind)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يرفع استثناء</th><td>1 موضع <code>raise</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>_last_raw_fields, body, cookie_names, ctype, custom_headers, extra, form, hop, hops, html, last, last_fields_redacted, last_status, login_html, low, method…</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/capture.html#f-is_kirapass_url"><code>is_kirapass_url</code></a><span class="muted">×1 سطر 1068 (نفس الملف)</span> · <a href="../files/capture.html#f-_strip_hop"><code>_strip_hop</code></a><span class="muted">×1 سطر 1077 (نفس الملف)</span> · <a href="../files/capture.html#f-cookie_names_from_session"><code>cookie_names_from_session</code></a><span class="muted">×1 سطر 1084 (نفس الملف)</span> · <a href="../files/portals.html#f-parse_form"><code>parse_form</code></a><span class="muted">×1 سطر 1096</span> · <a href="../files/capture.html#f-_is_login_form"><code>_is_login_form</code></a><span class="muted">×1 سطر 1097 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/capture.html#f-Hub.start"><code>Hub.start</code></a> <span class="muted">(capture.py:883)</span> <a href="../files/capture.html#f-Hub.step"><code>Hub.step</code></a> <span class="muted">(capture.py:925)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Hub._build_report"><span class="tag fn">دالة</span> <b>Hub._build_report(self, cap)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/capture.html#L1115">سطر 1115–1148</a>
+<div>تعريف الدالة _build_report(self, cap) ترجع dict</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>report, scrubbed</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/capture.html#f-safe_url"><code>safe_url</code></a><span class="muted">×2 سطر 1121 (نفس الملف)</span> · <a href="../files/capture.html#f-export_curl"><code>export_curl</code></a><span class="muted">×1 سطر 1141 (نفس الملف)</span> · <a href="../files/capture.html#f-_scrub"><code>_scrub</code></a><span class="muted">×1 سطر 1144 (نفس الملف)</span> · <a href="../files/capture.html#f-redact_fields"><code>redact_fields</code></a><span class="muted">×1 سطر 1138 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/capture.html#f-Hub.finish"><code>Hub.finish</code></a> <span class="muted">(capture.py:987)</span> <a href="../files/capture.html#f-Hub.report_of"><code>Hub.report_of</code></a> <span class="muted">(capture.py:1018)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Hub._build_profile"><span class="tag fn">دالة</span> <b>Hub._build_profile(self, cap, hints)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/capture.html#L1150">سطر 1150–1181</a>
+<div>تعريف الدالة _build_profile(self, cap, hints) ترجع dict</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>extra, form, host, mode, needs, prof</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/capture.html#f-extra_fields_for_profile"><code>extra_fields_for_profile</code></a><span class="muted">×1 سطر 1156 (نفس الملف)</span> · <a href="../files/store.html#f-new_profile"><code>new_profile</code></a><span class="muted">×1 سطر 1158</span> · <a href="../files/portals.html#f-parse_form"><code>parse_form</code></a><span class="muted">×1 سطر 1151</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/capture.html#f-Hub.finish"><code>Hub.finish</code></a> <span class="muted">(capture.py:989)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-os_basename"><span class="tag fn">دالة</span> <b>os_basename(path)</b>
+ <span class="muted">→ str</span>
+ <a class="tag api" href="../src/capture.html#L1184">سطر 1184–1186</a>
+<div>تعريف الدالة os_basename(path) ترجع str</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/capture.html#f-Hub.finish"><code>Hub.finish</code></a> <span class="muted">(capture.py:993)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-export_curl"><span class="tag fn">دالة</span> <b>export_curl(cap)</b>
+ <span class="muted">→ str</span>
+ <a class="tag api" href="../src/capture.html#L1190">سطر 1190–1217</a>
+<div>أمر curl منقّح: كل قيمة سرّية ⇒ <redacted> والترويسات المخصصة أسماء فقط. <span class="muted">(نص المؤلف الأصلي في docstring: Build a redacted curl sketch of the last login request (no secrets).)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>body, fields, key, method, parts, raw, url</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/capture.html#f-_safe_page_url"><code>_safe_page_url</code></a><span class="muted">×1 سطر 1198 (نفس الملف)</span> · <a href="../files/capture.html#f-looks_secret_name"><code>looks_secret_name</code></a><span class="muted">×1 سطر 1208 (نفس الملف)</span> · <a href="../files/capture.html#f-looks_token_name"><code>looks_token_name</code></a><span class="muted">×1 سطر 1208 (نفس الملف)</span> · <a href="../files/capture.html#f-looks_live_token"><code>looks_live_token</code></a><span class="muted">×1 سطر 1208 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/capture.html#f-Hub._build_report"><code>Hub._build_report</code></a> <span class="muted">(capture.py:1141)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-_scrub"><span class="tag fn">دالة</span> <b>_scrub(blob, values)</b>
+ <span class="muted">→ str</span>
+ <a class="tag api" href="../src/capture.html#L1220">سطر 1220–1227</a>
+<div>تعريف الدالة _scrub(blob, values) ترجع str</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>out, text</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/capture.html#f-Hub._build_report"><code>Hub._build_report</code></a> <span class="muted">(capture.py:1144)</span></td></tr>
+</table></div>
+<footer class="docfoot">صفحة مولّدة آلياً من مصدر الكود · KiraPass —
+<code>files</code> · 2026-10-01 02:26</footer>
+</main>
+</div>
+<script src="../assets/docs.js"></script>
+<script>KPInit("files");</script>
+</body>
+</html>

@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>واجهات API · KiraPass</title>
+<link rel="stylesheet" href="assets/docs.css">
+
+</head>
+<body>
+<div id="kp-layout">
+<main class="doc">
+<h1>واجهات API</h1>
+<p class="lead">كل مسار HTTP في الأداة: وظيفته، من يستدعيه من الواجهة، وأين يُعالَج في <code>web/server.py</code>.</p>
+<div class="card info"><b>هذه الصفحة مولّدة آلياً</b> من مصدر الكود مباشرة (<code>tools/docs/build_docs.py</code>). إن غيّرت الكود فأعد توليدها: <code>python3 tools/docs/build_docs.py</code>. الشرح اليدوي الأوسع في <a href="architecture.html">المعمارية</a> و<a href="editing.html">دليل التعديل</a> و<a href="danger.html">أماكن الخطر</a>.</div>
+<div class="card warn"><b>التفويض:</b> كل مسار يتطلب رمزاً (<code>?token=</code> أو ترويسة <code>X-KiraPass-Token</code>) باستثناء المسارات الثابتة الأربعة الأولى التي تُخدم قبل التفويض عمداً حتى تستطيع الصفحة أن تطلب الرمز. العميل المحلي (<code>127.0.0.1</code>/<code>::1</code>) مسموح دائماً. المقارنة بـ<code>hmac.compare_digest</code>.</div>
+<h2 id="http">مسارات JSON</h2>
+<div class="scroll-x"><table class="t"><thead><tr><th>المسار</th><th>الأسلوب</th><th>الوظيفة</th><th>معالَج في server.py</th><th>يُستدعى من ui.js</th></tr></thead><tbody>
+<tr><td class="mono"><b>/api/cache</b></td><td><span class="tag get">GET</span></td><td>أحجام المجلدات والملفات على القرص</td><td><a href="src/server.html#L300" class="mono">300</a></td><td><a href="src/ui-js.html#L2337" class="mono">2337</a></td></tr>
+<tr><td class="mono"><b>/api/capture/report</b></td><td><span class="tag get">GET</span></td><td>تقرير المسجّل المنقّح (أو تنزيله)</td><td><a href="src/server.html#L319" class="mono">319</a></td><td><span class="muted">لا يُستدعى مباشرة</span></td></tr>
+<tr><td class="mono"><b>/api/capture/status</b></td><td><span class="tag get">GET</span></td><td>حالة جلسة المسجّل الحالية</td><td><a href="src/server.html#L317" class="mono">317</a></td><td><span class="muted">لا يُستدعى مباشرة</span></td></tr>
+<tr><td class="mono"><b>/api/job</b></td><td><span class="tag get">GET</span></td><td>استطلاع مهمة خلفية (معايرة/تشخيص/قياس حجب)</td><td><a href="src/server.html#L286" class="mono">286</a></td><td><a href="src/ui-js.html#L1571" class="mono">1571</a></td></tr>
+<tr><td class="mono"><b>/api/meta</b></td><td><span class="tag get">GET</span></td><td>هوية الأداة: النسخة، اللغة، المسارات، حدود الإعدادات، وهل يوجد رمز</td><td><a href="src/server.html#L240" class="mono">240</a></td><td><a href="src/ui-js.html#L2647" class="mono">2647</a></td></tr>
+<tr><td class="mono"><b>/api/profiles</b></td><td><span class="tag get">GET</span></td><td>قائمة البروفايلات المحفوظة (بلا قيم سرّية)</td><td><a href="src/server.html#L269" class="mono">269</a></td><td><a href="src/ui-js.html#L1419" class="mono">1419</a></td></tr>
+<tr><td class="mono"><b>/api/profiles/get</b></td><td><span class="tag get">GET</span></td><td>بروفايل واحد بالاسم</td><td><a href="src/server.html#L272" class="mono">272</a></td><td><a href="src/ui-js.html#L1245" class="mono">1245</a>, <a href="src/ui-js.html#L1434" class="mono">1434</a></td></tr>
+<tr><td class="mono"><b>/api/report</b></td><td><span class="tag get">GET</span></td><td>تقرير تشغيل واحد أو تنزيله</td><td><a href="src/server.html#L302" class="mono">302</a></td><td><a href="src/ui-js.html#L1761" class="mono">1761</a>, <a href="src/ui-js.html#L2446" class="mono">2446</a>, <a href="src/ui-js.html#L2446" class="mono">2446</a></td></tr>
+<tr><td class="mono"><b>/api/reports</b></td><td><span class="tag get">GET</span></td><td>قائمة تقارير التشغيل</td><td><a href="src/server.html#L311" class="mono">311</a></td><td><span class="muted">لا يُستدعى مباشرة</span></td></tr>
+<tr><td class="mono"><b>/api/review</b></td><td><span class="tag get">GET</span></td><td>فهرس صفحات المراجعة</td><td><a href="src/server.html#L291" class="mono">291</a></td><td><span class="muted">لا يُستدعى مباشرة</span></td></tr>
+<tr><td class="mono"><b>/api/review/file</b></td><td><span class="tag get">GET</span></td><td>نص صفحة مراجعة واحدة (باسم ملفها)</td><td><a href="src/server.html#L293" class="mono">293</a></td><td><a href="src/ui-js.html#L2126" class="mono">2126</a></td></tr>
+<tr><td class="mono"><b>/api/run/status</b></td><td><span class="tag get">GET</span></td><td>حالة التشغيل + الأحداث الجديدة منذ seq</td><td><a href="src/server.html#L281" class="mono">281</a></td><td><a href="src/ui-js.html#L1970" class="mono">1970</a></td></tr>
+<tr><td class="mono"><b>/api/cache/cleanup-old</b></td><td><span class="tag post">POST</span></td><td>حذف تقارير أقدم من n يوم</td><td><a href="src/server.html#L479" class="mono">479</a></td><td><span class="muted">لا يُستدعى مباشرة</span></td></tr>
+<tr><td class="mono"><b>/api/cache/clear</b></td><td><span class="tag post">POST</span></td><td>مسح البيانات بنطاق: temp/results/profiles/all</td><td><a href="src/server.html#L420" class="mono">420</a></td><td><a href="src/ui-js.html#L2357" class="mono">2357</a>, <a href="src/ui-js.html#L2449" class="mono">2449</a></td></tr>
+<tr><td class="mono"><b>/api/calibrate</b></td><td><span class="tag post">POST</span></td><td>بدء معايرة كمهمة خلفية</td><td><a href="src/server.html#L353" class="mono">353</a></td><td><a href="src/ui-js.html#L1623" class="mono">1623</a></td></tr>
+<tr><td class="mono"><b>/api/capture/finish</b></td><td><span class="tag post">POST</span></td><td>إنهاء الجلسة وبناء البروفايل المقترح</td><td><a href="src/server.html#L494" class="mono">494</a></td><td><span class="muted">لا يُستدعى مباشرة</span></td></tr>
+<tr><td class="mono"><b>/api/capture/mark</b></td><td><span class="tag post">POST</span></td><td>تعليم صفحة كنجاح/حالة (مرفوض إن كان فيها نموذج دخول)</td><td><a href="src/server.html#L492" class="mono">492</a></td><td><span class="muted">لا يُستدعى مباشرة</span></td></tr>
+<tr><td class="mono"><b>/api/capture/start</b></td><td><span class="tag post">POST</span></td><td>بدء جلسة تسجيل على رابط بوابة</td><td><a href="src/server.html#L488" class="mono">488</a></td><td><a href="src/ui-js.html#L1598" class="mono">1598</a></td></tr>
+<tr><td class="mono"><b>/api/capture/step</b></td><td><span class="tag post">POST</span></td><td>إعادة إرسال طلب مسجّل بجلسة خاضعة للرقابة</td><td><a href="src/server.html#L490" class="mono">490</a></td><td><span class="muted">لا يُستدعى مباشرة</span></td></tr>
+<tr><td class="mono"><b>/api/diagnose</b></td><td><span class="tag post">POST</span></td><td>تشخيص «لماذا يتصرف هكذا» بعينات محدودة</td><td><a href="src/server.html#L345" class="mono">345</a></td><td><a href="src/ui-js.html#L1771" class="mono">1771</a></td></tr>
+<tr><td class="mono"><b>/api/format/preview</b></td><td><span class="tag post">POST</span></td><td>معاينة الفضاء والعينات ومشاكل الصيغة</td><td><a href="src/server.html#L329" class="mono">329</a></td><td><a href="src/ui-js.html#L1379" class="mono">1379</a>, <a href="src/ui-js.html#L1546" class="mono">1546</a></td></tr>
+<tr><td class="mono"><b>/api/lockout</b></td><td><span class="tag post">POST</span></td><td>قياس مدى تسامح الراوتر (محدود وبإذن صريح)</td><td><a href="src/server.html#L377" class="mono">377</a></td><td><a href="src/ui-js.html#L1785" class="mono">1785</a></td></tr>
+<tr><td class="mono"><b>/api/probe-link</b></td><td><span class="tag post">POST</span></td><td>طلب GET واحد للرابط لعرضه بلا تخمين</td><td><a href="src/server.html#L453" class="mono">453</a></td><td><a href="src/ui-js.html#L2556" class="mono">2556</a></td></tr>
+<tr><td class="mono"><b>/api/profiles/delete</b></td><td><span class="tag post">POST</span></td><td>حذف بروفايل بالاسم</td><td><a href="src/server.html#L341" class="mono">341</a></td><td><a href="src/ui-js.html#L1257" class="mono">1257</a>, <a href="src/ui-js.html#L2438" class="mono">2438</a></td></tr>
+<tr><td class="mono"><b>/api/profiles/export</b></td><td><span class="tag post">POST</span></td><td>تصدير بروفايل منقّح كنص</td><td><a href="src/server.html#L455" class="mono">455</a></td><td><a href="src/ui-js.html#L2576" class="mono">2576</a></td></tr>
+<tr><td class="mono"><b>/api/profiles/import</b></td><td><span class="tag post">POST</span></td><td>استيراد بروفايل (يمسح pass_fixed)</td><td><a href="src/server.html#L462" class="mono">462</a></td><td><a href="src/ui-js.html#L2595" class="mono">2595</a></td></tr>
+<tr><td class="mono"><b>/api/profiles/save</b></td><td><span class="tag post">POST</span></td><td>حفظ بروفايل (يرحلّه ثم يكتبه)</td><td><a href="src/server.html#L331" class="mono">331</a></td><td><a href="src/ui-js.html#L2427" class="mono">2427</a></td></tr>
+<tr><td class="mono"><b>/api/quit</b></td><td><span class="tag post">POST</span></td><td>إغلاق الأداة (من خيط منفصل حتى لا يعلق)</td><td><a href="src/server.html#L496" class="mono">496</a></td><td><a href="src/ui-js.html#L2401" class="mono">2401</a></td></tr>
+<tr><td class="mono"><b>/api/run/start</b></td><td><span class="tag post">POST</span></td><td>بدء التخمين</td><td><a href="src/server.html#L388" class="mono">388</a></td><td><a href="src/ui-js.html#L1903" class="mono">1903</a>, <a href="src/ui-js.html#L1945" class="mono">1945</a>, <a href="src/ui-js.html#L2224" class="mono">2224</a></td></tr>
+<tr><td class="mono"><b>/api/run/stop</b></td><td><span class="tag post">POST</span></td><td>إيقاف التخمين</td><td><a href="src/server.html#L417" class="mono">417</a></td><td><a href="src/ui-js.html#L1963" class="mono">1963</a></td></tr>
+<tr><td class="mono"><b>/api/scan</b></td><td><span class="tag post">POST</span></td><td>قراءة صفحة الدخول + فحص حالة الإنترنت</td><td><a href="src/server.html#L327" class="mono">327</a></td><td><a href="src/ui-js.html#L1456" class="mono">1456</a></td></tr>
+<tr><td class="mono"><b>/api/settings</b></td><td><span class="tag post">POST</span></td><td>حفظ اللغة/رابط الفحص/المهلات</td><td><a href="src/server.html#L430" class="mono">430</a></td><td><a href="src/ui-js.html#L843" class="mono">843</a>, <a href="src/ui-js.html#L843" class="mono">843</a>, <a href="src/ui-js.html#L2618" class="mono">2618</a></td></tr>
+</tbody></table></div>
+<h2 id="static">المسارات الثابتة</h2><table class="t compact"><thead><tr><th>المسار</th><th>ما يخدمه</th><th>قبل التفويض؟</th></tr></thead><tbody>
+<tr><td class="mono">/</td><td>صفحة الواجهة ui.html</td><td>نعم (يُخدم بلا رمز)</td></tr>
+<tr><td class="mono">/ui.js</td><td>منطق الواجهة</td><td>نعم (يُخدم بلا رمز)</td></tr>
+<tr><td class="mono">/ui.css</td><td>تنسيقات الواجهة</td><td>نعم (يُخدم بلا رمز)</td></tr>
+<tr><td class="mono">/favicon.ico</td><td>أيقونة</td><td>نعم (يُخدم بلا رمز)</td></tr>
+<tr><td class="mono">/capture/view</td><td>عرض البوابة المسجَّلة في إطار معزول (يتطلب تفويضاً)</td><td>لا — يتطلب رمزاً</td></tr>
+</tbody></table>
+<h2 id="shapes">أشكال الحمولات</h2>
+<div class="grid2">
+<div class="card"><b>POST /api/run/start</b><pre>{
+  "profile": { …بروفايل كامل… },
+  "attempts": 2000,      // 1 … 20,000,000
+  "threads": 12,         // 1 … 200
+  "delay_ms": 0,
+  "verify": true,        // فحص إنترنت بعد كل إصابة
+  "auto_stop": true,
+  "resume": true,        // تابع من space_pos
+  "known_card": "0201242548",
+  "preflight_only": false
+}</pre></div>
+<div class="card"><b>GET /api/run/status?since=N</b><pre>{
+  "status": { state, counters, reason_counts,
+              net_kinds, progress, speed,
+              latency, throttle, calibration,
+              hits, review, stop_reason,
+              ban_evidence, plan, seq },
+  "events": [ { seq, t, kind, data } ]
+}</pre></div>
+<div class="card"><b>POST /api/scan</b><pre>{ "url": "http://10.5.50.1/login" }
+→ { ok, ms, portal: { status, url,
+      form: { action, method, user_field,
+              pass_field, chap, inputs,
+              extra_fields, dst_field,
+              dst_value } },
+    internet: { state, detail },
+    problems: [...] }</pre></div>
+<div class="card"><b>POST /api/cache/clear</b><pre>{ "scope": "temp" }   // أو results|profiles|all
+→ { ok, cleared: { scope, removed[],
+      freed_bytes, freed_human },
+    cache: { folders, files, total_bytes } }</pre></div>
+</div>
+<h2 id="errors">أشكال الأخطاء</h2>
+<p>كل فشل يرجع <code>{"ok": false, "error": "&lt;مفتاح آلية&gt;"}</code> بحالة HTTP
+مناسبة (400 لمدخلات خاطئة، 401 بلا رمز، 404 لمفقود، 409 لتشغيل جارٍ).
+المفاتيح الشائعة: <code>already_running</code> · <code>profile_invalid</code> ·
+<code>bad_scope</code> · <code>profile_not_found</code> · <code>bad_json</code> ·
+<code>server_gone</code> (من جهة الواجهة عندما ينقطع السيرفر).</p>
+<footer class="docfoot">صفحة مولّدة آلياً من مصدر الكود · KiraPass —
+<code>api</code> · 2026-10-01 02:26</footer>
+</main>
+</div>
+<script src="assets/docs.js"></script>
+<script>KPInit("api");</script>
+</body>
+</html>

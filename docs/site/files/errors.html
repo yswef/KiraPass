@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ملف errors.py · KiraPass</title>
+<link rel="stylesheet" href="../assets/docs.css">
+
+</head>
+<body>
+<div id="kp-layout">
+<main class="doc">
+<h1>ملف <code>errors.py</code></h1>
+<p class="lead">تحويل أي استثناء شبكة إلى كود ونص وتلميح — <code>kirapass/errors.py</code></p>
+<div class="card info"><b>هذه الصفحة مولّدة آلياً</b> من مصدر الكود مباشرة (<code>tools/docs/build_docs.py</code>). إن غيّرت الكود فأعد توليدها: <code>python3 tools/docs/build_docs.py</code>. الشرح اليدوي الأوسع في <a href="../architecture.html">المعمارية</a> و<a href="../editing.html">دليل التعديل</a> و<a href="../danger.html">أماكن الخطر</a>.</div>
+<div class="grid3"><div class="card"><b>138</b><br>سطراً</div><div class="card"><b>5</b><br>دالة</div><div class="card"><b>1</b><br>صنف</div></div>
+<div class="note"><b>ملخّص المؤلف للملف (نصه الأصلي بالإنجليزية):</b> <span class="muted">Turn any network exception into one clear, explainable answer.</span></div>
+<p><a class="btn primary" href="../src/errors.html">افتح المصدر كاملاً مرقّماً</a></p>
+<h2 id="imports">الاستيرادات</h2><table class="t compact"><thead><tr><th>السطر</th><th>الاستيراد</th><th>لماذا</th></tr></thead><tbody>
+<tr><td class="mono">14</td><td class="mono">from __future__ import annotations</td><td>استيراد annotations من الوحدة __future__</td></tr>
+<tr><td class="mono">16</td><td class="mono">import errno</td><td>استيراد الوحدة errno من المكتبة</td></tr>
+<tr><td class="mono">17</td><td class="mono">import http.client</td><td>استيراد الوحدة http.client من المكتبة</td></tr>
+<tr><td class="mono">18</td><td class="mono">import socket</td><td>استيراد الوحدة socket من المكتبة</td></tr>
+<tr><td class="mono">19</td><td class="mono">import ssl</td><td>استيراد الوحدة ssl من المكتبة</td></tr>
+</tbody></table>
+<h2 id="vars">متغيرات وثوابت على مستوى الوحدة</h2><div class="scroll-x"><table class="t compact"><thead><tr><th>الاسم</th><th>السطر</th><th>القيمة</th><th>الشرح</th></tr></thead><tbody>
+<tr><td class="mono"><span class="tag var">KINDS</span></td><td class="mono"><a href="../src/errors.html#L22">22</a></td><td class="mono">{&#x27;dns&#x27;: (False, &#x27;اسم العنوان لم يُترجم (DNS)&#x27;, &#x27;host name could not be</td><td>إسناد قاموس إلى KINDS</td></tr>
+<tr><td class="mono"><span class="tag var">RETRY_KINDS</span></td><td class="mono"><a href="../src/errors.html#L50">50</a></td><td class="mono">(&#x27;stale&#x27;, &#x27;reset&#x27;, &#x27;read_timeout&#x27;, &#x27;bad_response&#x27;, &#x27;unknown&#x27;)</td><td>إسناد مجموعة إلى RETRY_KINDS</td></tr>
+</tbody></table></div>
+<h2 id="classes">الأصناف</h2>
+<div class="sym head" id="c-NetError"><span class="tag mod">صنف</span> <b>NetError</b> يرث من Exception <a class="tag api" href="../src/errors.html#L55">سطر 55</a><div>خطأ شبكة واحد: kind (كود ثابت) + text (رسالة النظام) + url. retryable وshort خاصيتان محسوبتان من جدول KINDS.</div></div>
+<div class="sym body">دواله: <a href="#f-NetError.__init__"><code>__init__</code></a> · <a href="#f-NetError.retryable"><code>retryable</code></a> · <a href="#f-NetError.short"><code>short</code></a> · <a href="#f-NetError.as_dict"><code>as_dict</code></a></div>
+<h2 id="funcs">الدوال — واحدة واحدة</h2>
+<div class="sym head" id="f-NetError.__init__"><span class="tag fn">دالة</span> <b>NetError.__init__(self, kind, text, url)</b>
+ <a class="tag api" href="../src/errors.html#L58">سطر 58–62</a>
+<div>تعريف الدالة __init__(self, kind, text, url)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>يُسند إلى</th><td><code>self.kind, self.text, self.url</code></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-NetError.retryable"><span class="tag fn">دالة</span> <b>NetError.retryable(self)</b>
+ <span class="muted">→ bool</span>
+ <span class="tag var">@property</span>
+ <a class="tag api" href="../src/errors.html#L65">سطر 65–66</a>
+<div>تعريف الدالة retryable(self) ترجع bool</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-NetError.short"><span class="tag fn">دالة</span> <b>NetError.short(self)</b>
+ <span class="muted">→ str</span>
+ <span class="tag var">@property</span>
+ <a class="tag api" href="../src/errors.html#L69">سطر 69–70</a>
+<div>تعريف الدالة short(self) ترجع str</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-NetError.as_dict"><span class="tag fn">دالة</span> <b>NetError.as_dict(self)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/errors.html#L72">سطر 72–73</a>
+<div>تعريف الدالة as_dict(self) ترجع dict</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-classify"><span class="tag fn">دالة</span> <b>classify(exc, url)</b>
+ <span class="muted">→ NetError</span>
+ <a class="tag api" href="../src/errors.html#L80">سطر 80–137</a>
+<div>يحوّل أي استثناء بايثون إلى NetError واحد له كود ونص وتلميح. ترتيب الفروع مقصود: الأنواع الدقيقة أولاً، ثم مطابقة النص. في بايثون ≥3.10 socket.timeout هو TimeoutError نفسه ويرتفع للمرحلتين، لذلك مرحلة فتح الاتصال ملفوفة في httpclient._send_once وحدها. <span class="muted">(نص المؤلف الأصلي في docstring: Map a python exception to a NetError.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>kind, low, text</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/errors.html#f-NetError"><code>NetError</code></a><span class="muted">×1 سطر 137 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<footer class="docfoot">صفحة مولّدة آلياً من مصدر الكود · KiraPass —
+<code>files</code> · 2026-10-01 02:26</footer>
+</main>
+</div>
+<script src="../assets/docs.js"></script>
+<script>KPInit("files");</script>
+</body>
+</html>
