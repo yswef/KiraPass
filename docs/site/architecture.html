@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>المعمارية وتدفق البيانات · KiraPass</title>
+<link rel="stylesheet" href="assets/docs.css">
+</head>
+<body>
+<div id="kp-layout">
+<main class="doc">
+
+<h1>المعمارية وتدفق البيانات</h1>
+<p class="lead">
+  هذه الصفحة تتتبّع <b>رحلة كاملة</b>: من ضغط زر في المتصفح إلى سطر في جدول النتائج،
+  مع كل دالة تمرّ بها الرحلة وكل قرار يُتخذ. بعدها ستقرأ أي ملف وأنت تعرف مكانه من الصورة.
+</p>
+
+<div class="toc card"><b>محتويات الصفحة</b><div class="toc-auto"></div></div>
+
+<h2 id="big-picture">الصورة الكبيرة</h2>
+<pre><code>┌──────────────────── المتصفح ────────────────────┐      ┌─────────── بايثون ───────────┐
+│ ui.html  +  ui.js  +  ui.css                    │      │ web/server.py                │
+│                                                 │      │   Handler._api_post          │
+│  زر «افحص الآن»  ────────── POST /api/scan ─────┼─────▶│     _scan()                  │
+│  زر «اختبر البطاقة» ── POST /api/calibrate ─────┼─────▶│     submit(Job) ──▶ engine.calibrate
+│  زر «ابدأ التخمين» ── POST /api/run/start ──────┼─────▶│     engine.Engine.start()    │
+│                                                 │      │        └─ thread: _run()      │
+│  كل 550ms ─── GET /api/run/status?since=N ──────┼─────▶│        Engine.status()        │
+│  renderStatus() ◀── {status, events[]} ─────────┼──────│        Engine.events_since()  │
+└─────────────────────────────────────────────────┘      └───────────────┬──────────────┘
+                                                                          │
+                        ┌─────────────────────────────────────────────────▼──────────────┐
+                        │  engine.py: worker × N  (كل واحد يملك Session خاصة)             │
+                        │    warm_up() ← الصفحة (كوكي + رمز مخفي)                        │
+                        │    send_login() → الراوتر                                       │
+                        │    Judge.classify() → Verdict                                   │
+                        │    _verify_hit() → verify.verify_online()                       │
+                        │    emit("attempt"/"hit"/"review"/"stats")                       │
+                        └────────────────────────────────────────────────────────────────┘</code></pre>
+
+<h2 id="startup">رحلة الإقلاع: <code>python3 KiraPass.py</code></h2>
+<table class="t">
+  <thead><tr><th>#</th><th>ماذا يحدث</th><th>المكان</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>يُضاف مجلد المشروع إلى <code>sys.path</code> حتى تعمل الحزمة من أي مكان تشغيل</td><td><code>KiraPass.py:20</code></td></tr>
+    <tr><td>2</td><td><code>main(argv)</code> تبني <code>argparse</code> وتقرأ الخيارات</td><td><a href="files/cli.html">cli.py</a> · <code>build_parser</code></td></tr>
+    <tr><td>3</td><td>خيارات «اخرج فوراً»: <code>--version</code> / <code>--check</code> / <code>--clear-cache</code> / <code>--selftest</code></td><td><code>cli.py</code> · <code>main</code></td></tr>
+    <tr><td>4</td><td>يُنشأ <code>store.Store()</code>: يضمن المجلدات، يحمّل <code>profiles.json</code> ويرحّل أي نسخة قديمة، ويقرأ <code>settings.json</code></td><td><a href="files/store.html">store.py</a></td></tr>
+    <tr><td>5</td><td><code>free_port()</code> يجد أول منفذ حرّ من المطلوب (حتى 25 محاولة)</td><td><code>cli.py</code></td></tr>
+    <tr><td>6</td><td>إن كان <code>--host</code> غير محلي: يُولَّد رمز بـ <code>secrets.token_urlsafe(9)</code> ويُطبع تحذير</td><td><code>cli.py</code> · <code>main</code></td></tr>
+    <tr><td>7</td><td><code>serve(host, port, token, on_ready)</code> ينشئ <code>KiraServer</code> الذي يملك <code>Store</code> و<code>Engine</code> و<code>ThreadPoolExecutor(2)</code></td><td><a href="files/server.html">web/server.py</a></td></tr>
+    <tr><td>8</td><td><code>on_ready</code> تُستدعى بالمنفذ الحقيقي والرمز → تطبع <code>banner()</code> وتفتح المتصفح</td><td><code>cli.py</code></td></tr>
+    <tr><td>9</td><td><code>serve_forever(poll_interval=0.4)</code> حتى <code>Ctrl+C</code> أو <code>/api/quit</code></td><td><code>serve()</code></td></tr>
+  </tbody>
+</table>
+
+<h2 id="boot-ui">إقلاع الصفحة</h2>
+<ol>
+  <li><code>ui.html</code> يُحمَّل، ثم <code>ui.js</code> في آخر <code>&lt;body&gt;</code>.</li>
+  <li>دالة <code>boot()</code> (IIFE في آخر الملف) تستدعي <code>api("/api/meta")</code>:
+      الإصدار، اللغة المحفوظة، الأبجديات <code>charsets</code>، أوضاع كلمة المرور
+      <code>pass_modes</code>، القيم الافتراضية، الإعدادات الجاهزة <code>presets</code>،
+      معلومات الكاش، قائمة البروفايلات، وهل الواجهة مفتوحة على الشبكة <code>lan_open</code>.</li>
+  <li><code>buildSelects()</code> تبني القوائم المنسدلة من <code>meta</code>،
+      <code>setLang()</code> تطبّق الترجمة على كل عنصر له <code>data-i18n</code>
+      وتضبط <code>dir</code>، ثم <code>wire()</code> تربط كل الأزرار.</li>
+  <li><code>showStart()</code> تعرض لوحة البداية وتخفي شريط الخطوات.</li>
+</ol>
+<div class="note">
+  <b>مهم:</b> <code>data-i18n="key"</code> في HTML هو <b>النص الاحتياطي</b>؛
+  القيمة الفعلية تأتي من <code>I18N[LANG][key]</code> في <code>ui.js</code>.
+  أي نص تغيّره يجب أن يُغيَّر في <b>المكانين</b> (عربي/إنجليزي) —
+  انظر <a href="texts.html">النصوص المعروضة</a>.
+</div>
+
+<h2 id="scan">رحلة الفحص: <code>POST /api/scan</code></h2>
+<pre><code>ui.js doScan()
+  └─▶ server.Handler._api_post("/api/scan") → _scan(data)
+        ├─ Session(allow_redirects=True)
+        ├─ portals.discover(session, url)
+        │    ├─ _safe_page_url(url)        ← يحذف username/password من رابط منسوخ
+        │    ├─ session.get(page_url)      ← يتبع التحويلات
+        │    ├─ parse_form(resp.text, base)
+        │    │    ├─ _form_segments()      ← كل &lt;form&gt; مع محتواه
+        │    │    ├─ _score_form()         ← أي نموذج يشبه نموذج الدخول أكثر؟
+        │    │    ├─ _attrs() / INPUT_RE   ← الحقول وقيمها
+        │    │    ├─ اختيار pass_field ثم user_field (بترتيب أولويات)
+        │    │    ├─ تصنيف dst / popup / extra_fields
+        │    │    ├─ sanitize_login_url()  ← يُفرغ قيم الاعتماد من الرابط المحفوظ
+        │    │    └─ CHAP_CALL_RE          ← اكتشاف hexMD5('id'+pass+'challenge')
+        │    └─ جمع dst_candidates + notes
+        └─ verify.probe_internet(session)  ← ONLINE / WALLED / OFFLINE / BLOCKED</code></pre>
+<p>النتيجة تعود إلى <code>doScan()</code> فترسم بطاقتي «حالة الإنترنت» و«ما اكتشفته الأداة»،
+  و<b>تملأ حقول الخطوة الثانية تلقائياً</b> بما تعلّمته، وتُفعّل زر الاختبار.</p>
+
+<h2 id="calibration">رحلة المعايرة: <code>POST /api/calibrate</code></h2>
+<p>هذه أهم رحلة في الأداة. تُنفَّذ كـ<b>مهمة خلفية</b> (<code>Job</code> في
+  <code>ThreadPoolExecutor</code>) والصفحة تستطلعها بـ <code>waitJob()</code> كل 700ms.</p>
+<table class="t">
+  <thead><tr><th>الخطوة</th><th>المعرّف في التقرير</th><th>ماذا يحدث</th><th>الفشل يعني</th></tr></thead>
+  <tbody>
+    <tr><td>0</td><td class="mono">profile_valid</td>
+        <td><code>store.validate()</code> + <code>space_size() &gt; 0</code></td>
+        <td>الصيغة لا تنتج أي بطاقة → لا يوجد ما يُخمَّن</td></tr>
+    <tr><td>1</td><td class="mono">reach_login_page</td>
+        <td><code>session.get(login_url)</code> ثم <code>absorb_form()</code>
+            (الصفحة هي المرجع لا ما حفظه الفحص)</td>
+        <td><code>net_*</code> أو <code>blocked_before_probes</code> أو <code>captcha_challenge</code></td></tr>
+    <tr><td>2</td><td class="mono">internet_state</td>
+        <td><code>verify.probe_internet()</code>: WALLED / ONLINE / OFFLINE / BLOCKED</td>
+        <td>ONLINE ⇒ التحقق لاحقاً محدود (يُسجَّل صراحة)</td></tr>
+    <tr><td>2b</td><td class="mono">known_card_preflight</td>
+        <td><code>_known_card_preflight()</code>: يرسل بطاقتك <b>مرة واحدة</b> بشكلها الحالي،
+            ينتظر 1 ثانية، يفحص الإنترنت، وإن نجح <b>يسجّل الخروج</b> ويتأكد أن الحالة رجعت WALLED</td>
+        <td><code>logout_unconfirmed</code> ⇒ لا يُكمَل: لا نترك كرتك مستهلكاً</td></tr>
+    <tr><td>3</td><td class="mono">rejection_probe</td>
+        <td><code>bench_cards()</code> تنتج 3 بطاقات صحيحة الشكل <b>من داخل الفضاء نفسه</b></td>
+        <td>—</td></tr>
+    <tr><td>3b</td><td class="mono">rejection_baseline</td>
+        <td>لكل بطاقة: <code>send_login()</code> → <code>_is_protective_reply()</code> →
+            <code>absorb_form()</code> (رمز CSRF جديد) →
+            <code>Fingerprinter.learn(replies)</code></td>
+        <td><code>blocked_by_our_probes</code> · <code>no_rejection_baseline</code> ·
+            <code>request_shape_rejected</code> (كل الردود 400/405/415/422)</td></tr>
+    <tr><td>3c</td><td class="mono">probe_looked_accepted</td>
+        <td>إن بدت بطاقة تجريبية مقبولة ⇒ تُتخذ «بطاقة معروفة مجانية»
+            ويُعاد التعلّم <b>بدونها</b> حتى لا نتعلّم صفحة النجاح كصفحة رفض</td>
+        <td>—</td></tr>
+    <tr><td>4</td><td class="mono">shape_tuned</td>
+        <td><code>_tune_with_known_card()</code>: يجرب حتى
+            <code>KNOWN_CARD_TRIAL_LIMIT = 8</code> تركيبات
+            (طريقة × dst × وضع كلمة المرور × إرسال dst/popup)، مرتّبة بالأقرب للأصل،
+            ويتوقف عند أول دليل موثَّق</td>
+        <td><code>known_card_not_proven</code> ⇒ لا يُفتح التخمين</td></tr>
+    <tr><td>5</td><td class="mono">—</td>
+        <td>بناء <code>Judge</code> بكلمات النجاح المتعلَّمة و<code>success_url_contains</code>،
+            ثم <code>cal.ok = True</code></td>
+        <td>—</td></tr>
+  </tbody>
+</table>
+<p>
+  <b>الدليل الوحيد المقبُول</b> في الخطوة 4 هو: انتقال <code>WALLED → ONLINE</code>
+  <b>ثم</b> عودة الحالة إلى <code>WALLED</code> بعد تسجيل الخروج. تحويل مختلف أو كلمات
+  ترحيب ترفع <code>evidence</code> لكنها وحدها لا تكفي إن كان الفحص متاحاً.
+</p>
+<p>
+  <b>ماذا يُحفظ؟</b> <code>Calibration.as_dict()</code> تُنتج تقريراً يمرّ عبر
+  <code>_safe_calibration_report()</code> في <code>server.py</code> (يحذف
+  <code>card_hint</code>، <code>sample_cards</code>، أي اسم فيه
+  cookie/token/csrf/challenge، وأي مفتاح اسمه <code>text</code>)،
+  ثم يُكتب في <code>runs/*.json</code> كنوع <code>calibration</code>.
+</p>
+
+<h2 id="run">رحلة التشغيل: <code>POST /api/run/start</code></h2>
+<h3>أ) التجهيز (<code>Engine.start</code>)</h3>
+<ol>
+  <li>رفض إن كان <code>state == "running"</code>.</li>
+  <li><code>store.migrate(profile)</code> ثم <code>validate()</code>: أي مشكلة صلبة ⇒
+      <code>{"ok": false, "error": "profile_invalid"}</code> (HTTP 400).</li>
+  <li>إن كان <code>resume=False</code>: تصفير <code>space_pos/walk_a/walk_b</code>.</li>
+  <li>حساب <code>total</code> = أدنى(المحاولات المطلوبة، الباقي في هذا المرور).</li>
+  <li>تصفير كل العدّادات والأحداث (<code>events.clear()</code> حتى لا تُعرض نتائج التشغيل السابق).</li>
+  <li>الحالة ← <code>calibrating</code>، وإطلاق الخيط <code>kirapass-engine</code> بدالة <code>_run</code>.</li>
+</ol>
+
+<h3>ب) داخل <code>_run</code></h3>
+<pre><code>_run()
+ ├─ calibrate(...)                       ← نفس رحلة المعايرة أعلاه
+ │    └─ إن فشل بخطأ قابل للإعادة (CALIBRATION_RETRYABLE) ⇒ يعيد مرة واحدة بعد ثانية
+ ├─ إن فشلت المعايرة أو فشلت البطاقة المعروفة ⇒ state="done", stop_reason="calibration_failed"
+ ├─ _verification_serialized = (verify_enabled و الحالة WALLED)
+ │    └─ إذا صحّ ⇒ threads = 1  (حتى لا يُنسب فتح الإنترنت إلى بطاقة أخرى)
+ ├─ judge = cal.judge ; state="running" ; _start_watchdog()
+ ├─ إن walk_a == 0 ⇒ walk_a = _coprime(space) و walk_b = عشوائي
+ ├─ إنشاء task_q = Queue(maxsize=max(16, threads*4))
+ ├─ إنشاء `threads` عامل، كل عامل:
+ │    ├─ new_session(for_attack=True, headers=browser_headers(...))
+ │    ├─ live = warm_up(sess, profile)     ← الصفحة أولاً: كوكي + حقول مخفية
+ │    └─ حلقة: item = task_q.get(timeout=0.2)
+ │         ├─ إن live is None ⇒ warm_up مرة أخرى، وإلا no_session + إعادة جدولة الكرت
+ │         ├─ كل WARMUP_EVERY محاولة ⇒ warm_up() لتحديث الجلسة
+ │         └─ _attempt(sess, judge, card, index, live)
+ ├─ المنتج (خيط المحرك نفسه):
+ │    while sent &lt; planned: card = store.card_at_walk_pos(profile, pos)
+ │                          task_q.put((card, sent+1, False), timeout=0.2)
+ ├─ finally: _finish_retries(task_q) → انتظار ما في الطابور → تفريغ الباقي (dropped)
+ │           → join العمال (5 ثوانٍ لكل واحد)
+ ├─ حساب resume_pos = start_pos + (المعالَج − غير المُقيَّم − المعلَّق)
+ │    └─ divmod على space ⇒ space_pos جديد + space_pass++ ومسار جديد إن لزم
+ ├─ store.put(profile)  (إن persist)
+ └─ _save_report() → emit("state", {"state":"done", ...})</code></pre>
+
+<h3>ج) محاولة واحدة (<code>Engine._attempt</code>)</h3>
+<ol>
+  <li>إن <code>stop_event</code> ⇒ خروج فوري.</li>
+  <li>انتظار <code>throttle.delay_ms</code> الحالي.</li>
+  <li><code>send_login()</code> مع إعادة محاولة حتى 3 مرات لأخطاء النقل القابلة للإعادة فقط.</li>
+  <li>إن لم يصل أي رد: <code>_record_transport_health(kind)</code> + <code>net_kinds[kind]++</code>
+      + <code>_retry_later(card)</code> (أو <code>_unevaluated++</code>) +
+      <code>_emit_net_error()</code> + <code>_apply_delay_pressure()</code> + <code>_check_stop_rules()</code>
+      ⇒ <b>الكارت لم يُجرَّب</b>.</li>
+  <li><code>judge.classify(resp, submitted_values(...))</code> ⇒ <code>Verdict</code>.</li>
+  <li><b>ابتلاع النموذج الجديد</b>: <code>absorb_form()</code> على ردّ هذا العامل فقط
+      (يحدّث قاموسه الخاص <code>profile.clear(); profile.update(fresh)</code>).</li>
+  <li>إن كان الحكم إصابة و<code>verify_enabled</code> ⇒ <code>_verify_hit()</code>.</li>
+  <li>تحديث <code>latencies</code>، <code>counters[code]</code>، <code>reason_counts[reason]</code>،
+      و<code>_clean_streak</code>.</li>
+  <li>حسب الكود: <code>_register_hit</code> / <code>_save_unknown</code> /
+      عدّادات الحجب والتقييد + <code>_apply_delay_pressure</code> / إيقاف عند كابتشا.</li>
+  <li>تسجيل الصف في <code>_recent</code> و<code>_since_check</code>
+      (للمراقب)، و<code>_unevaluated++</code> إن رفض الراوتر الحكم.</li>
+  <li><code>_emit_attempt()</code> (يكبح إصدار حدث لكل رفض: كل 25 رفضاً أو أي نتيجة مثيرة)،
+      ثم <code>_maybe_decay_delay()</code> و<code>_auto_pace(code)</code> و<code>_check_stop_rules()</code>.</li>
+</ol>
+
+<h2 id="judge">شجرة قرار الحكم (<code>Judge.classify</code>)</h2>
+<p>الترتيب <b>مقصود</b>: الحجب أولاً، ثم الرفض، ثم الأدلة الإيجابية، ثم «غير واضح».</p>
+<pre><code>1. هل هذه صفحة حماية؟
+   ├─ عبارة من BAN_WORDS (مطابقة كلمة كاملة) أو HTTP 403/429/503
+   │   ├─ 429 أو عبارة rate limit/slow down ──▶ RATE_LIMITED  (سبب: http_429 / ban_page)
+   │   ├─ 503 بدون عبارة حجب            ──▶ RATE_LIMITED  (سبب: http_503)  ← لا نكذب على المستخدم
+   │   └─ غير ذلك                       ──▶ BANNED        (سبب: ban_page / http_403)
+   └─ لا ⇒ ننتقل للخطوة التالية
+
+2. fp.same_as_reject(resp, extra_literals=القيم التي أرسلناها)
+   ├─ «مطابق» + لكنه تحويل خارج البوابة  ──▶ UNKNOWN (redirect_out_of_portal_but_page_matches)
+   ├─ «مطابق» + فيه كلمات نجاح متعلَّمة   ──▶ UNKNOWN (looks_rejected_but_success_words_found)
+   └─ «مطابق»                            ──▶ REJECTED (same_as_rejection_page_exact/shape/similar/empty/redirect)
+
+3. فيه captcha/g-recaptcha/hcaptcha      ──▶ CHALLENGE (captcha_present)
+
+4. تحويل (redirect)؟
+   ├─ المضيف ≠ مضيف البوابة
+   │    ├─ فيه علامة من EXIT_HOST_MARKERS ──▶ ACCEPTED 0.95 (redirect_out_of_portal)
+   │    ├─ فيه كلمة من PORTAL_URL_WORDS   ──▶ UNKNOWN (redirect_to_another_portal_page)
+   │    └─ غير ذلك                       ──▶ ACCEPTED 0.85 (redirect_out_of_portal)
+   ├─ التحويل ≠ تحويل الرفض المعروف       ──▶ ACCEPTED 0.70 (redirect_differs_from_rejection)
+   └─ success_url_contains موجود         ──▶ ACCEPTED 0.90 (success_url_contains)
+
+5. كلمات نجاح متعلَّمة + لا عبارات رفض    ──▶ ACCEPTED 0.6–0.9 (learned_success_words)
+6. success_url_contains في رابط الرد      ──▶ ACCEPTED 0.90 (success_url_contains)
+7. كلمة ترحيب فريدة (ACCEPT_WORDS)        ──▶ ACCEPTED 0.70 (welcome_words)
+8. عبارة رفض موجودة (صفحة رفض متغيّرة)    ──▶ REJECTED 0.75 (rejection_wording)
+9. غير ذلك                                ──▶ UNKNOWN 0.0 (reply_differs_not_proven) + كلمات الفرق</code></pre>
+
+<h3>كيف يُقارَن الرد بصفحة الرفض؟ (<code>Fingerprinter</code>)</h3>
+<ol>
+  <li><b>التعلّم</b>: <code>learn_dynamic(bodies)</code> تُخرج <b>القيم الحرفية</b> التي تختلف
+      بين صفحتَي رفض (رمز جلسة، صدى الكرت، وقت…) — حتى 4 جولات.</li>
+  <li><code>learn_patterns(bodies)</code> تحوّلها إلى <b>أنماط</b>
+      (<code>\b[0-9a-fA-F]{8}\b</code>) لأن القيمة نفسها لا تتكرر.</li>
+  <li>بعد الإخفاء: إن تطابقت كل النسخ ⇒ <code>exact = True</code> ويُحفظ
+      <code>reject_masked_sha</code> (مقارنة دقيقة بـ SHA-256).</li>
+  <li>وإلا ⇒ <code>reject_tokens = struct_tokens(...)</code> (شكل الصفحة فقط)
+      وتُستخدم نسبة تشابه <code>difflib</code>: ≥0.995 ⇒ رفض «shape»،
+      وإلا مع تساوي الحالة و≥0.97 ⇒ «similar».</li>
+  <li>الصفحات الفارغة: تُقارن بمفتاح التحويل <code>_loc_key()</code>
+      (scheme+host+path فقط) أو بالحالة، ولا تُعتبر «مطابقة» بمجرد الفراغ.</li>
+</ol>
+
+<h2 id="verify">إثبات النجاح (<code>_verify_hit</code> + <code>verify.py</code>)</h2>
+<table class="t compact">
+  <thead><tr><th>الحالة قبل التشغيل</th><th>ماذا يحدث بعد بطاقة مقبولة</th><th>الكود الناتج</th></tr></thead>
+  <tbody>
+    <tr><td>WALLED</td><td><code>verify_online()</code>: إن صار ONLINE ⇒ <code>ACCEPTED_VERIFIED</code> (ثقة 1.0) وسبب <code>redirect_out_of_portal_and_online</code>، ثم <b>إيقاف فوري</b> <code>found_verified</code></td><td class="mono">ACCEPTED_VERIFIED</td></tr>
+    <tr><td>WALLED</td><td>فشل فحص الإنترنت ⇒ يبقى <code>ACCEPTED</code> لكن يُسمّى <code>ACCEPTED_UNVERIFIED</code></td><td class="mono">ACCEPTED_UNVERIFIED</td></tr>
+    <tr><td>ONLINE</td><td>فحص الإنترنت بلا معنى ⇒ تُقرأ <code>portal_status_page()</code> فقط، والسبب <code>accepted_internet_already_open</code>، والثقة ≤0.85</td><td class="mono">ACCEPTED</td></tr>
+    <tr><td>مات الطلب أثناء التأكيد</td><td>لا يُرمى الإصابة: <code>ok=False, detail=اسم الاستثناء</code></td><td class="mono">ACCEPTED_UNVERIFIED</td></tr>
+  </tbody>
+</table>
+<p>مواقع الفحص الثلاثة الافتراضية (<code>INTERNET_CHECKS</code> في <code>config.py</code>):
+  <code>connectivitycheck.gstatic.com/generate_204</code> (204)،
+  <code>www.msftconnecttest.com/connecttest.txt</code> (200 + نص)،
+  <code>captive.apple.com/hotspot-detect.html</code> (200 + «Success»).
+  ويمكن استبدالها بـ <code>KIRAPASS_INTERNET_CHECKS</code> أو من الصفحة.</p>
+
+<h2 id="watchdog">المراقب: عندما يكذب الراوتر</h2>
+<p>
+  بعض الراوترات <b>تُدخل الضيف ثم تردّ بصفحة الرفض نفسها</b>. الحكم وحده لا يرى النجاح.
+  لذلك <code>_start_watchdog()</code> يشغّل خيط <code>kirapass-watchdog</code> يفحص كل
+  <code>WATCH_EVERY_SECONDS = 3</code> ثوانٍ: هل ما زلنا خلف الجدار؟
+</p>
+<ul>
+  <li>يعمل فقط إن كانت الحالة قبل التشغيل <code>WALLED</code> و<code>WATCH_INTERNET</code> و<code>verify_enabled</code>.</li>
+  <li>كل بطاقة تُرسل تُضاف إلى <code>_since_check</code>؛ وإن لم يفتح الإنترنت تُفرَّغ
+      (لم تكن هي السبب).</li>
+  <li>عند <code>ONLINE</code>: تُنسخ القائمة كـ<b>مشتبه بها</b>
+      (حتى <code>WATCH_SUSPECTS = 40</code> بطاقة)، ويُصدر حدث
+      <code>internet_opened</code>، ويتوقف التشغيل بـ <code>stop_reason="internet_opened"</code>.</li>
+  <li>الصفحة تعرض المشتبه بها وتطلب من المستخدم تجريبها واحداً واحداً —
+      <b>لا تدّعي معرفة أيها الصحيح</b>.</li>
+</ul>
+
+<h2 id="pace">الوتيرة: التباطؤ والسرعة التلقائية</h2>
+<table class="t">
+  <thead><tr><th>الدالة</th><th>المُحفّز</th><th>الفعل</th></tr></thead>
+  <tbody>
+    <tr><td><code>_apply_delay_pressure("rate_limited", resp)</code></td><td>HTTP 429</td>
+        <td><code>delay = max(الحالي+250, الأساس+400, Retry-After×1000)</code> بحد 2000ms</td></tr>
+    <tr><td><code>_apply_delay_pressure("banned")</code></td><td>صفحة حجب</td>
+        <td><code>delay = max(الحالي+400, 800)</code> بحد 2000ms (ثم إيقاف فوري من <code>_check_stop_rules</code>)</td></tr>
+    <tr><td><code>_apply_delay_pressure("refused"/"reset")</code></td><td>رفض/قطع اتصال</td><td>+75ms</td></tr>
+    <tr><td><code>_apply_delay_pressure(أي خطأ نقل)</code></td><td>أخطاء متفرقة</td><td>+25ms ما دام &lt;1000ms</td></tr>
+    <tr><td><code>_maybe_decay_delay()</code></td><td>150 رداً نظيفاً متتالياً</td><td><code>delay ×= 0.6</code> حتى الأساس</td></tr>
+    <tr><td><code>_auto_pace(code)</code></td><td>كل <code>PACE_WINDOW_SECONDS = 3</code> ثوانٍ و≥8 ردود</td>
+        <td>نسبة سيئة &gt;2% ⇒ التأخير ×2 (بحد 4000ms). نظيف 0% والتأخير = الأساس ⇒
+            <code>_add_workers(2)</code>. نظيف ≤1% ⇒ التأخير ×0.7</td></tr>
+    <tr><td><code>_add_workers(n)</code></td><td>الراوتر نظيف</td>
+        <td>يضيف خيوطاً حتى <code>min(PACE_MAX_THREADS=32, max(4, started×2))</code></td></tr>
+  </tbody>
+</table>
+<p>AIMD (زيادة جمعية/نقصان مضاعف) كما في TCP. لتعطيله: <code>KIRAPASS_AUTO_PACE=0</code>
+  أو عندما يكون التحقق مسلسَلاً (<code>_verification_serialized</code>) فهو معطّل حكماً.</p>
+
+<h2 id="stop">قواعد الإيقاف (<code>_check_stop_rules</code>)</h2>
+<table class="t compact">
+  <thead><tr><th>الشرط</th><th>سبب التوقف</th></tr></thead>
+  <tbody>
+    <tr><td><code>NET_ERROR ≥ BURST_LIMIT(20)</code> و≥80% من المحاولات</td><td class="mono">target_unreachable</td></tr>
+    <tr><td><code>_transport_error_streak ≥ CONSECUTIVE_TRANSPORT_FAILURE_LIMIT(3)</code></td><td class="mono">target_unreachable</td></tr>
+    <tr><td><code>_ban_count ≥ 1</code></td><td class="mono">banned_by_router</td></tr>
+    <tr><td><code>_rate_count ≥ 1</code></td><td class="mono">rate_limited_by_router</td></tr>
+    <tr><td><code>counters["CHALLENGE"] ≥ 1</code></td><td class="mono">captcha_challenge</td></tr>
+    <tr><td>إصابة مؤكدة</td><td class="mono">found_verified</td></tr>
+    <tr><td>إصابة قوية + <code>auto_stop</code></td><td class="mono">found_strong_evidence</td></tr>
+    <tr><td>الإنترنت فتح (المراقب)</td><td class="mono">internet_opened</td></tr>
+    <tr><td>المستخدم</td><td class="mono">user_stop</td></tr>
+    <tr><td>انتهت المحاولات</td><td class="mono">attempts_done</td></tr>
+  </tbody>
+</table>
+<div class="danger">
+  <b>لا يوجد أي مسار يعيد الاتصال أو ينتظر زوال الحجب أو يغيّر الهوية.</b>
+  الإيقاف نهائي والاستئناف يدوي بتأكيد المستخدم في الواجهة
+  (<code>manualResumeRequired</code> في <code>ui.js</code>).
+</div>
+
+<h2 id="events">الأحداث: كيف تصل النتيجة إلى الشاشة</h2>
+<table class="t">
+  <thead><tr><th>الحدث</th><th>يُصدره</th><th>يستهلكه في <code>ui.js</code></th></tr></thead>
+  <tbody>
+    <tr><td class="mono">state</td><td><code>emit("state", …)</code> عند كل تغيير حالة</td><td>يوقف/يستأنف الاستطلاع عبر <code>pollStatus</code></td></tr>
+    <tr><td class="mono">calibration</td><td>بعد المعايرة</td><td><code>renderCalibration()</code></td></tr>
+    <tr><td class="mono">attempt</td><td><code>_emit_attempt()</code> / <code>_emit_net_error()</code></td><td><code>addRow()</code> في جدول السجل</td></tr>
+    <tr><td class="mono">stats</td><td><code>_emit_stats()</code> (بحد 400ms)</td><td>يُدمج في <code>renderStatus()</code></td></tr>
+    <tr><td class="mono">hit</td><td><code>_register_hit()</code></td><td><code>renderHits()</code> + تنبيه 🎯</td></tr>
+    <tr><td class="mono">review</td><td><code>_save_unknown()</code></td><td><code>renderReview()</code></td></tr>
+    <tr><td class="mono">throttle</td><td><code>_apply_delay_pressure</code> / <code>_auto_pace</code></td><td>بطاقة «التباطؤ»</td></tr>
+    <tr><td class="mono">resume</td><td>عند استئناف من <code>space_pos</code></td><td>تنبيه «متابعة من N»</td></tr>
+    <tr><td class="mono">internet_opened</td><td>المراقب</td><td>تنبيه 🌐 + قائمة المشتبه بها</td></tr>
+    <tr><td class="mono">internal</td><td>استثناء داخل عامل</td><td>— (في التقرير)</td></tr>
+    <tr><td class="mono">error</td><td>استثناء في <code>_run</code></td><td>نافذة منبثقة</td></tr>
+    <tr><td class="mono">report</td><td><code>_save_report()</code></td><td>يفعّل زر «تنزيل آخر تقرير»</td></tr>
+  </tbody>
+</table>
+<p>
+  كل حدث له رقم تسلسلي <code>seq</code>؛ الصفحة ترسل <code>?since=N</code>
+  فتستقبل الجديد فقط (<code>events_since()</code> على <code>deque(maxlen=4000)</code>).
+  الاستطلاع كل 550ms.
+</p>
+
+<h2 id="persistence">التخزين</h2>
+<table class="t compact">
+  <thead><tr><th>الملف</th><th>يكتبه</th><th>متى</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">profiles.json</td><td><code>Store.save()</code> ← <code>atomic_write()</code></td><td>بعد كل <code>put()</code> (حفظ/نهاية تشغيل/مسجّل)</td></tr>
+    <tr><td class="mono">settings.json</td><td><code>Store.set_setting()</code></td><td>تغيير اللغة/المَهلات/رابط الفحص</td></tr>
+    <tr><td class="mono">hits.txt</td><td><code>Store.append_hit()</code></td><td>كل إصابة</td></tr>
+    <tr><td class="mono">runs/&lt;وقت&gt;_&lt;اسم&gt;.json</td><td><code>Store.save_run()</code></td><td>نهاية كل تشغيل + كل معايرة + كل تقرير مسجّل</td></tr>
+    <tr><td class="mono">review/&lt;وقت&gt;_&lt;seq&gt;_&lt;كرت&gt;.html</td><td><code>Store.save_review()</code></td><td>كل رد غير واضح (حتى 50 لكل تشغيل، 500 في الفهرس)</td></tr>
+  </tbody>
+</table>
+<p><b>الكتابة ذرّية</b>: <code>atomic_write()</code> تكتب <code>.tmp</code> ثم
+  <code>os.replace()</code>، وتتحمّل حذف المجلد في نفس اللحظة (زر «مسح الكاش» أثناء حفظ).</p>
+
+<h2 id="capture-flow">رحلة المسجّل المنقّح</h2>
+<pre><code>ui.js startCapture()
+ ├─ window.open("about:blank")            ← داخل إيماءة النقر (حتى لا يُمنع المنبثق)
+ ├─ POST /api/capture/start {url}
+ │    └─ Hub.start() → Capture(url, guard) → _exchange("GET", start_url)
+ ├─ popup.location = /capture/view?id=…   ← capture.view_page() تبني صفحة VIEW_PAGE
+ │
+ │  داخل صفحة المسجّل:
+ │  ├─ iframe sandbox="allow-scripts allow-forms"  (بلا allow-same-origin)
+ │  ├─ srcdoc = rewrite_html(page)         ← يحقن &lt;base&gt; + CSP + window.__KP__ + INTERCEPTOR
+ │  ├─ INTERCEPTOR يعترض: submit / HTMLFormElement.submit / نقرات &lt;a&gt; / fetch / XHR
+ │  │    └─ postMessage إلى الصفحة الأم (ولا يرسل شيئاً إلى البوابة أو إلى API الأداة)
+ │  ├─ الأم تستدعي POST /api/capture/step
+ │  │    └─ Hub.step() → Capture._exchange() بجلسة سيرفر تحتفظ بالكوكي والرموز
+ │  │       ├─ _learn_password(before, after) → infer_pass_mode()
+ │  │       └─ يعيد frame_body لطلبات fetch/XHR أو html_view محدّثاً للتنقل
+ │  ├─ POST /api/capture/mark {success|reject|status}
+ │  │    └─ learn_words() على نص &lt;body&gt; المرئي فقط (لا meta ولا script)
+ │  └─ POST /api/capture/finish
+ │       └─ _build_report() + _build_profile() → Store.save_run() + Store.put()
+ └─ تنزيل التقرير (GET /api/capture/report?download=1)</code></pre>
+<p>كل مخرجات هذه الرحلة <b>منقّحة</b>: <code>redact_fields</code> (أطوال وتصنيفات بدل القيم)،
+  <code>safe_url</code> (مفاتيح الاستعلام بدل قيمها)، <code>_strip_hop</code>
+  (أسماء الكوكيز)، <code>custom_header_names</code> (أسماء الترويسات)،
+  <code>_scrub</code> (حذف أي قيمة سرّية رُصدت من كامل JSON)،
+  و<code>export_curl</code> (أمر curl بقيم <code>&lt;redacted&gt;</code>).</p>
+
+<footer class="docfoot">المعمارية وتدفق البيانات · KiraPass — <code>docs/site/architecture.html</code></footer>
+
+</main>
+</div>
+<script src="assets/docs.js"></script>
+<script>KPInit("architecture");</script>
+</body>
+</html>

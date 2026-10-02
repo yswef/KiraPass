@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ملف portals.py · KiraPass</title>
+<link rel="stylesheet" href="../assets/docs.css">
+
+</head>
+<body>
+<div id="kp-layout">
+<main class="doc">
+<h1>ملف <code>portals.py</code></h1>
+<p class="lead">قراءة صفحة البوابة واستخراج النموذج وبنائه — <code>kirapass/portals.py</code></p>
+<div class="card info"><b>هذه الصفحة مولّدة آلياً</b> من مصدر الكود مباشرة (<code>tools/docs/build_docs.py</code>). إن غيّرت الكود فأعد توليدها: <code>python3 tools/docs/build_docs.py</code>. الشرح اليدوي الأوسع في <a href="../architecture.html">المعمارية</a> و<a href="../editing.html">دليل التعديل</a> و<a href="../danger.html">أماكن الخطر</a>.</div>
+<div class="grid3"><div class="card"><b>375</b><br>سطراً</div><div class="card"><b>15</b><br>دالة</div><div class="card"><b>2</b><br>صنف</div></div>
+<div class="note"><b>ملخّص المؤلف للملف (نصه الأصلي بالإنجليزية):</b> <span class="muted">Read a captive-portal login page and copy exactly what the browser sends.</span></div>
+<p><a class="btn primary" href="../src/portals.html">افتح المصدر كاملاً مرقّماً</a></p>
+<h2 id="imports">الاستيرادات</h2><table class="t compact"><thead><tr><th>السطر</th><th>الاستيراد</th><th>لماذا</th></tr></thead><tbody>
+<tr><td class="mono">16</td><td class="mono">from __future__ import annotations</td><td>استيراد annotations من الوحدة __future__</td></tr>
+<tr><td class="mono">18</td><td class="mono">import html</td><td>استيراد الوحدة html من المكتبة</td></tr>
+<tr><td class="mono">19</td><td class="mono">import re</td><td>استيراد الوحدة re من المكتبة</td></tr>
+<tr><td class="mono">20</td><td class="mono">from urllib.parse import parse_qs, parse_qsl, urlencode, urljoin, urlsplit, urlunsplit</td><td>استيراد parse_qs, parse_qsl, urlencode, urljoin, urlsplit, urlunsplit من الوحدة urllib.parse</td></tr>
+</tbody></table>
+<h2 id="vars">متغيرات وثوابت على مستوى الوحدة</h2><div class="scroll-x"><table class="t compact"><thead><tr><th>الاسم</th><th>السطر</th><th>القيمة</th><th>الشرح</th></tr></thead><tbody>
+<tr><td class="mono"><span class="tag var">FORM_RE</span></td><td class="mono"><a href="../src/portals.html#L22">22</a></td><td class="mono">re.compile(&#x27;&lt;form\\b[^&gt;]*&gt;&#x27;, re.I)</td><td>إسناد نتيجة استدعاء re.compile (2 معاملات) إلى FORM_RE</td></tr>
+<tr><td class="mono"><span class="tag var">INPUT_RE</span></td><td class="mono"><a href="../src/portals.html#L23">23</a></td><td class="mono">re.compile(&#x27;&lt;input\\b[^&gt;]*&gt;&#x27;, re.I)</td><td>إسناد نتيجة استدعاء re.compile (2 معاملات) إلى INPUT_RE</td></tr>
+<tr><td class="mono"><span class="tag var">ATTR_RE</span></td><td class="mono"><a href="../src/portals.html#L24">24</a></td><td class="mono">re.compile(&#x27;([\\w\\-:]+)\\s*=\\s*(\\&quot;[^\\&quot;]*\\&quot;|\&#x27;[^\&#x27;]*\&#x27;|[^\\s&gt;]+)&#x27;)</td><td>إسناد نتيجة استدعاء re.compile (معامل واحد) إلى ATTR_RE</td></tr>
+<tr><td class="mono"><span class="tag var">CHAP_CALL_RE</span></td><td class="mono"><a href="../src/portals.html#L25">25</a></td><td class="mono">re.compile(&quot;hexMD5\\s*\\(\\s*&#x27;([^&#x27;]*)&#x27;\\s*\\+\\s*([^+)]+?)\\s*\\+\\s*&#x27;</td><td>إسناد نتيجة استدعاء re.compile (2 معاملات) إلى CHAP_CALL_RE</td></tr>
+<tr><td class="mono"><span class="tag var">CHAP_SIMPLE_RE</span></td><td class="mono"><a href="../src/portals.html#L27">27</a></td><td class="mono">re.compile(&#x27;hexMD5\\s*\\(\\s*([^)]+)\\)&#x27;, re.I)</td><td>إسناد نتيجة استدعاء re.compile (2 معاملات) إلى CHAP_SIMPLE_RE</td></tr>
+<tr><td class="mono"><span class="tag var">TITLE_RE</span></td><td class="mono"><a href="../src/portals.html#L28">28</a></td><td class="mono">re.compile(&#x27;&lt;title[^&gt;]*&gt;(.*?)&lt;/title&gt;&#x27;, re.I | re.S)</td><td>إسناد نتيجة استدعاء re.compile (2 معاملات) إلى TITLE_RE</td></tr>
+<tr><td class="mono"><span class="tag var">CORE_FIELDS</span></td><td class="mono"><a href="../src/portals.html#L31">31</a></td><td class="mono">(&#x27;username&#x27;, &#x27;user&#x27;, &#x27;password&#x27;, &#x27;passwd&#x27;, &#x27;pass&#x27;, &#x27;card&#x27;, &#x27;code&#x27;, &#x27;vo</td><td>إسناد مجموعة إلى CORE_FIELDS</td></tr>
+</tbody></table></div>
+<h2 id="classes">الأصناف</h2>
+<div class="sym head" id="c-FormInfo"><span class="tag mod">صنف</span> <b>FormInfo</b> <a class="tag api" href="../src/portals.html#L47">سطر 47</a><div>تعريف الصنف FormInfo</div></div>
+<div class="sym body">دواله: <a href="#f-FormInfo.__init__"><code>__init__</code></a> · <a href="#f-FormInfo.is_post"><code>is_post</code></a> · <a href="#f-FormInfo.as_dict"><code>as_dict</code></a></div>
+<div class="sym head" id="c-Portal"><span class="tag mod">صنف</span> <b>Portal</b> <a class="tag api" href="../src/portals.html#L255">سطر 255</a><div>تعريف الصنف Portal</div></div>
+<div class="sym body">دواله: <a href="#f-Portal.__init__"><code>__init__</code></a> · <a href="#f-Portal.as_dict"><code>as_dict</code></a></div>
+<h2 id="funcs">الدوال — واحدة واحدة</h2>
+<div class="sym head" id="f-_attrs"><span class="tag fn">دالة</span> <b>_attrs(tag)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/portals.html#L35">سطر 35–44</a>
+<div>تعريف الدالة _attrs(tag) ترجع dict</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>out, value</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/portals.html#f-_score_form"><code>_score_form</code></a> <span class="muted">(portals.py:97)</span> <a href="../files/portals.html#f-parse_form"><code>parse_form</code></a> <span class="muted">(portals.py:149)</span> <a href="../files/portals.html#f-parse_form"><code>parse_form</code></a> <span class="muted">(portals.py:151)</span> <a href="../files/portals.html#f-parse_form"><code>parse_form</code></a> <span class="muted">(portals.py:161)</span> <a href="../files/portals.html#f-parse_form"><code>parse_form</code></a> <span class="muted">(portals.py:171)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-FormInfo.__init__"><span class="tag fn">دالة</span> <b>FormInfo.__init__(self, action, method, fields, inputs)</b>
+ <a class="tag api" href="../src/portals.html#L48">سطر 48–59</a>
+<div>تعريف الدالة __init__(self, action, method, fields, inputs)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>يُسند إلى</th><td><code>self.action, self.chap, self.dst_field, self.dst_value, self.extra_fields, self.fields, self.inputs, self.method, self.pass_field, self.popup_field, self.user_field</code></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-FormInfo.is_post"><span class="tag fn">دالة</span> <b>FormInfo.is_post(self)</b>
+ <span class="muted">→ bool</span>
+ <span class="tag var">@property</span>
+ <a class="tag api" href="../src/portals.html#L62">سطر 62–63</a>
+<div>تعريف الدالة is_post(self) ترجع bool</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-FormInfo.as_dict"><span class="tag fn">دالة</span> <b>FormInfo.as_dict(self)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/portals.html#L65">سطر 65–77</a>
+<div>تعريف الدالة as_dict(self) ترجع dict</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/selftest.html#f-scan"><code>scan</code></a> <span class="muted">(selftest.py:61)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-_form_segments"><span class="tag fn">دالة</span> <b>_form_segments(html)</b>
+ <span class="muted">→ list</span>
+ <a class="tag api" href="../src/portals.html#L80">سطر 80–91</a>
+<div>تعريف الدالة _form_segments(html) ترجع list <span class="muted">(نص المؤلف الأصلي في docstring: -&gt; [(form tag, html inside that form)] for every &lt;form&gt; on the page.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>close, end, marks, out, start</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/portals.html#f-discover"><code>discover</code></a> <span class="muted">(portals.py:344)</span> <a href="../files/portals.html#f-parse_form"><code>parse_form</code></a> <span class="muted">(portals.py:133)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-_score_form"><span class="tag fn">دالة</span> <b>_score_form(attrs, segment)</b>
+ <span class="muted">→ int</span>
+ <a class="tag api" href="../src/portals.html#L94">سطر 94–114</a>
+<div>تعريف الدالة _score_form(attrs, segment) ترجع int <span class="muted">(نص المؤلف الأصلي في docstring: How much does this form look like the login form? (higher = better).)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>blob, names, score, tags, types</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/portals.html#f-_attrs"><code>_attrs</code></a><span class="muted">×1 سطر 97 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/portals.html#f-parse_form"><code>parse_form</code></a> <span class="muted">(portals.py:149)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-parse_form"><span class="tag fn">دالة</span> <b>parse_form(html, base_url)</b>
+ <span class="muted">→ FormInfo</span>
+ <a class="tag api" href="../src/portals.html#L119">سطر 119–242</a>
+<div>يختار نموذج الدخول من بين نماذج الصفحة بأعلى نتيجة، لا أول نموذج. يسقط على username/password إن لم يجد أسماء أوضح. <span class="muted">(نص المؤلف الأصلي في docstring: Find the login form and classify every field in it.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>NON_DATA_TYPES, a, action, base_url, best, body, chap, cm, dst_field, existing, html, info, low, method, name, pass_field…</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/portals.html#f-_attrs"><code>_attrs</code></a><span class="muted">×4 سطر 151 (نفس الملف)</span> · <a href="../files/portals.html#f-_pick"><code>_pick</code></a><span class="muted">×4 سطر 196 (نفس الملف)</span> · <a href="../files/portals.html#f-_form_segments"><code>_form_segments</code></a><span class="muted">×1 سطر 133 (نفس الملف)</span> · <a href="../files/portals.html#f-FormInfo"><code>FormInfo</code></a><span class="muted">×1 سطر 192 (نفس الملف)</span> · <a href="../files/portals.html#f-sanitize_login_url"><code>sanitize_login_url</code></a><span class="muted">×1 سطر 233 (نفس الملف)</span> · <a href="../files/portals.html#f-_score_form"><code>_score_form</code></a><span class="muted">×1 سطر 149 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/capture.html#f-Hub._build_profile"><code>Hub._build_profile</code></a> <span class="muted">(capture.py:1151)</span> <a href="../files/capture.html#f-Hub._exchange"><code>Hub._exchange</code></a> <span class="muted">(capture.py:1096)</span> <a href="../files/capture.html#f-Hub.mark"><code>Hub.mark</code></a> <span class="muted">(capture.py:952)</span> <a href="../files/capture.html#f-infer_pass_mode"><code>infer_pass_mode</code></a> <span class="muted">(capture.py:203)</span> <a href="../files/engine.html#f-_ban_evidence"><code>_ban_evidence</code></a> <span class="muted">(engine.py:328)</span> <a href="../files/engine.html#f-_is_protective_reply"><code>_is_protective_reply</code></a> <span class="muted">(engine.py:368)</span> <a href="../files/engine.html#f-absorb_form"><code>absorb_form</code></a> <span class="muted">(engine.py:255)</span> <a href="../files/portals.html#f-discover"><code>discover</code></a> <span class="muted">(portals.py:342)</span> <a href="../files/portals.html#f-discover"><code>discover</code></a> <span class="muted">(portals.py:345)</span> <a href="../files/server.html#f-Handler._probe_link"><code>Handler._probe_link</code></a> <span class="muted">(server.py:522)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-_pick"><span class="tag fn">دالة</span> <b>_pick(inputs, predicate)</b>
+ <span class="muted">→ str</span>
+ <a class="tag api" href="../src/portals.html#L245">سطر 245–252</a>
+<div>تعريف الدالة _pick(inputs, predicate) ترجع str</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/portals.html#f-parse_form"><code>parse_form</code></a> <span class="muted">(portals.py:196)</span> <a href="../files/portals.html#f-parse_form"><code>parse_form</code></a> <span class="muted">(portals.py:197)</span> <a href="../files/portals.html#f-parse_form"><code>parse_form</code></a> <span class="muted">(portals.py:200)</span> <a href="../files/portals.html#f-parse_form"><code>parse_form</code></a> <span class="muted">(portals.py:208)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Portal.__init__"><span class="tag fn">دالة</span> <b>Portal.__init__(self, url, resp, form, dst_candidates, notes)</b>
+ <a class="tag api" href="../src/portals.html#L256">سطر 256–265</a>
+<div>تعريف الدالة __init__(self, url, resp, form, dst_candidates, notes)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>يُسند إلى</th><td><code>mt, self.dst_candidates, self.form, self.host, self.html, self.notes, self.status, self.title, self.url</code></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Portal.as_dict"><span class="tag fn">دالة</span> <b>Portal.as_dict(self)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/portals.html#L267">سطر 267–277</a>
+<div>تعريف الدالة as_dict(self) ترجع dict</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/portals.html#f-Portal.as_dict"><code>Portal.as_dict</code></a><span class="muted">×1 سطر 274 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/portals.html#f-Portal.as_dict"><code>Portal.as_dict</code></a> <span class="muted">(portals.py:274)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-sanitize_login_url"><span class="tag fn">دالة</span> <b>sanitize_login_url(url, user_field, pass_field)</b>
+ <span class="muted">→ str</span>
+ <a class="tag api" href="../src/portals.html#L283">سطر 283–301</a>
+<div>يحذف قيم username/password من رابط منسوخ قبل حفظه أو عرضه. <span class="muted">(نص المؤلف الأصلي في docstring: Canonicalize a login URL and remove credential values from its query.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>parts, query, secret_keys, value</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-_get_request_url"><code>_get_request_url</code></a> <span class="muted">(engine.py:116)</span> <a href="../files/engine.html#f-_without_query_fields"><code>_without_query_fields</code></a> <span class="muted">(engine.py:94)</span> <a href="../files/engine.html#f-safe_profile_snapshot"><code>safe_profile_snapshot</code></a> <span class="muted">(engine.py:1207)</span> <a href="../files/portals.html#f-parse_form"><code>parse_form</code></a> <span class="muted">(portals.py:233)</span> <a href="../files/store.html#f-migrate"><code>migrate</code></a> <span class="muted">(store.py:261)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-_copied_login_query"><span class="tag fn">دالة</span> <b>_copied_login_query(url)</b>
+ <span class="muted">→ tuple</span>
+ <a class="tag api" href="../src/portals.html#L304">سطر 304–314</a>
+<div>تعريف الدالة _copied_login_query(url) ترجع tuple <span class="muted">(نص المؤلف الأصلي في docstring: (looks like a submitted GET login, credential field names).)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>names, pairs, passwords, url, users</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/portals.html#f-_safe_page_url"><code>_safe_page_url</code></a> <span class="muted">(portals.py:320)</span> <a href="../files/portals.html#f-discover"><code>discover</code></a> <span class="muted">(portals.py:343)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-_safe_page_url"><span class="tag fn">دالة</span> <b>_safe_page_url(url)</b>
+ <span class="muted">→ str</span>
+ <a class="tag api" href="../src/portals.html#L317">سطر 317–327</a>
+<div>تعريف الدالة _safe_page_url(url) ترجع str <span class="muted">(نص المؤلف الأصلي في docstring: Open the login *page*, never spend the card embedded in a copied URL.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>pairs, parts, url</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/portals.html#f-_copied_login_query"><code>_copied_login_query</code></a><span class="muted">×1 سطر 320 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/capture.html#f-_safe_page_url"><code>_safe_page_url</code></a> <span class="muted">(capture.py:79)</span> <a href="../files/portals.html#f-discover"><code>discover</code></a> <span class="muted">(portals.py:339)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-discover"><span class="tag fn">دالة</span> <b>discover(session, url, timeout)</b>
+ <span class="muted">→ Portal</span>
+ <a class="tag api" href="../src/portals.html#L330">سطر 330–369</a>
+<div>تعريف الدالة discover(session, url, timeout) ترجع Portal <span class="muted">(نص المؤلف الأصلي في docstring: Open the login page and report everything the tool learned from it.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>action, base, form, notes, page_url, resp, url</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/portals.html#f-parse_form"><code>parse_form</code></a><span class="muted">×2 سطر 342 (نفس الملف)</span> · <a href="../files/portals.html#f-_safe_page_url"><code>_safe_page_url</code></a><span class="muted">×1 سطر 339 (نفس الملف)</span> · <a href="../files/portals.html#f-_copied_login_query"><code>_copied_login_query</code></a><span class="muted">×1 سطر 343 (نفس الملف)</span> · <a href="../files/portals.html#f-Portal"><code>Portal</code></a><span class="muted">×1 سطر 369 (نفس الملف)</span> · <a href="../files/portals.html#f-_js_var"><code>_js_var</code></a><span class="muted">×1 سطر 351 (نفس الملف)</span> · <a href="../files/portals.html#f-_form_segments"><code>_form_segments</code></a><span class="muted">×1 سطر 344 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/selftest.html#f-scan"><code>scan</code></a> <span class="muted">(selftest.py:61)</span> <a href="../files/server.html#f-Handler._scan"><code>Handler._scan</code></a> <span class="muted">(server.py:556)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-_js_var"><span class="tag fn">دالة</span> <b>_js_var(html, name)</b>
+ <span class="muted">→ str</span>
+ <a class="tag api" href="../src/portals.html#L372">سطر 372–374</a>
+<div>تعريف الدالة _js_var(html, name) ترجع str</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>m</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/portals.html#f-discover"><code>discover</code></a> <span class="muted">(portals.py:351)</span></td></tr>
+</table></div>
+<footer class="docfoot">صفحة مولّدة آلياً من مصدر الكود · KiraPass —
+<code>files</code> · 2026-10-01 02:26</footer>
+</main>
+</div>
+<script src="../assets/docs.js"></script>
+<script>KPInit("files");</script>
+</body>
+</html>

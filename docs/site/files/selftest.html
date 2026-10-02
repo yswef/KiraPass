@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ملف selftest.py · KiraPass</title>
+<link rel="stylesheet" href="../assets/docs.css">
+
+</head>
+<body>
+<div id="kp-layout">
+<main class="doc">
+<h1>ملف <code>selftest.py</code></h1>
+<p class="lead">15 سيناريو اختبار على راوترات وهمية — <code>kirapass/selftest.py</code></p>
+<div class="card info"><b>هذه الصفحة مولّدة آلياً</b> من مصدر الكود مباشرة (<code>tools/docs/build_docs.py</code>). إن غيّرت الكود فأعد توليدها: <code>python3 tools/docs/build_docs.py</code>. الشرح اليدوي الأوسع في <a href="../architecture.html">المعمارية</a> و<a href="../editing.html">دليل التعديل</a> و<a href="../danger.html">أماكن الخطر</a>.</div>
+<div class="grid3"><div class="card"><b>453</b><br>سطراً</div><div class="card"><b>22</b><br>دالة</div><div class="card"><b>1</b><br>صنف</div></div>
+<div class="note"><b>ملخّص المؤلف للملف (نصه الأصلي بالإنجليزية):</b> <span class="muted">Self-test: prove the tool works without touching any real network.</span></div>
+<p><a class="btn primary" href="../src/selftest.html">افتح المصدر كاملاً مرقّماً</a></p>
+<h2 id="imports">الاستيرادات</h2><table class="t compact"><thead><tr><th>السطر</th><th>الاستيراد</th><th>لماذا</th></tr></thead><tbody>
+<tr><td class="mono">15</td><td class="mono">from __future__ import annotations</td><td>استيراد annotations من الوحدة __future__</td></tr>
+<tr><td class="mono">17</td><td class="mono">import os</td><td>استيراد الوحدة os من المكتبة</td></tr>
+<tr><td class="mono">18</td><td class="mono">import shutil</td><td>استيراد الوحدة shutil من المكتبة</td></tr>
+<tr><td class="mono">19</td><td class="mono">import sys</td><td>استيراد الوحدة sys من المكتبة</td></tr>
+<tr><td class="mono">20</td><td class="mono">import time</td><td>استيراد الوحدة time من المكتبة</td></tr>
+<tr><td class="mono">22</td><td class="mono">from . import config, engine, portals, store</td><td>استيراد config, engine, portals, store من الوحدة .</td></tr>
+<tr><td class="mono">23</td><td class="mono">from .httpclient import Session</td><td>استيراد Session من الوحدة httpclient</td></tr>
+<tr><td class="mono">24</td><td class="mono">from .mockportal import MockPortal</td><td>استيراد MockPortal من الوحدة mockportal</td></tr>
+</tbody></table>
+<h2 id="vars">متغيرات وثوابت على مستوى الوحدة</h2><div class="scroll-x"><table class="t compact"><thead><tr><th>الاسم</th><th>السطر</th><th>القيمة</th><th>الشرح</th></tr></thead><tbody>
+<tr><td class="mono"><span class="tag var">_RUN_ID</span></td><td class="mono"><a href="../src/selftest.html#L66">66</a></td><td class="mono">[0]</td><td>إسناد قائمة إلى _RUN_ID</td></tr>
+<tr><td class="mono"><span class="tag var">SCENARIOS</span></td><td class="mono"><a href="../src/selftest.html#L385">385</a></td><td class="mono">(t_format_preview, t_legacy_profile, t_calibration, t_no_false_hits, t</td><td>إسناد مجموعة إلى SCENARIOS</td></tr>
+</tbody></table></div>
+<h2 id="classes">الأصناف</h2>
+<div class="sym head" id="c-Result"><span class="tag mod">صنف</span> <b>Result</b> <a class="tag api" href="../src/selftest.html#L98">سطر 98</a><div>تعريف الصنف Result</div></div>
+<div class="sym body">دواله: <a href="#f-Result.__init__"><code>__init__</code></a> · <a href="#f-Result.__str__"><code>__str__</code></a></div>
+<h2 id="funcs">الدوال — واحدة واحدة</h2>
+<div class="sym head" id="f-make_profile"><span class="tag fn">دالة</span> <b>make_profile(url, prefix, length, charset, portal_info, **kw)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/selftest.html#L30">سطر 30–47</a>
+<div>تعريف الدالة make_profile(url, prefix, length, charset, portal_info, **kw) ترجع dict</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>form, p</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/store.html#f-new_profile"><code>new_profile</code></a><span class="muted">×1 سطر 32</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/selftest.html#f-t_ban_is_reported"><code>t_ban_is_reported</code></a> <span class="muted">(selftest.py:186)</span> <a href="../files/selftest.html#f-t_calibration"><code>t_calibration</code></a> <span class="muted">(selftest.py:117)</span> <a href="../files/selftest.html#f-t_chap_portal"><code>t_chap_portal</code></a> <span class="muted">(selftest.py:260)</span> <a href="../files/selftest.html#f-t_dead_target_stops"><code>t_dead_target_stops</code></a> <span class="muted">(selftest.py:243)</span> <a href="../files/selftest.html#f-t_dropped_connections"><code>t_dropped_connections</code></a> <span class="muted">(selftest.py:227)</span> <a href="../files/selftest.html#f-t_find_card"><code>t_find_card</code></a> <span class="muted">(selftest.py:150)</span> <a href="../files/selftest.html#f-t_get_portal"><code>t_get_portal</code></a> <span class="muted">(selftest.py:282)</span> <a href="../files/selftest.html#f-t_no_false_hits"><code>t_no_false_hits</code></a> <span class="muted">(selftest.py:133)</span> <a href="../files/selftest.html#f-t_rate_limit_stops"><code>t_rate_limit_stops</code></a> <span class="muted">(selftest.py:202)</span> <a href="../files/selftest.html#f-t_resume_continues"><code>t_resume_continues</code></a> <span class="muted">(selftest.py:331)</span> <a href="../files/selftest.html#f-t_verified_hit_stops_before_shared_online_false_hits"><code>t_verified_hit_stops_before_shared_online_false_hits</code></a> <span class="muted">(selftest.py:167)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-mock_checks"><span class="tag fn">دالة</span> <b>mock_checks(portal)</b>
+ <span class="muted">→ tuple</span>
+ <a class="tag api" href="../src/selftest.html#L50">سطر 50–55</a>
+<div>تعريف الدالة mock_checks(portal) ترجع tuple <span class="muted">(نص المؤلف الأصلي في docstring: The mock router&#x27;s own internet endpoints - keeps tests off the internet.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>base</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/selftest.html#f-t_ban_is_reported"><code>t_ban_is_reported</code></a> <span class="muted">(selftest.py:188)</span> <a href="../files/selftest.html#f-t_chap_portal"><code>t_chap_portal</code></a> <span class="muted">(selftest.py:261)</span> <a href="../files/selftest.html#f-t_chap_portal"><code>t_chap_portal</code></a> <span class="muted">(selftest.py:270)</span> <a href="../files/selftest.html#f-t_dead_target_stops"><code>t_dead_target_stops</code></a> <span class="muted">(selftest.py:246)</span> <a href="../files/selftest.html#f-t_dropped_connections"><code>t_dropped_connections</code></a> <span class="muted">(selftest.py:229)</span> <a href="../files/selftest.html#f-t_find_card"><code>t_find_card</code></a> <span class="muted">(selftest.py:152)</span> <a href="../files/selftest.html#f-t_get_portal"><code>t_get_portal</code></a> <span class="muted">(selftest.py:284)</span> <a href="../files/selftest.html#f-t_legacy_profile"><code>t_legacy_profile</code></a> <span class="muted">(selftest.py:304)</span> <a href="../files/selftest.html#f-t_no_false_hits"><code>t_no_false_hits</code></a> <span class="muted">(selftest.py:136)</span> <a href="../files/selftest.html#f-t_rate_limit_stops"><code>t_rate_limit_stops</code></a> <span class="muted">(selftest.py:204)</span> <a href="../files/selftest.html#f-t_resume_continues"><code>t_resume_continues</code></a> <span class="muted">(selftest.py:333)</span> <a href="../files/selftest.html#f-t_resume_continues"><code>t_resume_continues</code></a> <span class="muted">(selftest.py:336)</span> <a href="../files/selftest.html#f-t_verified_hit_stops_before_shared_online_false_hits"><code>t_verified_hit_stops_before_shared_online_false_hits</code></a> <span class="muted">(selftest.py:170)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-scan"><span class="tag fn">دالة</span> <b>scan(url)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/selftest.html#L58">سطر 58–63</a>
+<div>تعريف الدالة scan(url) ترجع dict</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>session</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/httpclient.html#f-Session"><code>Session</code></a><span class="muted">×1 سطر 59</span> · <a href="../files/portals.html#f-FormInfo.as_dict"><code>FormInfo.as_dict</code></a><span class="muted">×1 سطر 61</span> · <a href="../files/portals.html#f-discover"><code>discover</code></a><span class="muted">×1 سطر 61</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/selftest.html#f-t_ban_is_reported"><code>t_ban_is_reported</code></a> <span class="muted">(selftest.py:185)</span> <a href="../files/selftest.html#f-t_calibration"><code>t_calibration</code></a> <span class="muted">(selftest.py:116)</span> <a href="../files/selftest.html#f-t_chap_portal"><code>t_chap_portal</code></a> <span class="muted">(selftest.py:259)</span> <a href="../files/selftest.html#f-t_dead_target_stops"><code>t_dead_target_stops</code></a> <span class="muted">(selftest.py:242)</span> <a href="../files/selftest.html#f-t_dropped_connections"><code>t_dropped_connections</code></a> <span class="muted">(selftest.py:226)</span> <a href="../files/selftest.html#f-t_find_card"><code>t_find_card</code></a> <span class="muted">(selftest.py:149)</span> <a href="../files/selftest.html#f-t_get_portal"><code>t_get_portal</code></a> <span class="muted">(selftest.py:281)</span> <a href="../files/selftest.html#f-t_legacy_profile"><code>t_legacy_profile</code></a> <span class="muted">(selftest.py:301)</span> <a href="../files/selftest.html#f-t_no_false_hits"><code>t_no_false_hits</code></a> <span class="muted">(selftest.py:132)</span> <a href="../files/selftest.html#f-t_rate_limit_stops"><code>t_rate_limit_stops</code></a> <span class="muted">(selftest.py:201)</span> <a href="../files/selftest.html#f-t_resume_continues"><code>t_resume_continues</code></a> <span class="muted">(selftest.py:330)</span> <a href="../files/selftest.html#f-t_verified_hit_stops_before_shared_online_false_hits"><code>t_verified_hit_stops_before_shared_online_false_hits</code></a> <span class="muted">(selftest.py:166)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-run_engine"><span class="tag fn">دالة</span> <b>run_engine(profile, attempts, threads, timeout, checks, reset, **kw)</b>
+ <a class="tag api" href="../src/selftest.html#L69">سطر 69–95</a>
+<div>تعريف الدالة run_engine(profile, attempts, threads, timeout, checks, reset, **kw) <span class="muted">(نص المؤلف الأصلي في docstring: Fresh, throw-away run: no resume state, nothing saved on disk.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>deadline, eng, profile, res</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/engine.html#f-Engine"><code>Engine</code></a><span class="muted">×1 سطر 82</span> · <a href="../files/store.html#f-Store"><code>Store</code></a><span class="muted">×1 سطر 82</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/selftest.html#f-t_ban_is_reported"><code>t_ban_is_reported</code></a> <span class="muted">(selftest.py:187)</span> <a href="../files/selftest.html#f-t_chap_portal"><code>t_chap_portal</code></a> <span class="muted">(selftest.py:269)</span> <a href="../files/selftest.html#f-t_dead_target_stops"><code>t_dead_target_stops</code></a> <span class="muted">(selftest.py:245)</span> <a href="../files/selftest.html#f-t_dropped_connections"><code>t_dropped_connections</code></a> <span class="muted">(selftest.py:228)</span> <a href="../files/selftest.html#f-t_find_card"><code>t_find_card</code></a> <span class="muted">(selftest.py:151)</span> <a href="../files/selftest.html#f-t_get_portal"><code>t_get_portal</code></a> <span class="muted">(selftest.py:283)</span> <a href="../files/selftest.html#f-t_legacy_profile"><code>t_legacy_profile</code></a> <span class="muted">(selftest.py:303)</span> <a href="../files/selftest.html#f-t_no_false_hits"><code>t_no_false_hits</code></a> <span class="muted">(selftest.py:135)</span> <a href="../files/selftest.html#f-t_resume_continues"><code>t_resume_continues</code></a> <span class="muted">(selftest.py:332)</span> <a href="../files/selftest.html#f-t_resume_continues"><code>t_resume_continues</code></a> <span class="muted">(selftest.py:335)</span> <a href="../files/selftest.html#f-t_verified_hit_stops_before_shared_online_false_hits"><code>t_verified_hit_stops_before_shared_online_false_hits</code></a> <span class="muted">(selftest.py:169)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Result.__init__"><span class="tag fn">دالة</span> <b>Result.__init__(self, name, ok, detail)</b>
+ <a class="tag api" href="../src/selftest.html#L99">سطر 99–102</a>
+<div>تعريف الدالة __init__(self, name, ok, detail)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>يُسند إلى</th><td><code>self.detail, self.name, self.ok</code></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Result.__str__"><span class="tag fn">دالة</span> <b>Result.__str__(self)</b>
+ <a class="tag api" href="../src/selftest.html#L104">سطر 104–106</a>
+<div>تعريف الدالة __str__(self)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>mark</code></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-t_calibration"><span class="tag fn">دالة</span> <b>t_calibration()</b>
+ <a class="tag api" href="../src/selftest.html#L112">سطر 112–126</a>
+<div>تعريف الدالة t_calibration() <span class="muted">(نص المؤلف الأصلي في docstring: The rejection baseline must be learned even with a changing token.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>cal, detail, fp, info, ok, p</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/mockportal.html#f-MockPortal"><code>MockPortal</code></a><span class="muted">×1 سطر 114</span> · <a href="../files/selftest.html#f-scan"><code>scan</code></a><span class="muted">×1 سطر 116 (نفس الملف)</span> · <a href="../files/selftest.html#f-make_profile"><code>make_profile</code></a><span class="muted">×1 سطر 117 (نفس الملف)</span> · <a href="../files/engine.html#f-calibrate"><code>calibrate</code></a><span class="muted">×1 سطر 118</span> · <a href="../files/selftest.html#f-Result"><code>Result</code></a><span class="muted">×1 سطر 126 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-t_no_false_hits"><span class="tag fn">دالة</span> <b>t_no_false_hits()</b>
+ <a class="tag api" href="../src/selftest.html#L129">سطر 129–143</a>
+<div>تعريف الدالة t_no_false_hits() <span class="muted">(نص المؤلف الأصلي في docstring: 50 wrong cards: zero accepted. This is the old bug, in a test.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>accepted, c, info, ok, p</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/mockportal.html#f-MockPortal"><code>MockPortal</code></a><span class="muted">×1 سطر 131</span> · <a href="../files/selftest.html#f-scan"><code>scan</code></a><span class="muted">×1 سطر 132 (نفس الملف)</span> · <a href="../files/selftest.html#f-make_profile"><code>make_profile</code></a><span class="muted">×1 سطر 133 (نفس الملف)</span> · <a href="../files/selftest.html#f-run_engine"><code>run_engine</code></a><span class="muted">×1 سطر 135 (نفس الملف)</span> · <a href="../files/selftest.html#f-Result"><code>Result</code></a><span class="muted">×1 سطر 140 (نفس الملف)</span> · <a href="../files/selftest.html#f-mock_checks"><code>mock_checks</code></a><span class="muted">×1 سطر 136 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-t_find_card"><span class="tag fn">دالة</span> <b>t_find_card()</b>
+ <a class="tag api" href="../src/selftest.html#L146">سطر 146–159</a>
+<div>تعريف الدالة t_find_card() <span class="muted">(نص المؤلف الأصلي في docstring: The card that exists gets found AND verified against the internet.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>hits, info, ok, p</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/mockportal.html#f-MockPortal"><code>MockPortal</code></a><span class="muted">×1 سطر 148</span> · <a href="../files/selftest.html#f-scan"><code>scan</code></a><span class="muted">×1 سطر 149 (نفس الملف)</span> · <a href="../files/selftest.html#f-make_profile"><code>make_profile</code></a><span class="muted">×1 سطر 150 (نفس الملف)</span> · <a href="../files/selftest.html#f-run_engine"><code>run_engine</code></a><span class="muted">×1 سطر 151 (نفس الملف)</span> · <a href="../files/selftest.html#f-Result"><code>Result</code></a><span class="muted">×1 سطر 157 (نفس الملف)</span> · <a href="../files/selftest.html#f-mock_checks"><code>mock_checks</code></a><span class="muted">×1 سطر 152 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-t_verified_hit_stops_before_shared_online_false_hits"><span class="tag fn">دالة</span> <b>t_verified_hit_stops_before_shared_online_false_hits()</b>
+ <a class="tag api" href="../src/selftest.html#L162">سطر 162–179</a>
+<div>تعريف الدالة t_verified_hit_stops_before_shared_online_false_hits() <span class="muted">(نص المؤلف الأصلي في docstring: One device-wide online transition must not verify later wrong cards.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>hits, info, ok, p</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/mockportal.html#f-MockPortal"><code>MockPortal</code></a><span class="muted">×1 سطر 164</span> · <a href="../files/selftest.html#f-scan"><code>scan</code></a><span class="muted">×1 سطر 166 (نفس الملف)</span> · <a href="../files/selftest.html#f-make_profile"><code>make_profile</code></a><span class="muted">×1 سطر 167 (نفس الملف)</span> · <a href="../files/selftest.html#f-run_engine"><code>run_engine</code></a><span class="muted">×1 سطر 169 (نفس الملف)</span> · <a href="../files/selftest.html#f-Result"><code>Result</code></a><span class="muted">×1 سطر 177 (نفس الملف)</span> · <a href="../files/selftest.html#f-mock_checks"><code>mock_checks</code></a><span class="muted">×1 سطر 170 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-t_ban_is_reported"><span class="tag fn">دالة</span> <b>t_ban_is_reported()</b>
+ <a class="tag api" href="../src/selftest.html#L182">سطر 182–195</a>
+<div>تعريف الدالة t_ban_is_reported() <span class="muted">(نص المؤلف الأصلي في docstring: A ban must be named as a ban - never as a hit or as &#x27;tested&#x27;.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>accepted, c, info, ok, p</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/mockportal.html#f-MockPortal"><code>MockPortal</code></a><span class="muted">×1 سطر 184</span> · <a href="../files/selftest.html#f-scan"><code>scan</code></a><span class="muted">×1 سطر 185 (نفس الملف)</span> · <a href="../files/selftest.html#f-make_profile"><code>make_profile</code></a><span class="muted">×1 سطر 186 (نفس الملف)</span> · <a href="../files/selftest.html#f-run_engine"><code>run_engine</code></a><span class="muted">×1 سطر 187 (نفس الملف)</span> · <a href="../files/selftest.html#f-Result"><code>Result</code></a><span class="muted">×1 سطر 193 (نفس الملف)</span> · <a href="../files/selftest.html#f-mock_checks"><code>mock_checks</code></a><span class="muted">×1 سطر 188 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-t_rate_limit_stops"><span class="tag fn">دالة</span> <b>t_rate_limit_stops()</b>
+ <a class="tag api" href="../src/selftest.html#L198">سطر 198–217</a>
+<div>تعريف الدالة t_rate_limit_stops()</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>c, deadline, delay, eng, info, ok, p, st</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/mockportal.html#f-MockPortal"><code>MockPortal</code></a><span class="muted">×1 سطر 199</span> · <a href="../files/selftest.html#f-scan"><code>scan</code></a><span class="muted">×1 سطر 201 (نفس الملف)</span> · <a href="../files/selftest.html#f-make_profile"><code>make_profile</code></a><span class="muted">×1 سطر 202 (نفس الملف)</span> · <a href="../files/engine.html#f-Engine"><code>Engine</code></a><span class="muted">×1 سطر 203</span> · <a href="../files/selftest.html#f-Result"><code>Result</code></a><span class="muted">×1 سطر 215 (نفس الملف)</span> · <a href="../files/store.html#f-Store"><code>Store</code></a><span class="muted">×1 سطر 203</span> · <a href="../files/selftest.html#f-mock_checks"><code>mock_checks</code></a><span class="muted">×1 سطر 204 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-t_dropped_connections"><span class="tag fn">دالة</span> <b>t_dropped_connections()</b>
+ <a class="tag api" href="../src/selftest.html#L220">سطر 220–236</a>
+<div>تعريف الدالة t_dropped_connections() <span class="muted">(نص المؤلف الأصلي في docstring: Half the sockets are cut: retries must save the card, and nothing may)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>accepted, accounted, c, info, ok, p, pr</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/mockportal.html#f-MockPortal"><code>MockPortal</code></a><span class="muted">×1 سطر 224</span> · <a href="../files/selftest.html#f-scan"><code>scan</code></a><span class="muted">×1 سطر 226 (نفس الملف)</span> · <a href="../files/selftest.html#f-make_profile"><code>make_profile</code></a><span class="muted">×1 سطر 227 (نفس الملف)</span> · <a href="../files/selftest.html#f-run_engine"><code>run_engine</code></a><span class="muted">×1 سطر 228 (نفس الملف)</span> · <a href="../files/selftest.html#f-Result"><code>Result</code></a><span class="muted">×1 سطر 235 (نفس الملف)</span> · <a href="../files/selftest.html#f-mock_checks"><code>mock_checks</code></a><span class="muted">×1 سطر 229 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-t_dead_target_stops"><span class="tag fn">دالة</span> <b>t_dead_target_stops()</b>
+ <a class="tag api" href="../src/selftest.html#L239">سطر 239–253</a>
+<div>تعريف الدالة t_dead_target_stops() <span class="muted">(نص المؤلف الأصلي في docstring: The router stops answering entirely: stop with that reason, honestly.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>c, drop_after, info, ok, p</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/mockportal.html#f-MockPortal"><code>MockPortal</code></a><span class="muted">×1 سطر 241</span> · <a href="../files/selftest.html#f-scan"><code>scan</code></a><span class="muted">×1 سطر 242 (نفس الملف)</span> · <a href="../files/selftest.html#f-make_profile"><code>make_profile</code></a><span class="muted">×1 سطر 243 (نفس الملف)</span> · <a href="../files/selftest.html#f-run_engine"><code>run_engine</code></a><span class="muted">×1 سطر 245 (نفس الملف)</span> · <a href="../files/selftest.html#f-Result"><code>Result</code></a><span class="muted">×1 سطر 251 (نفس الملف)</span> · <a href="../files/selftest.html#f-mock_checks"><code>mock_checks</code></a><span class="muted">×1 سطر 246 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-t_chap_portal"><span class="tag fn">دالة</span> <b>t_chap_portal()</b>
+ <a class="tag api" href="../src/selftest.html#L256">سطر 256–275</a>
+<div>تعريف الدالة t_chap_portal() <span class="muted">(نص المؤلف الأصلي في docstring: MikroTik md5.js (chap) portal - the tool must find the right formula.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>cal, hits, info, ok, p, p2, tuned</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/selftest.html#f-Result"><code>Result</code></a><span class="muted">×2 سطر 273 (نفس الملف)</span> · <a href="../files/selftest.html#f-mock_checks"><code>mock_checks</code></a><span class="muted">×2 سطر 261 (نفس الملف)</span> · <a href="../files/mockportal.html#f-MockPortal"><code>MockPortal</code></a><span class="muted">×1 سطر 258</span> · <a href="../files/selftest.html#f-scan"><code>scan</code></a><span class="muted">×1 سطر 259 (نفس الملف)</span> · <a href="../files/selftest.html#f-make_profile"><code>make_profile</code></a><span class="muted">×1 سطر 260 (نفس الملف)</span> · <a href="../files/engine.html#f-calibrate"><code>calibrate</code></a><span class="muted">×1 سطر 261</span> · <a href="../files/selftest.html#f-run_engine"><code>run_engine</code></a><span class="muted">×1 سطر 269 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-t_get_portal"><span class="tag fn">دالة</span> <b>t_get_portal()</b>
+ <a class="tag api" href="../src/selftest.html#L278">سطر 278–290</a>
+<div>تعريف الدالة t_get_portal()</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>hits, info, ok, p</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/mockportal.html#f-MockPortal"><code>MockPortal</code></a><span class="muted">×1 سطر 279</span> · <a href="../files/selftest.html#f-scan"><code>scan</code></a><span class="muted">×1 سطر 281 (نفس الملف)</span> · <a href="../files/selftest.html#f-make_profile"><code>make_profile</code></a><span class="muted">×1 سطر 282 (نفس الملف)</span> · <a href="../files/selftest.html#f-run_engine"><code>run_engine</code></a><span class="muted">×1 سطر 283 (نفس الملف)</span> · <a href="../files/selftest.html#f-Result"><code>Result</code></a><span class="muted">×1 سطر 287 (نفس الملف)</span> · <a href="../files/selftest.html#f-mock_checks"><code>mock_checks</code></a><span class="muted">×1 سطر 284 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-t_legacy_profile"><span class="tag fn">دالة</span> <b>t_legacy_profile()</b>
+ <a class="tag api" href="../src/selftest.html#L293">سطر 293–309</a>
+<div>تعريف الدالة t_legacy_profile() <span class="muted">(نص المؤلف الأصلي في docstring: A profile saved by the OLD version must not crash the new one.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>hits, info, ok, old, p, problems</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/store.html#f-migrate"><code>migrate</code></a><span class="muted">×1 سطر 298</span> · <a href="../files/store.html#f-validate"><code>validate</code></a><span class="muted">×1 سطر 299</span> · <a href="../files/mockportal.html#f-MockPortal"><code>MockPortal</code></a><span class="muted">×1 سطر 300</span> · <a href="../files/selftest.html#f-scan"><code>scan</code></a><span class="muted">×1 سطر 301 (نفس الملف)</span> · <a href="../files/selftest.html#f-run_engine"><code>run_engine</code></a><span class="muted">×1 سطر 303 (نفس الملف)</span> · <a href="../files/selftest.html#f-Result"><code>Result</code></a><span class="muted">×1 سطر 307 (نفس الملف)</span> · <a href="../files/selftest.html#f-mock_checks"><code>mock_checks</code></a><span class="muted">×1 سطر 304 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-t_diagnose_dead_target"><span class="tag fn">دالة</span> <b>t_diagnose_dead_target()</b>
+ <a class="tag api" href="../src/selftest.html#L312">سطر 312–318</a>
+<div>تعريف الدالة t_diagnose_dead_target()</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>ok, r, step</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/engine.html#f-diagnose"><code>diagnose</code></a><span class="muted">×1 سطر 313</span> · <a href="../files/selftest.html#f-Result"><code>Result</code></a><span class="muted">×1 سطر 317 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-t_resume_continues"><span class="tag fn">دالة</span> <b>t_resume_continues()</b>
+ <a class="tag api" href="../src/selftest.html#L321">سطر 321–344</a>
+<div>تعريف الدالة t_resume_continues() <span class="muted">(نص المؤلف الأصلي في docstring: A second run must continue - not repeat the cards of the first one.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>info, ok, p, pos1, pos2, resumed, same_walk</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/selftest.html#f-run_engine"><code>run_engine</code></a><span class="muted">×2 سطر 332 (نفس الملف)</span> · <a href="../files/selftest.html#f-mock_checks"><code>mock_checks</code></a><span class="muted">×2 سطر 333 (نفس الملف)</span> · <a href="../files/mockportal.html#f-MockPortal"><code>MockPortal</code></a><span class="muted">×1 سطر 329</span> · <a href="../files/selftest.html#f-scan"><code>scan</code></a><span class="muted">×1 سطر 330 (نفس الملف)</span> · <a href="../files/selftest.html#f-make_profile"><code>make_profile</code></a><span class="muted">×1 سطر 331 (نفس الملف)</span> · <a href="../files/selftest.html#f-Result"><code>Result</code></a><span class="muted">×1 سطر 342 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-t_cache_clear"><span class="tag fn">دالة</span> <b>t_cache_clear()</b>
+ <a class="tag api" href="../src/selftest.html#L347">سطر 347–370</a>
+<div>تعريف الدالة t_cache_clear() <span class="muted">(نص المؤلف الأصلي في docstring: Clearing the cache must not eat the results.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>before, hits_gone, hits_kept, ok, results, review_gone, saved, st, temp</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/store.html#f-Store"><code>Store</code></a><span class="muted">×1 سطر 354</span> · <a href="../files/selftest.html#f-Result"><code>Result</code></a><span class="muted">×1 سطر 366 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-t_format_preview"><span class="tag fn">دالة</span> <b>t_format_preview()</b>
+ <a class="tag api" href="../src/selftest.html#L373">سطر 373–382</a>
+<div>تعريف الدالة t_format_preview()</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>bad, ok, p</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/store.html#f-new_profile"><code>new_profile</code></a><span class="muted">×2 سطر 374</span> · <a href="../files/store.html#f-space_size"><code>space_size</code></a><span class="muted">×2 سطر 375</span> · <a href="../files/store.html#f-sample_cards"><code>sample_cards</code></a><span class="muted">×2 سطر 381</span> · <a href="../files/store.html#f-validate"><code>validate</code></a><span class="muted">×1 سطر 378</span> · <a href="../files/selftest.html#f-Result"><code>Result</code></a><span class="muted">×1 سطر 379 (نفس الملف)</span> · <a href="../files/store.html#f-Store.all"><code>Store.all</code></a><span class="muted">×1 سطر 376</span> · <a href="../files/store.html#f-variable_len"><code>variable_len</code></a><span class="muted">×1 سطر 375</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-run_all"><span class="tag fn">دالة</span> <b>run_all(verbose, keep_files)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/selftest.html#L406">سطر 406–447</a>
+<div>يشغّل السيناريوهات كلها داخل مجلد بيانات مؤقت حتى لا تختلط بطاقات التجربة ببروفايلات المستخدم الحقيقية. <span class="muted">(نص المؤلف الأصلي في docstring: Run every scenario inside a throw-away data folder.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>detail, passed, res, results, summary, t0, t_start, tmp</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/config.html#f-set_data_dir"><code>set_data_dir</code></a><span class="muted">×1 سطر 416</span> · <a href="../files/selftest.html#f-Result"><code>Result</code></a><span class="muted">×1 سطر 426 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/cli.html#f-cmd_selftest"><code>cmd_selftest</code></a> <span class="muted">(cli.py:127)</span></td></tr>
+</table></div>
+<footer class="docfoot">صفحة مولّدة آلياً من مصدر الكود · KiraPass —
+<code>files</code> · 2026-10-01 02:26</footer>
+</main>
+</div>
+<script src="../assets/docs.js"></script>
+<script>KPInit("files");</script>
+</body>
+</html>
