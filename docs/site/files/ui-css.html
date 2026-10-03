@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ملف web/ui.css · KiraPass</title>
+<link rel="stylesheet" href="../assets/docs.css">
+
+</head>
+<body>
+<div id="kp-layout">
+<main class="doc">
+<h1>ملف <code>web/ui.css</code></h1>
+<p class="lead">التنسيقات: كل الأصناف والمتغيرات — <code>kirapass/web/ui.css</code></p>
+<div class="card info"><b>هذه الصفحة مولّدة آلياً</b> من مصدر الكود مباشرة (<code>tools/docs/build_docs.py</code>). إن غيّرت الكود فأعد توليدها: <code>python3 tools/docs/build_docs.py</code>. الشرح اليدوي الأوسع في <a href="../architecture.html">المعمارية</a> و<a href="../editing.html">دليل التعديل</a> و<a href="../danger.html">أماكن الخطر</a>.</div>
+<div class="grid3"><div class="card"><b>481</b><br>سطراً</div><div class="card"><b>190</b><br>محدِّد</div><div class="card"><b>73</b><br>خاصية مختلفة</div></div>
+<p><a class="btn primary" href="../src/ui-css.html">افتح المصدر كاملاً مرقّماً</a></p>
+<h2 id="sel">المحدِّدات</h2><div class="scroll-x"><table class="t compact"><thead><tr><th>المحدِّد</th><th>السطر</th><th>الشرح</th></tr></thead><tbody>
+<tr><td class="mono">:root</td><td class="mono"><a href="../src/ui-css.html#L1">1</a></td><td></td></tr>
+<tr><td class="mono">*</td><td class="mono"><a href="../src/ui-css.html#L29">29</a></td><td></td></tr>
+<tr><td class="mono">html</td><td class="mono"><a href="../src/ui-css.html#L30">30</a></td><td></td></tr>
+<tr><td class="mono">body</td><td class="mono"><a href="../src/ui-css.html#L31">31</a></td><td></td></tr>
+<tr><td class="mono">button, input, select</td><td class="mono"><a href="../src/ui-css.html#L44">44</a></td><td></td></tr>
+<tr><td class="mono">button</td><td class="mono"><a href="../src/ui-css.html#L45">45</a></td><td></td></tr>
+<tr><td class="mono">::selection</td><td class="mono"><a href="../src/ui-css.html#L46">46</a></td><td>051118; background: var(--acc); } /* قاعدة كاملة في سطر واحد على المحدِّد ::selection */</td></tr>
+<tr><td class="mono">.sr-only</td><td class="mono"><a href="../src/ui-css.html#L48">48</a></td><td></td></tr>
+<tr><td class="mono">.skip-link</td><td class="mono"><a href="../src/ui-css.html#L49">49</a></td><td></td></tr>
+<tr><td class="mono">.skip-link:focus</td><td class="mono"><a href="../src/ui-css.html#L61">61</a></td><td></td></tr>
+<tr><td class="mono">.top</td><td class="mono"><a href="../src/ui-css.html#L64">64</a></td><td></td></tr>
+<tr><td class="mono">.brand</td><td class="mono"><a href="../src/ui-css.html#L79">79</a></td><td></td></tr>
+<tr><td class="mono">.logo</td><td class="mono"><a href="../src/ui-css.html#L80">80</a></td><td></td></tr>
+<tr><td class="mono">.brand-copy</td><td class="mono"><a href="../src/ui-css.html#L95">95</a></td><td></td></tr>
+<tr><td class="mono">.name</td><td class="mono"><a href="../src/ui-css.html#L96">96</a></td><td></td></tr>
+<tr><td class="mono">.tagline</td><td class="mono"><a href="../src/ui-css.html#L97">97</a></td><td></td></tr>
+<tr><td class="mono">.ver</td><td class="mono"><a href="../src/ui-css.html#L98">98</a></td><td></td></tr>
+<tr><td class="mono">.top-actions</td><td class="mono"><a href="../src/ui-css.html#L108">108</a></td><td></td></tr>
+<tr><td class="mono">.pill</td><td class="mono"><a href="../src/ui-css.html#L109">109</a></td><td></td></tr>
+<tr><td class="mono">.pill::before</td><td class="mono"><a href="../src/ui-css.html#L122">122</a></td><td></td></tr>
+<tr><td class="mono">.pill.run</td><td class="mono"><a href="../src/ui-css.html#L123">123</a></td><td>c7e1ff; background: rgba(42,105,173,.16); } /* قاعدة كاملة في سطر واحد على المحدِّد .pill.run */</td></tr>
+<tr><td class="mono">.pill.run::before</td><td class="mono"><a href="../src/ui-css.html#L124">124</a></td><td></td></tr>
+<tr><td class="mono">.pill.done</td><td class="mono"><a href="../src/ui-css.html#L125">125</a></td><td>c7ffe0; background: var(--ok-soft); } /* قاعدة كاملة في سطر واحد على المحدِّد .pill.done */</td></tr>
+<tr><td class="mono">.pill.done::before</td><td class="mono"><a href="../src/ui-css.html#L126">126</a></td><td></td></tr>
+<tr><td class="mono">.pill.err</td><td class="mono"><a href="../src/ui-css.html#L127">127</a></td><td>ffd7da; background: var(--bad-soft); } /* قاعدة كاملة في سطر واحد على المحدِّد .pill.err */</td></tr>
+<tr><td class="mono">.pill.err::before</td><td class="mono"><a href="../src/ui-css.html#L128">128</a></td><td></td></tr>
+<tr><td class="mono">@keyframes breathe</td><td class="mono"><a href="../src/ui-css.html#L129">129</a></td><td></td></tr>
+<tr><td class="mono">.banner</td><td class="mono"><a href="../src/ui-css.html#L132">132</a></td><td></td></tr>
+<tr><td class="mono">.banner-icon</td><td class="mono"><a href="../src/ui-css.html#L145">145</a></td><td></td></tr>
+<tr><td class="mono">.banner strong</td><td class="mono"><a href="../src/ui-css.html#L156">156</a></td><td>ffdc93; } /* قاعدة كاملة في سطر واحد على المحدِّد .banner strong */</td></tr>
+<tr><td class="mono">.banner &gt; span:not(.banner-icon)</td><td class="mono"><a href="../src/ui-css.html#L157">157</a></td><td></td></tr>
+<tr><td class="mono">.steps</td><td class="mono"><a href="../src/ui-css.html#L160">160</a></td><td></td></tr>
+<tr><td class="mono">.steps[hidden]</td><td class="mono"><a href="../src/ui-css.html#L174">174</a></td><td></td></tr>
+<tr><td class="mono">.step</td><td class="mono"><a href="../src/ui-css.html#L177">177</a></td><td></td></tr>
+<tr><td class="mono">.step:hover</td><td class="mono"><a href="../src/ui-css.html#L194">194</a></td><td></td></tr>
+<tr><td class="mono">.step b</td><td class="mono"><a href="../src/ui-css.html#L195">195</a></td><td></td></tr>
+<tr><td class="mono">.step.active</td><td class="mono"><a href="../src/ui-css.html#L207">207</a></td><td></td></tr>
+<tr><td class="mono">.step.active b</td><td class="mono"><a href="../src/ui-css.html#L213">213</a></td><td>062022; background: linear-gradient(135deg, #84e8dc, #64bdf0); } /* قاعدة كاملة في سطر واحد على المحدِّد .step.active b */</td></tr>
+<tr><td class="mono">main</td><td class="mono"><a href="../src/ui-css.html#L215">215</a></td><td></td></tr>
+<tr><td class="mono">.panel</td><td class="mono"><a href="../src/ui-css.html#L216">216</a></td><td></td></tr>
+<tr><td class="mono">.panel.active</td><td class="mono"><a href="../src/ui-css.html#L225">225</a></td><td></td></tr>
+<tr><td class="mono">@keyframes panel-in</td><td class="mono"><a href="../src/ui-css.html#L226">226</a></td><td></td></tr>
+<tr><td class="mono">.panel h2</td><td class="mono"><a href="../src/ui-css.html#L227">227</a></td><td></td></tr>
+<tr><td class="mono">.panel h2::before</td><td class="mono"><a href="../src/ui-css.html#L237">237</a></td><td></td></tr>
+<tr><td class="mono">.panel h3</td><td class="mono"><a href="../src/ui-css.html#L244">244</a></td><td>c7e9ec; font-size: 1rem; } /* قاعدة كاملة في سطر واحد على المحدِّد .panel h3 */</td></tr>
+<tr><td class="mono">.hint</td><td class="mono"><a href="../src/ui-css.html#L245">245</a></td><td></td></tr>
+<tr><td class="mono">a</td><td class="mono"><a href="../src/ui-css.html#L246">246</a></td><td>88dce1; text-decoration-color: rgba(136,220,225,.4); text-underline-offset: 3px; } /* قاعدة كاملة في سطر واحد على المحدِّد a */</td></tr>
+<tr><td class="mono">a:hover</td><td class="mono"><a href="../src/ui-css.html#L247">247</a></td><td>c1ffff; } /* قاعدة كاملة في سطر واحد على المحدِّد a:hover */</td></tr>
+<tr><td class="mono">.mono</td><td class="mono"><a href="../src/ui-css.html#L248">248</a></td><td></td></tr>
+<tr><td class="mono">.row</td><td class="mono"><a href="../src/ui-css.html#L251">251</a></td><td></td></tr>
+<tr><td class="mono">.row.wrap</td><td class="mono"><a href="../src/ui-css.html#L252">252</a></td><td></td></tr>
+<tr><td class="mono">.row.end</td><td class="mono"><a href="../src/ui-css.html#L253">253</a></td><td></td></tr>
+<tr><td class="mono">.row.small</td><td class="mono"><a href="../src/ui-css.html#L254">254</a></td><td></td></tr>
+<tr><td class="mono">.grow</td><td class="mono"><a href="../src/ui-css.html#L255">255</a></td><td></td></tr>
+<tr><td class="mono">.grid</td><td class="mono"><a href="../src/ui-css.html#L256">256</a></td><td></td></tr>
+<tr><td class="mono">label</td><td class="mono"><a href="../src/ui-css.html#L257">257</a></td><td>afbdd2; font-size: .79rem; font-weight: 580; } /* قاعدة كاملة في سطر واحد على المحدِّد label */</td></tr>
+<tr><td class="mono">label.check</td><td class="mono"><a href="../src/ui-css.html#L258">258</a></td><td>dfe9f7; font-size: .84rem; } /* قاعدة كاملة في سطر واحد على المحدِّد label.check */</td></tr>
+<tr><td class="mono">.input-action</td><td class="mono"><a href="../src/ui-css.html#L259">259</a></td><td></td></tr>
+<tr><td class="mono">.input-action .btn</td><td class="mono"><a href="../src/ui-css.html#L260">260</a></td><td></td></tr>
+<tr><td class="mono">label &gt; small.hint</td><td class="mono"><a href="../src/ui-css.html#L261">261</a></td><td></td></tr>
+<tr><td class="mono">input, select</td><td class="mono"><a href="../src/ui-css.html#L262">262</a></td><td></td></tr>
+<tr><td class="mono">input::placeholder</td><td class="mono"><a href="../src/ui-css.html#L273">273</a></td><td>62738d; opacity: 1; } /* قاعدة كاملة في سطر واحد على المحدِّد input::placeholder */</td></tr>
+<tr><td class="mono">input:hover, select:hover</td><td class="mono"><a href="../src/ui-css.html#L274">274</a></td><td></td></tr>
+<tr><td class="mono">input:focus, select:focus</td><td class="mono"><a href="../src/ui-css.html#L275">275</a></td><td></td></tr>
+<tr><td class="mono">input[type=checkbox]</td><td class="mono"><a href="../src/ui-css.html#L280">280</a></td><td></td></tr>
+<tr><td class="mono">input[type=number]</td><td class="mono"><a href="../src/ui-css.html#L281">281</a></td><td></td></tr>
+<tr><td class="mono">.btn</td><td class="mono"><a href="../src/ui-css.html#L282">282</a></td><td></td></tr>
+<tr><td class="mono">.btn:hover:not(:disabled)</td><td class="mono"><a href="../src/ui-css.html#L299">299</a></td><td>fff; transform: translateY(-1px); } /* قاعدة كاملة في سطر واحد على المحدِّد .btn:hover:not(:disabled) */</td></tr>
+<tr><td class="mono">.btn:active:not(:disabled)</td><td class="mono"><a href="../src/ui-css.html#L300">300</a></td><td></td></tr>
+<tr><td class="mono">.btn:focus-visible, .chip:focus-visible, .step:focus-visible, a:focus-visible</td><td class="mono"><a href="../src/ui-css.html#L301">301</a></td><td></td></tr>
+<tr><td class="mono">.btn:disabled</td><td class="mono"><a href="../src/ui-css.html#L302">302</a></td><td></td></tr>
+<tr><td class="mono">.btn.primary</td><td class="mono"><a href="../src/ui-css.html#L303">303</a></td><td></td></tr>
+<tr><td class="mono">.btn.primary:hover:not(:disabled)</td><td class="mono"><a href="../src/ui-css.html#L310">310</a></td><td></td></tr>
+<tr><td class="mono">.btn.danger</td><td class="mono"><a href="../src/ui-css.html#L311">311</a></td><td>ffdce0; background: linear-gradient(180deg, rgba(113,37,49,.55), rgba(74,25,35,.65)); } /* قاعدة كاملة في سطر واحد على المحدِّد .btn.danger */</td></tr>
+<tr><td class="mono">.btn.ghost</td><td class="mono"><a href="../src/ui-css.html#L312">312</a></td><td></td></tr>
+<tr><td class="mono">.btn.tiny</td><td class="mono"><a href="../src/ui-css.html#L313">313</a></td><td></td></tr>
+<tr><td class="mono">.btn.big</td><td class="mono"><a href="../src/ui-css.html#L314">314</a></td><td></td></tr>
+<tr><td class="mono">.icon-btn</td><td class="mono"><a href="../src/ui-css.html#L315">315</a></td><td></td></tr>
+<tr><td class="mono">.chip</td><td class="mono"><a href="../src/ui-css.html#L316">316</a></td><td></td></tr>
+<tr><td class="mono">.chip:hover, .chip:focus-visible</td><td class="mono"><a href="../src/ui-css.html#L329">329</a></td><td>edffff; background: rgba(105,216,208,.08); } /* قاعدة كاملة في سطر واحد على المحدِّد .chip:hover, .chip:focus-visible */</td></tr>
+<tr><td class="mono">.card</td><td class="mono"><a href="../src/ui-css.html#L332">332</a></td><td></td></tr>
+<tr><td class="mono">.card.muted</td><td class="mono"><a href="../src/ui-css.html#L342">342</a></td><td></td></tr>
+<tr><td class="mono">.card.hidden, .hidden</td><td class="mono"><a href="../src/ui-css.html#L343">343</a></td><td></td></tr>
+<tr><td class="mono">.card h4</td><td class="mono"><a href="../src/ui-css.html#L344">344</a></td><td>b7e9e6; font-size: .91rem; } /* قاعدة كاملة في سطر واحد على المحدِّد .card h4 */</td></tr>
+<tr><td class="mono">.kv</td><td class="mono"><a href="../src/ui-css.html#L345">345</a></td><td></td></tr>
+<tr><td class="mono">.kv dt</td><td class="mono"><a href="../src/ui-css.html#L346">346</a></td><td></td></tr>
+<tr><td class="mono">.kv dd</td><td class="mono"><a href="../src/ui-css.html#L347">347</a></td><td>d9e8f8; font: .77rem/1.7 var(--mono); overflow-wrap: anywhere; } /* قاعدة كاملة في سطر واحد على المحدِّد .kv dd */</td></tr>
+<tr><td class="mono">.warn</td><td class="mono"><a href="../src/ui-css.html#L348">348</a></td><td></td></tr>
+<tr><td class="mono">.bad</td><td class="mono"><a href="../src/ui-css.html#L349">349</a></td><td></td></tr>
+<tr><td class="mono">.ok</td><td class="mono"><a href="../src/ui-css.html#L350">350</a></td><td></td></tr>
+<tr><td class="mono">.adv</td><td class="mono"><a href="../src/ui-css.html#L351">351</a></td><td></td></tr>
+<tr><td class="mono">.adv summary</td><td class="mono"><a href="../src/ui-css.html#L358">358</a></td><td>b8c8df; cursor: pointer; font-size: .84rem; font-weight: 700; list-style: none; } /* قاعدة كاملة في سطر واحد على المحدِّد .adv summary */</td></tr>
+<tr><td class="mono">.adv summary::-webkit-details-marker</td><td class="mono"><a href="../src/ui-css.html#L359">359</a></td><td></td></tr>
+<tr><td class="mono">.adv summary::after</td><td class="mono"><a href="../src/ui-css.html#L360">360</a></td><td></td></tr>
+<tr><td class="mono">.adv[open] summary::after</td><td class="mono"><a href="../src/ui-css.html#L361">361</a></td><td></td></tr>
+<tr><td class="mono">.adv .grid</td><td class="mono"><a href="../src/ui-css.html#L362">362</a></td><td></td></tr>
+<tr><td class="mono">.adv .btn</td><td class="mono"><a href="../src/ui-css.html#L363">363</a></td><td></td></tr>
+<tr><td class="mono">.profrow</td><td class="mono"><a href="../src/ui-css.html#L364">364</a></td><td></td></tr>
+<tr><td class="mono">.profrow label.grow</td><td class="mono"><a href="../src/ui-css.html#L365">365</a></td><td></td></tr>
+<tr><td class="mono">.profrow select</td><td class="mono"><a href="../src/ui-css.html#L366">366</a></td><td></td></tr>
+<tr><td class="mono">.preview</td><td class="mono"><a href="../src/ui-css.html#L367">367</a></td><td>c6d6eb; font-size: .83rem; } /* قاعدة كاملة في سطر واحد على المحدِّد .preview */</td></tr>
+<tr><td class="mono">.preview b</td><td class="mono"><a href="../src/ui-css.html#L368">368</a></td><td>f0f7ff; font: 700 .9rem var(--mono); } /* قاعدة كاملة في سطر واحد على المحدِّد .preview b */</td></tr>
+<tr><td class="mono">#pvSamples</td><td class="mono"><a href="../src/ui-css.html#L369">369</a></td><td>pvSamples { display: inline-flex; flex-wrap: wrap; gap: 6px; } /* قاعدة كاملة في سطر واحد على المحدِّد #pvSamples */</td></tr>
+<tr><td class="mono">.sample</td><td class="mono"><a href="../src/ui-css.html#L370">370</a></td><td>cae4ff; background: rgba(52,116,184,.12); font: .78rem var(--mono); } /* قاعدة كاملة في سطر واحد على المحدِّد .sample */</td></tr>
+<tr><td class="mono">#previewCard</td><td class="mono"><a href="../src/ui-css.html#L371">371</a></td><td>previewCard { border-color: rgba(105,216,208,.18); background: linear-gradient(120deg, rgba(19,58,66,.25), rgba(21,34,53,.78)); } /* قاعدة كاملة في سطر واحد على المحدِّد #previewCard */</td></tr>
+<tr><td class="mono">.license</td><td class="mono"><a href="../src/ui-css.html#L372">372</a></td><td>eee2c8; background: rgba(113,79,23,.13); font-size: .81rem; } /* قاعدة كاملة في سطر واحد على المحدِّد .license */</td></tr>
+<tr><td class="mono">.statline</td><td class="mono"><a href="../src/ui-css.html#L375">375</a></td><td></td></tr>
+<tr><td class="mono">.stat</td><td class="mono"><a href="../src/ui-css.html#L376">376</a></td><td></td></tr>
+<tr><td class="mono">.stat::after</td><td class="mono"><a href="../src/ui-css.html#L389">389</a></td><td></td></tr>
+<tr><td class="mono">.stat span</td><td class="mono"><a href="../src/ui-css.html#L390">390</a></td><td></td></tr>
+<tr><td class="mono">.stat b</td><td class="mono"><a href="../src/ui-css.html#L391">391</a></td><td>eaf5ff; font: 700 1.1rem var(--mono); font-variant-numeric: tabular-nums; } /* قاعدة كاملة في سطر واحد على المحدِّد .stat b */</td></tr>
+<tr><td class="mono">.progress</td><td class="mono"><a href="../src/ui-css.html#L392">392</a></td><td>080e19; } /* قاعدة كاملة في سطر واحد على المحدِّد .progress */</td></tr>
+<tr><td class="mono">#bar</td><td class="mono"><a href="../src/ui-css.html#L393">393</a></td><td>bar { width: 0; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #2aaea9, #69d8d0 45%, #71b4ff); box-shadow: 0 0 16px rgba(105,216,208,.36); transition: width .35s ease; } /* قاعدة كاملة في سطر واحد على المحدِّد #bar */</td></tr>
+<tr><td class="mono">.chips</td><td class="mono"><a href="../src/ui-css.html#L394">394</a></td><td></td></tr>
+<tr><td class="mono">.cchip</td><td class="mono"><a href="../src/ui-css.html#L395">395</a></td><td>c2d1e4; background: rgba(255,255,255,.035); font-size: .75rem; } /* قاعدة كاملة في سطر واحد على المحدِّد .cchip */</td></tr>
+<tr><td class="mono">.cchip b</td><td class="mono"><a href="../src/ui-css.html#L396">396</a></td><td>f1f7ff; font: 700 .76rem var(--mono); } /* قاعدة كاملة في سطر واحد على المحدِّد .cchip b */</td></tr>
+<tr><td class="mono">.logwrap</td><td class="mono"><a href="../src/ui-css.html#L399">399</a></td><td>354963 transparent; } /* قاعدة كاملة في سطر واحد على المحدِّد .logwrap */</td></tr>
+<tr><td class="mono">table.log</td><td class="mono"><a href="../src/ui-css.html#L400">400</a></td><td></td></tr>
+<tr><td class="mono">table.log th</td><td class="mono"><a href="../src/ui-css.html#L401">401</a></td><td>9eb2cd; background: #111c2d; text-align: start; font-size: .71rem; font-weight: 700; white-space: nowrap; } /* قاعدة كاملة في سطر واحد على المحدِّد table.log th */</td></tr>
+<tr><td class="mono">table.log td</td><td class="mono"><a href="../src/ui-css.html#L402">402</a></td><td>c5d4e8; font: .72rem var(--mono); white-space: nowrap; } /* قاعدة كاملة في سطر واحد على المحدِّد table.log td */</td></tr>
+<tr><td class="mono">table.log tr:hover td</td><td class="mono"><a href="../src/ui-css.html#L403">403</a></td><td></td></tr>
+<tr><td class="mono">table.log td.why</td><td class="mono"><a href="../src/ui-css.html#L404">404</a></td><td>9caec7; font: .75rem/1.45 system-ui, sans-serif; white-space: normal; } /* قاعدة كاملة في سطر واحد على المحدِّد table.log td.why */</td></tr>
+<tr><td class="mono">table.log tr.ACCEPTED_VERIFIED td, table.log tr.ACCEPTED td</td><td class="mono"><a href="../src/ui-css.html#L405">405</a></td><td></td></tr>
+<tr><td class="mono">table.log tr.UNKNOWN td</td><td class="mono"><a href="../src/ui-css.html#L406">406</a></td><td></td></tr>
+<tr><td class="mono">table.log tr.BANNED td, table.log tr.RATE_LIMITED td</td><td class="mono"><a href="../src/ui-css.html#L407">407</a></td><td></td></tr>
+<tr><td class="mono">table.log tr.NET_ERROR td</td><td class="mono"><a href="../src/ui-css.html#L408">408</a></td><td>9aabc2; } /* قاعدة كاملة في سطر واحد على المحدِّد table.log tr.NET_ERROR td */</td></tr>
+<tr><td class="mono">.vcode</td><td class="mono"><a href="../src/ui-css.html#L409">409</a></td><td></td></tr>
+<tr><td class="mono">.v-ACCEPTED_VERIFIED</td><td class="mono"><a href="../src/ui-css.html#L410">410</a></td><td>d8ffeb; background: #155c3d; } /* قاعدة كاملة في سطر واحد على المحدِّد .v-ACCEPTED_VERIFIED */</td></tr>
+<tr><td class="mono">.v-ACCEPTED</td><td class="mono"><a href="../src/ui-css.html#L411">411</a></td><td>dcffec; background: #1d6947; } /* قاعدة كاملة في سطر واحد على المحدِّد .v-ACCEPTED */</td></tr>
+<tr><td class="mono">.v-ACCEPTED_UNVERIFIED</td><td class="mono"><a href="../src/ui-css.html#L412">412</a></td><td>ddf0ff; background: #285a7b; } /* قاعدة كاملة في سطر واحد على المحدِّد .v-ACCEPTED_UNVERIFIED */</td></tr>
+<tr><td class="mono">.v-REJECTED</td><td class="mono"><a href="../src/ui-css.html#L413">413</a></td><td>a9b7cb; background: #27364b; } /* قاعدة كاملة في سطر واحد على المحدِّد .v-REJECTED */</td></tr>
+<tr><td class="mono">.v-UNKNOWN</td><td class="mono"><a href="../src/ui-css.html#L414">414</a></td><td>ffe9ba; background: #674c1a; } /* قاعدة كاملة في سطر واحد على المحدِّد .v-UNKNOWN */</td></tr>
+<tr><td class="mono">.v-BANNED</td><td class="mono"><a href="../src/ui-css.html#L415">415</a></td><td>ffdadd; background: #672932; } /* قاعدة كاملة في سطر واحد على المحدِّد .v-BANNED */</td></tr>
+<tr><td class="mono">.v-RATE_LIMITED</td><td class="mono"><a href="../src/ui-css.html#L416">416</a></td><td>ffe1bb; background: #69411b; } /* قاعدة كاملة في سطر واحد على المحدِّد .v-RATE_LIMITED */</td></tr>
+<tr><td class="mono">.v-CHALLENGE</td><td class="mono"><a href="../src/ui-css.html#L417">417</a></td><td>eadfff; background: #493574; } /* قاعدة كاملة في سطر واحد على المحدِّد .v-CHALLENGE */</td></tr>
+<tr><td class="mono">.v-NET_ERROR</td><td class="mono"><a href="../src/ui-css.html#L418">418</a></td><td>d5e5ff; background: #243b61; } /* قاعدة كاملة في سطر واحد على المحدِّد .v-NET_ERROR */</td></tr>
+<tr><td class="mono">table.why</td><td class="mono"><a href="../src/ui-css.html#L419">419</a></td><td></td></tr>
+<tr><td class="mono">table.why td</td><td class="mono"><a href="../src/ui-css.html#L420">420</a></td><td></td></tr>
+<tr><td class="mono">table.why td:last-child</td><td class="mono"><a href="../src/ui-css.html#L421">421</a></td><td></td></tr>
+<tr><td class="mono">.modal</td><td class="mono"><a href="../src/ui-css.html#L424">424</a></td><td></td></tr>
+<tr><td class="mono">.modal-box</td><td class="mono"><a href="../src/ui-css.html#L425">425</a></td><td>111c2d; box-shadow: 0 28px 100px rgba(0,0,0,.55); } /* قاعدة كاملة في سطر واحد على المحدِّد .modal-box */</td></tr>
+<tr><td class="mono">.modal-head</td><td class="mono"><a href="../src/ui-css.html#L426">426</a></td><td></td></tr>
+<tr><td class="mono">.modal-body</td><td class="mono"><a href="../src/ui-css.html#L427">427</a></td><td>d7e3f2; font-size: .85rem; } /* قاعدة كاملة في سطر واحد على المحدِّد .modal-body */</td></tr>
+<tr><td class="mono">.modal-body pre</td><td class="mono"><a href="../src/ui-css.html#L428">428</a></td><td></td></tr>
+<tr><td class="mono">iframe.pagereview</td><td class="mono"><a href="../src/ui-css.html#L429">429</a></td><td>fff; } /* قاعدة كاملة في سطر واحد على المحدِّد iframe.pagereview */</td></tr>
+<tr><td class="mono">footer.foot</td><td class="mono"><a href="../src/ui-css.html#L431">431</a></td><td></td></tr>
+<tr><td class="mono">.foot #footText</td><td class="mono"><a href="../src/ui-css.html#L432">432</a></td><td>footText { flex: 1 1 360px; } /* قاعدة كاملة في سطر واحد على المحدِّد .foot #footText */</td></tr>
+<tr><td class="mono">.dot</td><td class="mono"><a href="../src/ui-css.html#L433">433</a></td><td>52647e; } /* قاعدة كاملة في سطر واحد على المحدِّد .dot */</td></tr>
+<tr><td class="mono">@media (min-width: 900px)</td><td class="mono"><a href="../src/ui-css.html#L435">435</a></td><td></td></tr>
+<tr><td class="mono">#panel-scan &gt; .row:first-of-type</td><td class="mono"><a href="../src/ui-css.html#L436">436</a></td><td>panel-scan &gt; .row:first-of-type { max-width: 850px; } /* قاعدة كاملة في سطر واحد على المحدِّد #panel-scan &gt; .row:first-of-type */</td></tr>
+<tr><td class="mono">#scanUrl</td><td class="mono"><a href="../src/ui-css.html#L437">437</a></td><td>scanUrl { min-height: 54px; font-size: .95rem; } /* قاعدة كاملة في سطر واحد على المحدِّد #scanUrl */</td></tr>
+<tr><td class="mono">@media (max-width: 760px)</td><td class="mono"><a href="../src/ui-css.html#L439">439</a></td><td></td></tr>
+<tr><td class="mono">.banner</td><td class="mono"><a href="../src/ui-css.html#L440">440</a></td><td></td></tr>
+<tr><td class="mono">.banner &gt; span:not(.banner-icon)</td><td class="mono"><a href="../src/ui-css.html#L441">441</a></td><td></td></tr>
+<tr><td class="mono">.banner .btn</td><td class="mono"><a href="../src/ui-css.html#L442">442</a></td><td></td></tr>
+<tr><td class="mono">.steps</td><td class="mono"><a href="../src/ui-css.html#L443">443</a></td><td></td></tr>
+<tr><td class="mono">.step</td><td class="mono"><a href="../src/ui-css.html#L444">444</a></td><td></td></tr>
+<tr><td class="mono">main</td><td class="mono"><a href="../src/ui-css.html#L445">445</a></td><td></td></tr>
+<tr><td class="mono">.panel</td><td class="mono"><a href="../src/ui-css.html#L446">446</a></td><td></td></tr>
+<tr><td class="mono">.statline</td><td class="mono"><a href="../src/ui-css.html#L447">447</a></td><td></td></tr>
+<tr><td class="mono">@media (max-width: 520px)</td><td class="mono"><a href="../src/ui-css.html#L449">449</a></td><td></td></tr>
+<tr><td class="mono">.top</td><td class="mono"><a href="../src/ui-css.html#L450">450</a></td><td></td></tr>
+<tr><td class="mono">.logo</td><td class="mono"><a href="../src/ui-css.html#L451">451</a></td><td></td></tr>
+<tr><td class="mono">.tagline</td><td class="mono"><a href="../src/ui-css.html#L452">452</a></td><td></td></tr>
+<tr><td class="mono">.top-actions</td><td class="mono"><a href="../src/ui-css.html#L453">453</a></td><td></td></tr>
+<tr><td class="mono">.top-actions .btn</td><td class="mono"><a href="../src/ui-css.html#L454">454</a></td><td></td></tr>
+<tr><td class="mono">.top-actions .icon-btn</td><td class="mono"><a href="../src/ui-css.html#L455">455</a></td><td></td></tr>
+<tr><td class="mono">.pill</td><td class="mono"><a href="../src/ui-css.html#L456">456</a></td><td></td></tr>
+<tr><td class="mono">.steps</td><td class="mono"><a href="../src/ui-css.html#L457">457</a></td><td></td></tr>
+<tr><td class="mono">main</td><td class="mono"><a href="../src/ui-css.html#L458">458</a></td><td></td></tr>
+<tr><td class="mono">.panel</td><td class="mono"><a href="../src/ui-css.html#L459">459</a></td><td></td></tr>
+<tr><td class="mono">.panel h2</td><td class="mono"><a href="../src/ui-css.html#L460">460</a></td><td></td></tr>
+<tr><td class="mono">.hint</td><td class="mono"><a href="../src/ui-css.html#L461">461</a></td><td></td></tr>
+<tr><td class="mono">.row</td><td class="mono"><a href="../src/ui-css.html#L462">462</a></td><td></td></tr>
+<tr><td class="mono">.row &gt; .btn</td><td class="mono"><a href="../src/ui-css.html#L463">463</a></td><td></td></tr>
+<tr><td class="mono">#panel-scan &gt; .row:first-of-type</td><td class="mono"><a href="../src/ui-css.html#L464">464</a></td><td>panel-scan &gt; .row:first-of-type { align-items: stretch; } /* قاعدة كاملة في سطر واحد على المحدِّد #panel-scan &gt; .row:first-of-type */</td></tr>
+<tr><td class="mono">#scanUrl</td><td class="mono"><a href="../src/ui-css.html#L465">465</a></td><td>scanUrl { flex-basis: 100%; } /* قاعدة كاملة في سطر واحد على المحدِّد #scanUrl */</td></tr>
+<tr><td class="mono">.grid</td><td class="mono"><a href="../src/ui-css.html#L466">466</a></td><td></td></tr>
+<tr><td class="mono">.profrow</td><td class="mono"><a href="../src/ui-css.html#L467">467</a></td><td></td></tr>
+<tr><td class="mono">.profrow .btn</td><td class="mono"><a href="../src/ui-css.html#L468">468</a></td><td></td></tr>
+<tr><td class="mono">.kv</td><td class="mono"><a href="../src/ui-css.html#L469">469</a></td><td></td></tr>
+<tr><td class="mono">.stat</td><td class="mono"><a href="../src/ui-css.html#L470">470</a></td><td></td></tr>
+<tr><td class="mono">.stat b</td><td class="mono"><a href="../src/ui-css.html#L471">471</a></td><td></td></tr>
+<tr><td class="mono">.logwrap</td><td class="mono"><a href="../src/ui-css.html#L472">472</a></td><td></td></tr>
+<tr><td class="mono">table.log th, table.log td</td><td class="mono"><a href="../src/ui-css.html#L473">473</a></td><td></td></tr>
+<tr><td class="mono">.license</td><td class="mono"><a href="../src/ui-css.html#L474">474</a></td><td></td></tr>
+<tr><td class="mono">.btn.big</td><td class="mono"><a href="../src/ui-css.html#L475">475</a></td><td></td></tr>
+<tr><td class="mono">footer.foot</td><td class="mono"><a href="../src/ui-css.html#L476">476</a></td><td></td></tr>
+<tr><td class="mono">@media (prefers-reduced-motion: reduce)</td><td class="mono"><a href="../src/ui-css.html#L478">478</a></td><td></td></tr>
+<tr><td class="mono">*, *::before, *::after</td><td class="mono"><a href="../src/ui-css.html#L479">479</a></td><td></td></tr>
+</tbody></table></div>
+<footer class="docfoot">صفحة مولّدة آلياً من مصدر الكود · KiraPass —
+<code>files</code> · 2026-10-01 02:26</footer>
+</main>
+</div>
+<script src="../assets/docs.js"></script>
+<script>KPInit("files");</script>
+</body>
+</html>

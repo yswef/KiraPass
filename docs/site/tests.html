@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>الاختبارات · KiraPass</title>
+<link rel="stylesheet" href="assets/docs.css">
+</head>
+<body>
+<div id="kp-layout">
+<main class="doc">
+
+<h1>الاختبارات: كيف تتأكد أنك لم تكسر شيئاً</h1>
+<p class="lead">
+  الأداة لديها ثلاث طبقات اختبار: <b>سيناريوهات مقروءة</b> (<code>--selftest</code>)،
+  <b>مجموعة unittest</b> (90 اختباراً)، و<b>فحص رحلة المستخدم كاملة عبر الـAPI</b>
+  (<code>web_e2e.py</code>). كلها تعمل على راوترات وهمية محلية — <b>لا تلمس أي شبكة حقيقية</b>.
+</p>
+
+<h2 id="quick">الأوامر السريعة</h2>
+<table class="t">
+  <thead><tr><th>الأمر</th><th>ماذا يفعل</th><th>الزمن التقريبي</th><th>متى تستخدمه</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">python3 -m unittest discover -s tests</td>
+        <td>كل مجموعة الاختبارات (90 اختباراً)</td><td>~72 ثانية</td>
+        <td>قبل أي تسليم — <b>هذا هو المعيار</b></td></tr>
+    <tr><td class="mono">python3 -m unittest discover -s tests -v</td>
+        <td>نفسها مع اسم كل اختبار</td><td>~72 ثانية</td>
+        <td>لمعرفة أي اختبار بالذات سقط</td></tr>
+    <tr><td class="mono">python3 KiraPass.py --selftest</td>
+        <td>15 سيناريو بأسطر مقروءة</td><td>~60 ثانية</td>
+        <td>تقرير سريع للإنسان</td></tr>
+    <tr><td class="mono">python3 -m kirapass.selftest --keep</td>
+        <td>نفسها وتُبقي ملفات الاختبار وتطبع مكانها</td><td>~60 ثانية</td>
+        <td>لتفتيش تقرير/صفحة مراجعة أنتجها سيناريو فاشل</td></tr>
+    <tr><td class="mono">python3 -m unittest tests.test_kirapass.MaskingTests -v</td>
+        <td>فئة واحدة فقط</td><td>&lt;1 ثانية</td><td>أثناء التطوير</td></tr>
+    <tr><td class="mono">python3 -m compileall kirapass KiraPass.py</td>
+        <td>فحص صياغة فقط</td><td>&lt;1 ثانية</td><td>بعد كل تعديل</td></tr>
+    <tr><td class="mono">node --check kirapass/web/ui.js</td>
+        <td>فحص صياغة JavaScript</td><td>&lt;1 ثانية</td><td>بعد تعديل الواجهة</td></tr>
+  </tbody>
+</table>
+
+<div class="card ok">
+  <b>حالة الأساس على هذه النسخة:</b> <code>Ran 90 tests … OK</code> في ~72 ثانية
+  على Python 3.11.2. إن حصلت على نفس النتيجة بعد تعديلك فأنت في أمان نسبي.
+</div>
+
+<h2 id="selftest">السيناريوهات الخمسة عشر (<code>selftest.py</code>)</h2>
+<p>كل سيناريو دالة <code>t_اسم()</code> ترجع <code>Result(name, ok, detail)</code>،
+وتشغّل <code>MockPortal</code> حقيقية على منفذ عشوائي في <code>127.0.0.1</code>.
+الترتيب في <code>SCENARIOS</code> هو ترتيب الطباعة:</p>
+
+<table class="t">
+  <thead><tr><th>السيناريو</th><th>ماذا يثبت</th><th>إعداد الراوتر الوهمي</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">t_format_preview</td><td>معاينة الصيغة تنتج الفضاء والعينات والمشاكل الصحيحة</td><td>بلا راوتر (دوال صرفة)</td></tr>
+    <tr><td class="mono">t_legacy_profile</td><td>بروفايل من نسخة قديمة يُرحَّل ولا يفقد حقولاً</td><td>بلا راوتر</td></tr>
+    <tr><td class="mono">t_calibration</td><td>خط أساس الرفض يُتعلَّم رغم رمز يتغير في كل رد</td><td><code>valid_cards={"0299"}, dynamic=True, pass_mode="empty"</code></td></tr>
+    <tr><td class="mono">t_no_false_hits</td><td>50 بطاقة خاطئة ⇒ <b>صفر</b> إصابات (العطل القديم في اختبار)</td><td><code>pass_mode="empty"</code></td></tr>
+    <tr><td class="mono">t_find_card</td><td>البطاقة الصالحة تُوجد وتُتحقق من الإنترنت</td><td><code>valid_cards={"0299"}</code></td></tr>
+    <tr><td class="mono">t_verified_hit_stops_before_shared_online_false_hits</td>
+        <td>بعد إصابة مؤكدة يتوقف التشغيل قبل أن تُنسب فتح الشبكة إلى بطاقات أخرى</td>
+        <td><code>global_online_login_page=True</code></td></tr>
+    <tr><td class="mono">t_ban_is_reported</td><td>صفحة الحجب تُسمّى حجباً وتوقف التشغيل</td><td><code>ban_after=3</code></td></tr>
+    <tr><td class="mono">t_rate_limit_stops</td><td>429 تُبطئ الوتيرة ثم توقف</td><td><code>rate_limit_after=…</code></td></tr>
+    <tr><td class="mono">t_dropped_connections</td><td>الاتصالات المقطوعة تُحسب ولا تُخفى كـ«رفض»</td><td><code>drop_every=…</code></td></tr>
+    <tr><td class="mono">t_dead_target_stops</td><td>راوتر ميت ⇒ <code>target_unreachable</code> سريعاً</td><td>منفذ لا يوجد عليه شيء</td></tr>
+    <tr><td class="mono">t_chap_portal</td><td>اكتشاف <code>md5.js</code> وبناء تجزئة CHAP صحيحة</td><td><code>chap=True</code></td></tr>
+    <tr><td class="mono">t_get_portal</td><td>بوابة تستقبل الدخول عبر GET</td><td><code>method="get"</code></td></tr>
+    <tr><td class="mono">t_diagnose_dead_target</td><td>التشخيص يقول «مشكلة شبكة» لا «بطاقات خاطئة»</td><td>منفذ ميت</td></tr>
+    <tr><td class="mono">t_resume_continues</td><td>تشغيل ثانٍ يُكمل من موضع الأول ولا يكرر بطاقات</td><td><code>valid_cards={"0299"}</code></td></tr>
+    <tr><td class="mono">t_cache_clear</td><td>مسح المؤقت لا يأكل <code>hits.txt</code></td><td>بلا راوتر</td></tr>
+  </tbody>
+</table>
+
+<div class="note"><b>كيف يعمل <code>run_all()</code>:</b> ينشئ مجلد بيانات مؤقتاً
+(<code>tempfile.mkdtemp(prefix="kirapass_selftest_")</code>) ويستدعي
+<code>config.set_data_dir()</code> — لذلك <b>لا يختلط شيء ببياناتك الحقيقية</b>.
+كل سيناريو يُغلَّف بـ<code>try/except</code> ليُطبع كـFAIL بدل أن يسقط البرنامج كله،
+ويُضاف زمنه إلى <code>detail</code>. الخلاصة: <code>{ok, passed, total, seconds, results[], data_dir}</code>.</div>
+
+<h2 id="mockportal">الراوتر الوهمي <code>mockportal.py</code></h2>
+<p><code>MockPortal</code> هو سيرفر HTTP كامل على <code>127.0.0.1</code> يتصرف كبوابة أسر،
+ويُستخدم كـcontext manager (<code>with MockPortal(...) as portal:</code>).
+كل حالة فشل حقيقية في العالم لها علم هنا:</p>
+
+<table class="t">
+  <thead><tr><th>المعامل</th><th>الافتراضي</th><th>الحالة التي يحاكيها</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">valid_cards</td><td>—</td><td>مجموعة البطاقات الصالحة</td></tr>
+    <tr><td class="mono">pass_mode</td><td>"same"</td><td><code>same</code> / <code>empty</code> / <code>chap</code></td></tr>
+    <tr><td class="mono">method</td><td>"post"</td><td>بوابة GET أم POST</td></tr>
+    <tr><td class="mono">dynamic</td><td>True</td><td>صفحة الرفض تحتوي رمزاً/وقتاً يتغير في كل رد</td></tr>
+    <tr><td class="mono">ban_after / ban_seconds</td><td>0 / 0</td><td>بعد كم فشل يُحجب، وهل يزول الحجب (0 = لا يزول أبداً)</td></tr>
+    <tr><td class="mono">rate_limit_after</td><td>0</td><td>يرد 429 بعد هذا العدد</td></tr>
+    <tr><td class="mono">drop_every / drop_after</td><td>0 / 0</td><td>يقطع الاتصال كل n طلباً، أو بعد n طلباً تماماً</td></tr>
+    <tr><td class="mono">chap</td><td>False</td><td>يقدّم <code>md5.js</code> ويتوقع تجزئة CHAP</td></tr>
+    <tr><td class="mono">prefix / length</td><td>"02" / 6</td><td>شكل البطاقات المتوقَّع</td></tr>
+    <tr><td class="mono">error_text</td><td>"invalid username or password"</td><td>عبارة الرفض</td></tr>
+    <tr><td class="mono">hide_success</td><td>False</td><td><b>أخبث حالة:</b> البطاقة تُدخل فعلاً لكن الراوتر يردّ بصفحة الرفض — وحده المراقب يكشفها</td></tr>
+    <tr><td class="mono">require_session</td><td>False</td><td>يرفض POST بلا كوكي جلسة ورمز من صفحة الدخول (ما يفعله المتصفح تلقائياً)</td></tr>
+    <tr><td class="mono">reject_shape</td><td>False</td><td>يرفض شكل الطلب (400) بدل رفض البطاقة</td></tr>
+    <tr><td class="mono">success_page</td><td>False</td><td>يردّ بصفحة نجاح واضحة</td></tr>
+    <tr><td class="mono">unknown_success_page</td><td>False</td><td>يقبل البطاقة ويفتح الشبكة لكن يردّ بصفحة 200 غير موسومة — لا يمكن إثباتها بدون فحص إنترنت</td></tr>
+    <tr><td class="mono">global_online_login_page</td><td>False</td><td>بعد فتح الجلسة يعيد صفحة الحالة/الدخول الناجح لكل طلب لاحق ⇒ يولّد تحققات كاذبة تحت التشغيل المتوازي</td></tr>
+  </tbody>
+</table>
+
+<p>خصائصه المفيدة في الاختبارات:</p>
+<ul>
+  <li><code>portal.url</code> ⇒ <code>http://127.0.0.1:&lt;منفذ&gt;/login</code>،
+      و<code>portal.base</code> ⇒ الجذر.</li>
+  <li><code>portal.state.tokens</code> ⇒ الرموز التي وزّعها (لاختبار الإحماء).</li>
+  <li><code>portal.state.bad_requests</code> ⇒ كم طلباً ردّ عليه بـ400
+      (لاختبار «شكل الطلب مرفوض»).</li>
+  <li>صفحات HTML جاهزة: <code>CARD_PAGE</code>, <code>BAN_PAGE</code>, <code>RATE_PAGE</code>,
+      <code>SUCCESS_PAGE</code>.</li>
+  <li>يوجد أيضاً مسار <code>/generate_204</code> حتى تستطيع
+      <code>KIRAPASS_INTERNET_CHECKS</code> أن «ترى إنترنت» محلياً.</li>
+</ul>
+
+<h2 id="unittest">مجموعة unittest — الفئات الاثنتا عشرة</h2>
+<p>الملف الوحيد: <code>tests/test_kirapass.py</code> (1416 سطراً).
+يبدأ بإنشاء مجلد بيانات مؤقت وتوجيه <code>config</code> إليه،
+و<code>tearDownModule()</code> يحذفه في النهاية.</p>
+
+<table class="t">
+  <thead><tr><th>الفئة</th><th>ما تغطيه</th><th>أمثلة</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">ScenarioTests</td>
+        <td>تولَّد آلياً من <code>selftest.SCENARIOS</code> (15 اختباراً)</td>
+        <td><code>setattr(ScenarioTests, "test_"+fn.__name__[2:], …)</code></td></tr>
+    <tr><td class="mono">UIIntegrityTests</td>
+        <td>يحلّل <code>ui.html</code> بـ<code>HTMLParser</code>: لا <code>id</code> مكرر،
+            وكل مفتاح <code>data-i18n</code> له نصّان (عربي وإنجليزي) في <code>ui.js</code>،
+            وموقع زر المعايرة، ووجود <code>preflight_only: true</code></td>
+        <td>تحرس <a href="editing.html#recipe2">وصفة إضافة مفتاح ترجمة</a></td></tr>
+    <tr><td class="mono">MaskingTests</td>
+        <td>كشف الرموز المتغيّرة وإخفاؤها، صفحة الحجب لا تُسمّى رفضاً،
+            عبارة حجب عربية، تحويل داخل البوابة ليس إصابة، صفحة مختلفة ليست إصابة،
+            تحويل خارج البوابة إصابة</td>
+        <td>قلب <code>fingerprint.py</code></td></tr>
+    <tr><td class="mono">PhraseTests</td>
+        <td>الكلمات المدمجة تُطابق <b>كلمة كاملة</b> فقط</td>
+        <td>تحرس <code>config.*_WORDS</code></td></tr>
+    <tr><td class="mono">FingerprintTests</td>
+        <td>رد مفقود لا يكسر خط الأساس</td><td><code>learn()</code> مع عيّنة ناقصة</td></tr>
+    <tr><td class="mono">PortalFormTests</td>
+        <td>نموذج الدخول يفوز على غيره، طلب GET منسوخ يُعرَف بلا نموذج،
+            الأزرار لا تُرسل كحقول ثابتة</td><td><code>portals.parse_form</code></td></tr>
+    <tr><td class="mono">CalibrationTests</td>
+        <td>فضاء بطاقات مستحيل يُرفض، هدف ميت يُبلَّغ كمشكلة شبكة</td>
+        <td><code>store.validate</code> · <code>engine.calibrate</code></td></tr>
+    <tr><td class="mono">CacheTests</td>
+        <td>مجلدات البايت كود تُحسب مرة واحدة</td><td><code>clear_cache</code></td></tr>
+    <tr><td class="mono">RedirectPortalTests</td>
+        <td>بطاقة تُحوَّل إلى مكان آخر ⇒ إصابة؛ نفس التحويل لبطاقة خاطئة ⇒ رفض</td>
+        <td><code>same_as_reject</code></td></tr>
+    <tr><td class="mono">BlockRecoveryTests / BlockFalsePositiveTests</td>
+        <td>معايرة الحجب تتوقف بلا انتظار ولا إعادة؛ حجب موجود أصلاً ليس ذنبنا؛
+            صفحة دخول <b>تحذّر</b> من الحجب ما زالت صفحة دخول؛ صفحة حجب حقيقية توقف قبل إهدار بطاقة؛
+            403 على صفحة فيها نموذج = حجب</td>
+        <td>أهم مجموعة لسلامة الاستخدام</td></tr>
+    <tr><td class="mono">NetworkFailureGuardTests</td>
+        <td>انفجار أخطاء نقل يوقف التشغيل سريعاً بلا إعادة اتصال</td>
+        <td><code>_check_stop_rules</code></td></tr>
+    <tr><td class="mono">InternetWatchdogTests</td>
+        <td>المراقب يسمّي البطاقات التي فتحت الإنترنت؛ البطاقات التي رفض الراوتر الحكم عليها
+            <b>لا تُحسب مغطّاة</b></td>
+        <td>تحرس <code>resume_pos</code> — أخطر محاسبة في الأداة</td></tr>
+    <tr><td class="mono">LockoutProbeTests</td>
+        <td>يتوقف عند أول حجب بلا انتظار أو إعادة؛ راوتر يحجب لا يُستطلَع لزوال الحجب؛
+            راوتر لا يحجب يُبلَّغ كذلك؛ التشخيص يتوقف عن أخذ العيّنات بعد حجب</td>
+        <td><code>probe_lockout</code></td></tr>
+    <tr><td class="mono">KnownCardTests</td>
+        <td>الفحص التمهيدي يتحقق من الطلب الدقيق مرة واحدة قبل خط الأساس؛
+            يتوقف قبل العيّنات إن فشلت البطاقة المعروفة؛
+            البطاقة المختبَرة مسبقاً تُستثنى بلا إعادة إرسال؛
+            خط أساس الرفض لا يستخدم البطاقة المعروفة أبداً؛
+            بطاقة خارج الصيغة تُسمّى؛ صفحة 200 مجهولة تُقاس بحالة الإنترنت؛
+            يجد شكل الطلب الصحيح ويقول ذلك؛ بطاقة غير مثبتة توقف وتحدّ طلبات الضبط</td>
+        <td>كل <code>_known_card_*</code> و<code>_tune_with_known_card</code></td></tr>
+    <tr><td class="mono">BrowserParityTests</td>
+        <td>POST عارٍ يُرفض لكن التشغيل يُحكَم؛ الطلب يشبه المتصفح الذي فحصه؛
+            ضبط البطاقة المعروفة يستمر في تدوير رموز الجلسة؛
+            التشخيص يستخدم جلسة متصفح في كل خيط؛
+            إرسال GET يحفظ ترتيب الاستعلام ويُسقط الحقول الغائبة؛
+            شكل الطلب الآمن يحفظ الترتيب وينقّح القيم؛
+            فحص رابط نجاح منسوخ لا يستهلك بطاقته؛ رابط نجاح منسوخ يستبدل بيانات قديمة؛
+            HTTP 400 لا يُتعلَّم كبطاقة خاطئة</td>
+        <td>تحرس <a href="danger.html#privacy">التنقيح</a> و<a href="danger.html#network">الترويسات</a></td></tr>
+    <tr><td class="mono">ResumeProgressTests</td>
+        <td>تشغيل مُستأنف يضع في الطابور البطاقات المتبقية الفريدة فقط</td>
+        <td><code>_run</code> + <code>card_at_walk_pos</code></td></tr>
+    <tr><td class="mono">LostAnswerTests</td>
+        <td><code>status()</code> آمن قبل أول تشغيل؛ بطاقة لم يصلها رد تُسأل مرة أخرى؛
+            تحويل خارج البوابة لا يُسمّى رفضاً أبداً</td>
+        <td>يستخدم <code>_FakeReply</code> بدل راوتر</td></tr>
+    <tr><td class="mono">StoreTests</td>
+        <td>تقرير المعايرة ينقّح التلميحات وأسرار الروابط؛ لقطة التقرير تنقّح الاستعلام وأسرار البروفايل الحي؛
+            الترحيل ينقّح بيانات من رابط GET منسوخ؛ يحفظ أعلام <code>dst/popup</code> الصريحة؛
+            يرحّل كل الأشكال القديمة؛ التحقق يمسك صيغة سيئة؛ الفضاء والعيّنات؛
+            المسار يزور كل شيء مرة واحدة؛ رحلة صفحة مراجعة كاملة؛ صفحة المراجعة تنقّح MAC وIP؛
+            أوضاع كلمة مرور SHA قابلة لإعادة الإرسال؛ بنية دليل الحجب؛
+            فحوص الإنترنت المخصصة تُحلَّل</td>
+        <td>كل <code>store.py</code> و<code>engine.safe_*</code></td></tr>
+    <tr><td class="mono">HttpTests</td>
+        <td>مهلة الاتصال ليست مهلة قراءة؛ الكوكيز والتحويلات؛ أنواع أخطاء HTTP</td>
+        <td><code>httpclient.py</code></td></tr>
+    <tr><td class="mono">PortalParsingTests</td>
+        <td><code>action</code> يفكّك كيانات HTML وينقّح بيانات GET؛ CHAP ميكروتيك وحقوله</td>
+        <td><code>portals.py</code></td></tr>
+    <tr><td class="mono">CaptureTests</td>
+        <td>تعلّم الكلمات يستخدم نص <code>body</code> المرئي فقط؛
+            تُتعلَّم أنماط كلمة المرور القابلة للتعميم فقط؛
+            تحويل JS مجهول يمنع الأتمتة؛ 200 ليس نجاحاً ولا رفضاً بدون تعليم؛
+            نموذج الدخول لا يمكن تعليمه نجاحاً أو حالة؛
+            <b>التقرير لا يحتوي أسراراً أبداً</b></td>
+        <td>كل <code>capture.py</code></td></tr>
+  </tbody>
+</table>
+
+<h2 id="e2e">فحص الرحلة الكاملة <code>tools/checks/web_e2e.py</code></h2>
+<p>ليس جزءاً من مجموعة unittest: سكربت مستقل يمرّ عبر <b>الـHTTP API نفسه</b>
+الذي تستخدمه الواجهة. يحتاج ثلاثة أشياء تعمل معاً:</p>
+<pre data-lines="6"><code># 1) بوابة تدريب
+python3 tools/practice_portal.py --port 8898 --card 020124042 \
+    --pass-mode empty --ban-after 5000
+
+# 2) الأداة نفسها (مع فحص إنترنت محلي)
+KIRAPASS_INTERNET_CHECKS="http://127.0.0.1:8898/generate_204|204" \
+    python3 KiraPass.py --host 0.0.0.0 --port 8770 --token kirapass --no-browser
+
+# 3) الفحص
+python3 tools/checks/web_e2e.py</code></pre>
+<p>الخطوات التي ينفّذها، وهي نفسها خطوات المستخدم:</p>
+<ol>
+  <li><code>/api/scan</code> — يقرأ صفحة الدخول ويطبع الحالة والأسلوب وأسماء الحقول وCHAP وحالة الإنترنت.</li>
+  <li><code>/api/format/preview</code> ثم <code>/api/profiles/save</code> — يبني البروفايل كما يبنيه المعالج.</li>
+  <li><code>/api/calibrate</code> كمهمة خلفية + <code>/api/job</code> للاستطلاع — يطبع كل خطوة ونتيجة البصمة.</li>
+  <li><code>/api/run/start</code> (1000 محاولة، 8 مسارات، تحقق، إيقاف تلقائي) + استطلاع
+      <code>/api/run/status?since=</code> — يطبع العدّادات والأسباب والتقدم وأنواع الأخطاء والإصابات.</li>
+  <li><b>الاستئناف:</b> تشغيلان من 150 محاولة، ويطالب بأن
+      <code>space_pos</code> = 150 ثم 300 وأن <code>walk_a/walk_b</code> لم يتغيرا؛
+      وإلا <code>SystemExit(1)</code>.</li>
+</ol>
+<div class="note">المعاملات الموضعية: <code>web_e2e.py [BASE] [TOKEN] [PORTAL]</code>
+— الافتراضي <code>http://127.0.0.1:8770</code> و<code>kirapass</code> و<code>http://127.0.0.1:8898/login</code>.</div>
+
+<h2 id="practice">بوابة التدريب <code>tools/practice_portal.py</code></h2>
+<p>نفس <code>MockPortal</code> لكن كخادم دائم يمكنك أن توجّه الأداة إليه من متصفحك:</p>
+<table class="t compact">
+  <thead><tr><th>الخيار</th><th>الافتراضي</th><th>الغرض</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">--card</td><td>0201242548</td><td>البطاقة الوحيدة الصالحة</td></tr>
+    <tr><td class="mono">--port</td><td>8899</td><td>المنفذ (استخدم 8898 لفحص e2e)</td></tr>
+    <tr><td class="mono">--method</td><td>post</td><td>post أو get</td></tr>
+    <tr><td class="mono">--pass-mode</td><td>—</td><td>same / empty / chap</td></tr>
+    <tr><td class="mono">--chap</td><td>off</td><td>تفعيل <code>md5.js</code></td></tr>
+    <tr><td class="mono">--ban-after</td><td>0</td><td>يحجب بعد n فشل (0 = لا يحجب أبداً)</td></tr>
+    <tr><td class="mono">--rate-limit</td><td>0</td><td>429 بعد n طلب</td></tr>
+    <tr><td class="mono">--drop-every</td><td>0</td><td>يقطع الاتصال كل n طلب</td></tr>
+    <tr><td class="mono">--static-page</td><td>off</td><td>صفحة رفض ثابتة بلا رموز متغيرة</td></tr>
+    <tr><td class="mono">--session</td><td>off</td><td>يتطلب كوكي جلسة ورمزاً</td></tr>
+    <tr><td class="mono">--success-page</td><td>off</td><td>صفحة نجاح واضحة</td></tr>
+  </tbody>
+</table>
+
+<h2 id="write">كيف تكتب اختباراً جديداً</h2>
+<ol>
+  <li>اختر الطبقة: منطق صرف ⇒ <code>unittest</code>؛ سلوك محرك كامل ⇒ سيناريو في <code>selftest.py</code>
+      (ويُضاف تلقائياً إلى <code>ScenarioTests</code>)؛ واجهة/ـAPI ⇒ <code>web_e2e.py</code>.</li>
+  <li>استخدم <code>MockPortal</code> — لا شبكة خارجية أبداً. إن احتجت «إنترنت»،
+      وجّه <code>KIRAPASS_INTERNET_CHECKS</code> إلى <code>…/generate_204</code>.</li>
+  <li>لا تكتب في <code>kirapass_data/</code>: الاختبارات توجّه <code>config.set_data_dir()</code>
+      إلى مجلد مؤقت عند استيراد الملف. إن كتبت سيناريو جديداً فهو يرث ذلك تلقائياً.</li>
+  <li>اجعل الفشل <b>مقروءاً</b>: مرّر رسالة في <code>assert*</code> أو املأ
+      <code>Result.detail</code> بالأرقام التي كنت ستقارنها.</li>
+  <li>سمِّ الاختبار بما يقوله لا بما يختبره:
+      <code>test_a_card_that_got_no_answer_is_asked_again</code> — هذا أسلوب الملف.</li>
+  <li>شغّل الفئة وحدها أولاً، ثم المجموعة كلها.</li>
+</ol>
+
+<h2 id="gaps">ما الذي <u>لا</u> تغطيه الاختبارات (كن صادقاً مع نفسك)</h2>
+<ul>
+  <li><b>لا اختبار لـ<code>web/ui.js</code> في متصفح</b>: <code>UIIntegrityTests</code> يفحص النص
+      (المعرّفات والترجمات ووجود عبارات معينة) ولا ينفّذ JavaScript.
+      تغييرات السلوك في الواجهة تحتاج فتح الصفحة يدوياً على بوابة تدريب.</li>
+  <li><b>لا اختبار لـ<code>ui.css</code></b> إطلاقاً.</li>
+  <li><b>لا اختبارات أداء/حمل حقيقية</b>: السرعات في الاختبارات مقاسة على راوتر وهمي محلي.</li>
+  <li><b>لا اختبار TLS حقيقي</b> (<code>VERIFY_TLS = False</code> ولا بوابة https وهمية).</li>
+  <li><b>لا اختبارات للخيوط خارج المحرك</b>: <code>web/server.py</code> يُختبر عبر
+      <code>web_e2e.py</code> يدوياً فقط.</li>
+</ul>
+
+<footer class="docfoot">الاختبارات · KiraPass — <code>docs/site/tests.html</code></footer>
+
+</main>
+</div>
+<script src="assets/docs.js"></script>
+<script>KPInit("tests");</script>
+</body>
+</html>

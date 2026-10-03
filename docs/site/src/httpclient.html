@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>مصدر httpclient.py · KiraPass</title>
+<link rel="stylesheet" href="../assets/docs.css">
+
+</head>
+<body>
+<div id="kp-layout">
+<main class="doc">
+<h1>مصدر <code>httpclient.py</code></h1>
+<p class="lead">عميل HTTP: الاتصال، الكوكيز، المهلات، التحويلات — 378 سطراً. كل سطر يحمل تعليقه العربي.</p>
+<div class="card info"><b>هذه الصفحة مولّدة آلياً</b> من مصدر الكود مباشرة (<code>tools/docs/build_docs.py</code>). إن غيّرت الكود فأعد توليدها: <code>python3 tools/docs/build_docs.py</code>. الشرح اليدوي الأوسع في <a href="../architecture.html">المعمارية</a> و<a href="../editing.html">دليل التعديل</a> و<a href="../danger.html">أماكن الخطر</a>.</div>
+<p><a class="btn" href="../files/httpclient.html">← صفحة الشرح</a> <label class="muted"> قفز إلى سطر: <input id="kp-jump" style="width:6rem" placeholder="123"></label></p>
+<details class="src" open><summary>المصدر كاملاً</summary><pre data-lines="378"><code>
+<span class="ln" id="L1">1</span># بداية نص متعدد الأسطر — الأسطر التالية نصّ حرفي لا كود، فلا يقبل تعليقاً
+<span class="ln" id="L2">2</span>&quot;&quot;&quot;A small HTTP client built only on the python standard library.
+<span class="ln" id="L3">3</span> 
+<span class="ln" id="L4">4</span>Why not `requests`?  Because the old version died with
+<span class="ln" id="L5">5</span>`ModuleNotFoundError: No module named requests` on any machine where the
+<span class="ln" id="L6">6</span>package was not installed (phones, fresh Windows, locked lab PCs).  This
+<span class="ln" id="L7">7</span>client needs nothing but python itself, and it gives exact control over the
+<span class="ln" id="L8">8</span>three things this tool lives on:
+<span class="ln" id="L9">9</span> 
+<span class="ln" id="L10">10</span>* keep-alive connection reuse  -&gt; real speed on a router
+<span class="ln" id="L11">11</span>* connect timeout vs read timeout -&gt; we can tell &quot;unreachable&quot; from &quot;busy&quot;
+<span class="ln" id="L12">12</span>* reading the real reply body   -&gt; we need the bytes, not a convenience layer
+<span class="ln" id="L13">13</span>&quot;&quot;&quot;  # نهاية النص متعدد الأسطر
+<span class="ln" id="L14">14</span> 
+<span class="ln" id="L15">15</span>from __future__ import annotations  # استيراد annotations من الوحدة __future__
+<span class="ln" id="L16">16</span> 
+<span class="ln" id="L17">17</span>import gzip  # استيراد الوحدة gzip من المكتبة
+<span class="ln" id="L18">18</span>import http.client  # استيراد الوحدة http.client من المكتبة
+<span class="ln" id="L19">19</span>import http.cookies  # استيراد الوحدة http.cookies من المكتبة
+<span class="ln" id="L20">20</span>import json  # استيراد الوحدة json من المكتبة
+<span class="ln" id="L21">21</span>import socket  # استيراد الوحدة socket من المكتبة
+<span class="ln" id="L22">22</span>import ssl  # استيراد الوحدة ssl من المكتبة
+<span class="ln" id="L23">23</span>import time  # استيراد الوحدة time من المكتبة
+<span class="ln" id="L24">24</span>import urllib.parse  # استيراد الوحدة urllib.parse من المكتبة
+<span class="ln" id="L25">25</span>import zlib  # استيراد الوحدة zlib من المكتبة
+<span class="ln" id="L26">26</span> 
+<span class="ln" id="L27">27</span>from . import config  # استيراد config من الوحدة .
+<span class="ln" id="L28">28</span>from .errors import NetError, classify  # استيراد NetError, classify من الوحدة errors
+<span class="ln" id="L29">29</span> 
+<span class="ln" id="L30">30</span>MAX_REDIRECTS = 8  # إسناد القيمة الثابتة MAX_REDIRECTS
+<span class="ln" id="L31">31</span> 
+<span class="ln" id="L32">32</span> 
+<span class="ln" id="L33">33</span>class Response:  # تعريف الصنف Response
+<span class="ln" id="L34">34</span>    &quot;&quot;&quot;One HTTP reply, decoded but otherwise untouched.&quot;&quot;&quot;  # نص توثيقي (docstring) يشرح ما يليه
+<span class="ln" id="L35">35</span> 
+<span class="ln" id="L36">36</span>    __slots__ = (&quot;status&quot;, &quot;headers&quot;, &quot;_body&quot;, &quot;url&quot;, &quot;elapsed_ms&quot;,  # إسناد مجموعة إلى __slots__
+<span class="ln" id="L37">37</span>                 &quot;history&quot;, &quot;method&quot;, &quot;request_headers&quot;, &quot;reason&quot;)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L38">38</span> 
+<span class="ln" id="L39">39</span>    def __init__(self, status, headers, body, url, elapsed_ms, history,  # تعريف الدالة __init__(self, status, headers, body, url, elapsed_ms, history, method, request_headers, reason)
+<span class="ln" id="L40">40</span>                 method=&quot;GET&quot;, request_headers=None, reason=&quot;&quot;):  # المعامل المسمّى method
+<span class="ln" id="L41">41</span>        self.status = status  # إسناد status إلى self.status
+<span class="ln" id="L42">42</span>        self.headers = headers            # قاموس، مفاتيحه بأحرف صغيرة
+<span class="ln" id="L43">43</span>        self._body = body  # إسناد body إلى self._body
+<span class="ln" id="L44">44</span>        self.url = url  # إسناد url إلى self.url
+<span class="ln" id="L45">45</span>        self.elapsed_ms = elapsed_ms  # إسناد elapsed_ms إلى self.elapsed_ms
+<span class="ln" id="L46">46</span>        self.history = history            # قائمة الروابط التي مرّت
+<span class="ln" id="L47">47</span>        self.method = method  # إسناد method إلى self.method
+<span class="ln" id="L48">48</span>        self.request_headers = request_headers or {}  # دمج منطقي (أو) وإسناده إلى self.request_headers
+<span class="ln" id="L49">49</span>        self.reason = reason  # إسناد reason إلى self.reason
+<span class="ln" id="L50">50</span> 
+<span class="ln" id="L51">51</span>    # -- الجسم -------------------------------------------------------------
+<span class="ln" id="L52">52</span>    @property  # مُزخرف (decorator) بـproperty
+<span class="ln" id="L53">53</span>    def body(self) -&gt; bytes:  # تعريف الدالة body(self) ترجع bytes
+<span class="ln" id="L54">54</span>        return self._body  # إرجاع self._body
+<span class="ln" id="L55">55</span> 
+<span class="ln" id="L56">56</span>    @property  # مُزخرف (decorator) بـproperty
+<span class="ln" id="L57">57</span>    def text(self) -&gt; str:  # تعريف الدالة text(self) ترجع str
+<span class="ln" id="L58">58</span>        return self.decode()  # إرجاع self.decode()
+<span class="ln" id="L59">59</span> 
+<span class="ln" id="L60">60</span>    def decode(self, limit: int = 0) -&gt; str:  # تعريف الدالة decode(self, limit) ترجع str
+<span class="ln" id="L61">61</span>        raw = self._body  # إسناد self._body إلى raw
+<span class="ln" id="L62">62</span>        if limit:  # شرط: limit
+<span class="ln" id="L63">63</span>            raw = raw[:limit]  # إسناد raw[] إلى raw
+<span class="ln" id="L64">64</span>        charset = &quot;utf-8&quot;  # إسناد القيمة الثابتة charset
+<span class="ln" id="L65">65</span>        ctype = self.header(&quot;content-type&quot;)  # إسناد نتيجة استدعاء self.header (معامل واحد) إلى ctype
+<span class="ln" id="L66">66</span>        if &quot;charset=&quot; in ctype:  # شرط: &#x27;charset=&#x27; ضمن ctype
+<span class="ln" id="L67">67</span>            charset = ctype.split(&quot;charset=&quot;, 1)[1].split(&quot;;&quot;)[0].strip() or &quot;utf-8&quot;  # دمج منطقي (أو) وإسناده إلى charset
+<span class="ln" id="L68">68</span>        try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L69">69</span>            return raw.decode(charset, &quot;replace&quot;)  # إرجاع raw.decode(charset, &#x27;replace&#x27;)
+<span class="ln" id="L70">70</span>        except LookupError:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L71">71</span>            return raw.decode(&quot;utf-8&quot;, &quot;replace&quot;)  # إرجاع raw.decode(&#x27;utf-8&#x27;, &#x27;replace&#x27;)
+<span class="ln" id="L72">72</span> 
+<span class="ln" id="L73">73</span>    def header(self, name: str, default: str = &quot;&quot;) -&gt; str:  # تعريف الدالة header(self, name, default) ترجع str
+<span class="ln" id="L74">74</span>        return self.headers.get(name.lower(), default)  # إرجاع self.headers.get(name.lower(), default)
+<span class="ln" id="L75">75</span> 
+<span class="ln" id="L76">76</span>    @property  # مُزخرف (decorator) بـproperty
+<span class="ln" id="L77">77</span>    def location(self) -&gt; str:  # تعريف الدالة location(self) ترجع str
+<span class="ln" id="L78">78</span>        return self.header(&quot;location&quot;)  # إرجاع self.header(&#x27;location&#x27;)
+<span class="ln" id="L79">79</span> 
+<span class="ln" id="L80">80</span>    @property  # مُزخرف (decorator) بـproperty
+<span class="ln" id="L81">81</span>    def length(self) -&gt; int:  # تعريف الدالة length(self) ترجع int
+<span class="ln" id="L82">82</span>        return len(self._body)  # إرجاع len(self._body)
+<span class="ln" id="L83">83</span> 
+<span class="ln" id="L84">84</span>    def is_redirect(self) -&gt; bool:  # تعريف الدالة is_redirect(self) ترجع bool
+<span class="ln" id="L85">85</span>        return self.status in (301, 302, 303, 307, 308) and bool(self.location)  # إرجاع مقارنة و bool(self.location)
+<span class="ln" id="L86">86</span> 
+<span class="ln" id="L87">87</span>    def as_dict(self) -&gt; dict:  # تعريف الدالة as_dict(self) ترجع dict
+<span class="ln" id="L88">88</span>        return {  # إرجاع قاموس
+<span class="ln" id="L89">89</span>            &quot;status&quot;: self.status,  # مفتاح status في القاموس
+<span class="ln" id="L90">90</span>            &quot;length&quot;: self.length,  # مفتاح length في القاموس
+<span class="ln" id="L91">91</span>            &quot;url&quot;: self.url,  # مفتاح url في القاموس
+<span class="ln" id="L92">92</span>            &quot;location&quot;: self.location,  # مفتاح location في القاموس
+<span class="ln" id="L93">93</span>            &quot;ms&quot;: round(self.elapsed_ms),  # مفتاح ms في القاموس
+<span class="ln" id="L94">94</span>        }  # إغلاق القوس المفتوح في السطر السابق
+<span class="ln" id="L95">95</span> 
+<span class="ln" id="L96">96</span> 
+<span class="ln" id="L97">97</span>class CookieStore:  # تعريف الصنف CookieStore
+<span class="ln" id="L98">98</span>    &quot;&quot;&quot;Minimal cookie jar (name/domain/path), enough for captive portals.&quot;&quot;&quot;  # نص توثيقي (docstring) يشرح ما يليه
+<span class="ln" id="L99">99</span> 
+<span class="ln" id="L100">100</span>    def __init__(self):  # تعريف الدالة __init__(self)
+<span class="ln" id="L101">101</span>        self._jar = {}  # إسناد قاموس إلى self._jar
+<span class="ln" id="L102">102</span> 
+<span class="ln" id="L103">103</span>    # يحفظ Set-Cookie مع النطاق والمسار وsecure حتى لا يُرسل كوكي في غير مكانه.
+<span class="ln" id="L104">104</span>    def update(self, url: str, set_cookie_headers) -&gt; None:  # تعريف الدالة update(self, url, set_cookie_headers) ترجع None
+<span class="ln" id="L105">105</span>        host = urllib.parse.urlsplit(url).hostname or &quot;&quot;  # دمج منطقي (أو) وإسناده إلى host
+<span class="ln" id="L106">106</span>        for raw in set_cookie_headers:  # دورة على set_cookie_headers باسم raw
+<span class="ln" id="L107">107</span>            try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L108">108</span>                parsed = http.cookies.SimpleCookie()  # إسناد نتيجة استدعاء http.cookies.SimpleCookie إلى parsed
+<span class="ln" id="L109">109</span>                parsed.load(raw)  # استدعاء parsed.load (معامل واحد)
+<span class="ln" id="L110">110</span>            except Exception:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L111">111</span>                continue  # الانتقال إلى الدورة التالية
+<span class="ln" id="L112">112</span>            for name, morsel in parsed.items():  # دورة على parsed.items() باسم مجموعة
+<span class="ln" id="L113">113</span>                domain = (morsel[&quot;domain&quot;] or host).lstrip(&quot;.&quot;).lower()  # إسناد نتيجة استدعاء morsel[&#x27;domain&#x27;] أو host.lstrip(&#x27;.&#x27;).lower إلى domain
+<span class="ln" id="L114">114</span>                path = morsel[&quot;path&quot;] or &quot;/&quot;  # دمج منطقي (أو) وإسناده إلى path
+<span class="ln" id="L115">115</span>                self._jar[name] = {  # إسناد قاموس إلى self._jar[name]
+<span class="ln" id="L116">116</span>                    &quot;value&quot;: morsel.value,  # مفتاح value في القاموس
+<span class="ln" id="L117">117</span>                    &quot;domain&quot;: domain,  # مفتاح domain في القاموس
+<span class="ln" id="L118">118</span>                    &quot;path&quot;: path,  # مفتاح path في القاموس
+<span class="ln" id="L119">119</span>                    &quot;secure&quot;: bool(morsel[&quot;secure&quot;]),  # مفتاح secure في القاموس
+<span class="ln" id="L120">120</span>                }  # إغلاق القوس المفتوح في السطر السابق
+<span class="ln" id="L121">121</span> 
+<span class="ln" id="L122">122</span>    def header(self, url: str) -&gt; str:  # تعريف الدالة header(self, url) ترجع str
+<span class="ln" id="L123">123</span>        parts = urllib.parse.urlsplit(url)  # إسناد نتيجة استدعاء urllib.parse.urlsplit (معامل واحد) إلى parts
+<span class="ln" id="L124">124</span>        host = (parts.hostname or &quot;&quot;).lower()  # إسناد نتيجة استدعاء parts.hostname أو &#x27;&#x27;.lower إلى host
+<span class="ln" id="L125">125</span>        path = parts.path or &quot;/&quot;  # دمج منطقي (أو) وإسناده إلى path
+<span class="ln" id="L126">126</span>        out = []  # إسناد قائمة إلى out
+<span class="ln" id="L127">127</span>        for name, c in self._jar.items():  # دورة على self._jar.items() باسم مجموعة
+<span class="ln" id="L128">128</span>            dom = c[&quot;domain&quot;]  # إسناد c[&#x27;domain&#x27;] إلى dom
+<span class="ln" id="L129">129</span>            if dom and not (host == dom or host.endswith(&quot;.&quot; + dom)):  # شرط مركّب (و)
+<span class="ln" id="L130">130</span>                continue  # الانتقال إلى الدورة التالية
+<span class="ln" id="L131">131</span>            if not path.startswith(c[&quot;path&quot;]):  # شرط معكوس: ليس path.startswith(c[&#x27;path&#x27;])
+<span class="ln" id="L132">132</span>                continue  # الانتقال إلى الدورة التالية
+<span class="ln" id="L133">133</span>            if c[&quot;secure&quot;] and parts.scheme != &quot;https&quot;:  # شرط مركّب (و)
+<span class="ln" id="L134">134</span>                continue  # الانتقال إلى الدورة التالية
+<span class="ln" id="L135">135</span>            out.append(f&quot;{name}={c[&#x27;value&#x27;]}&quot;)  # استدعاء out.append (معامل واحد)
+<span class="ln" id="L136">136</span>        return &quot;; &quot;.join(out)  # إرجاع &#x27;; &#x27;.join(out)
+<span class="ln" id="L137">137</span> 
+<span class="ln" id="L138">138</span>    def clear(self) -&gt; None:  # تعريف الدالة clear(self) ترجع None
+<span class="ln" id="L139">139</span>        self._jar.clear()  # استدعاء self._jar.clear
+<span class="ln" id="L140">140</span> 
+<span class="ln" id="L141">141</span>    # أسماء الكوكيز فقط ولا القيم أبداً — القيم أسرار جلسات.
+<span class="ln" id="L142">142</span>    def names(self) -&gt; list:  # تعريف الدالة names(self) ترجع list
+<span class="ln" id="L143">143</span>        &quot;&quot;&quot;Cookie names only - never the values.&quot;&quot;&quot;  # نص توثيقي (docstring) يشرح ما يليه
+<span class="ln" id="L144">144</span>        return sorted(self._jar.keys())  # إرجاع sorted(self._jar.keys())
+<span class="ln" id="L145">145</span> 
+<span class="ln" id="L146">146</span>    def __len__(self) -&gt; int:  # تعريف الدالة __len__(self) ترجع int
+<span class="ln" id="L147">147</span>        return len(self._jar)  # إرجاع len(self._jar)
+<span class="ln" id="L148">148</span> 
+<span class="ln" id="L149">149</span> 
+<span class="ln" id="L150">150</span>class Session:  # تعريف الصنف Session
+<span class="ln" id="L151">151</span>    &quot;&quot;&quot;One connection + cookie store. Use one Session per worker thread.&quot;&quot;&quot;  # نص توثيقي (docstring) يشرح ما يليه
+<span class="ln" id="L152">152</span> 
+<span class="ln" id="L153">153</span>    def __init__(self, headers=None, connect_timeout=config.CONNECT_TIMEOUT,  # تعريف الدالة __init__(self, headers, connect_timeout, read_timeout, verify_tls, allow_redirects)
+<span class="ln" id="L154">154</span>                 read_timeout=config.READ_TIMEOUT, verify_tls=config.VERIFY_TLS,  # المعامل المسمّى read_timeout
+<span class="ln" id="L155">155</span>                 allow_redirects=False):  # المعامل المسمّى allow_redirects
+<span class="ln" id="L156">156</span>        self.headers = dict(config.BASE_HEADERS)  # إسناد نتيجة استدعاء dict (معامل واحد) إلى self.headers
+<span class="ln" id="L157">157</span>        if headers:  # شرط: headers
+<span class="ln" id="L158">158</span>            self.headers.update(headers)  # استدعاء self.headers.update (معامل واحد)
+<span class="ln" id="L159">159</span>        self.connect_timeout = connect_timeout  # إسناد connect_timeout إلى self.connect_timeout
+<span class="ln" id="L160">160</span>        self.read_timeout = read_timeout  # إسناد read_timeout إلى self.read_timeout
+<span class="ln" id="L161">161</span>        self.verify_tls = verify_tls  # إسناد verify_tls إلى self.verify_tls
+<span class="ln" id="L162">162</span>        self.allow_redirects = allow_redirects  # إسناد allow_redirects إلى self.allow_redirects
+<span class="ln" id="L163">163</span>        self.cookies = CookieStore()  # إسناد نتيجة استدعاء CookieStore إلى self.cookies
+<span class="ln" id="L164">164</span>        self._conn = None  # إسناد القيمة الثابتة self._conn
+<span class="ln" id="L165">165</span>        self._key = None  # إسناد القيمة الثابتة self._key
+<span class="ln" id="L166">166</span>        self.stats = {&quot;requests&quot;: 0, &quot;retries&quot;: 0, &quot;bytes&quot;: 0}  # إسناد قاموس إلى self.stats
+<span class="ln" id="L167">167</span>        self._ssl_ctx = None  # إسناد القيمة الثابتة self._ssl_ctx
+<span class="ln" id="L168">168</span> 
+<span class="ln" id="L169">169</span>    def __enter__(self) -&gt; &quot;Session&quot;:  # تعريف الدالة __enter__(self) ترجع &#x27;Session&#x27;
+<span class="ln" id="L170">170</span>        return self  # إرجاع self
+<span class="ln" id="L171">171</span> 
+<span class="ln" id="L172">172</span>    def __exit__(self, *exc) -&gt; bool:  # تعريف الدالة __exit__(self, *exc) ترجع bool
+<span class="ln" id="L173">173</span>        self.close()  # استدعاء self.close
+<span class="ln" id="L174">174</span>        return False  # إرجاع False
+<span class="ln" id="L175">175</span> 
+<span class="ln" id="L176">176</span>    # -- الاتصال -------------------------------------------------------
+<span class="ln" id="L177">177</span>    def _ssl_context(self):  # تعريف الدالة _ssl_context(self)
+<span class="ln" id="L178">178</span>        if self._ssl_ctx is None:  # شرط: self._ssl_ctx هو نفسه None
+<span class="ln" id="L179">179</span>            if self.verify_tls:  # شرط: self.verify_tls
+<span class="ln" id="L180">180</span>                self._ssl_ctx = ssl.create_default_context()  # إسناد نتيجة استدعاء ssl.create_default_context إلى self._ssl_ctx
+<span class="ln" id="L181">181</span>            else:  # مفتاح else في القاموس
+<span class="ln" id="L182">182</span>                self._ssl_ctx = ssl._create_unverified_context()  # إسناد نتيجة استدعاء ssl._create_unverified_context إلى self._ssl_ctx
+<span class="ln" id="L183">183</span>        return self._ssl_ctx  # إرجاع self._ssl_ctx
+<span class="ln" id="L184">184</span> 
+<span class="ln" id="L185">185</span>    def _connection(self, scheme, host, port):  # تعريف الدالة _connection(self, scheme, host, port)
+<span class="ln" id="L186">186</span>        key = (scheme, host, port)  # إسناد مجموعة إلى key
+<span class="ln" id="L187">187</span>        if self._conn is not None and self._key == key:  # شرط مركّب (و)
+<span class="ln" id="L188">188</span>            return self._conn  # إرجاع self._conn
+<span class="ln" id="L189">189</span>        self.close()  # استدعاء self.close
+<span class="ln" id="L190">190</span>        if scheme == &quot;https&quot;:  # شرط: scheme يساوي &#x27;https&#x27;
+<span class="ln" id="L191">191</span>            conn = http.client.HTTPSConnection(  # إسناد نتيجة استدعاء http.client.HTTPSConnection (2 معاملات، timeout=…، context=…) إلى conn
+<span class="ln" id="L192">192</span>                host, port, timeout=self.connect_timeout,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L193">193</span>                context=self._ssl_context())  # المعامل المسمّى context
+<span class="ln" id="L194">194</span>        else:  # مفتاح else في القاموس
+<span class="ln" id="L195">195</span>            conn = http.client.HTTPConnection(  # إسناد نتيجة استدعاء http.client.HTTPConnection (2 معاملات، timeout=…) إلى conn
+<span class="ln" id="L196">196</span>                host, port, timeout=self.connect_timeout)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L197">197</span>        self._conn, self._key = conn, key  # إسناد مجموعة إلى مجموعة
+<span class="ln" id="L198">198</span>        return conn  # إرجاع conn
+<span class="ln" id="L199">199</span> 
+<span class="ln" id="L200">200</span>    def close(self):  # تعريف الدالة close(self)
+<span class="ln" id="L201">201</span>        if self._conn is not None:  # شرط: self._conn ليس نفسه None
+<span class="ln" id="L202">202</span>            try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L203">203</span>                self._conn.close()  # استدعاء self._conn.close
+<span class="ln" id="L204">204</span>            except Exception:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L205">205</span>                pass  # سطر فارغ منطقياً (pass) — مطلوب صياغياً
+<span class="ln" id="L206">206</span>        self._conn = None  # إسناد القيمة الثابتة self._conn
+<span class="ln" id="L207">207</span>        self._key = None  # إسناد القيمة الثابتة self._key
+<span class="ln" id="L208">208</span> 
+<span class="ln" id="L209">209</span>    # -- الطلبات ---------------------------------------------------------
+<span class="ln" id="L210">210</span>    # الواجهة العامة: إعادة محاولة صامتة واحدة على stale، ثم تصنيف الخطأ.
+<span class="ln" id="L211">211</span>    def request(self, method, url, params=None, data=None, headers=None,  # تعريف الدالة request(self, method, url, params, data, headers, allow_redirects, timeout) ترجع Response
+<span class="ln" id="L212">212</span>                allow_redirects=None, timeout=None) -&gt; Response:  # المعامل المسمّى allow_redirects
+<span class="ln" id="L213">213</span>        method = method.upper()  # إسناد نتيجة استدعاء method.upper إلى method
+<span class="ln" id="L214">214</span>        if params:  # شرط: params
+<span class="ln" id="L215">215</span>            sep = &quot;&amp;&quot; if urllib.parse.urlsplit(url).query else &quot;?&quot;  # إسناد &#x27;&amp;&#x27; إن urllib.parse.urlsplit(url).query وإلا &#x27;?&#x27; إلى sep
+<span class="ln" id="L216">216</span>            url = url + sep + urllib.parse.urlencode(params, doseq=True)  # حساب جمع بين جمع وurllib.parse.urlencode(params, doseq=True) وإسناده إلى url
+<span class="ln" id="L217">217</span>        hdr_ct = &quot;&quot;  # إسناد القيمة الثابتة hdr_ct
+<span class="ln" id="L218">218</span>        if headers:  # شرط: headers
+<span class="ln" id="L219">219</span>            for key, value in headers.items():  # دورة على headers.items() باسم مجموعة
+<span class="ln" id="L220">220</span>                if str(key).lower() == &quot;content-type&quot;:  # شرط: str(key).lower() يساوي &#x27;content-type&#x27;
+<span class="ln" id="L221">221</span>                    hdr_ct = value or &quot;&quot;  # دمج منطقي (أو) وإسناده إلى hdr_ct
+<span class="ln" id="L222">222</span>                    break  # قطع الحلقة فوراً
+<span class="ln" id="L223">223</span>        if isinstance(data, dict):  # شرط: نتيجة isinstance(data, dict)
+<span class="ln" id="L224">224</span>            if &quot;json&quot; in hdr_ct.lower():  # شرط: &#x27;json&#x27; ضمن hdr_ct.lower()
+<span class="ln" id="L225">225</span>                body = json.dumps(data).encode(&quot;utf-8&quot;)  # إسناد نتيجة استدعاء json.dumps(data).encode (معامل واحد) إلى body
+<span class="ln" id="L226">226</span>                post_headers = {&quot;Content-Type&quot;: hdr_ct or &quot;application/json&quot;}  # إسناد قاموس إلى post_headers
+<span class="ln" id="L227">227</span>            else:  # مفتاح else في القاموس
+<span class="ln" id="L228">228</span>                body = urllib.parse.urlencode(data, doseq=True).encode()  # إسناد نتيجة استدعاء urllib.parse.urlencode(data, doseq=True).encode إلى body
+<span class="ln" id="L229">229</span>                post_headers = {&quot;Content-Type&quot;: &quot;application/x-www-form-urlencoded&quot;}  # إسناد قاموس إلى post_headers
+<span class="ln" id="L230">230</span>        elif isinstance(data, str):  # شرط: نتيجة isinstance(data, str)
+<span class="ln" id="L231">231</span>            body = data.encode()  # إسناد نتيجة استدعاء data.encode إلى body
+<span class="ln" id="L232">232</span>            post_headers = {&quot;Content-Type&quot;: hdr_ct or &quot;application/x-www-form-urlencoded&quot;}  # إسناد قاموس إلى post_headers
+<span class="ln" id="L233">233</span>        elif isinstance(data, bytes):  # شرط: نتيجة isinstance(data, bytes)
+<span class="ln" id="L234">234</span>            body = data  # إسناد data إلى body
+<span class="ln" id="L235">235</span>            post_headers = {&quot;Content-Type&quot;: &quot;application/octet-stream&quot;}  # إسناد قاموس إلى post_headers
+<span class="ln" id="L236">236</span>        else:  # مفتاح else في القاموس
+<span class="ln" id="L237">237</span>            body = None  # إسناد القيمة الثابتة body
+<span class="ln" id="L238">238</span>            post_headers = {}  # إسناد قاموس إلى post_headers
+<span class="ln" id="L239">239</span> 
+<span class="ln" id="L240">240</span>        follow = self.allow_redirects if allow_redirects is None else allow_redirects  # إسناد self.allow_redirects إن مقارنة وإلا allow_redirects إلى follow
+<span class="ln" id="L241">241</span>        history = []  # إسناد قائمة إلى history
+<span class="ln" id="L242">242</span>        started = time.time()  # إسناد نتيجة استدعاء time.time إلى started
+<span class="ln" id="L243">243</span> 
+<span class="ln" id="L244">244</span>        for _ in range(MAX_REDIRECTS + 1):  # دورة على range(جمع) باسم _
+<span class="ln" id="L245">245</span>            resp = self._send_once(method, url, body, headers, post_headers,  # إسناد نتيجة استدعاء self._send_once (6 معاملات) إلى resp
+<span class="ln" id="L246">246</span>                                   timeout)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L247">247</span>            resp.history = list(history)  # إسناد نتيجة استدعاء list (معامل واحد) إلى resp.history
+<span class="ln" id="L248">248</span>            if not (follow and resp.is_redirect()):  # شرط معكوس: ليس follow و resp.is_redirect()
+<span class="ln" id="L249">249</span>                resp.elapsed_ms = (time.time() - started) * 1000  # حساب ضرب بين طرح و1000 وإسناده إلى resp.elapsed_ms
+<span class="ln" id="L250">250</span>                return resp  # إرجاع resp
+<span class="ln" id="L251">251</span>            history.append(url)  # استدعاء history.append (معامل واحد)
+<span class="ln" id="L252">252</span>            target = urllib.parse.urljoin(url, resp.location)  # إسناد نتيجة استدعاء urllib.parse.urljoin (2 معاملات) إلى target
+<span class="ln" id="L253">253</span>            if resp.status == 303 or (resp.status in (301, 302) and method == &quot;POST&quot;):  # شرط مركّب (أو)
+<span class="ln" id="L254">254</span>                method, body, post_headers = &quot;GET&quot;, None, {}  # إسناد مجموعة إلى مجموعة
+<span class="ln" id="L255">255</span>            url = target  # إسناد target إلى url
+<span class="ln" id="L256">256</span>        raise NetError(&quot;too_many_redirects&quot;, f&quot;redirect loop at {url}&quot;, url)  # رفع NetError(&#x27;too_many_redirects&#x27;, نص منسّق (f-string), url)
+<span class="ln" id="L257">257</span> 
+<span class="ln" id="L258">258</span>    def get(self, url, **kw) -&gt; Response:  # تعريف الدالة get(self, url, **kw) ترجع Response
+<span class="ln" id="L259">259</span>        return self.request(&quot;GET&quot;, url, **kw)  # إرجاع self.request(&#x27;GET&#x27;, url, **=kw)
+<span class="ln" id="L260">260</span> 
+<span class="ln" id="L261">261</span>    def post(self, url, **kw) -&gt; Response:  # تعريف الدالة post(self, url, **kw) ترجع Response
+<span class="ln" id="L262">262</span>        return self.request(&quot;POST&quot;, url, **kw)  # إرجاع self.request(&#x27;POST&#x27;, url, **=kw)
+<span class="ln" id="L263">263</span> 
+<span class="ln" id="L264">264</span>    # -- رحلة الذهاب والإياب الخام الواحدة -------------------------------
+<span class="ln" id="L265">265</span>    # إرسال طلب واحد على اتصال موجود أو جديد.
+<span class="ln" id="L266">266</span>    # فصل مهلة الاتصال عن مهلة القراءة مقصود: بدونه يدمج بايثون المرحلتين
+<span class="ln" id="L267">267</span>    # في TimeoutError واحد فيبدو الراوتر الميت «بطيئاً» بدل «غير قابل للوصول».
+<span class="ln" id="L268">268</span>    def _send_once(self, method, url, body, extra_headers, post_headers,  # تعريف الدالة _send_once(self, method, url, body, extra_headers, post_headers, timeout) ترجع Response
+<span class="ln" id="L269">269</span>                   timeout) -&gt; Response:  # تكملة تعريف متعدد الأسطر
+<span class="ln" id="L270">270</span>        parts = urllib.parse.urlsplit(url)  # إسناد نتيجة استدعاء urllib.parse.urlsplit (معامل واحد) إلى parts
+<span class="ln" id="L271">271</span>        if parts.scheme not in (&quot;http&quot;, &quot;https&quot;):  # شرط: parts.scheme ليس ضمن مجموعة
+<span class="ln" id="L272">272</span>            raise NetError(&quot;proto&quot;, f&quot;unsupported scheme: {parts.scheme!r}&quot;, url)  # رفع NetError(&#x27;proto&#x27;, نص منسّق (f-string), url)
+<span class="ln" id="L273">273</span>        host = parts.hostname or &quot;&quot;  # دمج منطقي (أو) وإسناده إلى host
+<span class="ln" id="L274">274</span>        if not host:  # شرط معكوس: ليس host
+<span class="ln" id="L275">275</span>            raise NetError(&quot;proto&quot;, f&quot;no host in url: {url}&quot;, url)  # رفع NetError(&#x27;proto&#x27;, نص منسّق (f-string), url)
+<span class="ln" id="L276">276</span>        scheme = parts.scheme  # إسناد parts.scheme إلى scheme
+<span class="ln" id="L277">277</span>        port = parts.port or (443 if scheme == &quot;https&quot; else 80)  # دمج منطقي (أو) وإسناده إلى port
+<span class="ln" id="L278">278</span>        path = urllib.parse.urlunsplit((&quot;&quot;, &quot;&quot;, parts.path or &quot;/&quot;, parts.query, &quot;&quot;))  # إسناد نتيجة استدعاء urllib.parse.urlunsplit (معامل واحد) إلى path
+<span class="ln" id="L279">279</span> 
+<span class="ln" id="L280">280</span>        headers = dict(self.headers)  # إسناد نتيجة استدعاء dict (معامل واحد) إلى headers
+<span class="ln" id="L281">281</span>        headers.update(post_headers)  # استدعاء headers.update (معامل واحد)
+<span class="ln" id="L282">282</span>        headers[&quot;Host&quot;] = host if port in (80, 443) else f&quot;{host}:{port}&quot;  # إسناد host إن مقارنة وإلا نص منسّق (f-string) إلى headers[&#x27;Host&#x27;]
+<span class="ln" id="L283">283</span>        headers[&quot;Accept-Encoding&quot;] = &quot;gzip, deflate&quot;  # إسناد القيمة الثابتة headers[&#x27;Accept-Encoding&#x27;]
+<span class="ln" id="L284">284</span>        cookie = self.cookies.header(url)  # إسناد نتيجة استدعاء self.cookies.header (معامل واحد) إلى cookie
+<span class="ln" id="L285">285</span>        if cookie:  # شرط: cookie
+<span class="ln" id="L286">286</span>            headers[&quot;Cookie&quot;] = cookie  # إسناد cookie إلى headers[&#x27;Cookie&#x27;]
+<span class="ln" id="L287">287</span>        if extra_headers:  # شرط: extra_headers
+<span class="ln" id="L288">288</span>            headers.update(extra_headers)  # استدعاء headers.update (معامل واحد)
+<span class="ln" id="L289">289</span> 
+<span class="ln" id="L290">290</span>        read_to = (timeout[1] if isinstance(timeout, (tuple, list))  # إسناد timeout[1] إن isinstance(timeout, مجموعة) وإلا timeout أو self.read_timeout إلى read_to
+<span class="ln" id="L291">291</span>                   else (timeout or self.read_timeout))  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L292">292</span>        connect_to = (timeout[0] if isinstance(timeout, (tuple, list))  # إسناد timeout[0] إن isinstance(timeout, مجموعة) وإلا self.connect_timeout إلى connect_to
+<span class="ln" id="L293">293</span>                      else self.connect_timeout)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L294">294</span> 
+<span class="ln" id="L295">295</span>        last_exc = None  # إسناد القيمة الثابتة last_exc
+<span class="ln" id="L296">296</span>        for attempt in range(2):          # إعادة صامتة واحدة لاتصال keep-alive ميت
+<span class="ln" id="L297">297</span>            try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L298">298</span>                conn = self._connection(scheme, host, port)  # إسناد نتيجة استدعاء self._connection (3 معاملات) إلى conn
+<span class="ln" id="L299">299</span>                if conn.sock is None:  # شرط: conn.sock هو نفسه None
+<span class="ln" id="L300">300</span>                    conn.timeout = connect_to  # إسناد connect_to إلى conn.timeout
+<span class="ln" id="L301">301</span>                    # فتح المقبس مرحلة قائمة بذاتها: إن انتهت مهلتها يجب
+<span class="ln" id="L302">302</span>                    # أن نقول «الراوتر لم يردّ على الاتصال»،
+<span class="ln" id="L303">303</span>                    # لا «الراوتر لم يردّ على الطلب». (بدون
+<span class="ln" id="L304">304</span>                    # هذا، يطوي بايثون المرحلتين في TimeoutError واحد فيبدو كل
+<span class="ln" id="L305">305</span>                    # راوتر ميت راوتراً بطيئاً.)
+<span class="ln" id="L306">306</span>                    try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L307">307</span>                        conn.connect()  # استدعاء conn.connect
+<span class="ln" id="L308">308</span>                    except (socket.timeout, TimeoutError) as exc:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L309">309</span>                        self.close()  # استدعاء self.close
+<span class="ln" id="L310">310</span>                        raise NetError(&quot;connect_timeout&quot;,  # رفع NetError(&#x27;connect_timeout&#x27;, نص منسّق (f-string), url)
+<span class="ln" id="L311">311</span>                                       f&quot;{type(exc).__name__}: {exc}&quot;, url)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L312">312</span>                conn.sock.settimeout(read_to)  # استدعاء conn.sock.settimeout (معامل واحد)
+<span class="ln" id="L313">313</span>                start = time.time()  # إسناد نتيجة استدعاء time.time إلى start
+<span class="ln" id="L314">314</span>                conn.request(method, path, body=body, headers=headers)  # استدعاء conn.request (2 معاملات، body=…، headers=…)
+<span class="ln" id="L315">315</span>                raw = conn.getresponse()  # إسناد نتيجة استدعاء conn.getresponse إلى raw
+<span class="ln" id="L316">316</span>                payload = raw.read()  # إسناد نتيجة استدعاء raw.read إلى payload
+<span class="ln" id="L317">317</span>                elapsed = (time.time() - start) * 1000  # حساب ضرب بين طرح و1000 وإسناده إلى elapsed
+<span class="ln" id="L318">318</span>                payload = self._decompress(payload, raw.getheader(&quot;Content-Encoding&quot;))  # إسناد نتيجة استدعاء self._decompress (2 معاملات) إلى payload
+<span class="ln" id="L319">319</span>                hdrs = {k.lower(): v for k, v in raw.getheaders()}  # بناء قاموس بالاشتقاق وإسناده إلى hdrs
+<span class="ln" id="L320">320</span>                self.stats[&quot;requests&quot;] += 1  # تحديث self.stats[&#x27;requests&#x27;] بعملية جمع
+<span class="ln" id="L321">321</span>                self.stats[&quot;bytes&quot;] += len(payload)  # تحديث self.stats[&#x27;bytes&#x27;] بعملية جمع
+<span class="ln" id="L322">322</span>                if raw.will_close:  # شرط: raw.will_close
+<span class="ln" id="L323">323</span>                    self.close()  # استدعاء self.close
+<span class="ln" id="L324">324</span>                self.cookies.update(url, raw.headers.get_all(&quot;Set-Cookie&quot;) or [])  # استدعاء self.cookies.update (2 معاملات)
+<span class="ln" id="L325">325</span>                return Response(raw.status, hdrs, payload, url, elapsed, [],  # إرجاع Response(raw.status, hdrs, payload, …)
+<span class="ln" id="L326">326</span>                                method, headers, raw.reason)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L327">327</span>            except NetError:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L328">328</span>                raise  # إعادة رفع الاستثناء الحالي
+<span class="ln" id="L329">329</span>            except Exception as exc:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L330">330</span>                err = classify(exc, url)  # إسناد نتيجة استدعاء classify (2 معاملات) إلى err
+<span class="ln" id="L331">331</span>                last_exc = err  # إسناد err إلى last_exc
+<span class="ln" id="L332">332</span>                self.close()  # استدعاء self.close
+<span class="ln" id="L333">333</span>                if attempt == 0 and err.retryable:  # شرط مركّب (و)
+<span class="ln" id="L334">334</span>                    self.stats[&quot;retries&quot;] += 1  # تحديث self.stats[&#x27;retries&#x27;] بعملية جمع
+<span class="ln" id="L335">335</span>                    time.sleep(0.05)  # استدعاء time.sleep (معامل واحد)
+<span class="ln" id="L336">336</span>                    continue  # الانتقال إلى الدورة التالية
+<span class="ln" id="L337">337</span>                raise err  # رفع err
+<span class="ln" id="L338">338</span>        raise last_exc or NetError(&quot;unknown&quot;, &quot;request failed&quot;, url)  # رفع last_exc أو NetError(&#x27;unknown&#x27;, &#x27;request failed&#x27;, url)
+<span class="ln" id="L339">339</span> 
+<span class="ln" id="L340">340</span>    @staticmethod  # مُزخرف (decorator) بـstaticmethod
+<span class="ln" id="L341">341</span>    def _decompress(payload: bytes, encoding: str) -&gt; bytes:  # تعريف الدالة _decompress(payload, encoding) ترجع bytes
+<span class="ln" id="L342">342</span>        enc = (encoding or &quot;&quot;).lower()  # إسناد نتيجة استدعاء encoding أو &#x27;&#x27;.lower إلى enc
+<span class="ln" id="L343">343</span>        if &quot;gzip&quot; in enc:  # شرط: &#x27;gzip&#x27; ضمن enc
+<span class="ln" id="L344">344</span>            try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L345">345</span>                return gzip.decompress(payload)  # إرجاع gzip.decompress(payload)
+<span class="ln" id="L346">346</span>            except Exception:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L347">347</span>                return payload  # إرجاع payload
+<span class="ln" id="L348">348</span>        if &quot;deflate&quot; in enc:  # شرط: &#x27;deflate&#x27; ضمن enc
+<span class="ln" id="L349">349</span>            try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L350">350</span>                return zlib.decompress(payload)  # إرجاع zlib.decompress(payload)
+<span class="ln" id="L351">351</span>            except Exception:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L352">352</span>                try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L353">353</span>                    return zlib.decompress(payload, -zlib.MAX_WBITS)  # إرجاع zlib.decompress(payload, نفي/سالب)
+<span class="ln" id="L354">354</span>                except Exception:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L355">355</span>                    return payload  # إرجاع payload
+<span class="ln" id="L356">356</span>        return payload  # إرجاع payload
+<span class="ln" id="L357">357</span> 
+<span class="ln" id="L358">358</span> 
+<span class="ln" id="L359">359</span>def open_url(url: str, timeout=None, headers=None) -&gt; Response:  # تعريف الدالة open_url(url, timeout, headers) ترجع Response
+<span class="ln" id="L360">360</span>    &quot;&quot;&quot;One-shot GET with a throw-away session (used for quick checks).&quot;&quot;&quot;  # نص توثيقي (docstring) يشرح ما يليه
+<span class="ln" id="L361">361</span>    s = Session(headers=headers)  # إسناد نتيجة استدعاء Session (headers=…) إلى s
+<span class="ln" id="L362">362</span>    try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L363">363</span>        return s.get(url, timeout=timeout)  # إرجاع s.get(url, timeout=timeout)
+<span class="ln" id="L364">364</span>    finally:  # مفتاح finally في القاموس
+<span class="ln" id="L365">365</span>        s.close()  # استدعاء s.close
+<span class="ln" id="L366">366</span> 
+<span class="ln" id="L367">367</span> 
+<span class="ln" id="L368">368</span>def local_ip() -&gt; str:  # تعريف الدالة local_ip() ترجع str
+<span class="ln" id="L369">369</span>    &quot;&quot;&quot;Best-effort local IP, used to print the LAN link of the web UI.&quot;&quot;&quot;  # نص توثيقي (docstring) يشرح ما يليه
+<span class="ln" id="L370">370</span>    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # إسناد نتيجة استدعاء socket.socket (2 معاملات) إلى s
+<span class="ln" id="L371">371</span>    try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L372">372</span>        s.connect((&quot;10.255.255.255&quot;, 1))  # استدعاء s.connect (معامل واحد)
+<span class="ln" id="L373">373</span>        return s.getsockname()[0]  # إرجاع s.getsockname()[0]
+<span class="ln" id="L374">374</span>    except Exception:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L375">375</span>        return &quot;127.0.0.1&quot;  # إرجاع &#x27;127.0.0.1&#x27;
+<span class="ln" id="L376">376</span>    finally:  # مفتاح finally في القاموس
+<span class="ln" id="L377">377</span>        s.close()  # استدعاء s.close
+<span class="ln" id="L378">378</span> 
+</code></pre></details>
+<script>
+document.getElementById("kp-jump").addEventListener("change", function (e) {
+  var n = parseInt(e.target.value, 10);
+  if (n > 0) { var el = document.getElementById("L" + n);
+    if (el) el.scrollIntoView({block: "center"}); }
+});
+if (location.hash) { var el = document.querySelector(location.hash);
+  if (el) setTimeout(function () { el.scrollIntoView({block: "center"}); }, 60); }
+</script>
+<footer class="docfoot">صفحة مولّدة آلياً من مصدر الكود · KiraPass —
+<code>files</code> · 2026-10-01 02:26</footer>
+</main>
+</div>
+<script src="../assets/docs.js"></script>
+<script>KPInit("files");</script>
+</body>
+</html>

@@ -218,3 +218,67 @@ python3 KiraPass.py --selftest
 في تقرير التوقف يظهر حقل `ban_evidence` (status / word / has_form / kind_hint)
 عندما يكون السبب صفحة حظر أو تقييد، لمساعدة المشرف على التشخيص — دون أي
 اقتراح لتجاوز الحظر.
+
+---
+
+## banned_by_router بعد أول بطاقة — بينما الراوتر لم يحظرك أصلاً
+
+### الحالة التي وصلتنا
+
+تقرير توقف من شبكة «تواصل» (`http://t.com/login`):
+
+```
+"counters":    {"BANNED": 1}
+"stop_reason": "banned_by_router"
+"progress":    {"attempts": 1, "dropped": 16, "total": 100}
+"ban_evidence":{"status": 200, "word": "blocked.html", "has_form": true,
+                "reason": "ban_page", "kind_hint": "page_block"}
+```
+
+لاحظ التناقض داخل التقرير نفسه: المعايرة (`reach_login_page`) كتبت
+`http_ok_word_ignored` — «الصفحة ما زالت تعرض نموذج الدخول، لذلك تم تجاهل كلمة
+الحجب في نصها» — ومع ذلك اعتُبرت **أول بطاقة** حظراً.
+
+### السبب الحقيقي
+
+صفحة الدخول نفسها في هذه الشبكة تحتوي في سكربتها:
+
+```js
+function checkCookie() {
+    var user = getCookie("username");
+    if (user >= 1000) { window.location = "blocked.html"; }   // ← هنا
+}
+```
+
+أي أن النص `blocked.html` موجود في **كل رد** ترسله البوابة، حظر أم لا — فهو من
+«أثاث الصفحة»، لا حكم على بطاقتك. (النسخة المحفوظة من هذه الصفحة موجودة في
+مستودعك: `Example pages/شبكة تواصل نت.html`، السطر 51.)
+
+وكان في الكود مساران يقرآن الرد ولا يتفقان:
+
+| المسار | القاعدة | النتيجة على نفس الصفحة |
+|---|---|---|
+| `engine._is_protective_reply` (المعايرة) | كلمة حجب + **نموذج دخول موجود** ⇒ ليست حظراً | `stop=False` ✔ |
+| `fingerprint.Judge.classify` (المحاولات) | كلمة حجب ⇒ حظر، بلا أي استثناء | `BANNED` ✘ |
+
+و`_check_stop_rules` يوقف التشغيل عند **أول** `BANNED` (`_ban_count >= 1`)،
+فسقط الفضاء كله بعد بطاقة واحدة.
+
+### الإصلاح
+
+كلمة الحجب تُحذف من قائمة الكلمات **فقط** إذا كانت موجودة في صفحة الدخول التي
+جُلبت قبل إرسال أي بطاقة (`Judge.ban_phrases`)، والكلمات المتجاهَلة تُكتب في
+التقرير تحت `calibration.fingerprint.ignored_ban_words` — لا شيء يُتجاهل بصمت.
+أي كلمة تظهر لاحقاً (في صفحة الفشل، أو بعد حظر حقيقي) ما زالت تُحتسب حظراً.
+
+الإثبات: `python3 KiraPass.py --selftest`
+
+```
+[PASS] ban_from_router_is_named_and_stops_the_run: banned=1 accepted=0 stop=banned_by_router
+[PASS] block_word_on_the_login_page_is_not_a_ban: banned=0 rejected=40
+       ignored_ban_words=['blocked.html'] stop=attempts_done
+```
+
+السيناريوهان معاً: الحظر الحقيقي ما زال يوقف التشغيل، وكلمة الحجب المكتوبة في
+صفحة الدخول لم تعد تُوقفه. وقبل الإصلاح كان السيناريو الثاني يفشل بنفس توقيع
+تقريرك تماماً: `banned=1 rejected=0 stop=banned_by_router`.

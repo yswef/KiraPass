@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ملف mockportal.py · KiraPass</title>
+<link rel="stylesheet" href="../assets/docs.css">
+
+</head>
+<body>
+<div id="kp-layout">
+<main class="doc">
+<h1>ملف <code>mockportal.py</code></h1>
+<p class="lead">راوتر وهمي كامل للاختبارات — <code>kirapass/mockportal.py</code></p>
+<div class="card info"><b>هذه الصفحة مولّدة آلياً</b> من مصدر الكود مباشرة (<code>tools/docs/build_docs.py</code>). إن غيّرت الكود فأعد توليدها: <code>python3 tools/docs/build_docs.py</code>. الشرح اليدوي الأوسع في <a href="../architecture.html">المعمارية</a> و<a href="../editing.html">دليل التعديل</a> و<a href="../danger.html">أماكن الخطر</a>.</div>
+<div class="grid3"><div class="card"><b>432</b><br>سطراً</div><div class="card"><b>23</b><br>دالة</div><div class="card"><b>4</b><br>صنف</div></div>
+<div class="note"><b>ملخّص المؤلف للملف (نصه الأصلي بالإنجليزية):</b> <span class="muted">A small, honest captive-portal simulator used by the self-test.</span></div>
+<p><a class="btn primary" href="../src/mockportal.html">افتح المصدر كاملاً مرقّماً</a></p>
+<h2 id="imports">الاستيرادات</h2><table class="t compact"><thead><tr><th>السطر</th><th>الاستيراد</th><th>لماذا</th></tr></thead><tbody>
+<tr><td class="mono">17</td><td class="mono">from __future__ import annotations</td><td>استيراد annotations من الوحدة __future__</td></tr>
+<tr><td class="mono">19</td><td class="mono">import hashlib</td><td>استيراد الوحدة hashlib من المكتبة</td></tr>
+<tr><td class="mono">20</td><td class="mono">import http.server</td><td>استيراد الوحدة http.server من المكتبة</td></tr>
+<tr><td class="mono">21</td><td class="mono">import random</td><td>استيراد الوحدة random من المكتبة</td></tr>
+<tr><td class="mono">22</td><td class="mono">import socket</td><td>استيراد الوحدة socket من المكتبة</td></tr>
+<tr><td class="mono">23</td><td class="mono">import socketserver</td><td>استيراد الوحدة socketserver من المكتبة</td></tr>
+<tr><td class="mono">24</td><td class="mono">import string</td><td>استيراد الوحدة string من المكتبة</td></tr>
+<tr><td class="mono">25</td><td class="mono">import threading</td><td>استيراد الوحدة threading من المكتبة</td></tr>
+<tr><td class="mono">26</td><td class="mono">import time</td><td>استيراد الوحدة time من المكتبة</td></tr>
+<tr><td class="mono">27</td><td class="mono">import urllib.parse</td><td>استيراد الوحدة urllib.parse من المكتبة</td></tr>
+<tr><td class="mono">28</td><td class="mono">import uuid</td><td>استيراد الوحدة uuid من المكتبة</td></tr>
+</tbody></table>
+<h2 id="vars">متغيرات وثوابت على مستوى الوحدة</h2><div class="scroll-x"><table class="t compact"><thead><tr><th>الاسم</th><th>السطر</th><th>القيمة</th><th>الشرح</th></tr></thead><tbody>
+<tr><td class="mono"><span class="tag var">CARD_PAGE</span></td><td class="mono"><a href="../src/mockportal.html#L31">31</a></td><td class="mono">&#x27;&lt;!DOCTYPE html&gt;&lt;html&gt;&lt;head&gt;&lt;title&gt;Hotspot Login&lt;/title&gt;\n&lt;script type</td><td></td></tr>
+<tr><td class="mono"><span class="tag var">BAN_PAGE</span></td><td class="mono"><a href="../src/mockportal.html#L55">55</a></td><td class="mono">&#x27;&lt;html&gt;&lt;head&gt;&lt;title&gt;Blocked&lt;/title&gt;&lt;/head&gt;&lt;body&gt;\n&lt;h1&gt;You are blocked&lt;</td><td></td></tr>
+<tr><td class="mono"><span class="tag var">RATE_PAGE</span></td><td class="mono"><a href="../src/mockportal.html#L60">60</a></td><td class="mono">&#x27;&lt;html&gt;&lt;head&gt;&lt;title&gt;Slow down&lt;/title&gt;&lt;/head&gt;&lt;body&gt;\n&lt;p&gt;rate limit exce</td><td></td></tr>
+<tr><td class="mono"><span class="tag var">SUCCESS_PAGE</span></td><td class="mono"><a href="../src/mockportal.html#L64">64</a></td><td class="mono">&#x27;&lt;!DOCTYPE html&gt;&lt;html&gt;&lt;head&gt;&lt;title&gt;Welcome&lt;/title&gt;&lt;/head&gt;\n&lt;body&gt;&lt;h1&gt;Y</td><td></td></tr>
+</tbody></table></div>
+<h2 id="classes">الأصناف</h2>
+<div class="sym head" id="c-PortalState"><span class="tag mod">صنف</span> <b>PortalState</b> <a class="tag api" href="../src/mockportal.html#L71">سطر 71</a><div>تعريف الصنف PortalState</div></div>
+<div class="sym body">دواله: <a href="#f-PortalState.__init__"><code>__init__</code></a> · <a href="#f-PortalState.bump"><code>bump</code></a> · <a href="#f-PortalState.snapshot"><code>snapshot</code></a></div>
+<div class="sym head" id="c-Handler"><span class="tag mod">صنف</span> <b>Handler</b> يرث من http.server.BaseHTTPRequestHandler <a class="tag api" href="../src/mockportal.html#L138">سطر 138</a><div>تعريف الصنف Handler يرث من http.server.BaseHTTPRequestHandler</div></div>
+<div class="sym body">دواله: <a href="#f-Handler.log_message"><code>log_message</code></a> · <a href="#f-Handler._reply"><code>_reply</code></a> · <a href="#f-Handler._raw_reply"><code>_raw_reply</code></a> · <a href="#f-Handler.do_GET"><code>do_GET</code></a> · <a href="#f-Handler.do_POST"><code>do_POST</code></a> · <a href="#f-Handler._handle"><code>_handle</code></a> · <a href="#f-Handler._internet_check"><code>_internet_check</code></a> · <a href="#f-Handler._session_id"><code>_session_id</code></a> · <a href="#f-Handler._bad_request"><code>_bad_request</code></a> · <a href="#f-Handler._is_valid"><code>_is_valid</code></a> · <a href="#f-Handler._chap"><code>_chap</code></a> · <a href="#f-Handler._login_page"><code>_login_page</code></a></div>
+<div class="sym head" id="c-_Server"><span class="tag mod">صنف</span> <b>_Server</b> يرث من socketserver.ThreadingTCPServer <a class="tag api" href="../src/mockportal.html#L384">سطر 384</a><div>تعريف الصنف _Server يرث من socketserver.ThreadingTCPServer</div></div>
+<div class="sym body">دواله: <a href="#f-_Server.server_bind"><code>server_bind</code></a></div>
+<div class="sym head" id="c-MockPortal"><span class="tag mod">صنف</span> <b>MockPortal</b> <a class="tag api" href="../src/mockportal.html#L393">سطر 393</a><div>تعريف الصنف MockPortal</div></div>
+<div class="sym body">دواله: <a href="#f-MockPortal.__init__"><code>__init__</code></a> · <a href="#f-MockPortal.url"><code>url</code></a> · <a href="#f-MockPortal.base"><code>base</code></a> · <a href="#f-MockPortal.start"><code>start</code></a> · <a href="#f-MockPortal.stop"><code>stop</code></a> · <a href="#f-MockPortal.__enter__"><code>__enter__</code></a> · <a href="#f-MockPortal.__exit__"><code>__exit__</code></a></div>
+<h2 id="funcs">الدوال — واحدة واحدة</h2>
+<div class="sym head" id="f-PortalState.__init__"><span class="tag fn">دالة</span> <b>PortalState.__init__(self, valid_cards, pass_mode, method, dynamic, ban_after, ban_seconds, rate_limit_after, drop_every, drop_after, chap, prefix, length, error_text, hide_success, require_session, reject_shape, success_page, unknown_success_page, global_online_login_page)</b>
+ <a class="tag api" href="../src/mockportal.html#L72">سطر 72–123</a>
+<div>تعريف الدالة __init__(self, valid_cards, pass_mode, method, dynamic, ban_after, ban_seconds, rate_limit_after, drop_every, drop_after, chap, prefix, length, error_text, hide_success, require_session, reject_shape, success_page, unknown_success_page, global_online_login_page)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>يُسند إلى</th><td><code>self.asked_cards, self.bad_requests, self.ban_after, self.ban_seconds, self.banned_at, self.bans, self.chap, self.chap_challenge, self.chap_id, self.drop_after, self.drop_every, self.dynamic, self.error_text, self.failures, self.global_online_login_page, self.hidden_successes…</code></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-PortalState.bump"><span class="tag fn">دالة</span> <b>PortalState.bump(self, field, n)</b>
+ <a class="tag api" href="../src/mockportal.html#L126">سطر 126–128</a>
+<div>-- العدّادات ---------------------------------------------------------</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-PortalState.snapshot"><span class="tag fn">دالة</span> <b>PortalState.snapshot(self)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/mockportal.html#L130">سطر 130–135</a>
+<div>تعريف الدالة snapshot(self) ترجع dict</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Handler.log_message"><span class="tag fn">دالة</span> <b>Handler.log_message(self, *args)</b>
+ <a class="tag api" href="../src/mockportal.html#L142">سطر 142–144</a>
+<div>تعريف الدالة log_message(self, *args)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Handler._reply"><span class="tag fn">دالة</span> <b>Handler._reply(self, code, body, headers)</b>
+ <a class="tag api" href="../src/mockportal.html#L147">سطر 147–154</a>
+<div>-- الأنابيب ---------------------------------------------------------</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>headers, self._new_cookie, sid</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/mockportal.html#f-Handler._raw_reply"><code>Handler._raw_reply</code></a><span class="muted">×1 سطر 154 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/mockportal.html#f-Handler._bad_request"><code>Handler._bad_request</code></a> <span class="muted">(mockportal.py:342)</span> <a href="../files/mockportal.html#f-Handler._handle"><code>Handler._handle</code></a> <span class="muted">(mockportal.py:220)</span> <a href="../files/mockportal.html#f-Handler._handle"><code>Handler._handle</code></a> <span class="muted">(mockportal.py:225)</span> <a href="../files/mockportal.html#f-Handler._handle"><code>Handler._handle</code></a> <span class="muted">(mockportal.py:226)</span> <a href="../files/mockportal.html#f-Handler._handle"><code>Handler._handle</code></a> <span class="muted">(mockportal.py:231)</span> <a href="../files/mockportal.html#f-Handler._handle"><code>Handler._handle</code></a> <span class="muted">(mockportal.py:232)</span> <a href="../files/mockportal.html#f-Handler._handle"><code>Handler._handle</code></a> <span class="muted">(mockportal.py:239)</span> <a href="../files/mockportal.html#f-Handler._handle"><code>Handler._handle</code></a> <span class="muted">(mockportal.py:258)</span> <a href="../files/mockportal.html#f-Handler._handle"><code>Handler._handle</code></a> <span class="muted">(mockportal.py:262)</span> <a href="../files/mockportal.html#f-Handler._handle"><code>Handler._handle</code></a> <span class="muted">(mockportal.py:286)</span> <a href="../files/mockportal.html#f-Handler._handle"><code>Handler._handle</code></a> <span class="muted">(mockportal.py:296)</span> <a href="../files/mockportal.html#f-Handler._handle"><code>Handler._handle</code></a> <span class="muted">(mockportal.py:300)</span> <a href="../files/mockportal.html#f-Handler._handle"><code>Handler._handle</code></a> <span class="muted">(mockportal.py:301)</span> <a href="../files/mockportal.html#f-Handler._internet_check"><code>Handler._internet_check</code></a> <span class="muted">(mockportal.py:313)</span> <span class="muted">+4 غيرها</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Handler._raw_reply"><span class="tag fn">دالة</span> <b>Handler._raw_reply(self, code, body, headers)</b>
+ <a class="tag api" href="../src/mockportal.html#L156">سطر 156–168</a>
+<div>تعريف الدالة _raw_reply(self, code, body, headers)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>يُسند إلى</th><td><code>payload</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/mockportal.html#f-Handler._reply"><code>Handler._reply</code></a> <span class="muted">(mockportal.py:154)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Handler.do_GET"><span class="tag fn">دالة</span> <b>Handler.do_GET(self)</b>
+ <a class="tag api" href="../src/mockportal.html#L170">سطر 170–171</a>
+<div>تعريف الدالة do_GET(self)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/mockportal.html#f-Handler._handle"><code>Handler._handle</code></a><span class="muted">×1 سطر 171 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Handler.do_POST"><span class="tag fn">دالة</span> <b>Handler.do_POST(self)</b>
+ <a class="tag api" href="../src/mockportal.html#L173">سطر 173–174</a>
+<div>تعريف الدالة do_POST(self)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/mockportal.html#f-Handler._handle"><code>Handler._handle</code></a><span class="muted">×1 سطر 174 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Handler._handle"><span class="tag fn">دالة</span> <b>Handler._handle(self, method)</b>
+ <a class="tag api" href="../src/mockportal.html#L176">سطر 176–305</a>
+<div>تعريف الدالة _handle(self, method)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>18 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>already_online, banned_at, base, body, card, drop, failures, fields, form, length, n, online, online_ips, parts, password, query…</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/mockportal.html#f-Handler._reply"><code>Handler._reply</code></a><span class="muted">×12 سطر 220 (نفس الملف)</span> · <a href="../files/mockportal.html#f-Handler._login_page"><code>Handler._login_page</code></a><span class="muted">×3 سطر 305 (نفس الملف)</span> · <a href="../files/mockportal.html#f-Handler._bad_request"><code>Handler._bad_request</code></a><span class="muted">×2 سطر 277 (نفس الملف)</span> · <a href="../files/mockportal.html#f-Handler._is_valid"><code>Handler._is_valid</code></a><span class="muted">×1 سطر 288 (نفس الملف)</span> · <a href="../files/mockportal.html#f-Handler._internet_check"><code>Handler._internet_check</code></a><span class="muted">×1 سطر 215 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/mockportal.html#f-Handler.do_GET"><code>Handler.do_GET</code></a> <span class="muted">(mockportal.py:171)</span> <a href="../files/mockportal.html#f-Handler.do_POST"><code>Handler.do_POST</code></a> <span class="muted">(mockportal.py:174)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Handler._internet_check"><span class="tag fn">دالة</span> <b>Handler._internet_check(self, path, base)</b>
+ <a class="tag api" href="../src/mockportal.html#L308">سطر 308–323</a>
+<div>-- مساعدات ---------------------------------------------------------</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>4 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>online, st</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/mockportal.html#f-Handler._reply"><code>Handler._reply</code></a><span class="muted">×4 سطر 322 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/mockportal.html#f-Handler._handle"><code>Handler._handle</code></a> <span class="muted">(mockportal.py:215)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Handler._session_id"><span class="tag fn">دالة</span> <b>Handler._session_id(self)</b>
+ <span class="muted">→ str</span>
+ <a class="tag api" href="../src/mockportal.html#L325">سطر 325–337</a>
+<div>تعريف الدالة _session_id(self) ترجع str <span class="muted">(نص المؤلف الأصلي في docstring: The portal&#x27;s session cookie: created on the first page view.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>raw, self._new_cookie, sid, st</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/mockportal.html#f-Handler._login_page"><code>Handler._login_page</code></a> <span class="muted">(mockportal.py:368)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Handler._bad_request"><span class="tag fn">دالة</span> <b>Handler._bad_request(self, why)</b>
+ <a class="tag api" href="../src/mockportal.html#L339">سطر 339–342</a>
+<div>تعريف الدالة _bad_request(self, why)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>st</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/mockportal.html#f-Handler._reply"><code>Handler._reply</code></a><span class="muted">×1 سطر 342 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/mockportal.html#f-Handler._handle"><code>Handler._handle</code></a> <span class="muted">(mockportal.py:270)</span> <a href="../files/mockportal.html#f-Handler._handle"><code>Handler._handle</code></a> <span class="muted">(mockportal.py:277)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Handler._is_valid"><span class="tag fn">دالة</span> <b>Handler._is_valid(self, card, password)</b>
+ <span class="muted">→ bool</span>
+ <a class="tag api" href="../src/mockportal.html#L344">سطر 344–358</a>
+<div>تعريف الدالة _is_valid(self, card, password) ترجع bool</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>7 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>st</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/mockportal.html#f-Handler._chap"><code>Handler._chap</code></a><span class="muted">×2 سطر 357 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/mockportal.html#f-Handler._handle"><code>Handler._handle</code></a> <span class="muted">(mockportal.py:288)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Handler._chap"><span class="tag fn">دالة</span> <b>Handler._chap(self, raw)</b>
+ <span class="muted">→ str</span>
+ <a class="tag api" href="../src/mockportal.html#L360">سطر 360–362</a>
+<div>تعريف الدالة _chap(self, raw) ترجع str</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>st</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/mockportal.html#f-Handler._is_valid"><code>Handler._is_valid</code></a> <span class="muted">(mockportal.py:354)</span> <a href="../files/mockportal.html#f-Handler._is_valid"><code>Handler._is_valid</code></a> <span class="muted">(mockportal.py:357)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Handler._login_page"><span class="tag fn">دالة</span> <b>Handler._login_page(self, base, fields, error)</b>
+ <a class="tag api" href="../src/mockportal.html#L364">سطر 364–381</a>
+<div>تعريف الدالة _login_page(self, base, fields, error)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>html, message, nonce, sid, st, tok_field</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/mockportal.html#f-Handler._reply"><code>Handler._reply</code></a><span class="muted">×1 سطر 381 (نفس الملف)</span> · <a href="../files/mockportal.html#f-Handler._session_id"><code>Handler._session_id</code></a><span class="muted">×1 سطر 368 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/mockportal.html#f-Handler._handle"><code>Handler._handle</code></a> <span class="muted">(mockportal.py:243)</span> <a href="../files/mockportal.html#f-Handler._handle"><code>Handler._handle</code></a> <span class="muted">(mockportal.py:294)</span> <a href="../files/mockportal.html#f-Handler._handle"><code>Handler._handle</code></a> <span class="muted">(mockportal.py:305)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-_Server.server_bind"><span class="tag fn">دالة</span> <b>_Server.server_bind(self)</b>
+ <a class="tag api" href="../src/mockportal.html#L387">سطر 387–390</a>
+<div>تعريف الدالة server_bind(self)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-MockPortal.__init__"><span class="tag fn">دالة</span> <b>MockPortal.__init__(self, port, **kwargs)</b>
+ <a class="tag api" href="../src/mockportal.html#L396">سطر 396–403</a>
+<div>تعريف الدالة __init__(self, port, **kwargs)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>يُسند إلى</th><td><code>daemon_threads, self.httpd, self.port, self.state, self.thread, state, verbose</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/mockportal.html#f-PortalState"><code>PortalState</code></a><span class="muted">×1 سطر 397 (نفس الملف)</span> · <a href="../files/mockportal.html#f-_Server"><code>_Server</code></a><span class="muted">×1 سطر 398 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-MockPortal.url"><span class="tag fn">دالة</span> <b>MockPortal.url(self)</b>
+ <span class="muted">→ str</span>
+ <span class="tag var">@property</span>
+ <a class="tag api" href="../src/mockportal.html#L406">سطر 406–407</a>
+<div>تعريف الدالة url(self) ترجع str</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-MockPortal.base"><span class="tag fn">دالة</span> <b>MockPortal.base(self)</b>
+ <span class="muted">→ str</span>
+ <span class="tag var">@property</span>
+ <a class="tag api" href="../src/mockportal.html#L410">سطر 410–411</a>
+<div>تعريف الدالة base(self) ترجع str</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-MockPortal.start"><span class="tag fn">دالة</span> <b>MockPortal.start(self)</b>
+ <a class="tag api" href="../src/mockportal.html#L413">سطر 413–417</a>
+<div>تعريف الدالة start(self)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>self.thread</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/mockportal.html#f-MockPortal.start"><code>MockPortal.start</code></a><span class="muted">×1 سطر 416 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/mockportal.html#f-MockPortal.__enter__"><code>MockPortal.__enter__</code></a> <span class="muted">(mockportal.py:427)</span> <a href="../files/mockportal.html#f-MockPortal.start"><code>MockPortal.start</code></a> <span class="muted">(mockportal.py:416)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-MockPortal.stop"><span class="tag fn">دالة</span> <b>MockPortal.stop(self)</b>
+ <a class="tag api" href="../src/mockportal.html#L419">سطر 419–424</a>
+<div>تعريف الدالة stop(self)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>من يناديها</th><td><a href="../files/mockportal.html#f-MockPortal.__exit__"><code>MockPortal.__exit__</code></a> <span class="muted">(mockportal.py:430)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-MockPortal.__enter__"><span class="tag fn">دالة</span> <b>MockPortal.__enter__(self)</b>
+ <a class="tag api" href="../src/mockportal.html#L426">سطر 426–427</a>
+<div>تعريف الدالة __enter__(self)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/mockportal.html#f-MockPortal.start"><code>MockPortal.start</code></a><span class="muted">×1 سطر 427 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-MockPortal.__exit__"><span class="tag fn">دالة</span> <b>MockPortal.__exit__(self, *exc)</b>
+ <a class="tag api" href="../src/mockportal.html#L429">سطر 429–431</a>
+<div>تعريف الدالة __exit__(self, *exc)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/mockportal.html#f-MockPortal.stop"><code>MockPortal.stop</code></a><span class="muted">×1 سطر 430 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<footer class="docfoot">صفحة مولّدة آلياً من مصدر الكود · KiraPass —
+<code>files</code> · 2026-10-01 02:26</footer>
+</main>
+</div>
+<script src="../assets/docs.js"></script>
+<script>KPInit("files");</script>
+</body>
+</html>

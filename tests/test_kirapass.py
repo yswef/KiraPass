@@ -129,6 +129,60 @@ class MaskingTests(unittest.TestCase):
         fr = "<html><body>trop de tentatives de connexion</body></html>"
         self.assertTrue(fingerprint.find_phrase(fr.lower(), config.BAN_WORDS))
 
+    def test_block_word_printed_on_the_login_page_is_not_a_ban(self):
+        """The page furniture of a real portal, in a test.
+
+        "شبكة تواصل نت" keeps `window.location = "blocked.html"` behind a
+        browser-side counter, so the literal sits in every reply it sends.
+        The judge used to call the first wrong card BANNED, and one BANNED is
+        a hard stop: the run died after a single attempt with the rest of the
+        space dropped.
+        """
+        login = ("<html><head><title>portal</title><script>"
+                 'function checkCookie(){var u=getCookie("username");'
+                 'if (u >= 1000) { window.location = "blocked.html"; }}</script>'
+                 "</head><body>"
+                 '<form action="http://t.com/login" method="post">'
+                 '<input name="username"><input name="password" type="hidden">'
+                 "</form></body></html>")
+        wrong = login.replace("</form>",
+                              '<p class="err">بيانات غير صحيحة</p></form>')
+        fp = fingerprint.Fingerprinter.learn([_FakeReply(wrong),
+                                              _FakeReply(wrong)],
+                                             login_reply=_FakeReply(login))
+        judge = fingerprint.Judge(fp, "http://t.com/login")
+        self.assertIn("blocked.html", judge.ignored_ban_phrases)
+        v = judge.classify(_FakeReply(wrong), submitted=["0106557600", ""])
+        self.assertEqual(v.code, "REJECTED", v.as_dict())
+        # The two code paths that read a reply must agree about the same page:
+        # calibration already ignored this word, so the judge must too.
+        stop, _word, ev = engine._is_protective_reply(_FakeReply(wrong),
+                                                      "http://t.com/login")
+        self.assertFalse(stop, ev)
+
+    def test_a_block_word_that_appears_later_is_still_a_ban(self):
+        """Excusing page furniture must not blind the judge to a real lockout."""
+        login = ("<html><body><form action='http://t.com/login' method='post'>"
+                 "<input name='username'><input name='password'></form>"
+                 "</body></html>")
+        fp = fingerprint.Fingerprinter.learn([_FakeReply(login),
+                                              _FakeReply(login)],
+                                             login_reply=_FakeReply(login))
+        judge = fingerprint.Judge(fp, "http://t.com/login")
+        self.assertEqual(judge.ignored_ban_phrases, [])
+        blocked = ("<html><body><h1>تم حظرك</h1><p>جهازك محظور مؤقتا</p>"
+                   "</body></html>")
+        v = judge.classify(_FakeReply(blocked))
+        self.assertEqual(v.code, "BANNED", v.as_dict())
+        self.assertEqual(v.reason, "ban_page")
+
+    def test_report_names_the_block_words_it_ignored(self):
+        cal = engine.Calibration()
+        cal.fingerprint = fingerprint.Fingerprinter()
+        cal.fingerprint.login_text = '<script>window.location = "blocked.html";</script>'
+        fp_dict = cal.as_dict()["fingerprint"]
+        self.assertIn("blocked.html", fp_dict["ignored_ban_words"])
+
     def test_a_redirect_inside_the_portal_is_not_a_hit(self):
         """Some routers bounce you between their own pages - every bounce
         used to be reported as "the router let us out"."""

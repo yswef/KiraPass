@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>دليل التعديل وأسلوب الكتابة · KiraPass</title>
+<link rel="stylesheet" href="assets/docs.css">
+</head>
+<body>
+<div id="kp-layout">
+<main class="doc">
+
+<h1>دليل التعديل وأسلوب الكتابة</h1>
+<p class="lead">
+  هذه الصفحة تجيب على ثلاثة أسئلة: <b>ما الذي أستطيع تعديله؟</b>،
+  <b>كيف أعدّله خطوة بخطوة؟</b>، و<b>ما أسلوب الكتابة المتّبع في هذا المشروع؟</b>
+  لكل مهمة شائعة «وصفة» جاهزة. وقبل أن تلمس أي سطر حساس اقرأ
+  <a href="danger.html">أماكن الخطر</a>.
+</p>
+
+<div class="toc card"><b>محتويات الصفحة</b><div class="toc-auto"></div></div>
+
+<h2 id="levels">مستويات التعديل الأربعة</h2>
+<table class="t">
+  <thead><tr><th>المستوى</th><th>ماذا يشمل</th><th>الخطورة</th><th>ماذا يلزم بعده</th></tr></thead>
+  <tbody>
+    <tr><td><b>1 · نصوص وألوان</b></td>
+        <td>قاموس <code>I18N</code> في <code>ui.js</code>، نصوص <code>data-i18n</code> في <code>ui.html</code>،
+            متغيرات <code>:root</code> في <code>ui.css</code>، البانر في <code>cli.py</code></td>
+        <td><span class="pill-risk r-low">آمن</span></td>
+        <td>فتح الصفحة والتأكد من اللغتين والاتجاهين</td></tr>
+    <tr><td><b>2 · قيم وحدود</b></td>
+        <td>ثوابت <code>config.py</code>، القيم الافتراضية في <code>store.new_profile()</code>
+            و<code>presets</code> في <code>server.py</code>، قيم الحقول في <code>ui.html</code></td>
+        <td><span class="pill-risk r-med">متوسط</span></td>
+        <td><code>python3 -m unittest discover -s tests</code></td></tr>
+    <tr><td><b>3 · قوائم وسلوك محدود</b></td>
+        <td>قوائم الكلمات (<code>REJECT_WORDS</code>/<code>BAN_WORDS</code>/<code>ACCEPT_WORDS</code>)،
+            إضافة <code>pass_mode</code>، إضافة <code>charset</code>، إضافة نقطة API جديدة،
+            إضافة حدث جديد</td>
+        <td><span class="pill-risk r-med">متوسط</span></td>
+        <td>الاختبارات + <code>--selftest</code> + تجربة على <code>tools/practice_portal.py</code></td></tr>
+    <tr><td><b>4 · منطق القرار</b></td>
+        <td><code>Judge.classify</code>، <code>Fingerprinter</code>، <code>calibrate</code>،
+            <code>Engine._attempt</code>، <code>_check_stop_rules</code>، التنقيح (redaction)</td>
+        <td><span class="pill-risk r-high">عالٍ</span></td>
+        <td>كل ما سبق + <code>tools/checks/web_e2e.py</code> + إضافة اختبار يغطّي تعديلك</td></tr>
+  </tbody>
+</table>
+
+<h2 id="what-can-i-edit">جدول «أين أعدّل هذا الشيء؟»</h2>
+<div class="scroll-x">
+<table class="t compact">
+  <thead><tr><th>أريد تغيير…</th><th>الملف</th><th>المكان بالضبط</th><th>ملاحظة</th></tr></thead>
+  <tbody>
+    <tr><td>اسم الأداة</td><td class="mono">config.py</td><td><code>APP_NAME</code></td><td>يظهر في البانر والتقرير وعنوان الصفحة</td></tr>
+    <tr><td>رقم الإصدار</td><td class="mono">config.py</td><td><code>VERSION</code></td><td>يظهر في <code>--version</code> و<code>/api/meta</code> وشارة <code>v…</code></td></tr>
+    <tr><td>المنفذ الافتراضي</td><td class="mono">cli.py</td><td><code>--port … 8770</code></td><td>يوجد أيضاً في <code>docs</code> والـREADME</td></tr>
+    <tr><td>عدد المسارات الافتراضي</td><td class="mono">config.py</td><td><code>DEFAULT_THREADS</code></td><td>والإعدادات الجاهزة في <code>server.py: /api/meta presets</code></td></tr>
+    <tr><td>عدد المحاولات الافتراضي</td><td class="mono">config.py</td><td><code>DEFAULT_ATTEMPTS</code></td><td>وكذلك <code>value="2000"</code> في <code>ui.html</code></td></tr>
+    <tr><td>حد المسارات الأقصى</td><td class="mono">config.py</td><td><code>MAX_THREADS</code></td><td>و<code>max="200"</code> في <code>ui.html</code></td></tr>
+    <tr><td>مَهلة الاتصال/القراءة</td><td class="mono">config.py</td><td><code>CONNECT_TIMEOUT</code> · <code>READ_TIMEOUT</code> · <code>ATTACK_READ_TIMEOUT</code></td><td>تُقرأ من متغيرات بيئة وتُحَدّ بين 0.5 و120</td></tr>
+    <tr><td>التحقق من شهادة TLS</td><td class="mono">config.py</td><td><code>VERIFY_TLS = False</code></td><td><span class="pill-risk r-high">خطر</span> بوابات الأسر تستخدم شهادات موقّعة ذاتياً</td></tr>
+    <tr><td>كلمات الرفض</td><td class="mono">config.py</td><td><code>REJECT_WORDS</code></td><td>تُطابق <b>كلمة كاملة</b>؛ لا تضف كلمات تظهر في صفحة الحالة</td></tr>
+    <tr><td>كلمات الحجب</td><td class="mono">config.py</td><td><code>BAN_WORDS</code></td><td>لا تُستخدم وحدها إن كان نموذج الدخول ما زال ظاهراً</td></tr>
+    <tr><td>كلمات القبول</td><td class="mono">config.py</td><td><code>ACCEPT_WORDS</code></td><td>تُستبعد تلقائياً إن وُجدت في صفحة الرفض/الدخول</td></tr>
+    <tr><td>مواقع فحص الإنترنت</td><td class="mono">config.py</td><td><code>INTERNET_CHECKS</code></td><td>أو متغير <code>KIRAPASS_INTERNET_CHECKS</code> أو من الصفحة</td></tr>
+    <tr><td>علامات الخروج من البوابة</td><td class="mono">config.py</td><td><code>EXIT_HOST_MARKERS</code></td><td>تُطابق نصاً فرعياً في <code>Location</code></td></tr>
+    <tr><td>عدد بطاقات التجربة</td><td class="mono">config.py</td><td><code>CALIBRATION_PROBES = 3</code></td><td>كل واحدة فشل دخول عند الراوتر — لا ترفعها بلا سبب</td></tr>
+    <tr><td>حد محاولات البطاقة المعروفة</td><td class="mono">config.py</td><td><code>KNOWN_CARD_TRIAL_LIMIT = 8</code></td><td><span class="pill-risk r-high">خطر</span> رفعه يقربك من الحجب</td></tr>
+    <tr><td>حد فحص الحجب</td><td class="mono">config.py</td><td><code>LOCKOUT_PROBE_MAX_FAILURES = 8</code></td><td>الواجهة ترسل 8 أصلاً</td></tr>
+    <tr><td>حد عيّنات التشخيص</td><td class="mono">config.py</td><td><code>DIAGNOSTIC_SAMPLE_LIMIT = 8</code></td><td>—</td></tr>
+    <tr><td>إعادة محاولات الكرت</td><td class="mono">config.py</td><td><code>MAX_CARD_RETRIES = 2</code></td><td>للطلبات التي <b>لم يصل لها رد</b> فقط</td></tr>
+    <tr><td>تحديث الجلسة كل كم محاولة</td><td class="mono">config.py</td><td><code>WARMUP_EVERY = 25</code></td><td>أو <code>KIRAPASS_WARMUP_EVERY</code>؛ صفر = مرة واحدة</td></tr>
+    <tr><td>إيقاف ضبط الوتيرة التلقائي</td><td class="mono">config.py</td><td><code>AUTO_PACE</code></td><td><code>KIRAPASS_AUTO_PACE=0</code></td></tr>
+    <tr><td>حدود تحذيرات الواجهة</td><td class="mono">config.py</td><td><code>WARN_SPACE</code> · <code>WARN_THREADS</code></td><td>تحذير فقط، لا يمنع</td></tr>
+    <tr><td>مدة الاحتفاظ بالتقارير</td><td class="mono">config.py</td><td><code>REPORT_RETENTION_DAYS = 30</code></td><td>0 = تعطيل الحذف التلقائي</td></tr>
+    <tr><td>مجلد البيانات</td><td class="mono">config.py</td><td><code>DATA_DIR</code> عبر <code>set_data_dir()</code></td><td>لا تعدّل المسارات يدوياً؛ استخدم الدالة</td></tr>
+    <tr><td>هوية المتصفح الافتراضية</td><td class="mono">config.py</td><td><code>USER_AGENT</code> · <code>BASE_HEADERS</code></td><td>و<code>UA_PRESETS</code> في <code>ui.js</code> لأندرويد/آيفون</td></tr>
+    <tr><td>عدد التحويلات الأقصى</td><td class="mono">httpclient.py</td><td><code>MAX_REDIRECTS = 8</code></td><td>يُستخدم أيضاً في <code>capture._exchange</code></td></tr>
+    <tr><td>أبجديات الكروت</td><td class="mono">store.py</td><td><code>CHARSETS</code></td><td>+ مفتاح ترجمة <code>cs_&lt;key&gt;</code> في <code>ui.js</code></td></tr>
+    <tr><td>أوضاع كلمة المرور</td><td class="mono">store.py</td><td><code>PASS_MODES</code></td><td>+ <code>engine.password_value</code> + <code>capture.KNOWN_PASS_MODES</code> + <code>pm_&lt;mode&gt;</code></td></tr>
+    <tr><td>حقول البروفايل</td><td class="mono">store.py</td><td><code>new_profile()</code></td><td><span class="pill-risk r-high">خطر</span> أي حقل جديد يجب أن يُضاف هنا وإلا أسقطه <code>migrate()</code></td></tr>
+    <tr><td>مسارات API</td><td class="mono">web/server.py</td><td><code>_api_get</code> / <code>_api_post</code></td><td>سلاسل <code>if route == …</code></td></tr>
+    <tr><td>الإعدادات الجاهزة للتشغيل</td><td class="mono">web/server.py</td><td><code>presets</code> داخل <code>/api/meta</code></td><td>+ <code>preset_&lt;id&gt;</code> في <code>ui.js</code></td></tr>
+    <tr><td>أي نص في الواجهة</td><td class="mono">web/ui.js</td><td><code>I18N.ar</code> و<code>I18N.en</code></td><td>انظر <a href="texts.html">النصوص المعروضة</a></td></tr>
+    <tr><td>ترتيب الخطوات/اللوحات</td><td class="mono">web/ui.html</td><td><code>&lt;section class="panel" id="panel-…"&gt;</code></td><td>+ <code>steps</code> في <code>/api/meta</code></td></tr>
+    <tr><td>الألوان والأحجام</td><td class="mono">web/ui.css</td><td><code>:root</code> ثم الأصناف</td><td>لا تغيّر أسماء أصناف <code>.v-*</code> (مرتبطة بأكواد الأحكام)</td></tr>
+    <tr><td>رسائل التنقيح/السرية</td><td class="mono">capture.py</td><td><code>SECRET_NAME_RE</code> · <code>TOKEN_NAME_RE</code> · <code>STANDARD_HEADERS</code> · <code>SKIP_WORDS</code></td><td><span class="pill-risk r-high">خطر</span> توسيعها آمن، تضييقها يسرّب أسراراً</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="recipes">وصفات جاهزة (خطوة بخطوة)</h2>
+
+<h3>وصفة 1 · تغيير نص معروض في الواجهة</h3>
+<ol>
+  <li>ابحث عن النص في <a href="texts.html">صفحة النصوص</a> لتعرف <b>مفتاحه</b> و<b>سطره</b>.</li>
+  <li>افتح <code>kirapass/web/ui.js</code> وغيّر القيمة داخل <code>I18N.ar</code>
+      <b>و</b> داخل <code>I18N.en</code> (نفس المفتاح).</li>
+  <li>إن كان النص مكتوباً أيضاً كنص احتياطي في <code>ui.html</code>
+      (داخل الوسم الذي يحمل <code>data-i18n="نفس المفتاح"</code>) غيّره هناك كذلك.</li>
+  <li>أعد تحميل الصفحة (Ctrl+F5). لا يوجد بناء ولا تخزين مؤقت للـJS سوى ترويسة
+      <code>Cache-Control: no-store</code> التي يرسلها السيرفر أصلاً.</li>
+</ol>
+<div class="note">
+  <b>قاعدة:</b> لا تضع نصاً عربياً مباشراً داخل دوال <code>ui.js</code>.
+  استخدم <code>t("مفتاح")</code> دائماً حتى تعمل اللغتان. الاستثناءات الحالية
+  (نصوص مكتوبة مباشرة) موثّقة في <a href="texts.html">صفحة النصوص</a>.
+</div>
+
+<h3>وصفة 2 · إضافة مفتاح ترجمة جديد</h3>
+<ol>
+  <li>أضف المفتاح في <code>I18N.ar</code> و<code>I18N.en</code> في <b>نفس الموضع النسبي</b>
+      (المفاتيح مرتبة حسب الشاشة: واجهة ← فحص ← صيغة ← تشغيل ← نتائج ← أحكام ← أسباب ← شبكة ← توقف ← تباطؤ ← معايرة ← مشاكل ← أوضاع ← أبجديات).</li>
+  <li>في <code>ui.html</code>: <code>&lt;span data-i18n="مفتاحك"&gt;النص الاحتياطي&lt;/span&gt;</code>
+      أو للـplaceholder: <code>data-i18n-placeholder="مفتاحك"</code>.</li>
+  <li>في <code>ui.js</code> داخل كود: <code>t("مفتاحك", "احتياطي")</code>.</li>
+  <li>للتحقق: افتح <a href="texts.html">texts.html</a> بعد إعادة التوليد —
+      يعرض المفاتيح الموجودة في لغة والناقصة في الأخرى.</li>
+</ol>
+
+<h3>وصفة 3 · إضافة كلمة رفض/حجب/قبول جديدة</h3>
+<ol>
+  <li>افتح <code>kirapass/config.py</code> وأضف العبارة إلى <code>REJECT_WORDS</code>
+      أو <code>BAN_WORDS</code> أو <code>ACCEPT_WORDS</code>.</li>
+  <li>اجعلها <b>قصيرة وكاملة</b>: المطابقة تتم على حدود كلمة
+      (<code>(?&lt;![\w\-])…(?![\w\-])</code> في <code>fingerprint._phrase_re</code>)،
+      فلا تضف نقطة أو فاصلة في آخرها.</li>
+  <li>تأكد أنها <b>لا تظهر</b> في صفحة الدخول العادية ولا في صفحة الحالة؛
+      وإلا ستُصنَّف كل صفحة رفضاً أو كل صفحة نجاحاً.
+      (<code>Judge.__init__</code> يستبعد تلقائياً ما وُجد في صفحة الرفض/الدخول، لكن لا تعتمد على ذلك وحده.)</li>
+  <li>أضف اختباراً في <code>tests/test_kirapass.py</code> يبني استجابة فيها الكلمة
+      ويتأكد من الحكم المتوقع.</li>
+  <li>شغّل <code>python3 -m unittest discover -s tests</code> و<code>python3 KiraPass.py --selftest</code>.</li>
+</ol>
+
+<h3>وصفة 4 · إضافة وضع كلمة مرور جديد (<code>pass_mode</code>)</h3>
+<p>يلزم تعديل <b>خمسة أماكن</b> — نسيان واحد منها يُنتج وضعاً يظهر في القائمة ولا يعمل:</p>
+<table class="t compact">
+  <thead><tr><th>#</th><th>الملف</th><th>ماذا تضيف</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td class="mono">store.py</td><td>الاسم في <code>PASS_MODES</code> (يصل للواجهة عبر <code>/api/meta</code> ويُبني منه <code>&lt;select&gt;</code>)</td></tr>
+    <tr><td>2</td><td class="mono">engine.py</td><td>فرع في <code>password_value()</code> يُرجع القيمة (أو <code>None</code> لعدم إرسال الحقل)</td></tr>
+    <tr><td>3</td><td class="mono">engine.py</td><td>الاسم في قائمة <code>modes</code> داخل <code>_tune_with_known_card()</code> إن أردت أن يُجرَّب تلقائياً</td></tr>
+    <tr><td>4</td><td class="mono">capture.py</td><td>الاسم في <code>KNOWN_PASS_MODES</code> + منطق التعرف عليه في <code>infer_pass_mode()</code></td></tr>
+    <tr><td>5</td><td class="mono">web/ui.js</td><td>مفتاحا الترجمة <code>pm_&lt;mode&gt;</code> في <code>ar</code> و<code>en</code></td></tr>
+  </tbody>
+</table>
+<p>ثم اختبر: <code>tests/test_kirapass.py</code> فيه اختبارات على <code>password_value</code> لكل وضع.</p>
+
+<h3>وصفة 5 · إضافة أبجدية (charset) جديدة</h3>
+<ol>
+  <li><code>store.CHARSETS</code>: أضف <code>"اسم": "المحارف"</code>.</li>
+  <li><code>ui.js</code>: أضف <code>cs_اسم</code> في <code>ar</code> و<code>en</code>.</li>
+  <li><code>ui.js · buildSelects()</code>: إن أضفت اسماً خارج القائمة المعروفة فأضفه إلى
+      مصفوفة الأسماء المسموحة (السطر الذي يتحقق من <code>cs.value</code>) وإلا أُعيد الاختيار إلى <code>digits</code>.</li>
+</ol>
+
+<h3>وصفة 6 · إضافة نقطة API جديدة</h3>
+<ol>
+  <li>في <code>web/server.py</code>: أضف فرعاً في <code>_api_get</code> أو <code>_api_post</code>
+      قبل السطر الأخير <code>return self._error("not_found", 404)</code>.</li>
+  <li>إن كانت المهمة بطيئة (ثانية أو أكثر) استخدم نمط المهام:
+<pre><code>job = srv.submit("اسم_المهمة", lambda: engine.دالتك(prof))
+return self._json({"ok": True, "job": job.as_dict()})</code></pre>
+      والواجهة تستطلعها بـ <code>waitJob(job.id)</code> عبر <code>GET /api/job?id=</code>.</li>
+  <li>أي قيمة تدخل من المستخدم: حوّلها بـ <code>int()/float()</code> داخل
+      <code>try</code> وحدّد لها مدى (كما في <code>/api/settings</code>).</li>
+  <li>أي قيمة تخرج: مرّرها على دالة تنقيح إن كانت قد تحتوي سرّاً.</li>
+  <li>في <code>ui.js</code>: <code>await api("/api/مسارك", {…})</code> — الدالة تضيف الرمز
+      وتعالج 401 وانقطاع السيرفر.</li>
+  <li>حدّث <a href="api.html">api.html</a> بإعادة توليد التوثيق.</li>
+</ol>
+<div class="danger">
+  <b>لا تضف نقطة API تتجاوز حجباً أو ترسل طلبات بدون تأكيد المستخدم.</b>
+  كل النقاط التي ترسل طلبات إلى الراوتر تُستدعى من زر صريح في الصفحة.
+</div>
+
+<h3>وصفة 7 · إضافة حقل جديد إلى البروفايل</h3>
+<ol>
+  <li><code>store.new_profile()</code>: أضف الحقل بقيمته الافتراضية.
+      <b>هذه الخطوة إلزامية</b>: <code>migrate()</code> ينسخ فقط المفاتيح الموجودة في
+      <code>new_profile()</code>، فأي حقل غير مُضاف هنا <b>يُسقط بصمت</b> عند الحفظ.</li>
+  <li>إن كان الحقل يؤثر في صحة البروفايل أضف فحصه في <code>store.validate()</code>
+      (بمفتاح آلية مثل <code>"my_field_missing"</code>) + ترجمة <code>prob_my_field_missing</code>.</li>
+  <li>إن كان جزءاً من «شكل الطلب» أضفه إلى <code>engine.safe_profile_snapshot()</code>
+      (والتنقيح إن كان سرّاً) وإلى <code>requestSettingsSignature()</code> في <code>ui.js</code>
+      حتى يُطلب اختبار جديد عند تغييره.</li>
+  <li>ارفع <code>SCHEMA</code> في <code>store.py</code> إن غيّرت بنية الحفظ،
+      وتأكد أن <code>migrate()</code> يقرأ البروفايلات القديمة.</li>
+  <li>أضف الحقل إلى نموذج في <code>ui.html</code> + <code>profileFromForm()</code>
+      و<code>fillFormFromProfile()</code> في <code>ui.js</code> (الاثنان معاً وإلا ضاعت القيمة).</li>
+  <li>أضف اختبار ترحيل في <code>tests/test_kirapass.py</code>.</li>
+</ol>
+
+<h3>وصفة 8 · إضافة سبب توقف أو حكم جديد</h3>
+<ol>
+  <li>الحكم: أنشئ <code>Verdict("الاسم", "السبب", الثقة, data={…}, evidence=resp.as_dict())</code>
+      داخل <code>Judge.classify</code> في الموضع الصحيح من شجرة القرار.</li>
+  <li>أضف الترجمة: <code>v_الاسم</code> و<code>r_السبب</code> في <code>I18N</code>،
+      ولوناً <code>.v-الاسم</code> في <code>ui.css</code>، وأضف الاسم إلى مصفوفة
+      <code>order</code> داخل <code>renderStatus()</code> إن أردته في شرائح العدّادات.</li>
+  <li>سبب توقف: <code>self.stop("سببي")</code> في المحرك، ثم أضف
+      <code>stop_سببي</code> في <code>I18N</code>، وقرّر هل يحتاج تأكيداً يدوياً
+      (أضفه إلى <code>requiresManualClearance</code> في <code>renderStop()</code>).</li>
+  <li><b>لا تنسَ</b>: أي كود حكم جديد يبدأ بـ <code>ACCEPTED</code> سيُعتبر إصابة
+      (<code>Verdict.is_hit</code>) وقد يوقف التشغيل — فكّر مرتين.</li>
+</ol>
+
+<h3>وصفة 9 · إضافة خيار سطر أوامر</h3>
+<ol>
+  <li><code>cli.build_parser()</code>: <code>p.add_argument("--خياري", …)</code> مع <code>help</code> واضح.</li>
+  <li><code>cli.main()</code>: عالج الخيار في المكان الصحيح:
+      «اخرج فوراً» قبل إنشاء <code>Store</code>، و«يؤثر على السيرفر» قبل <code>serve()</code>.</li>
+  <li>إن كان له متغير بيئة مطابق اتبع النمط: <code>default=os.environ.get("KIRAPASS_…", …)</code>.</li>
+  <li>حدّث <a href="env.html">env.html</a> و<a href="user.html">user.html</a> (جدول الأوامر) وREADME.</li>
+</ol>
+
+<h3>وصفة 10 · إضافة اختبار</h3>
+<pre><code># في tests/test_kirapass.py داخل أي TestCase
+def test_اسم_واضح(self):
+    with MockPortal(valid_cards={"0242"}, pass_mode="empty") as portal:
+        info = scan(portal.url)
+        p = make_profile(portal.url, portal_info=info)
+        st, _eng = run_engine(p, attempts=50, threads=3,
+                              checks=mock_checks(portal))
+        self.assertEqual(st["counters"].get("ACCEPTED_VERIFIED", 0), 1)</code></pre>
+<ul>
+  <li>استخدم <code>MockPortal</code> دائماً — لا شبكة حقيقية في الاختبارات.</li>
+  <li><code>mock_checks(portal)</code> تجعل فحص الإنترنت يشير إلى الراوتر الوهمي نفسه.</li>
+  <li>لإضافة سيناريو يظهر في <code>--selftest</code>: اكتب <code>t_اسمه()</code>
+      تُرجع <code>Result(الاسم, النجاح, التفاصيل)</code> وأضفه إلى <code>SCENARIOS</code>.</li>
+  <li>شغّل: <code>python3 -m unittest discover -s tests -v</code>.</li>
+</ul>
+
+<h2 id="style">أسلوب الكتابة في هذا المشروع</h2>
+
+<h3>1 · بايثون</h3>
+<table class="t">
+  <thead><tr><th>القاعدة</th><th>المثال</th><th>لماذا</th></tr></thead>
+  <tbody>
+    <tr><td>كل وحدة تبدأ بـ docstring يشرح <b>السبب</b> لا الوصف</td>
+        <td><code>"""A small HTTP client built only on the standard library. Why not requests? …"""</code></td>
+        <td>القارئ يحتاج أن يعرف لماذا وُجد الملف</td></tr>
+    <tr><td><code>from __future__ import annotations</code> في أول كل وحدة</td>
+        <td>—</td><td>تلميحات أنواع حديثة على بايثون 3.8</td></tr>
+    <tr><td>تلميحات أنواع على التوقيعات العامة</td>
+        <td><code>def validate(p: dict) -&gt; list:</code></td><td>توثيق حي</td></tr>
+    <tr><td>لا استيراد ثقيل في أعلى الوحدة إن لم يلزم دائماً</td>
+        <td><code>from . import selftest</code> داخل <code>cmd_selftest()</code></td>
+        <td>إقلاع أسرع وتجنّب دوائر الاستيراد</td></tr>
+    <tr><td>الاستثناءات العامة مقصودة ومعلّمة</td>
+        <td><code>except Exception as exc:  # noqa: BLE001</code></td>
+        <td>الأداة لا تموت بسبب رد غريب</td></tr>
+    <tr><td>المفاتيح الآلية بالإنجليزية الصغيرة مع شرطيات سفلية</td>
+        <td><code>same_as_rejection_page_exact</code></td>
+        <td>تُرجم في مكان واحد فقط</td></tr>
+    <tr><td>التعليق يشرح <b>الدرس</b> الذي وُلد منه السطر</td>
+        <td><code># a bare session for each card loses the cookie and CSRF token…</code></td>
+        <td>يمنع إعادة ارتكاب العطل القديم</td></tr>
+    <tr><td>لا أرقام سحرية: كل رقم ثابت في <code>config.py</code> باسم</td>
+        <td><code>config.KNOWN_CARD_TRIAL_LIMIT</code></td><td>يمكن ضبطه وتوثيقه</td></tr>
+    <tr><td>الدوال النقية منفصلة عن الدوال ذات الأثر</td>
+        <td><code>store.decode_card</code> (نقية) مقابل <code>Store.save</code> (قرص)</td>
+        <td>سهولة الاختبار</td></tr>
+    <tr><td>الكتابة على القرص ذرّية دائماً</td>
+        <td><code>atomic_write(path, text)</code></td><td>لا يقرأ أحد نصف ملف</td></tr>
+    <tr><td>أي حالة مشتركة بين الخيوط داخل قفل</td>
+        <td><code>with self.lock: self._ban_count += 1</code></td><td>تحديث ضائع = حجب لا يوقف التشغيل</td></tr>
+  </tbody>
+</table>
+
+<h3>2 · التسمية</h3>
+<table class="t compact">
+  <thead><tr><th>النوع</th><th>الأسلوب</th><th>أمثلة من الكود</th></tr></thead>
+  <tbody>
+    <tr><td>وحدة/ملف</td><td>حروف صغيرة</td><td><code>fingerprint.py</code>, <code>httpclient.py</code></td></tr>
+    <tr><td>دالة عامة</td><td><code>snake_case</code> فعلية</td><td><code>parse_form()</code>, <code>probe_internet()</code></td></tr>
+    <tr><td>دالة خاصة</td><td>بادئة <code>_</code></td><td><code>_score_form()</code>, <code>_attempt()</code></td></tr>
+    <tr><td>صنف</td><td><code>CamelCase</code> اسم فاعل</td><td><code>Fingerprinter</code>, <code>Judge</code>, <code>CookieStore</code></td></tr>
+    <tr><td>ثابت</td><td><code>UPPER_SNAKE</code></td><td><code>MAX_REDIRECTS</code>, <code>BAN_WORDS</code></td></tr>
+    <tr><td>دوال السيناريوهات</td><td>بادئة <code>t_</code></td><td><code>t_no_false_hits()</code></td></tr>
+    <tr><td>مفاتيح الترجمة</td><td>بادئة حسب النوع</td><td><code>v_*</code> أحكام · <code>r_*</code> أسباب · <code>net_*</code> أخطاء شبكة · <code>stop_*</code> توقف · <code>th_*</code> تباطؤ · <code>cal_*</code> معايرة · <code>diag_*</code> تشخيص · <code>prob_*</code> مشاكل · <code>pm_*</code> أوضاع كلمة مرور · <code>cs_*</code> أبجديات · <code>f_*</code> حقول · <code>r_</code>/<code>s_</code>/<code>t_</code> للتشغيل والنتائج</td></tr>
+    <tr><td>معرّفات HTML</td><td>بادئة حسب الشاشة</td><td><code>f_*</code> خطوة الصيغة · <code>r_*</code> خطوة التشغيل · <code>rv_*</code> مراجعة البروفايل · <code>pv*/rvPv*</code> المعاينة · <code>st*</code> مؤشرات النتائج · <code>panel-*</code> اللوحات</td></tr>
+  </tbody>
+</table>
+
+<h3>3 · جافاسكربت / HTML / CSS</h3>
+<ul>
+  <li><b>Vanilla JS فقط</b>: لا إطار، لا build step، لا CDN، لا <code>import</code>.
+      الملف واحد ويعمل بفتحه مباشرة.</li>
+  <li><code>"use strict"</code> في أعلى الملف.</li>
+  <li>كل عنصر يُقرأ بـ <code>$(id)</code> (اختصار <code>getElementById</code>).</li>
+  <li>كل HTML يُبنى بـ <b>سلاسل</b> ثم <code>innerHTML</code>،
+      وأي قيمة ديناميكية تمرّ عبر <code>esc()</code> — <b>لا استثناءات</b>
+      (هذا هو خط الدفاع ضد XSS من صفحة بوابة معادية).</li>
+  <li>كل طلب للسيرفر عبر <code>api(path, body)</code> — لا <code>fetch</code> مباشر
+      (الاستثناء الوحيد: <code>openReview()</code> لأنه يحمّل نصاً لا JSON).</li>
+  <li>الحالة العامة كلها في كائن واحد <code>S</code>؛ لا متغيرات عامة متناثرة.</li>
+  <li>الربط بالأزرار كله داخل <code>wire()</code> — لا <code>onclick</code> في HTML.</li>
+  <li>CSS: متغيرات في <code>:root</code>، وأصناف دلالية
+      (<code>.card</code>, <code>.warn</code>, <code>.ok</code>, <code>.bad</code>, <code>.v-*</code>)،
+      واستعلامات وسائط عند 1000/900/760/520 بكسل، ودعم
+      <code>prefers-reduced-motion</code>.</li>
+  <li>الاتجاه: استخدم خصائص منطقية (<code>inset-inline-start</code>,
+      <code>padding-inline-start</code>, <code>margin-inline-start</code>) حتى يعمل
+      <code>rtl</code> و<code>ltr</code> معاً.</li>
+</ul>
+
+<h3>4 · التعليقات</h3>
+<p>في هذه النسخة أُضيف <b>شرح عربي بعد كل سطر</b> في <code>kirapass/</code> و<code>KiraPass.py</code>.
+  الاصطلاح المتّبع:</p>
+<ul>
+  <li>تعليق <b>في نهاية السطر</b> نفسه عندما يسمح النحو
+      (<code>#</code> في بايثون، <code>//</code> في JS، <code>/* */</code> في CSS،
+      <code>&lt;!-- --&gt;</code> في HTML).</li>
+  <li>عندما يكون السطر <b>داخل نص متعدد الأسطر</b> (docstring، قالب HTML/JS داخل بايثون)
+      لا يمكن وضع تعليق داخله؛ يوضع <b>كتلة شرح قبل النص</b> تشرح أسطره واحداً واحداً
+      برقم السطر، وتبقى بقية الأسطر مشروحة.</li>
+  <li>السطر الذي <b>ينتهي بشرطة مائلة</b> <code>\</code> (تكملة سطر) لا يقبل تعليقاً في آخره؛
+      يُشرح في السطر السابق له.</li>
+  <li>الأسطر الفارغة لا تعليق لها إلا إن كانت فاصلاً بين قسمين.</li>
+  <li>التعليق العربي <b>لا يغيّر الكود</b>: إن احتجت تغيير سلوك فغيّر السطر نفسه
+      ثم حدّث تعليقه.</li>
+</ul>
+<div class="tip">
+  <b>لماذا نهتم؟</b> لأن أي تعليق يوضع داخل نص بايثون متعدد الأسطر أو بعد شرطة مائلة
+  <b>يكسر الملف</b>. لذلك بعد أي تعديل كبير شغّل:
+  <pre><code>python3 -m compileall -q kirapass KiraPass.py &amp;&amp; node --check kirapass/web/ui.js &amp;&amp; python3 -m unittest discover -s tests</code></pre>
+</div>
+
+<h2 id="workflow">سير العمل المقترح لأي تعديل</h2>
+<ol>
+  <li><b>افهم</b>: افتح صفحة الملف في <a href="files/index.html">files/</a> واقرأ الدالة
+      ومن يستدعيها (<a href="callgraph.html">خريطة الاستدعاءات</a>).</li>
+  <li><b>تأكد أنه ليس خطراً</b>: راجع <a href="danger.html">أماكن الخطر</a>.</li>
+  <li><b>خذ نسخة اختبار</b>: <code>git switch -c تجربتي</code>.</li>
+  <li><b>عدّل</b> بأسلوب المشروع (أعلاه).</li>
+  <li><b>حدّث الشرح</b>: التعليق العربي بعد السطر + ملاحظة الدالة في
+      <code>tools/docs/notes.py</code> إن تغيّر معناها.</li>
+  <li><b>اختبر</b>: <code>python3 -m unittest discover -s tests</code> ثم
+      <code>python3 KiraPass.py --selftest</code>.</li>
+  <li><b>جرّب يدوياً</b>: <code>python3 tools/practice_portal.py --card 020124042 --pass-mode empty</code>
+      ثم وجّه الأداة إلى <code>http://127.0.0.1:8899/login</code>.</li>
+  <li><b>أعد توليد التوثيق</b>: <code>python3 tools/docs/build_docs.py</code>.</li>
+  <li><b>وثّق</b>: إن كان التغيير سلوكياً أضف سطراً في <code>docs/CHANGES.md</code>.</li>
+</ol>
+
+<h2 id="dont">لا تفعل</h2>
+<div class="card bad">
+  <ul>
+    <li>لا تضف مكتبة خارجية (لا <code>requests</code>، لا <code>bs4</code>، لا <code>lxml</code>).</li>
+    <li>لا تضف أي منطق «يتجاوز» حجباً أو كابتشا أو تقييد طلبات.</li>
+    <li>لا ترفع حدود المحاولات/الطلبات في <code>config.py</code> لتسريع شيء دون سبب.</li>
+    <li>لا تحذف <code>esc()</code> من أي <code>innerHTML</code>.</li>
+    <li>لا تخزّن قيمة سرّية (كرت، كلمة مرور، تجزئة، قيمة كوكي، رمز حي) في تقرير أو في
+        <code>profiles.json</code>.</li>
+    <li>لا تُصدر حكماً <code>ACCEPTED*</code> بلا دليل إيجابي.</li>
+    <li>لا تحذف <code>with self.lock:</code> حول أي عدّاد مشترك.</li>
+    <li>لا تستبدل <code>task_q.put(…, timeout=…)</code> بـ <code>put()</code> غير المحدود
+        (الإيقاف قد يعلّق).</li>
+    <li>لا تعتمد على مقارنة «الطول ±40 بايت» — هذا هو العطل التاريخي الذي بُنيت
+        <code>fingerprint.py</code> لإصلاحه.</li>
+  </ul>
+</div>
+
+<footer class="docfoot">دليل التعديل وأسلوب الكتابة · KiraPass — <code>docs/site/editing.html</code></footer>
+
+</main>
+</div>
+<script src="assets/docs.js"></script>
+<script>KPInit("editing");</script>
+</body>
+</html>

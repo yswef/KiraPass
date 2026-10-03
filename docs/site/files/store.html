@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ملف store.py · KiraPass</title>
+<link rel="stylesheet" href="../assets/docs.css">
+
+</head>
+<body>
+<div id="kp-layout">
+<main class="doc">
+<h1>ملف <code>store.py</code></h1>
+<p class="lead">البروفايلات، الإعدادات، التقارير، المراجعة، المسح — <code>kirapass/store.py</code></p>
+<div class="card info"><b>هذه الصفحة مولّدة آلياً</b> من مصدر الكود مباشرة (<code>tools/docs/build_docs.py</code>). إن غيّرت الكود فأعد توليدها: <code>python3 tools/docs/build_docs.py</code>. الشرح اليدوي الأوسع في <a href="../architecture.html">المعمارية</a> و<a href="../editing.html">دليل التعديل</a> و<a href="../danger.html">أماكن الخطر</a>.</div>
+<div class="grid3"><div class="card"><b>570</b><br>سطراً</div><div class="card"><b>34</b><br>دالة</div><div class="card"><b>1</b><br>صنف</div></div>
+<div class="note"><b>ملخّص المؤلف للملف (نصه الأصلي بالإنجليزية):</b> <span class="muted">Profiles, settings, reports and the &quot;clear cache&quot; logic - all in one place.</span></div>
+<p><a class="btn primary" href="../src/store.html">افتح المصدر كاملاً مرقّماً</a></p>
+<h2 id="imports">الاستيرادات</h2><table class="t compact"><thead><tr><th>السطر</th><th>الاستيراد</th><th>لماذا</th></tr></thead><tbody>
+<tr><td class="mono">10</td><td class="mono">from __future__ import annotations</td><td>استيراد annotations من الوحدة __future__</td></tr>
+<tr><td class="mono">12</td><td class="mono">import glob</td><td>استيراد الوحدة glob من المكتبة</td></tr>
+<tr><td class="mono">13</td><td class="mono">import json</td><td>استيراد الوحدة json من المكتبة</td></tr>
+<tr><td class="mono">14</td><td class="mono">import os</td><td>استيراد الوحدة os من المكتبة</td></tr>
+<tr><td class="mono">15</td><td class="mono">import re</td><td>استيراد الوحدة re من المكتبة</td></tr>
+<tr><td class="mono">16</td><td class="mono">import shutil</td><td>استيراد الوحدة shutil من المكتبة</td></tr>
+<tr><td class="mono">17</td><td class="mono">import time</td><td>استيراد الوحدة time من المكتبة</td></tr>
+<tr><td class="mono">19</td><td class="mono">from . import config</td><td>استيراد config من الوحدة .</td></tr>
+</tbody></table>
+<h2 id="vars">متغيرات وثوابت على مستوى الوحدة</h2><div class="scroll-x"><table class="t compact"><thead><tr><th>الاسم</th><th>السطر</th><th>القيمة</th><th>الشرح</th></tr></thead><tbody>
+<tr><td class="mono"><span class="tag var">SCHEMA</span></td><td class="mono"><a href="../src/store.html#L21">21</a></td><td class="mono">5</td><td>إسناد القيمة الثابتة SCHEMA</td></tr>
+<tr><td class="mono"><span class="tag var">CHARSETS</span></td><td class="mono"><a href="../src/store.html#L22">22</a></td><td class="mono">{&#x27;digits&#x27;: &#x27;0123456789&#x27;, &#x27;lower&#x27;: &#x27;abcdefghijklmnopqrstuvwxyz&#x27;, &#x27;upper</td><td>إسناد قاموس إلى CHARSETS</td></tr>
+<tr><td class="mono"><span class="tag var">PASS_MODES</span></td><td class="mono"><a href="../src/store.html#L31">31</a></td><td class="mono">(&#x27;same&#x27;, &#x27;empty&#x27;, &#x27;omit&#x27;, &#x27;fixed&#x27;, &#x27;chap&#x27;, &#x27;chap_empty&#x27;, &#x27;md5user&#x27;, &#x27;s</td><td>إسناد مجموعة إلى PASS_MODES</td></tr>
+<tr><td class="mono"><span class="tag var">_REVIEW_MAC_RE</span></td><td class="mono"><a href="../src/store.html#L526">526</a></td><td class="mono">re.compile(&#x27;\\b(?:[0-9a-fA-F]{2}[:-]){5}[0-9a-fA-F]{2}\\b&#x27;)</td><td>إسناد نتيجة استدعاء re.compile (معامل واحد) إلى _REVIEW_MAC_RE</td></tr>
+<tr><td class="mono"><span class="tag var">_REVIEW_IP_RE</span></td><td class="mono"><a href="../src/store.html#L528">528</a></td><td class="mono">re.compile(&#x27;\\b(?:(?:25[0-5]|2[0-4]\\d|[01]?\\d?\\d)\\.){3}(?:25[0-5]|</td><td>إسناد نتيجة استدعاء re.compile (معامل واحد) إلى _REVIEW_IP_RE</td></tr>
+</tbody></table></div>
+<h2 id="classes">الأصناف</h2>
+<div class="sym head" id="c-Store"><span class="tag mod">صنف</span> <b>Store</b> <a class="tag api" href="../src/store.html#L270">سطر 270</a><div>تعريف الصنف Store</div></div>
+<div class="sym body">دواله: <a href="#f-Store.__init__"><code>__init__</code></a> · <a href="#f-Store._load"><code>_load</code></a> · <a href="#f-Store.save"><code>save</code></a> · <a href="#f-Store.all"><code>all</code></a> · <a href="#f-Store.get"><code>get</code></a> · <a href="#f-Store.put"><code>put</code></a> · <a href="#f-Store.delete"><code>delete</code></a> · <a href="#f-Store.get_setting"><code>get_setting</code></a> · <a href="#f-Store.set_setting"><code>set_setting</code></a> · <a href="#f-Store.save_review"><code>save_review</code></a> · <a href="#f-Store.list_review"><code>list_review</code></a> · <a href="#f-Store.read_review"><code>read_review</code></a> · <a href="#f-Store.save_run"><code>save_run</code></a> · <a href="#f-Store.cleanup_old_reports"><code>cleanup_old_reports</code></a> · <a href="#f-Store.append_hit"><code>append_hit</code></a> · <a href="#f-Store.cache_info"><code>cache_info</code></a> · <a href="#f-Store.clear_cache"><code>clear_cache</code></a></div>
+<h2 id="funcs">الدوال — واحدة واحدة</h2>
+<div class="sym head" id="f-ensure_dirs"><span class="tag fn">دالة</span> <b>ensure_dirs()</b>
+ <span class="muted">→ None</span>
+ <a class="tag api" href="../src/store.html#L35">سطر 35–37</a>
+<div>تعريف الدالة ensure_dirs() ترجع None</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>من يناديها</th><td><a href="../files/cli.html#f-cmd_check"><code>cmd_check</code></a> <span class="muted">(cli.py:103)</span> <a href="../files/store.html#f-Store.__init__"><code>Store.__init__</code></a> <span class="muted">(store.py:272)</span> <a href="../files/store.html#f-Store.append_hit"><code>Store.append_hit</code></a> <span class="muted">(store.py:410)</span> <a href="../files/store.html#f-Store.clear_cache"><code>Store.clear_cache</code></a> <span class="muted">(store.py:484)</span> <a href="../files/store.html#f-Store.save_review"><code>Store.save_review</code></a> <span class="muted">(store.py:338)</span> <a href="../files/store.html#f-Store.save_run"><code>Store.save_run</code></a> <span class="muted">(store.py:373)</span> <a href="../files/store.html#f-atomic_write"><code>atomic_write</code></a> <span class="muted">(store.py:51)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-atomic_write"><span class="tag fn">دالة</span> <b>atomic_write(path, text)</b>
+ <span class="muted">→ None</span>
+ <a class="tag api" href="../src/store.html#L42">سطر 42–59</a>
+<div>كتابة آمنة: ملف مؤقت ثم os.replace() — لا يرى القارئ نصف JSON أبداً. محاولتان تتحمّلان حذف المجلد أثناء الكتابة (زر «مسح البيانات»). <span class="muted">(نص المؤلف الأصلي في docstring: Write a file so that a reader never sees half of it.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>يُسند إلى</th><td><code>tmp</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/store.html#f-ensure_dirs"><code>ensure_dirs</code></a><span class="muted">×1 سطر 51 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/store.html#f-Store.save"><code>Store.save</code></a> <span class="muted">(store.py:302)</span> <a href="../files/store.html#f-Store.save_review"><code>Store.save_review</code></a> <span class="muted">(store.py:352)</span> <a href="../files/store.html#f-Store.save_run"><code>Store.save_run</code></a> <span class="muted">(store.py:377)</span> <a href="../files/store.html#f-Store.set_setting"><code>Store.set_setting</code></a> <span class="muted">(store.py:333)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-read_json"><span class="tag fn">دالة</span> <b>read_json(path, default)</b>
+ <a class="tag api" href="../src/store.html#L62">سطر 62–67</a>
+<div>تعريف الدالة read_json(path, default)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/store.html#f-Store.__init__"><code>Store.__init__</code></a> <span class="muted">(store.py:275)</span> <a href="../files/store.html#f-Store._load"><code>Store._load</code></a> <span class="muted">(store.py:279)</span> <a href="../files/store.html#f-Store.list_review"><code>Store.list_review</code></a> <span class="muted">(store.py:360)</span> <a href="../files/store.html#f-Store.save_review"><code>Store.save_review</code></a> <span class="muted">(store.py:347)</span> <a href="../files/store.html#f-load_legacy_profiles"><code>load_legacy_profiles</code></a> <span class="muted">(store.py:560)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-clean"><span class="tag fn">دالة</span> <b>clean(name, limit)</b>
+ <span class="muted">→ str</span>
+ <a class="tag api" href="../src/store.html#L70">سطر 70–72</a>
+<div>تعريف الدالة clean(name, limit) ترجع str</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>name</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/store.html#f-Store._load"><code>Store._load</code></a> <span class="muted">(store.py:292)</span> <a href="../files/store.html#f-Store._load"><code>Store._load</code></a> <span class="muted">(store.py:294)</span> <a href="../files/store.html#f-Store.delete"><code>Store.delete</code></a> <span class="muted">(store.py:322)</span> <a href="../files/store.html#f-Store.get"><code>Store.get</code></a> <span class="muted">(store.py:308)</span> <a href="../files/store.html#f-Store.put"><code>Store.put</code></a> <span class="muted">(store.py:312)</span> <a href="../files/store.html#f-Store.save_review"><code>Store.save_review</code></a> <span class="muted">(store.py:339)</span> <a href="../files/store.html#f-Store.save_run"><code>Store.save_run</code></a> <span class="muted">(store.py:375)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-new_profile"><span class="tag fn">دالة</span> <b>new_profile(**kw)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/store.html#L80">سطر 80–123</a>
+<div>الصيغة الكاملة للبروفايل: أي حقل غير موجود هنا يُسقطه migrate(). لذلك إضافة حقل جديد تبدأ دائماً من هذه الدالة.</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>p</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/capture.html#f-Hub._build_profile"><code>Hub._build_profile</code></a> <span class="muted">(capture.py:1158)</span> <a href="../files/selftest.html#f-make_profile"><code>make_profile</code></a> <span class="muted">(selftest.py:32)</span> <a href="../files/selftest.html#f-t_format_preview"><code>t_format_preview</code></a> <span class="muted">(selftest.py:374)</span> <a href="../files/selftest.html#f-t_format_preview"><code>t_format_preview</code></a> <span class="muted">(selftest.py:378)</span> <a href="../files/store.html#f-migrate"><code>migrate</code></a> <span class="muted">(store.py:207)</span> <a href="../files/store.html#f-migrate"><code>migrate</code></a> <span class="muted">(store.py:208)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-variable_len"><span class="tag fn">دالة</span> <b>variable_len(p)</b>
+ <span class="muted">→ int</span>
+ <a class="tag api" href="../src/store.html#L126">سطر 126–129</a>
+<div>تعريف الدالة variable_len(p) ترجع int</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/selftest.html#f-t_format_preview"><code>t_format_preview</code></a> <span class="muted">(selftest.py:375)</span> <a href="../files/store.html#f-decode_card"><code>decode_card</code></a> <span class="muted">(store.py:169)</span> <a href="../files/store.html#f-space_size"><code>space_size</code></a> <span class="muted">(store.py:133)</span> <a href="../files/store.html#f-validate"><code>validate</code></a> <span class="muted">(store.py:149)</span> <a href="../files/server.html#f-Handler._preview"><code>Handler._preview</code></a> <span class="muted">(server.py:583)</span> <a href="../files/server.html#f-_profile_brief"><code>_profile_brief</code></a> <span class="muted">(server.py:673)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-space_size"><span class="tag fn">دالة</span> <b>space_size(p)</b>
+ <span class="muted">→ int</span>
+ <a class="tag api" href="../src/store.html#L132">سطر 132–137</a>
+<div>تعريف الدالة space_size(p) ترجع int</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>chars, vlen</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/store.html#f-variable_len"><code>variable_len</code></a><span class="muted">×1 سطر 133 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-Engine._run"><code>Engine._run</code></a> <span class="muted">(engine.py:1494)</span> <a href="../files/engine.html#f-Engine.start"><code>Engine.start</code></a> <span class="muted">(engine.py:1417)</span> <a href="../files/engine.html#f-bench_cards"><code>bench_cards</code></a> <span class="muted">(engine.py:433)</span> <a href="../files/engine.html#f-calibrate"><code>calibrate</code></a> <span class="muted">(engine.py:477)</span> <a href="../files/engine.html#f-probe_lockout"><code>probe_lockout</code></a> <span class="muted">(engine.py:2281)</span> <a href="../files/engine.html#f-probe_lockout"><code>probe_lockout</code></a> <span class="muted">(engine.py:2316)</span> <a href="../files/selftest.html#f-t_format_preview"><code>t_format_preview</code></a> <span class="muted">(selftest.py:375)</span> <a href="../files/selftest.html#f-t_format_preview"><code>t_format_preview</code></a> <span class="muted">(selftest.py:381)</span> <a href="../files/store.html#f-card_at_walk_pos"><code>card_at_walk_pos</code></a> <span class="muted">(store.py:190)</span> <a href="../files/store.html#f-sample_cards"><code>sample_cards</code></a> <span class="muted">(store.py:180)</span> <a href="../files/server.html#f-Handler._api_get"><code>Handler._api_get</code></a> <span class="muted">(server.py:279)</span> <a href="../files/server.html#f-Handler._preview"><code>Handler._preview</code></a> <span class="muted">(server.py:582)</span> <a href="../files/server.html#f-_profile_brief"><code>_profile_brief</code></a> <span class="muted">(server.py:676)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-validate"><span class="tag fn">دالة</span> <b>validate(p)</b>
+ <span class="muted">→ list</span>
+ <a class="tag api" href="../src/store.html#L142">سطر 142–162</a>
+<div>يرجع قائمة مفاتيح آلية للمشاكل (فارغة = البروفايل صالح). space_is_astronomically_big تحذير لا مانع. <span class="muted">(نص المؤلف الأصلي في docstring: -&gt; list of machine-readable problems (empty = good to go).)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>problems, vlen</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/store.html#f-variable_len"><code>variable_len</code></a><span class="muted">×1 سطر 149 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-Engine.start"><code>Engine.start</code></a> <span class="muted">(engine.py:1375)</span> <a href="../files/engine.html#f-calibrate"><code>calibrate</code></a> <span class="muted">(engine.py:471)</span> <a href="../files/selftest.html#f-t_format_preview"><code>t_format_preview</code></a> <span class="muted">(selftest.py:378)</span> <a href="../files/selftest.html#f-t_legacy_profile"><code>t_legacy_profile</code></a> <span class="muted">(selftest.py:299)</span> <a href="../files/server.html#f-Handler._api_get"><code>Handler._api_get</code></a> <span class="muted">(server.py:280)</span> <a href="../files/server.html#f-Handler._api_post"><code>Handler._api_post</code></a> <span class="muted">(server.py:333)</span> <a href="../files/server.html#f-Handler._api_post"><code>Handler._api_post</code></a> <span class="muted">(server.py:470)</span> <a href="../files/server.html#f-Handler._preview"><code>Handler._preview</code></a> <span class="muted">(server.py:585)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-decode_card"><span class="tag fn">دالة</span> <b>decode_card(p, index)</b>
+ <span class="muted">→ str</span>
+ <a class="tag api" href="../src/store.html#L167">سطر 167–176</a>
+<div>رقم ⇒ بطاقة: تحويل بأساس عدد المحارف الفريدة المرتّبة. sorted(set(charset)) مقصود: أبجدية فيها تكرار تُنتج بطاقات مكرّرة.</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>base, chars, charset, out, vlen</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/store.html#f-variable_len"><code>variable_len</code></a><span class="muted">×1 سطر 169 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-bench_cards"><code>bench_cards</code></a> <span class="muted">(engine.py:446)</span> <a href="../files/engine.html#f-bench_cards"><code>bench_cards</code></a> <span class="muted">(engine.py:451)</span> <a href="../files/engine.html#f-bench_cards"><code>bench_cards</code></a> <span class="muted">(engine.py:455)</span> <a href="../files/engine.html#f-probe_lockout"><code>probe_lockout</code></a> <span class="muted">(engine.py:2321)</span> <a href="../files/store.html#f-card_at_walk_pos"><code>card_at_walk_pos</code></a> <span class="muted">(store.py:192)</span> <a href="../files/store.html#f-card_at_walk_pos"><code>card_at_walk_pos</code></a> <span class="muted">(store.py:198)</span> <a href="../files/store.html#f-sample_cards"><code>sample_cards</code></a> <span class="muted">(store.py:184)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-sample_cards"><span class="tag fn">دالة</span> <b>sample_cards(p, count)</b>
+ <span class="muted">→ list</span>
+ <a class="tag api" href="../src/store.html#L179">سطر 179–184</a>
+<div>تعريف الدالة sample_cards(p, count) ترجع list</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>picks, space</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/store.html#f-space_size"><code>space_size</code></a><span class="muted">×1 سطر 180 (نفس الملف)</span> · <a href="../files/store.html#f-decode_card"><code>decode_card</code></a><span class="muted">×1 سطر 184 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/selftest.html#f-t_format_preview"><code>t_format_preview</code></a> <span class="muted">(selftest.py:377)</span> <a href="../files/selftest.html#f-t_format_preview"><code>t_format_preview</code></a> <span class="muted">(selftest.py:381)</span> <a href="../files/server.html#f-Handler._api_get"><code>Handler._api_get</code></a> <span class="muted">(server.py:278)</span> <a href="../files/server.html#f-Handler._preview"><code>Handler._preview</code></a> <span class="muted">(server.py:584)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-card_at_walk_pos"><span class="tag fn">دالة</span> <b>card_at_walk_pos(p, pos)</b>
+ <span class="muted">→ str</span>
+ <a class="tag api" href="../src/store.html#L188">سطر 188–198</a>
+<div>مشي مخلوط بلا تكرار: (b + a*pos) mod space حيث a أولي نسبياً مع space. <span class="muted">(نص المؤلف الأصلي في docstring: Shuffled but repeat-free walk over the whole space.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>a, b, idx, space</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/store.html#f-decode_card"><code>decode_card</code></a><span class="muted">×2 سطر 198 (نفس الملف)</span> · <a href="../files/store.html#f-space_size"><code>space_size</code></a><span class="muted">×1 سطر 190 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-Engine._run"><code>Engine._run</code></a> <span class="muted">(engine.py:1598)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-migrate"><span class="tag fn">دالة</span> <b>migrate(raw)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/store.html#L204">سطر 204–264</a>
+<div>يقبل بروفايلاً من أي نسخة قديمة ويحوّله إلى الصيغة الحالية. في النهاية يمرّر login_url عبر sanitize_login_url حتى تُحذف أي بطاقة أو كلمة مرور قديمة منسوخة داخل رابط GET. <span class="muted">(نص المؤلف الأصلي في docstring: Accept a profile written by ANY older version of the tool.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>charset, length, nt, p, prefix, suffix, vlen</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/store.html#f-new_profile"><code>new_profile</code></a><span class="muted">×2 سطر 208 (نفس الملف)</span> · <a href="../files/store.html#f-Store.get"><code>Store.get</code></a><span class="muted">×1 سطر 256 (نفس الملف)</span> · <a href="../files/portals.html#f-sanitize_login_url"><code>sanitize_login_url</code></a><span class="muted">×1 سطر 261</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-Engine.start"><code>Engine.start</code></a> <span class="muted">(engine.py:1370)</span> <a href="../files/engine.html#f-calibrate"><code>calibrate</code></a> <span class="muted">(engine.py:463)</span> <a href="../files/engine.html#f-diagnose"><code>diagnose</code></a> <span class="muted">(engine.py:1013)</span> <a href="../files/engine.html#f-probe_lockout"><code>probe_lockout</code></a> <span class="muted">(engine.py:2271)</span> <a href="../files/engine.html#f-safe_profile_snapshot"><code>safe_profile_snapshot</code></a> <span class="muted">(engine.py:1206)</span> <a href="../files/selftest.html#f-t_legacy_profile"><code>t_legacy_profile</code></a> <span class="muted">(selftest.py:298)</span> <a href="../files/store.html#f-Store._load"><code>Store._load</code></a> <span class="muted">(store.py:289)</span> <a href="../files/store.html#f-Store.put"><code>Store.put</code></a> <span class="muted">(store.py:311)</span> <a href="../files/store.html#f-load_legacy_profiles"><code>load_legacy_profiles</code></a> <span class="muted">(store.py:566)</span> <a href="../files/server.html#f-Handler._api_post"><code>Handler._api_post</code></a> <span class="muted">(server.py:332)</span> <a href="../files/server.html#f-Handler._api_post"><code>Handler._api_post</code></a> <span class="muted">(server.py:346)</span> <a href="../files/server.html#f-Handler._api_post"><code>Handler._api_post</code></a> <span class="muted">(server.py:354)</span> <a href="../files/server.html#f-Handler._api_post"><code>Handler._api_post</code></a> <span class="muted">(server.py:380)</span> <a href="../files/server.html#f-Handler._api_post"><code>Handler._api_post</code></a> <span class="muted">(server.py:389)</span> <span class="muted">+2 غيرها</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Store.__init__"><span class="tag fn">دالة</span> <b>Store.__init__(self)</b>
+ <a class="tag api" href="../src/store.html#L271">سطر 271–275</a>
+<div>تعريف الدالة __init__(self)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>يُسند إلى</th><td><code>self._profiles, self.path, self.settings</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/store.html#f-ensure_dirs"><code>ensure_dirs</code></a><span class="muted">×1 سطر 272 (نفس الملف)</span> · <a href="../files/store.html#f-Store._load"><code>Store._load</code></a><span class="muted">×1 سطر 274 (نفس الملف)</span> · <a href="../files/store.html#f-read_json"><code>read_json</code></a><span class="muted">×1 سطر 275 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Store._load"><span class="tag fn">دالة</span> <b>Store._load(self)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/store.html#L278">سطر 278–297</a>
+<div>-- البروفايلات ------------------------------------------------------</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>items, name, out, prof, raw</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/store.html#f-clean"><code>clean</code></a><span class="muted">×2 سطر 292 (نفس الملف)</span> · <a href="../files/store.html#f-read_json"><code>read_json</code></a><span class="muted">×1 سطر 279 (نفس الملف)</span> · <a href="../files/store.html#f-migrate"><code>migrate</code></a><span class="muted">×1 سطر 289 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/store.html#f-Store.__init__"><code>Store.__init__</code></a> <span class="muted">(store.py:274)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Store.save"><span class="tag fn">دالة</span> <b>Store.save(self)</b>
+ <span class="muted">→ None</span>
+ <a class="tag api" href="../src/store.html#L299">سطر 299–302</a>
+<div>تعريف الدالة save(self) ترجع None</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>يُسند إلى</th><td><code>payload</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/store.html#f-atomic_write"><code>atomic_write</code></a><span class="muted">×1 سطر 302 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/store.html#f-Store.delete"><code>Store.delete</code></a> <span class="muted">(store.py:324)</span> <a href="../files/store.html#f-Store.put"><code>Store.put</code></a> <span class="muted">(store.py:318)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Store.all"><span class="tag fn">دالة</span> <b>Store.all(self)</b>
+ <span class="muted">→ list</span>
+ <a class="tag api" href="../src/store.html#L304">سطر 304–305</a>
+<div>تعريف الدالة all(self) ترجع list</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/fingerprint.html#f-Fingerprinter.learn"><code>Fingerprinter.learn</code></a> <span class="muted">(fingerprint.py:340)</span> <a href="../files/fingerprint.html#f-Fingerprinter.learn"><code>Fingerprinter.learn</code></a> <span class="muted">(fingerprint.py:351)</span> <a href="../files/fingerprint.html#f-learn_dynamic"><code>learn_dynamic</code></a> <span class="muted">(fingerprint.py:241)</span> <a href="../files/selftest.html#f-t_format_preview"><code>t_format_preview</code></a> <span class="muted">(selftest.py:376)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Store.get"><span class="tag fn">دالة</span> <b>Store.get(self, name)</b>
+ <a class="tag api" href="../src/store.html#L307">سطر 307–308</a>
+<div>تعريف الدالة get(self, name)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/store.html#f-Store.get"><code>Store.get</code></a><span class="muted">×1 سطر 308 (نفس الملف)</span> · <a href="../files/store.html#f-clean"><code>clean</code></a><span class="muted">×1 سطر 308 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/store.html#f-Store.get"><code>Store.get</code></a> <span class="muted">(store.py:308)</span> <a href="../files/store.html#f-Store.get_setting"><code>Store.get_setting</code></a> <span class="muted">(store.py:329)</span> <a href="../files/store.html#f-migrate"><code>migrate</code></a> <span class="muted">(store.py:256)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Store.put"><span class="tag fn">دالة</span> <b>Store.put(self, profile)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/store.html#L310">سطر 310–319</a>
+<div>تعريف الدالة put(self, profile) ترجع dict</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>name, prof</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/store.html#f-migrate"><code>migrate</code></a><span class="muted">×1 سطر 311 (نفس الملف)</span> · <a href="../files/store.html#f-clean"><code>clean</code></a><span class="muted">×1 سطر 312 (نفس الملف)</span> · <a href="../files/store.html#f-Store.save"><code>Store.save</code></a><span class="muted">×1 سطر 318 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Store.delete"><span class="tag fn">دالة</span> <b>Store.delete(self, name)</b>
+ <span class="muted">→ bool</span>
+ <a class="tag api" href="../src/store.html#L321">سطر 321–326</a>
+<div>تعريف الدالة delete(self, name) ترجع bool</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>prof</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/store.html#f-clean"><code>clean</code></a><span class="muted">×1 سطر 322 (نفس الملف)</span> · <a href="../files/store.html#f-Store.save"><code>Store.save</code></a><span class="muted">×1 سطر 324 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Store.get_setting"><span class="tag fn">دالة</span> <b>Store.get_setting(self, key, default)</b>
+ <a class="tag api" href="../src/store.html#L328">سطر 328–329</a>
+<div>تعريف الدالة get_setting(self, key, default)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/store.html#f-Store.get"><code>Store.get</code></a><span class="muted">×1 سطر 329 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Store.set_setting"><span class="tag fn">دالة</span> <b>Store.set_setting(self, key, value)</b>
+ <span class="muted">→ None</span>
+ <a class="tag api" href="../src/store.html#L331">سطر 331–334</a>
+<div>تعريف الدالة set_setting(self, key, value) ترجع None</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/store.html#f-atomic_write"><code>atomic_write</code></a><span class="muted">×1 سطر 333 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Store.save_review"><span class="tag fn">دالة</span> <b>Store.save_review(self, seq, card, verdict, body)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/store.html#L337">سطر 337–357</a>
+<div>-- التقارير / صفحات المراجعة ----------------------------------------</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>index, name, path</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/store.html#f-ensure_dirs"><code>ensure_dirs</code></a><span class="muted">×1 سطر 338 (نفس الملف)</span> · <a href="../files/store.html#f-read_json"><code>read_json</code></a><span class="muted">×1 سطر 347 (نفس الملف)</span> · <a href="../files/store.html#f-atomic_write"><code>atomic_write</code></a><span class="muted">×1 سطر 352 (نفس الملف)</span> · <a href="../files/store.html#f-clean"><code>clean</code></a><span class="muted">×1 سطر 339 (نفس الملف)</span> · <a href="../files/store.html#f-redact_review_body"><code>redact_review_body</code></a><span class="muted">×1 سطر 343 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Store.list_review"><span class="tag fn">دالة</span> <b>Store.list_review(self)</b>
+ <span class="muted">→ list</span>
+ <a class="tag api" href="../src/store.html#L359">سطر 359–361</a>
+<div>تعريف الدالة list_review(self) ترجع list</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>index</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/store.html#f-read_json"><code>read_json</code></a><span class="muted">×1 سطر 360 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Store.read_review"><span class="tag fn">دالة</span> <b>Store.read_review(self, name)</b>
+ <span class="muted">→ str</span>
+ <a class="tag api" href="../src/store.html#L363">سطر 363–370</a>
+<div>تعريف الدالة read_review(self, name) ترجع str</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>path, safe</code></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Store.save_run"><span class="tag fn">دالة</span> <b>Store.save_run(self, report)</b>
+ <span class="muted">→ str</span>
+ <a class="tag api" href="../src/store.html#L372">سطر 372–378</a>
+<div>تعريف الدالة save_run(self, report) ترجع str</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>name, path</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/store.html#f-ensure_dirs"><code>ensure_dirs</code></a><span class="muted">×1 سطر 373 (نفس الملف)</span> · <a href="../files/store.html#f-Store.cleanup_old_reports"><code>Store.cleanup_old_reports</code></a><span class="muted">×1 سطر 374 (نفس الملف)</span> · <a href="../files/store.html#f-atomic_write"><code>atomic_write</code></a><span class="muted">×1 سطر 377 (نفس الملف)</span> · <a href="../files/store.html#f-clean"><code>clean</code></a><span class="muted">×1 سطر 375 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Store.cleanup_old_reports"><span class="tag fn">دالة</span> <b>Store.cleanup_old_reports(self, days)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/store.html#L380">سطر 380–407</a>
+<div>تعريف الدالة cleanup_old_reports(self, days) ترجع dict <span class="muted">(نص المؤلف الأصلي في docstring: Delete run reports older than `days` (default from config).)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>3 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>cutoff, names, path, retain, size</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/store.html#f-Store.save_run"><code>Store.save_run</code></a> <span class="muted">(store.py:374)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Store.append_hit"><span class="tag fn">دالة</span> <b>Store.append_hit(self, line)</b>
+ <span class="muted">→ None</span>
+ <a class="tag api" href="../src/store.html#L409">سطر 409–412</a>
+<div>تعريف الدالة append_hit(self, line) ترجع None</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/store.html#f-ensure_dirs"><code>ensure_dirs</code></a><span class="muted">×1 سطر 410 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Store.cache_info"><span class="tag fn">دالة</span> <b>Store.cache_info(self)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/store.html#L415">سطر 415–434</a>
+<div>-- الكاش ------------------------------------------------------------</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>info, prof, size</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/store.html#f-_dir_size"><code>_dir_size</code></a><span class="muted">×1 سطر 421 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Store.clear_cache"><span class="tag fn">دالة</span> <b>Store.clear_cache(self, scope)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/store.html#L436">سطر 436–486</a>
+<div>تعريف الدالة clear_cache(self, scope) ترجع dict <span class="muted">(نص المؤلف الأصلي في docstring: Delete tool data by scope.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>always, key, seen_paths, self._profiles, targets</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/store.html#f-ensure_dirs"><code>ensure_dirs</code></a><span class="muted">×1 سطر 484 (نفس الملف)</span> · <a href="../files/store.html#f-_remove_path"><code>_remove_path</code></a><span class="muted">×1 سطر 460 (نفس الملف)</span> · <a href="../files/store.html#f-human_size"><code>human_size</code></a><span class="muted">×1 سطر 486 (نفس الملف)</span> · <a href="../files/store.html#f-_dir_size"><code>_dir_size</code></a><span class="muted">×1 سطر 480 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-_dir_size"><span class="tag fn">دالة</span> <b>_dir_size(path)</b>
+ <span class="muted">→ tuple</span>
+ <a class="tag api" href="../src/store.html#L489">سطر 489–500</a>
+<div>تعريف الدالة _dir_size(path) ترجع tuple</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/store.html#f-Store.cache_info"><code>Store.cache_info</code></a> <span class="muted">(store.py:421)</span> <a href="../files/store.html#f-Store.clear_cache"><code>Store.clear_cache</code></a> <span class="muted">(store.py:480)</span> <a href="../files/store.html#f-_remove_path"><code>_remove_path</code></a> <span class="muted">(store.py:514)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-_remove_path"><span class="tag fn">دالة</span> <b>_remove_path(path)</b>
+ <span class="muted">→ int</span>
+ <a class="tag api" href="../src/store.html#L505">سطر 505–522</a>
+<div>يميّز الملف من المجلد ويرجع البايتات المحررة فعلاً. shutil.rmtree على ملف لا يفعل شيئاً بصمت — هكذا كانت hits.txt تُحسب محذوفة. <span class="muted">(نص المؤلف الأصلي في docstring: Delete a file or a folder and return the bytes really freed.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>3 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>size</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/store.html#f-_dir_size"><code>_dir_size</code></a><span class="muted">×1 سطر 514 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/store.html#f-Store.clear_cache"><code>Store.clear_cache</code></a> <span class="muted">(store.py:460)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-redact_review_body"><span class="tag fn">دالة</span> <b>redact_review_body(body)</b>
+ <span class="muted">→ str</span>
+ <a class="tag api" href="../src/store.html#L534">سطر 534–544</a>
+<div>يحذف MAC وIPv4 من صفحات المراجعة قبل كتابتها على القرص. <span class="muted">(نص المؤلف الأصلي في docstring: Strip client MAC/IP addresses from review pages before saving.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>text</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/store.html#f-Store.save_review"><code>Store.save_review</code></a> <span class="muted">(store.py:343)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-human_size"><span class="tag fn">دالة</span> <b>human_size(num)</b>
+ <span class="muted">→ str</span>
+ <a class="tag api" href="../src/store.html#L547">سطر 547–553</a>
+<div>تعريف الدالة human_size(num) ترجع str</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>value</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/store.html#f-Store.clear_cache"><code>Store.clear_cache</code></a> <span class="muted">(store.py:486)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-load_legacy_profiles"><span class="tag fn">دالة</span> <b>load_legacy_profiles()</b>
+ <span class="muted">→ list</span>
+ <a class="tag api" href="../src/store.html#L556">سطر 556–569</a>
+<div>تعريف الدالة load_legacy_profiles() ترجع list <span class="muted">(نص المؤلف الأصلي في docstring: Import profiles written by the old version, if any exist.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>items, out, raw</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/store.html#f-read_json"><code>read_json</code></a><span class="muted">×1 سطر 560 (نفس الملف)</span> · <a href="../files/store.html#f-migrate"><code>migrate</code></a><span class="muted">×1 سطر 566 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<footer class="docfoot">صفحة مولّدة آلياً من مصدر الكود · KiraPass —
+<code>files</code> · 2026-10-01 02:26</footer>
+</main>
+</div>
+<script src="../assets/docs.js"></script>
+<script>KPInit("files");</script>
+</body>
+</html>

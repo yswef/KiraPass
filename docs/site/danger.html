@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>أماكن الخطر · KiraPass</title>
+<link rel="stylesheet" href="assets/docs.css">
+</head>
+<body>
+<div id="kp-layout">
+<main class="doc">
+
+<h1>أماكن الخطر — الأسطر التي تكسر الأداة إن لُمست</h1>
+<p class="lead">
+  هذه ليست قائمة تحذيرات عامة: كل بند هنا <b>موجود فعلاً في الكود</b>، ومعظمها وُلد من عطل
+  حقيقي في نسخة سابقة. لكل بند: أين هو، لماذا هو حساس، ماذا يحدث بالضبط لو غيّرته،
+  وما البديل الآمن إن كانت لديك حاجة مشروعة.
+</p>
+
+<div class="card warn">
+  <b>كيف تستخدم هذه الصفحة:</b> قبل أن تعدّل أي دالة، ابحث عن اسمها هنا.
+  إن ظهرت — اقرأ البند كاملاً، ثم شغّل الاختبارات بعد تعديلك
+  (<code>python3 -m unittest discover -s tests</code> و<code>python3 KiraPass.py --selftest</code>).
+</div>
+
+<div class="toc card"><b>محتويات الصفحة</b><div class="toc-auto"></div></div>
+
+<h2 id="legal">الخطر الأول: حدود الاستخدام المصرّح به</h2>
+<table class="t">
+  <thead><tr><th>المكان</th><th>لماذا حساس</th><th>لو غيّرته</th><th>البديل الآمن</th></tr></thead>
+  <tbody>
+    <tr>
+      <td class="mono">ui.html · <code>#licenseOk</code><br><code>ui.js · wire()</code></td>
+      <td>بوابة الإقرار: زر «ابدأ التخمين» يبقى <code>disabled</code> حتى يضع المستخدم علامة
+          بأنه يملك الشبكة أو لديه إذن كتابي.</td>
+      <td>إزالة الإقرار تجعل الأداة تُشغَّل على أي شبكة بضغطة، وهذا يغيّر وضعها القانوني
+          من أداة اختبار مصرّح به إلى أداة اعتداء.</td>
+      <td>لا يوجد سبب مشروع لإزالته. إن أردت تسهيل الاستخدام على شبكتك فاحفظ
+          البروفايل واستخدم مسار «بروفايل محفوظ».</td>
+    </tr>
+    <tr>
+      <td class="mono">engine.py · <code>_check_stop_rules</code></td>
+      <td>أول رد حجب أو تقييد ⇒ إيقاف فوري (<code>_ban_count &gt;= 1</code>،
+          <code>_rate_count &gt;= 1</code>، <code>CHALLENGE &gt;= 1</code>).</td>
+      <td>أي «تسامح» هنا يعني الاستمرار في الطرق على راوتر أعلن صراحة أنه يحجبك —
+          وهذا هو تعريف الاعتداء على الخدمة.</td>
+      <td>إن كان الراوتر يَحجب بسبب إعداد متشدّد، الحل هو تغيير إعداد الراوتر
+          (بإذن مسؤوله) وليس تعديل الأداة.</td>
+    </tr>
+    <tr>
+      <td class="mono">ui.js · <code>renderStop</code> · <code>manualResumeRequired</code><br>
+          <code>openManualResumeConfirm()</code></td>
+      <td>بعد <code>target_unreachable</code> / <code>banned_by_router</code> /
+          <code>rate_limited_by_router</code> / <code>captcha_challenge</code> لا يوجد استئناف
+          تلقائي: يلزم زر صريح + علامة تأكيد.</td>
+      <td>إضافة «إعادة محاولة تلقائية» تحوّل التوقّف الأخلاقي إلى حلقة اعتداء.</td>
+      <td>أضف بدلاً منها <b>توضيحاً</b> أفضل للمشرف (دليل الحجب موجود أصلاً في
+          <code>ban_evidence</code>).</td>
+    </tr>
+    <tr>
+      <td class="mono">engine.py · <code>probe_lockout</code><br>config.py · <code>LOCKOUT_PROBE_MAX_FAILURES</code></td>
+      <td>فحص «كم يسامح الراوتر» محدود بـ8 محاولات، ويتوقف عند أول رد حماية،
+          <b>ولا ينتظر زوال الحجب أبداً</b> (المعاملان <code>wait_limit</code> و<code>step</code>
+          مقبولان للتوافق لكنهما مُتجاهلان عمداً).</td>
+      <td>رفع الحد أو إعادة تفعيل الانتظار = اختبار حجب حقيقي على شبكة قد تكون إنتاجية.</td>
+      <td>لا شيء. إن احتجت قياساً أعمق فافعله على <code>tools/practice_portal.py</code>.</td>
+    </tr>
+    <tr>
+      <td class="mono">capture.py · <code>infer_pass_mode</code></td>
+      <td>أي تحويل كلمة مرور بـJavaScript غير معروف ⇒
+          <code>needs_browser_js = True</code> و<code>pass_mode = ""</code>،
+          والأداة <b>ترفض الأتمتة</b> وتشرح السبب.</td>
+      <td>محاولة «تنفيذ JS مجهول» أو ادعاء قابلية الأتمتة = نتائج كاذبة + تنفيذ كود بوابة
+          لا نعرفه داخل الأداة.</td>
+      <td>دع المستخدم يسجّل الدخول يدوياً في المسجّل ويصدّر أمر <code>curl</code> المنقّح
+          ليدرسه.</td>
+    </tr>
+    <tr>
+      <td class="mono">config.py · <code>CALIBRATION_PROBES = 3</code><br>
+          <code>KNOWN_CARD_TRIAL_LIMIT = 8</code><br><code>DIAGNOSTIC_SAMPLE_LIMIT = 8</code></td>
+      <td>كل بطاقة تجريبية هي <b>فشل دخول حقيقي</b> عند الراوتر. راوتر يُقفل بعد محاولتين
+          سيُقفل من تعلّمنا نفسه.</td>
+      <td>رفعها يزيد احتمال الحجب قبل أن يبدأ التخمين أصلاً.</td>
+      <td>إن كان راوترك يقفل مبكراً فاستخدم «قِس حدّ الحظر» أولاً واضبط
+          <code>delay</code> ومساراً واحداً.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="verdict">الخطر الثاني: منطق القرار (أن تكذب الأداة)</h2>
+<table class="t">
+  <thead><tr><th>المكان</th><th>لماذا حساس</th><th>لو غيّرته</th></tr></thead>
+  <tbody>
+    <tr>
+      <td class="mono">fingerprint.py · <code>Judge.classify</code><br><b>ترتيب الفروع</b></td>
+      <td>الترتيب هو القرار: <b>الحجب أولاً</b> ← ثم مطابقة صفحة الرفض ← ثم الكابتشا ←
+          ثم الأدلة الإيجابية (تحويل/كلمات/رابط) ← ثم <code>UNKNOWN</code>.</td>
+      <td>تقديم الأدلة الإيجابية على الحجب ⇒ صفحة حجب فيها كلمة «welcome» تُسمّى نجاحاً.
+          وتأخير مطابقة الرفض ⇒ كل رفض يصبح «غير واضح» ويمتلئ مجلد المراجعة.</td>
+    </tr>
+    <tr>
+      <td class="mono">fingerprint.py · <code>Verdict.is_hit</code></td>
+      <td><code>return self.code.startswith("ACCEPTED")</code> — أي كود يبدأ بـACCEPTED
+          هو إصابة تُحفظ في <code>hits.txt</code> وقد توقف التشغيل.</td>
+      <td>إضافة كود مثل <code>ACCEPTED_MAYBE</code> لحالة غير مثبتة ⇒ إصابات كاذبة في سجل
+          المستخدم. استخدم <code>UNKNOWN</code> لأي حالة غير مثبتة.</td>
+    </tr>
+    <tr>
+      <td class="mono">fingerprint.py · <code>Verdict.is_final</code></td>
+      <td>الإيقاف النهائي فقط لـ<code>ACCEPTED_VERIFIED</code> أو
+          <code>ACCEPTED</code> بثقة ≥0.85.</td>
+      <td>خفض العتبة يوقف التشغيل على دليل ضعيف ويترك باقي الفضاء غير مُختبَر.</td>
+    </tr>
+    <tr>
+      <td class="mono">fingerprint.py · <code>same_as_reject</code> — فرع الصفحات الفارغة</td>
+      <td>ردّان فارغان لا يعنيان «نفس الصفحة»: يُقارن مفتاح التحويل
+          <code>_loc_key()</code> ثم الحالة، وإلا <code>"empty"</code>.</td>
+      <td>اعتبار الفراغ تطابقاً دائماً ⇒ راوتر يحوّل الكرت الصالح إلى مكان آخر
+          يُصنَّف «مرفوضاً» — وهذا بالضبط كيف ضاعت إصابات حقيقية سابقاً.</td>
+    </tr>
+    <tr>
+      <td class="mono">fingerprint.py · <code>_loc_key</code></td>
+      <td>يقارن <b>scheme + host + path فقط</b> من رابط التحويل.</td>
+      <td>مقارنة الرابط كاملاً ⇒ كل رد «مختلف» لأن الراوتر يضيف رمزاً متغيّراً أو
+          <code>dst</code> الضيف إلى الاستعلام.</td>
+    </tr>
+    <tr>
+      <td class="mono">fingerprint.py · <code>learn_dynamic</code> / <code>learn_patterns</code>
+          / <code>mask_text</code></td>
+      <td>هنا تُخفى القيم التي تتغير وحدها (رمز جلسة، صدى الكرت، وقت، MAC، IP، أرقام طويلة).</td>
+      <td>إخفاء أكثر من اللازم ⇒ صفحتا النجاح والرفض تصبحان متطابقتين فتضيع الإصابة.
+          وإخفاء أقل ⇒ كل رفض يصبح <code>UNKNOWN</code>. العتبات الحالية
+          (<code>_nonce_like</code>: ≥6 محارف وفيها رقم وحرف) مضبوطة عمداً حتى لا يُخفى
+          رقم كرت مثل <code>0201242548</code>.</td>
+    </tr>
+    <tr>
+      <td class="mono">fingerprint.py · عتبتا التشابه <code>0.995</code> و<code>0.97</code></td>
+      <td>الأولى لمقارنة «الشكل» بالخط الأساس، والثانية للحالة+الشكل معاً.</td>
+      <td>خفض <code>0.995</code> ⇒ صفحات مختلفة تُسمّى رفضاً؛ رفعها ⇒ كل شيء
+          <code>UNKNOWN</code>.</td>
+    </tr>
+    <tr>
+      <td class="mono">config.py · <code>REJECT_WORDS</code> / <code>ACCEPT_WORDS</code> /
+          <code>BAN_WORDS</code></td>
+      <td>قوائم كلمات تُطابق <b>كلمة كاملة</b>. وفي <code>Judge.__init__</code> تُستبعد
+          أي كلمة موجودة أصلاً في صفحة الرفض أو الدخول.</td>
+      <td>إضافة كلمة عامة مثل «error» أو «welcome» بلا اختبار ⇒ تصنيفات خاطئة على كل شبكة.
+          وكلمة حجب موجودة في تذييل صفحة الدخول كانت سبباً في توقف تشغيلات على شبكات سليمة
+          (لذلك <code>_is_protective_reply</code> يتجاهل الكلمة إن كان نموذج الدخول ما زال ظاهراً).</td>
+    </tr>
+    <tr>
+      <td class="mono">engine.py · <code>_verify_hit</code></td>
+      <td>فرعان: إن كان الجهاز <b>ONLINE أصلاً</b> ففحص الإنترنت لا يثبت شيئاً
+          (السبب <code>accepted_internet_already_open</code> والثقة ≤0.85)،
+          وإلا فحص حقيقي ثم <code>portal_status_page</code>.</td>
+      <td>حذف فرع «متصل أصلاً» ⇒ كل بطاقة تُسمّى «مؤكدة» على جهاز لديه إنترنت من شبكة أخرى.</td>
+    </tr>
+    <tr>
+      <td class="mono">engine.py · <code>_register_hit</code></td>
+      <td><code>ACCEPTED_VERIFIED</code> ⇒ إيقاف <b>غير مشروط</b> بـ<code>found_verified</code>
+          (حتى لو كان <code>auto_stop</code> مطفأً).</td>
+      <td>الاستمرار بعد فتح الإنترنت يعني إرسال محاولات إلى بوابة مفتوحة، وقد «تُتحقق»
+          كروت خاطئة زوراً بسبب نفس الانتقال.</td>
+    </tr>
+    <tr>
+      <td class="mono">engine.py · <code>_verification_serialized</code> داخل <code>_run</code></td>
+      <td>إن كانت الحالة <code>WALLED</code> والتحقق مفعّل ⇒ <b>threads = 1</b> حكماً.</td>
+      <td>التشغيل المتوازي مع تحقق مشترك على مستوى الجهاز يجعل انتقال الإنترنت
+          يُنسب إلى بطاقة أخرى (اختبار
+          <code>t_verified_hit_stops_before_shared_online_false_hits</code> يغطي هذا).</td>
+    </tr>
+    <tr>
+      <td class="mono">engine.py · <code>_start_watchdog</code></td>
+      <td>يعمل فقط إن كانت الحالة قبل التشغيل <code>WALLED</code>. عند <code>ONLINE</code>
+          ينسخ <code>_since_check</code> كمشتبه بها ويتوقف بـ<code>internet_opened</code>.</td>
+      <td>تسميته «إصابة» بدل «مشتبه بها» = كذب صريح: لا نعرف أي كرت فتح الشبكة.
+          وتعطيله ⇒ راوترات «يُدخلك ويردّ بصفحة الرفض» تضيّع الكرت الصالح تماماً.</td>
+    </tr>
+    <tr>
+      <td class="mono">engine.py · <code>calibrate</code> فرع <code>probe_looked_accepted</code></td>
+      <td>إن بدت بطاقة تجريبية مقبولة ⇒ تُخرج من عيّنات الرفض ويُعاد التعلّم بدونها.</td>
+      <td>إبقاؤها ⇒ الأداة تتعلّم <b>صفحة النجاح</b> كصفحة رفض، فكل نجاح لاحق يُسمّى مرفوضاً.</td>
+    </tr>
+    <tr>
+      <td class="mono">engine.py · <code>_tune_with_known_card</code> شرط
+          <code>logout_state == "WALLED"</code></td>
+      <td>الدليل يُصفَّر (<code>evidence = 0.0</code>) إن لم يعد الجهاز خلف البوابة بعد الخروج.</td>
+      <td>قبول نجاح بدون تأكيد الخروج ⇒ (1) كرت المستخدم يبقى مستهلكاً، و(2) «النجاح»
+          قد يكون حالة شبكة سابقة.</td>
+    </tr>
+    <tr>
+      <td class="mono">engine.py · <code>_known_card_preflight</code> ·
+          <code>logout_unconfirmed</code></td>
+      <td>إن لم يُؤكَّد الخروج تُوقف المعايرة بالكامل ولا يبدأ التخمين.</td>
+      <td>المتابعة تعني إرسال آلاف المحاولات على بوابة قد تكون مفتوحة بكرت المستخدم.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="coverage">الخطر الثالث: المحاسبة (أن تقول الأداة إنها جرّبت ما لم تجرّبه)</h2>
+<table class="t">
+  <thead><tr><th>المكان</th><th>لماذا حساس</th><th>لو غيّرته</th></tr></thead>
+  <tbody>
+    <tr>
+      <td class="mono">engine.py · حساب <code>resume_pos</code> في <code>_run</code></td>
+      <td><code>processed = مجموع العدّادات − _retry_processed</code> ثم
+          <code>refused = _unevaluated + len(_pending)</code>،
+          و<code>resume_pos = start_pos + processed − refused</code>.</td>
+      <td>نسيان طرح <code>refused</code> ⇒ كل كرت حُجب أو لم يصل له رد يُحسب «مغطّى»
+          ولا يُسأل عنه أبداً في التشغيل التالي — أي أن الكرت الصالح قد يُفقد إلى الأبد.</td>
+    </tr>
+    <tr>
+      <td class="mono">engine.py · <code>_retry_later</code> + <code>_finish_retries</code></td>
+      <td>الكروت بلا رد تُعاد إلى الطابور (حتى <code>MAX_CARD_RETRIES</code>)
+          <b>بعد</b> انتظار تفريغ الطابور الحالي، وبـ<code>put(timeout=0.2)</code> في حلقة.</td>
+      <td>استخدام <code>put_nowait</code> ⇒ يفقد الكرت كلما امتلأ الطابور.
+          والنظر إلى <code>_pending</code> قبل تفريغ الطابور ⇒ سباق كان يضيّع
+          آخر الإخفاقات قرب نهاية التشغيل.</td>
+    </tr>
+    <tr>
+      <td class="mono">engine.py · حلقة المنتج <code>task_q.put(…, timeout=0.2)</code></td>
+      <td><code>put</code> محدود بزمن داخل <code>while not stop_event</code>، مع
+          <code>for…else: break</code>.</td>
+      <td><code>put()</code> غير المحدود ⇒ إيقاف التشغيل يعلّق المنتج إلى الأبد
+          (هذا بالضبط كان يعلّق النسخة القديمة).</td>
+    </tr>
+    <tr>
+      <td class="mono">engine.py · تفريغ الطابور وحساب <code>dropped</code></td>
+      <td>ما يبقى في الطابور بعد الإيقاف يُفرَّغ ويُحسب في <code>progress["dropped"]</code>
+          ولا يُحسب «مجرَّباً».</td>
+      <td>إخفاء <code>dropped</code> ⇒ تقرير يقول «جرّبنا 2000» وهو جرّب 1800.</td>
+    </tr>
+    <tr>
+      <td class="mono">engine.py · <code>_emit_net_error</code> +
+          <code>_record_transport_health</code></td>
+      <td>«لا رد» يُحسب <code>NET_ERROR</code> ويُعلَّم الكرت غير مُقيَّم، وثلاثة إخفاقات نقل
+          متتالية ⇒ <code>target_unreachable</code>.</td>
+      <td>حذف <code>_unevaluated++</code> ⇒ انقطاع الشبكة يُحسب تغطيةً للفضاء.</td>
+    </tr>
+    <tr>
+      <td class="mono">engine.py · <code>warm_up</code> يُرجع <code>None</code></td>
+      <td>بلا صفحة لا توجد جلسة ⇒ الكرت لا يُرسل أصلاً (<code>no_session</code>).</td>
+      <td>الإرسال بلا جلسة ⇒ الراوتر يرفض <b>شكل الطلب</b> لا الكرت، فتحسب الأداة
+          آلاف الرفضات الكاذبة.</td>
+    </tr>
+    <tr>
+      <td class="mono">engine.py · <code>absorb_form</code> شرط <code>if not form.inputs: return p</code></td>
+      <td>صفحة بلا نموذج (حجب/خطأ/دخول ناجح) يجب ألا تستبدل أسماء الحقول،
+          لأن <code>parse_form</code> ترجع افتراضياً <code>username/password</code>.</td>
+      <td>حذف الشرط ⇒ بروفايل عامل يكسر بصمت في منتصف التشغيل.</td>
+    </tr>
+    <tr>
+      <td class="mono">engine.py · <code>_attempt</code> ابتلاع النموذج داخل
+          <code>profile.clear(); profile.update(fresh)</code></td>
+      <td>يحدّث قاموس <b>العامل نفسه</b> في مكانه (وليس <code>self.profile</code> العام).</td>
+      <td>تحديث <code>self.profile</code> من خيط عامل ⇒ سباق على قاموس مشترك بين كل الخيوط.</td>
+    </tr>
+    <tr>
+      <td class="mono">engine.py · <code>counters/reason_counts/net_kinds/_ban_count</code>
+          كلها داخل <code>with self.lock</code></td>
+      <td>كل الخيوط تكتب فيها.</td>
+      <td>تحديث ضائع في <code>_ban_count</code> ⇒ صفحة حجب لا توقف التشغيل.</td>
+    </tr>
+    <tr>
+      <td class="mono">store.py · <code>decode_card</code> / <code>card_at_walk_pos</code></td>
+      <td>تحويل رقم ↔ بطاقة بأساس <code>len(set(charset))</code>، ومشي مخلوط
+          <code>(b + a·pos) mod space</code> حيث <code>a</code> أولي نسبياً مع <code>space</code>.</td>
+      <td>تغيير <code>sorted(set(charset))</code> إلى <code>charset</code> مباشرة ⇒
+          أبجدية فيها تكرار تُنتج بطاقات مكرّرة وتنكسر المقابلة 1:1.
+          وتغيير <code>_coprime</code> ⇒ مسار يكرر بطاقات ويتخطى أخرى.</td>
+    </tr>
+    <tr>
+      <td class="mono">store.py · <code>space_size</code> شرط <code>chars &lt; 2</code></td>
+      <td>أبجدية من رمز واحد تعني فضاءً صفرياً (لا شيء يُخمَّن).</td>
+      <td>إلغاء الشرط ⇒ قسمة/أسّ غير منطقي وبروفايل «يعمل» بلا محتوى.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="privacy">الخطر الرابع: الخصوصية والتنقيح (أن تُسرَّب أسرار)</h2>
+<table class="t">
+  <thead><tr><th>المكان</th><th>ما يحميه</th><th>لو ضعفته</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">capture.py · <code>SECRET_NAME_RE</code> و<code>TOKEN_NAME_RE</code></td>
+        <td>أي اسم حقل فيه pass/user/card/token/csrf/nonce/session/chap/cookie/auth/secret/otp
+            يُعتبر سرّاً ⇒ لا تُحفظ قيمته.</td>
+        <td>تضييق النمط ⇒ اسم حقل غريب مثل <code>cred</code> أو <code>otp2</code> يُحفظ بقيمة
+            الكرت في التقرير.</td></tr>
+    <tr><td class="mono">capture.py · <code>looks_live_token</code></td>
+        <td>قيمة ≥8 محارف بشكل hex أو base64-ish ⇒ تُعتبر رمزاً حياً وتُحذف.</td>
+        <td>تعطيلها ⇒ رموز جلسات حية تُكتب على القرص.</td></tr>
+    <tr><td class="mono">capture.py · <code>redact_fields</code> / <code>field_shape</code></td>
+        <td>يُحفظ <b>الطول والتصنيف</b> فقط (digits/hex32/hex/alnum/other/empty).</td>
+        <td>حفظ القيمة بدل التصنيف = تسريب مباشر.</td></tr>
+    <tr><td class="mono">capture.py · <code>_scrub</code> في <code>_build_report</code></td>
+        <td>يمسح كل قيمة سرّية رُصدت من <b>كامل نص JSON</b> (بصيغتيها الخام والمهرَّبة).</td>
+        <td>حذفه ⇒ قد تبقى القيمة مدفونة داخل حدث أو رابط.</td></tr>
+    <tr><td class="mono">capture.py · <code>export_curl</code></td>
+        <td>كل حقل سرّي أو رمزي ⇒ <code>&lt;redacted&gt;</code>، والترويسات المخصصة أسماء فقط.</td>
+        <td>أمر curl قابل للتنفيذ يحتوي كرت المستخدم.</td></tr>
+    <tr><td class="mono">capture.py · <code>cookie_names_from_session</code> /
+        <code>httpclient.CookieStore.names()</code></td>
+        <td>أسماء الكوكيز فقط، <b>ولا القيم أبداً</b>.</td>
+        <td>قيمة كوكي الجلسة تسمح لأي شخص بانتحال جلسة المسجّل.</td></tr>
+    <tr><td class="mono">portals.py · <code>sanitize_login_url</code> / <code>_safe_page_url</code></td>
+        <td>رابط منسوخ فيه <code>?username=…&amp;password=…</code>: تُحذف القيم قبل الحفظ،
+            ويُفتح <b>بدون</b> الكرت قبل الفحص.</td>
+        <td>حذفه ⇒ الأداة <b>تستهلك كرتاً صالحاً</b> أثناء الفحص، وتكتبه في
+            <code>profiles.json</code>.</td></tr>
+    <tr><td class="mono">engine.py · <code>_without_query_fields</code> / <code>_get_request_url</code></td>
+        <td>في طلبات GET تُستبدل قيم <code>username/password</code> في مكانها بدل إضافة
+            نسخة ثانية.</td>
+        <td>الإضافة بدل الاستبدال ⇒ راوتر يأخذ أول قيمة فيستمر في اختبار الكرت القديم
+            في كل محاولة (عطل صامت كان يضيّع التشغيل كاملاً).</td></tr>
+    <tr><td class="mono">engine.py · <code>_safe_url_shape</code> / <code>safe_request_shape</code></td>
+        <td>شكل الطلب المعروض في الواجهة: <code>[CARD]</code> / <code>[EMPTY]</code> /
+            <code>[REDACTED]</code>، وحذف <code>userinfo@</code> من العنوان.</td>
+        <td>عرض الرابط الحقيقي ⇒ رقم الكرت على الشاشة وفي لقطات المستخدم.</td></tr>
+    <tr><td class="mono">engine.py · <code>safe_profile_snapshot</code></td>
+        <td>في التقرير: <code>pass_fixed</code> ⇒ <code>[redacted]</code>،
+            و<code>chap</code> ⇒ وجود/عدم وجود فقط، وأي حقل إضافي باسم سرّي ⇒ <code>[redacted]</code>.</td>
+        <td>التقرير يُشارك مع المشرفين؛ تسريب فيه دائم.</td></tr>
+    <tr><td class="mono">server.py · <code>_safe_calibration_report</code></td>
+        <td>يحذف <code>card_hint</code> و<code>sample_cards</code> وأي مفتاح فيه
+            cookie/csrf/token/challenge وأي مفتاح اسمه <code>text</code>.</td>
+        <td>تقرير المعايرة يحتوي نصوص ردود كاملة وأرقام كروت تجريبية.</td></tr>
+    <tr><td class="mono">store.py · <code>redact_review_body</code></td>
+        <td>يحذف عناوين MAC وIPv4 من صفحات المراجعة قبل كتابتها
+            (<code>[mac-redacted]</code> / <code>[ip-redacted]</code>).</td>
+        <td>صفحة المراجعة قد تحمل هوية جهاز الضيف (MAC) — وهي بيانات شخصية.</td></tr>
+    <tr><td class="mono">server.py · <code>/api/profiles/import</code> ·
+        <code>prof["pass_fixed"] = ""</code></td>
+        <td>لا يستورد كلمة مرور ثابتة من ملف محرَّر يدوياً.</td>
+        <td>استيراد أسرار من ملف مجهول المصدر.</td></tr>
+    <tr><td class="mono">capture.py · <code>learn_words</code> + <code>_visible_body_text</code></td>
+        <td>كلمات النجاح تُؤخذ من <b>نص &lt;body&gt; المرئي فقط</b> (لا head ولا script ولا style
+            ولا خصائص meta)، وتُحذف منها القيم التي أدخلها المستخدم.</td>
+        <td>التعلّم من HTML الخام ⇒ كلمات مثل «windows» و«apple» و«icon» تصبح «كلمات نجاح»،
+            وقيمة الكرت نفسها قد تُتعلَّم ككلمة نجاح.</td></tr>
+  </tbody>
+</table>
+
+<h2 id="sandbox">الخطر الخامس: عزل المسجّل (أن يصل كود البوابة إلى أداتك)</h2>
+<table class="t">
+  <thead><tr><th>المكان</th><th>ما يحميه</th><th>لو ضعفته</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">capture.py · <code>VIEW_PAGE</code> ·
+        <code>&lt;iframe sandbox="allow-scripts allow-forms"&gt;</code></td>
+        <td>أصل معتم (opaque origin): كود البوابة لا يقرأ ملفاتك ولا يستدعي API الأداة
+            ولا يصل إلى <code>localStorage</code>.</td>
+        <td>إضافة <code>allow-same-origin</code> ⇒ بوابة خبيثة تستدعي
+            <code>/api/run/start</code> أو تقرأ <code>/api/report</code> برمزانك.</td></tr>
+    <tr><td class="mono">capture.py · <code>rewrite_html</code></td>
+        <td>يحقن <code>Content-Security-Policy: connect-src 'none'; form-action 'none'</code>
+            + <code>&lt;base href&gt;</code> + <code>window.__KP__</code> + <code>INTERCEPTOR</code>.</td>
+        <td>حذف CSP ⇒ الصفحة ترسل <code>fetch</code> مباشرة إلى أي مكان
+            (وتفقد الأداة قدرتها على إعادة الإرسال بجلسة خاضعة للرقابة).</td></tr>
+    <tr><td class="mono">capture.py · <code>is_kirapass_url</code> + <code>Hub.step</code>
+        (<code>blocked_kirapass_target</code>)</td>
+        <td>أي طلب من البوابة نحو <code>127.0.0.1/localhost/::1</code> أو نحو مسار
+            <code>/api/</code> أو <code>/capture</code> أو أصل الأداة ⇒ <b>يُمنع</b>.</td>
+        <td>بوابة أسر خبيثة تستطيع استطلاع أو مهاجمة واجهة الأداة المحلية (SSRF محلي).</td></tr>
+    <tr><td class="mono">capture.py · <code>INTERCEPTOR</code> دالة <code>forbidden()</code></td>
+        <td>نفس المنع من داخل الإطار (خط دفاع ثانٍ قبل <code>postMessage</code>).</td>
+        <td>الاعتماد على جهة واحدة فقط يترك ثغرة إن اختُصر أحدهما.</td></tr>
+    <tr><td class="mono">capture.py · <code>Hub._remember</code> (حد 8 جلسات)</td>
+        <td>يغلق أقدم الجلسات حتى لا تتراكم اتصالات وكوكيز مفتوحة.</td>
+        <td>تسريب موارد وجلسات حيّة بلا حد.</td></tr>
+    <tr><td class="mono">capture.py · <code>_is_login_form</code> داخل <code>Hub.mark</code></td>
+        <td>لا يقبل تعليم «نجاح/إحصائيات» لصفحة ما زال فيها نموذج دخول.</td>
+        <td>تعليم صفحة الدخول كصفحة نجاح ⇒ كلمات النجاح تُؤخذ من صفحة الرفض
+            فيصبح كل رفض نجاحاً.</td></tr>
+    <tr><td class="mono">ui.js · <code>openReview</code> ·
+        <code>&lt;iframe sandbox srcdoc=…&gt;</code></td>
+        <td>صفحات المراجعة (HTML من راوتر غريب) تُعرض في إطار معزول تماماً.</td>
+        <td>عرضها بـ<code>innerHTML</code> أو بدون <code>sandbox</code> ⇒ تنفيذ كود
+            من صفحة الراوتر داخل نطاق أداتك.</td></tr>
+    <tr><td class="mono">ui.js · <code>esc()</code> قبل أي <code>innerHTML</code></td>
+        <td>كل قيمة قادمة من الراوتر (نص صفحة، رابط تحويل، كلمة، اسم حقل) تُهرَّب.</td>
+        <td>XSS: راوتر يعيد <code>&lt;img onerror=…&gt;</code> داخل رسالة خطأ
+            ينفّذ كوداً في صفحة أداتك (التي تملك الرمز!).</td></tr>
+  </tbody>
+</table>
+
+<h2 id="server">الخطر السادس: السيرفر والوصول</h2>
+<table class="t">
+  <thead><tr><th>المكان</th><th>لماذا حساس</th><th>لو غيّرته</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">server.py · <code>Handler._authorized</code></td>
+        <td>العميل المحلي مسموح دائماً؛ وغيره يلزمه الرمز، والمقارنة بـ
+            <code>hmac.compare_digest</code> (زمن ثابت).</td>
+        <td>مقارنة بـ<code>==</code> ⇒ يمكن استعادة الرمز بايتاً بايتاً من زمن الاستجابة.
+            وإلغاء الرمز مع <code>--host 0.0.0.0</code> ⇒ أي جهاز على الشبكة يشغّل تخميناً.</td></tr>
+    <tr><td class="mono">server.py · <code>do_GET</code> — المسارات الثابتة قبل التفويض</td>
+        <td><code>/</code> و<code>/ui.js</code> و<code>/ui.css</code> و<code>/favicon.ico</code>
+            تُخدم بلا رمز <b>عمداً</b> حتى تستطيع الصفحة أن تطلب الرمز من المستخدم.</td>
+        <td>إضافة أي مسار حساس قبل فحص <code>_authorized()</code> ⇒ مكشوف للشبكة.
+            (لاحظ أن <code>/capture/view</code> يأتي <b>بعد</b> الفحص.)</td></tr>
+    <tr><td class="mono">server.py · <code>/api/quit</code> ·
+        <code>threading.Timer(0.4, srv.shutdown)</code></td>
+        <td>الإيقاف من خيط منفصل.</td>
+        <td>استدعاء <code>shutdown()</code> داخل معالج الطلب ⇒ <b>deadlock</b>
+            (لأن <code>serve_forever</code> هو من ينفّذ المعالج).</td></tr>
+    <tr><td class="mono">server.py · <code>KiraServer.server_bind</code></td>
+        <td>يتجاوز <code>socket.getfqdn()</code>.</td>
+        <td>استدعاء الأصل ⇒ البحث عن الاسم قد يعلّق ثوانٍ على جهاز بمحلل DNS بطيء.</td></tr>
+    <tr><td class="mono">server.py · <code>_send</code> ترويسات الأمان</td>
+        <td><code>Cache-Control: no-store</code> · <code>X-Content-Type-Options: nosniff</code>
+            · <code>Referrer-Policy: no-referrer</code>.</td>
+        <td>التخزين المؤقت ⇒ تقارير/رموز تبقى في كاش المتصفح على جهاز مشترك.</td></tr>
+    <tr><td class="mono">server.py · <code>/api/review/file</code> و<code>/api/report</code> ·
+        <code>os.path.basename(name)</code></td>
+        <td>يمنع اجتياز المسارات (<code>../../etc/passwd</code>).</td>
+        <td>استخدام <code>name</code> مباشرة ⇒ قراءة أي ملف يقرأه المستخدم.</td></tr>
+    <tr><td class="mono">cli.py · <code>main</code> تحذير <code>--host 0.0.0.0</code></td>
+        <td>الرمز يُرسل بلا TLS على شبكة محلية.</td>
+        <td>حذف التحذير أو توليد رمز ثابت ⇒ مستخدم يفتح أداته على شبكة مقهى.</td></tr>
+    <tr><td class="mono">config.py · <code>VERIFY_TLS = False</code></td>
+        <td>بوابات الأسر تستخدم شهادات موقّعة ذاتياً، فالتحقق يفشل دائماً.</td>
+        <td>تشغيله ⇒ <code>tls</code> error على معظم البوابات. لكن انتبه: معطّل
+            يعني <b>لا تحقق من الشهادة</b> — لا ترسل كروتاً حقيقية عبر بوابة
+            <code>https</code> عامة.</td></tr>
+  </tbody>
+</table>
+
+<h2 id="network">الخطر السابع: النقل (أن تقيس الأداة شيئاً غير الراوتر)</h2>
+<table class="t">
+  <thead><tr><th>المكان</th><th>لماذا حساس</th><th>لو غيّرته</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">httpclient.py · <code>Session._send_once</code> فصل
+        <code>connect_timeout</code> عن <code>read_timeout</code></td>
+        <td>مرحلة فتح المقبس ملفوفة بـ<code>try</code> خاص يرفع
+            <code>NetError("connect_timeout")</code>.</td>
+        <td>بدون الفصل يدمج بايثون المرحلتين في <code>TimeoutError</code> واحد
+            ⇒ كل راوتر ميت يبدو «بطيئاً» بدل «غير قابل للوصول»، فتنصح الأداة نصيحة خاطئة.</td></tr>
+    <tr><td class="mono">httpclient.py · إعادة المحاولة الصامتة الواحدة
+        (<code>for attempt in range(2)</code>)</td>
+        <td>اتصال keep-alive مغلق من الراوتر (<code>stale</code>) يُعاد مرة واحدة بعد 50ms.</td>
+        <td>إعادة لا نهائية ⇒ حلقة على راوتر ميت. وإلغاؤها ⇒ كل طلب ثانٍ يفشل
+            على راوتر يغلق الاتصالات الخاملة.</td></tr>
+    <tr><td class="mono">httpclient.py · <code>if raw.will_close: self.close()</code></td>
+        <td>يحترم طلب الراوتر إغلاق الاتصال.</td>
+        <td>إعادة استخدام مقبس مغلق ⇒ <code>RemoteDisconnected</code> على كل طلب تالٍ.</td></tr>
+    <tr><td class="mono">httpclient.py · <code>CookieStore.update/header</code></td>
+        <td>مطابقة النطاق والمسار و<code>secure</code> قبل إرسال الكوكي.</td>
+        <td>إرسال كوكي جلسة بوابة إلى موقع فحص الإنترنت ⇒ تسريب رمز جلسة إلى طرف ثالث.</td></tr>
+    <tr><td class="mono">engine.py · <code>browser_headers</code> —
+        <code>Origin</code> على POST فقط</td>
+        <td>المتصفح يرسل <code>Origin</code> مع إرسال نموذج، لا مع تنقل GET عادي.</td>
+        <td>إرساله على GET ⇒ بوابة كانت تعمل مع رابط المتصفح المنسوخ تبدأ برفض شكل الطلب.</td></tr>
+    <tr><td class="mono">engine.py · <code>browser_headers</code> — <code>Referer</code> منقّى</td>
+        <td>يُمرَّر عبر <code>_without_query_fields</code> حتى لا يُصدى كرت حقيقي من رابط منسوخ.</td>
+        <td>كرت المستخدم يُرسل في ترويسة وقد يُسجَّل في سجلّات الراوتر.</td></tr>
+    <tr><td class="mono">engine.py · <code>new_session(for_attack=True)</code></td>
+        <td>يستخدم <code>ATTACK_READ_TIMEOUT</code> (5 ثوانٍ) بدل مهلة القراءة العادية (8).</td>
+        <td>مهلة أطول أثناء التشغيل ⇒ خيوط معلّقة ووتيرة أبطأ بكثير مما يرى المستخدم.</td></tr>
+    <tr><td class="mono">engine.py · <code>send_login</code> · <code>allow_redirects=False</code></td>
+        <td><b>يجب</b> رؤية ترويسة <code>Location</code> — فهي دليل الخروج من البوابة.</td>
+        <td>اتباع التحويلات ⇒ الدليل يختفي وكل نجاح يصبح صفحة 200 غامضة.</td></tr>
+    <tr><td class="mono">verify.py · <code>probe_internet</code> · <code>allow_redirects=False</code></td>
+        <td>التحويل إلى صفحة الدخول هو <b>الدليل</b> على أننا خلف الجدار.</td>
+        <td>اتباع التحويل ⇒ <code>WALLED</code> لا تُكتشف أبداً وتصبح كل شيء ONLINE/OFFLINE.</td></tr>
+    <tr><td class="mono">errors.py · <code>classify</code> — ترتيب الفروع</td>
+        <td><code>socket.timeout</code> بعد <code>RemoteDisconnected</code> و<code>IncompleteRead</code>،
+            ومطابقة النص تأتي بعد مطابقة الأنواع.</td>
+        <td>تغيير الترتيب ⇒ أخطاء تُصنَّف في <code>kind</code> خاطئ، فتنقلب النصيحة
+            المعروضة للمستخدم (و<code>retryable</code> معه).</td></tr>
+    <tr><td class="mono">errors.py · <code>RETRY_KINDS</code> / <code>KINDS[kind][0]</code></td>
+        <td>يحدد ما يُعاد تلقائياً: <code>stale</code>, <code>reset</code>, <code>read_timeout</code>,
+            <code>bad_response</code>, <code>unknown</code>.</td>
+        <td>إضافة <code>refused</code> أو <code>dns</code> ⇒ الأداة تطرق باباً مقفولاً
+            آلاف المرات بدل أن تخبر المستخدم أنه غير متصل.</td></tr>
+  </tbody>
+</table>
+
+<h2 id="storage">الخطر الثامن: التخزين والمسح (أن تحذف الأداة نتائجك)</h2>
+<table class="t">
+  <thead><tr><th>المكان</th><th>لماذا حساس</th><th>لو غيّرته</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">store.py · <code>clear_cache</code> — فصل النطاقات</td>
+        <td><code>temp</code> يحذف <code>cache/</code> و<code>review/</code> فقط.
+            <code>hits.txt</code> و<code>runs/</code> و<code>logs/</code> ضمن <code>results</code>
+            أو <code>all</code> حصراً.</td>
+        <td>إضافة <code>HITS_FILE</code> إلى <code>temp</code> ⇒ «مسح الكاش» يحذف
+            البطاقات التي وجدتها المستخدم بصمت.</td></tr>
+    <tr><td class="mono">store.py · <code>_remove_path</code></td>
+        <td>يميّز الملف من المجلد، ويحسب البايتات المحرَّرة فعلاً.</td>
+        <td><code>shutil.rmtree(..., ignore_errors=True)</code> على <b>ملف</b> لا يفعل شيئاً
+            بصمت — وهذا كيف كان <code>hits.txt</code> يُدرَج «محذوفاً» دون حذفه.</td></tr>
+    <tr><td class="mono">store.py · <code>seen_paths</code> في <code>clear_cache</code></td>
+        <td>نمطا <code>__pycache__</code> متداخلان؛ المجموعة تمنع العدّ المزدوج.</td>
+        <td>رقم «المساحة المحررة» يصبح كذبة.</td></tr>
+    <tr><td class="mono">store.py · <code>atomic_write</code></td>
+        <td>كتابة إلى <code>.tmp</code> ثم <code>os.replace()</code>، مع محاولتين
+            تتحمّلان حذف المجلد.</td>
+        <td>كتابة مباشرة ⇒ قارئ (الصفحة أو تشغيل ثانٍ) يرى نصف JSON فينهار التحليل
+            وتضيع البروفايلات.</td></tr>
+    <tr><td class="mono">store.py · <code>migrate</code> + <code>new_profile</code></td>
+        <td><code>p.update({k: v for k, v in raw.items() if k in p})</code> —
+            أي مفتاح غير موجود في <code>new_profile()</code> <b>يُسقط</b>.</td>
+        <td>إضافة حقل في مكان آخر دون <code>new_profile()</code> ⇒ يختفي عند كل حفظ،
+            ويظهر كعطل «الإعداد لا يُحفظ».</td></tr>
+    <tr><td class="mono">store.py · <code>migrate</code> · <code>sanitize_login_url</code> في النهاية</td>
+        <td>بروفايلات قديمة قد تحتوي رابط GET ناجحاً بالكرت والتجزئة.</td>
+        <td>حذف هذا السطر ⇒ أسرار قديمة تبقى في <code>profiles.json</code> إلى الأبد.</td></tr>
+    <tr><td class="mono">store.py · <code>cleanup_old_reports</code></td>
+        <td>يحذف تقارير أقدم من <code>REPORT_RETENTION_DAYS</code>،
+            <b>ولا يلمس</b> <code>hits.txt</code> أو البروفايلات.</td>
+        <td>توسيعه ليشمل مجلد البيانات كله ⇒ حذف نتائج المستخدم بلا طلب.</td></tr>
+    <tr><td class="mono">store.py · <code>save_review</code> · <code>index[-500:]</code> ·
+        <code>[:400000]</code></td>
+        <td>حدّ لعدد المداخل ولحجم الصفحة المحفوظة.</td>
+        <td>بلا حد ⇒ قرص المستخدم يمتلئ بصفحات HTML من راوتر.</td></tr>
+    <tr><td class="mono">engine.py · <code>_save_unknown</code> · <code>_unknown_saved &gt;= 50</code></td>
+        <td>حتى 50 صفحة مراجعة لكل تشغيل.</td>
+        <td>إلغاء الحد ⇒ آلاف الملفات في تشغيل واحد.</td></tr>
+  </tbody>
+</table>
+
+<h2 id="ui">الخطر التاسع: الواجهة (أن تُظهر شيئاً كاذباً أو تُعطّل حماية)</h2>
+<table class="t">
+  <thead><tr><th>المكان</th><th>لماذا حساس</th><th>لو غيّرته</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">ui.js · <code>requestSettingsSignature</code> +
+        <code>S.calibrationSignature</code></td>
+        <td>بصمة إعدادات الطلب؛ إن تغيّرت بعد الاختبار ⇒ يُطلب اختبار جديد قبل التشغيل.</td>
+        <td>حذف المقارنة ⇒ تشغيل بشكل طلب لم يُختبر (آلاف الطلبات المرفوضة 400).</td></tr>
+    <tr><td class="mono">ui.js · <code>knownCardFormatProblem</code></td>
+        <td>يتأكد أن البطاقة التي اختُبرت تطابق الصيغة في الخطوة الثانية
+            (الطول/البادئة/اللاحقة/الأبجدية).</td>
+        <td>بدونه ⇒ تختبر كرتاً بطول 10 ثم تخمّن بطاقات طولها 8، فلا يُطابق أيٌّ منها
+            ما اختُبر.</td></tr>
+    <tr><td class="mono">ui.js · <code>calibrationProfileFromForm</code></td>
+        <td>يبني صيغة مؤقتة واسعة للبطاقة المعروفة فقط (بادئة فارغة،
+            طول = طول الكرت، أبجدية = أرقام + محارف الكرت).</td>
+        <td>استخدام صيغة التخمين الحقيقية هنا ⇒ <code>bench_cards</code> قد لا تنتج شيئاً
+            أو تنتج كروتاً لا تشبه كرتك.</td></tr>
+    <tr><td class="mono">ui.js · <code>step()</code> اعتراض <code>format/run</code></td>
+        <td>في مسار «بروفايل جديد» لا يمكن تجاوز الفحص بدون معايرة ناجحة.</td>
+        <td>إزالة الاعتراض ⇒ المستخدم يصل إلى التشغيل بلا دليل أن الشكل صحيح.</td></tr>
+    <tr><td class="mono">ui.js · <code>payload.preflight_only = true</code> في <code>startRun</code></td>
+        <td>عند بداية التشغيل تُعاد تجربة البطاقة المعروفة <b>مرة واحدة</b>؛ إن لم يثبت
+            الإنترنت يتوقف قبل التخمين.</td>
+        <td>إلغاؤه في مسار البروفايل الجديد ⇒ تشغيل كامل على شبكة قد تكون تغيّرت.</td></tr>
+    <tr><td class="mono">ui.js · <code>renderStatus</code> · <code>S.lastSeq</code></td>
+        <td>الاستطلاع التزايدي: <code>?since=lastSeq</code> ومنع تكرار الأحداث.</td>
+        <td>تصفير <code>lastSeq</code> في كل استطلاع ⇒ جدول السجل يمتلئ بآلاف الصفوف المكررة.</td></tr>
+    <tr><td class="mono">ui.js · <code>addRow</code> حد 400 صف</td>
+        <td>يحذف أقدم صف عند تجاوز 400.</td>
+        <td>بلا حد ⇒ المتصفح يختنق على الهاتف بعد عشرات آلاف المحاولات.</td></tr>
+    <tr><td class="mono">ui.js · <code>api()</code> · معالجة <code>server_gone</code> و401</td>
+        <td>انقطاع السيرفر ⇒ نافذة «الأداة توقفت» بدل تجميد الصفحة؛
+            401 ⇒ <code>askToken()</code>.</td>
+        <td>حذفها ⇒ صفحة ميتة بلا تفسير (أكثر شكوى مربكة للمستخدم).</td></tr>
+    <tr><td class="mono">ui.js · <code>TOKEN</code> في <code>localStorage</code></td>
+        <td>راحة للمستخدم على شبكة محلية.</td>
+        <td>لا تنقل هذا النمط إلى أي سياق غير محلي؛ الرمز يُرسل بلا TLS.</td></tr>
+    <tr><td class="mono">ui.html · <code>sandbox="allow-scripts allow-forms"</code> (داخل
+        <code>VIEW_PAGE</code> في capture.py)</td>
+        <td>عزل البوابة.</td>
+        <td>انظر قسم العزل أعلاه.</td></tr>
+    <tr><td class="mono">ui.css · أصناف <code>.v-ACCEPTED_VERIFIED</code> وغيرها</td>
+        <td>اسم الصنف = كود الحكم (يُبنى في <code>addRow</code> بـ
+            <code>"v-" + code</code>).</td>
+        <td>إعادة تسمية صنف ⇒ النتائج تفقد ألوانها (وتفقد وضوحها البصري).</td></tr>
+  </tbody>
+</table>
+
+<h2 id="tests-dangers">اختبارات تحرس هذه الأماكن</h2>
+<p>إن كسر تعديلُك أحد هذه الاختبارات فأنت على الأرجح في منطقة خطر:</p>
+<table class="t compact">
+  <thead><tr><th>الاختبار</th><th>ماذا يحرس</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">t_no_false_hits</td><td>50 كرتاً خاطئاً ⇒ صفر إصابات</td></tr>
+    <tr><td class="mono">t_find_card</td><td>الكرت الصالح يُوجد <b>ويُتحقق</b> من الإنترنت</td></tr>
+    <tr><td class="mono">t_verified_hit_stops_before_shared_online_false_hits</td>
+        <td>التحقق المسلسَل ومنع إصابات زائدة</td></tr>
+    <tr><td class="mono">t_ban_is_reported</td><td>الحجب يُسمّى حجباً ويوقف التشغيل</td></tr>
+    <tr><td class="mono">t_rate_limit_stops</td><td>429 يبطئ ويوقف</td></tr>
+    <tr><td class="mono">t_dropped_connections</td><td>الاتصالات المقطوعة تُحسب ولا تُخفى</td></tr>
+    <tr><td class="mono">t_dead_target_stops</td><td>الراوتر الميت ⇒ <code>target_unreachable</code></td></tr>
+    <tr><td class="mono">t_chap_portal</td><td>اكتشاف صيغة <code>md5.js</code></td></tr>
+    <tr><td class="mono">t_resume_continues</td><td>التشغيل الثاني يُكمل ولا يُعيد</td></tr>
+    <tr><td class="mono">t_cache_clear</td><td>مسح المؤقت لا يأكل النتائج</td></tr>
+    <tr><td class="mono">t_legacy_profile</td><td>بروفايل قديم لا يُسقط حقولاً ولا ينهار</td></tr>
+    <tr><td class="mono">t_calibration</td><td>خط أساس الرفض يُتعلَّم رغم الرموز المتغيّرة</td></tr>
+  </tbody>
+</table>
+
+<footer class="docfoot">أماكن الخطر · KiraPass — <code>docs/site/danger.html</code></footer>
+
+</main>
+</div>
+<script src="assets/docs.js"></script>
+<script>KPInit("danger");</script>
+</body>
+</html>

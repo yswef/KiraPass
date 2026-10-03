@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>مصدر cli.py · KiraPass</title>
+<link rel="stylesheet" href="../assets/docs.css">
+
+</head>
+<body>
+<div id="kp-layout">
+<main class="doc">
+<h1>مصدر <code>cli.py</code></h1>
+<p class="lead">سطر الأوامر: الخيارات، الطباعة، تشغيل السيرفر — 196 سطراً. كل سطر يحمل تعليقه العربي.</p>
+<div class="card info"><b>هذه الصفحة مولّدة آلياً</b> من مصدر الكود مباشرة (<code>tools/docs/build_docs.py</code>). إن غيّرت الكود فأعد توليدها: <code>python3 tools/docs/build_docs.py</code>. الشرح اليدوي الأوسع في <a href="../architecture.html">المعمارية</a> و<a href="../editing.html">دليل التعديل</a> و<a href="../danger.html">أماكن الخطر</a>.</div>
+<p><a class="btn" href="../files/cli.html">← صفحة الشرح</a> <label class="muted"> قفز إلى سطر: <input id="kp-jump" style="width:6rem" placeholder="123"></label></p>
+<details class="src" open><summary>المصدر كاملاً</summary><pre data-lines="196"><code>
+<span class="ln" id="L1">1</span># بداية نص متعدد الأسطر — الأسطر التالية نصّ حرفي لا كود، فلا يقبل تعليقاً
+<span class="ln" id="L2">2</span>&quot;&quot;&quot;Command line entry point.
+<span class="ln" id="L3">3</span> 
+<span class="ln" id="L4">4</span>The command line is intentionally tiny now: it only starts the local web UI,
+<span class="ln" id="L5">5</span>clears the cache, or runs the self-test.  Every question is asked in the
+<span class="ln" id="L6">6</span>browser, which is what makes the tool usable on a phone as well.
+<span class="ln" id="L7">7</span>&quot;&quot;&quot;  # نهاية النص متعدد الأسطر
+<span class="ln" id="L8">8</span> 
+<span class="ln" id="L9">9</span>from __future__ import annotations  # استيراد annotations من الوحدة __future__
+<span class="ln" id="L10">10</span> 
+<span class="ln" id="L11">11</span>import argparse  # استيراد الوحدة argparse من المكتبة
+<span class="ln" id="L12">12</span>import os  # استيراد الوحدة os من المكتبة
+<span class="ln" id="L13">13</span>import secrets  # استيراد الوحدة secrets من المكتبة
+<span class="ln" id="L14">14</span>import socket  # استيراد الوحدة socket من المكتبة
+<span class="ln" id="L15">15</span>import sys  # استيراد الوحدة sys من المكتبة
+<span class="ln" id="L16">16</span>import webbrowser  # استيراد الوحدة webbrowser من المكتبة
+<span class="ln" id="L17">17</span> 
+<span class="ln" id="L18">18</span>from . import config, store  # استيراد config, store من الوحدة .
+<span class="ln" id="L19">19</span>from .httpclient import local_ip  # استيراد local_ip من الوحدة httpclient
+<span class="ln" id="L20">20</span> 
+<span class="ln" id="L21">21</span> 
+<span class="ln" id="L22">22</span>def build_parser() -&gt; argparse.ArgumentParser:  # تعريف الدالة build_parser() ترجع argparse.ArgumentParser
+<span class="ln" id="L23">23</span>    p = argparse.ArgumentParser(  # إسناد نتيجة استدعاء argparse.ArgumentParser (prog=…، description=…، epilog=…) إلى p
+<span class="ln" id="L24">24</span>        prog=&quot;KiraPass&quot;,  # المعامل المسمّى prog
+<span class="ln" id="L25">25</span>        description=&quot;Authorized hotspot/captive-portal security testing tool. &quot;  # المعامل المسمّى description
+<span class="ln" id="L26">26</span>                    &quot;Runs a small local web page - open it and answer there.&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L27">27</span>        epilog=&quot;Use only on networks you own or have written permission to test.&quot;)  # المعامل المسمّى epilog
+<span class="ln" id="L28">28</span>    p.add_argument(&quot;--host&quot;, default=os.environ.get(&quot;KIRAPASS_HOST&quot;, &quot;127.0.0.1&quot;),  # استدعاء p.add_argument (معامل واحد، default=…، help=…)
+<span class="ln" id="L29">29</span>                   help=&quot;127.0.0.1 (default, this machine only) or 0.0.0.0 &quot;  # المعامل المسمّى help
+<span class="ln" id="L30">30</span>                        &quot;(also reachable from your phone on the same wifi - &quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L31">31</span>                        &quot;a token is then required)&quot;)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L32">32</span>    p.add_argument(&quot;--port&quot;, type=int, default=int(os.environ.get(&quot;KIRAPASS_PORT&quot;,  # استدعاء p.add_argument (معامل واحد، type=…، default=…، help=…)
+<span class="ln" id="L33">33</span>                                                                  8770)),  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L34">34</span>                   help=&quot;port for the local page (default 8770)&quot;)  # المعامل المسمّى help
+<span class="ln" id="L35">35</span>    p.add_argument(&quot;--token&quot;, default=&quot;auto&quot;,  # استدعاء p.add_argument (معامل واحد، default=…، help=…)
+<span class="ln" id="L36">36</span>                   help=&quot;auto (default) | off | your-own-secret&quot;)  # المعامل المسمّى help
+<span class="ln" id="L37">37</span>    p.add_argument(&quot;--no-browser&quot;, action=&quot;store_true&quot;,  # استدعاء p.add_argument (معامل واحد، action=…، help=…)
+<span class="ln" id="L38">38</span>                   help=&quot;do not open the browser automatically&quot;)  # المعامل المسمّى help
+<span class="ln" id="L39">39</span>    p.add_argument(&quot;--lang&quot;, choices=[&quot;ar&quot;, &quot;en&quot;], help=&quot;UI language&quot;)  # استدعاء p.add_argument (معامل واحد، choices=…، help=…)
+<span class="ln" id="L40">40</span>    p.add_argument(&quot;--clear-cache&quot;, nargs=&quot;?&quot;, const=&quot;temp&quot;,  # استدعاء p.add_argument (معامل واحد، nargs=…، const=…، choices=…، help=…)
+<span class="ln" id="L41">41</span>                   choices=[&quot;temp&quot;, &quot;results&quot;, &quot;profiles&quot;, &quot;all&quot;],  # المعامل المسمّى choices
+<span class="ln" id="L42">42</span>                   help=&quot;delete tool data and exit (temp=review+cache, &quot;  # المعامل المسمّى help
+<span class="ln" id="L43">43</span>                        &quot;results=reports+logs+hits, profiles, all)&quot;)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L44">44</span>    p.add_argument(&quot;--selftest&quot;, action=&quot;store_true&quot;,  # استدعاء p.add_argument (معامل واحد، action=…، help=…)
+<span class="ln" id="L45">45</span>                   help=&quot;run the built-in test against local mock routers&quot;)  # المعامل المسمّى help
+<span class="ln" id="L46">46</span>    p.add_argument(&quot;--check&quot;, action=&quot;store_true&quot;,  # استدعاء p.add_argument (معامل واحد، action=…، help=…)
+<span class="ln" id="L47">47</span>                   help=&quot;check python version, folders and write permissions&quot;)  # المعامل المسمّى help
+<span class="ln" id="L48">48</span>    p.add_argument(&quot;--version&quot;, action=&quot;store_true&quot;, help=&quot;print the version&quot;)  # استدعاء p.add_argument (معامل واحد، action=…، help=…)
+<span class="ln" id="L49">49</span>    return p  # إرجاع p
+<span class="ln" id="L50">50</span> 
+<span class="ln" id="L51">51</span> 
+<span class="ln" id="L52">52</span>def banner(url: str, lan: str, token: str) -&gt; str:  # تعريف الدالة banner(url, lan, token) ترجع str
+<span class="ln" id="L53">53</span>    bar = &quot;─&quot; * 62  # حساب ضرب بين &#x27;─&#x27; و62 وإسناده إلى bar
+<span class="ln" id="L54">54</span>    lines = [  # إسناد قائمة إلى lines
+<span class="ln" id="L55">55</span>        &quot;&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L56">56</span>        f&quot;  {config.APP_NAME} v{config.VERSION}  ·  authorized testing only&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L57">57</span>        f&quot;  {bar}&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L58">58</span>        f&quot;  Open this link / افتح هذا الرابط:&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L59">59</span>        f&quot;      {url}&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L60">60</span>    ]  # إغلاق القوس المفتوح في السطر السابق
+<span class="ln" id="L61">61</span>    if lan and token:  # شرط مركّب (و)
+<span class="ln" id="L62">62</span>        lines += [  # تحديث lines بعملية جمع
+<span class="ln" id="L63">63</span>            f&quot;  From your phone (same wifi) / من الهاتف على نفس الشبكة:&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L64">64</span>            f&quot;      {lan}&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L65">65</span>            f&quot;  token: {token}&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L66">66</span>        ]  # إغلاق القوس المفتوح في السطر السابق
+<span class="ln" id="L67">67</span>    lines += [  # تحديث lines بعملية جمع
+<span class="ln" id="L68">68</span>        f&quot;  {bar}&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L69">69</span>        &quot;  Stop the tool with Ctrl+C  ·  لإيقاف الأداة اضغط Ctrl+C&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L70">70</span>        &quot;&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L71">71</span>    ]  # إغلاق القوس المفتوح في السطر السابق
+<span class="ln" id="L72">72</span>    return &quot;\n&quot;.join(lines)  # إرجاع &#x27;\n&#x27;.join(lines)
+<span class="ln" id="L73">73</span> 
+<span class="ln" id="L74">74</span> 
+<span class="ln" id="L75">75</span>def free_port(host: str, wanted: int, tries: int = 25) -&gt; int:  # تعريف الدالة free_port(host, wanted, tries) ترجع int
+<span class="ln" id="L76">76</span>    for candidate in range(wanted, wanted + tries):  # دورة على range(wanted, جمع) باسم candidate
+<span class="ln" id="L77">77</span>        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:  # سياق مُدار: socket.socket(socket.AF_INET, socket.SOCK_STREAM) باسم s
+<span class="ln" id="L78">78</span>            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # استدعاء s.setsockopt (3 معاملات)
+<span class="ln" id="L79">79</span>            try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L80">80</span>                s.bind((host, candidate))  # استدعاء s.bind (معامل واحد)
+<span class="ln" id="L81">81</span>                return candidate  # إرجاع candidate
+<span class="ln" id="L82">82</span>            except OSError:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L83">83</span>                continue  # الانتقال إلى الدورة التالية
+<span class="ln" id="L84">84</span>    return wanted  # إرجاع wanted
+<span class="ln" id="L85">85</span> 
+<span class="ln" id="L86">86</span> 
+<span class="ln" id="L87">87</span>def cmd_clear_cache(scope: str) -&gt; int:  # تعريف الدالة cmd_clear_cache(scope) ترجع int
+<span class="ln" id="L88">88</span>    st = store.Store()  # إسناد نتيجة استدعاء store.Store إلى st
+<span class="ln" id="L89">89</span>    info = st.cache_info()  # إسناد نتيجة استدعاء st.cache_info إلى info
+<span class="ln" id="L90">90</span>    print(f&quot;  cache before: {info[&#x27;total_bytes&#x27;] / 1024:.1f} KB&quot;)  # استدعاء print (معامل واحد)
+<span class="ln" id="L91">91</span>    result = st.clear_cache(scope)  # إسناد نتيجة استدعاء st.clear_cache (معامل واحد) إلى result
+<span class="ln" id="L92">92</span>    print(f&quot;  scope       : {result[&#x27;scope&#x27;]}&quot;)  # استدعاء print (معامل واحد)
+<span class="ln" id="L93">93</span>    print(f&quot;  removed     : {&#x27;, &#x27;.join(result[&#x27;removed&#x27;]) or &#x27;nothing&#x27;}&quot;)  # استدعاء print (معامل واحد)
+<span class="ln" id="L94">94</span>    print(f&quot;  freed       : {result[&#x27;freed_human&#x27;]}&quot;)  # استدعاء print (معامل واحد)
+<span class="ln" id="L95">95</span>    print(&quot;  done.&quot;)  # استدعاء print (معامل واحد)
+<span class="ln" id="L96">96</span>    return 0  # إرجاع 0
+<span class="ln" id="L97">97</span> 
+<span class="ln" id="L98">98</span> 
+<span class="ln" id="L99">99</span>def cmd_check() -&gt; int:  # تعريف الدالة cmd_check() ترجع int
+<span class="ln" id="L100">100</span>    print(f&quot;  python      : {sys.version.split()[0]} ({sys.executable})&quot;)  # استدعاء print (معامل واحد)
+<span class="ln" id="L101">101</span>    print(f&quot;  platform    : {sys.platform} / {os.name}&quot;)  # استدعاء print (معامل واحد)
+<span class="ln" id="L102">102</span>    try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L103">103</span>        store.ensure_dirs()  # استدعاء store.ensure_dirs
+<span class="ln" id="L104">104</span>        probe = os.path.join(config.DATA_DIR, &quot;.write-test&quot;)  # إسناد نتيجة استدعاء os.path.join (2 معاملات) إلى probe
+<span class="ln" id="L105">105</span>        with open(probe, &quot;w&quot;, encoding=&quot;utf-8&quot;) as fh:  # سياق مُدار: open(probe, &#x27;w&#x27;, encoding=&#x27;utf-8&#x27;) باسم fh
+<span class="ln" id="L106">106</span>            fh.write(&quot;ok&quot;)  # استدعاء fh.write (معامل واحد)
+<span class="ln" id="L107">107</span>        os.remove(probe)  # استدعاء os.remove (معامل واحد)
+<span class="ln" id="L108">108</span>        print(f&quot;  data folder : {config.DATA_DIR} (writable)&quot;)  # استدعاء print (معامل واحد)
+<span class="ln" id="L109">109</span>    except OSError as exc:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L110">110</span>        print(f&quot;  data folder : NOT writable -&gt; {exc}&quot;)  # استدعاء print (معامل واحد)
+<span class="ln" id="L111">111</span>        return 1  # إرجاع 1
+<span class="ln" id="L112">112</span>    print(&quot;  dependencies: none needed (standard library only)&quot;)  # استدعاء print (معامل واحد)
+<span class="ln" id="L113">113</span>    try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L114">114</span>        # استيراد engine, fingerprint, httpclient, portals, verify من الوحدة .
+<span class="ln" id="L115">115</span>        from . import engine, fingerprint, httpclient, portals, verify  # noqa: F401
+<span class="ln" id="L116">116</span>        print(&quot;  modules     : import OK&quot;)  # استدعاء print (معامل واحد)
+<span class="ln" id="L117">117</span>    # تكملة السطر السابق داخل القوس
+<span class="ln" id="L118">118</span>    except Exception as exc:                              # noqa: BLE001
+<span class="ln" id="L119">119</span>        print(f&quot;  modules     : IMPORT FAILED -&gt; {exc}&quot;)  # استدعاء print (معامل واحد)
+<span class="ln" id="L120">120</span>        return 1  # إرجاع 1
+<span class="ln" id="L121">121</span>    return 0  # إرجاع 0
+<span class="ln" id="L122">122</span> 
+<span class="ln" id="L123">123</span> 
+<span class="ln" id="L124">124</span>def cmd_selftest() -&gt; int:  # تعريف الدالة cmd_selftest() ترجع int
+<span class="ln" id="L125">125</span>    from . import selftest  # استيراد selftest من الوحدة .
+<span class="ln" id="L126">126</span>    print(&quot;  KiraPass self-test - local mock routers only, no real network\n&quot;)  # استدعاء print (معامل واحد)
+<span class="ln" id="L127">127</span>    summary = selftest.run_all(verbose=True)  # إسناد نتيجة استدعاء selftest.run_all (verbose=…) إلى summary
+<span class="ln" id="L128">128</span>    return 0 if summary[&quot;ok&quot;] else 1  # إرجاع 0 إن summary[&#x27;ok&#x27;] وإلا 1
+<span class="ln" id="L129">129</span> 
+<span class="ln" id="L130">130</span> 
+<span class="ln" id="L131">131</span># يحلّل سطر الأوامر ثم يشغّل السيرفر ويطبع الرابط والرمز.
+<span class="ln" id="L132">132</span># --host 0.0.0.0 يطبع تحذيراً: الرمز يُرسل بلا TLS على شبكة محلية.
+<span class="ln" id="L133">133</span>def main(argv=None) -&gt; int:  # تعريف الدالة main(argv) ترجع int
+<span class="ln" id="L134">134</span>    args = build_parser().parse_args(argv)  # إسناد نتيجة استدعاء build_parser().parse_args (معامل واحد) إلى args
+<span class="ln" id="L135">135</span> 
+<span class="ln" id="L136">136</span>    if args.version:  # شرط: args.version
+<span class="ln" id="L137">137</span>        print(f&quot;{config.APP_NAME} {config.VERSION}&quot;)  # استدعاء print (معامل واحد)
+<span class="ln" id="L138">138</span>        return 0  # إرجاع 0
+<span class="ln" id="L139">139</span>    if args.check:  # شرط: args.check
+<span class="ln" id="L140">140</span>        return cmd_check()  # إرجاع cmd_check()
+<span class="ln" id="L141">141</span>    if args.clear_cache:  # شرط: args.clear_cache
+<span class="ln" id="L142">142</span>        return cmd_clear_cache(args.clear_cache)  # إرجاع cmd_clear_cache(args.clear_cache)
+<span class="ln" id="L143">143</span>    if args.selftest:  # شرط: args.selftest
+<span class="ln" id="L144">144</span>        return cmd_selftest()  # إرجاع cmd_selftest()
+<span class="ln" id="L145">145</span> 
+<span class="ln" id="L146">146</span>    st = store.Store()  # إسناد نتيجة استدعاء store.Store إلى st
+<span class="ln" id="L147">147</span>    if args.lang:  # شرط: args.lang
+<span class="ln" id="L148">148</span>        st.set_setting(&quot;lang&quot;, args.lang)  # استدعاء st.set_setting (2 معاملات)
+<span class="ln" id="L149">149</span> 
+<span class="ln" id="L150">150</span>    host = args.host  # إسناد args.host إلى host
+<span class="ln" id="L151">151</span>    port = free_port(host, args.port)  # إسناد نتيجة استدعاء free_port (2 معاملات) إلى port
+<span class="ln" id="L152">152</span>    token = &quot;&quot;  # إسناد القيمة الثابتة token
+<span class="ln" id="L153">153</span>    if host not in (&quot;127.0.0.1&quot;, &quot;localhost&quot;):  # شرط: host ليس ضمن مجموعة
+<span class="ln" id="L154">154</span>        # إسناد secrets.token_urlsafe(9) إن مقارنة وإلا &#x27;&#x27; إن مقارنة وإلا args.token إلى token
+<span class="ln" id="L155">155</span>        token = secrets.token_urlsafe(9) if args.token == &quot;auto&quot; else \
+<span class="ln" id="L156">156</span>            (&quot;&quot; if args.token == &quot;off&quot; else args.token)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L157">157</span>        print(  # استدعاء print (معامل واحد، flush=…)
+<span class="ln" id="L158">158</span>            &quot;\n  ⚠  WARNING / تحذير:\n&quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L159">159</span>            &quot;  --host 0.0.0.0 opens the UI on the LAN over plain HTTP.\n&quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L160">160</span>            &quot;  The access token is sent without TLS — use only on a network\n&quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L161">161</span>            &quot;  you trust. Prefer 127.0.0.1 when possible.\n&quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L162">162</span>            &quot;  فتح الواجهة على 0.0.0.0 يرسل الرمز بدون تشفير؛ استخدمه فقط\n&quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L163">163</span>            &quot;  على شبكة تثق بها.\n&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L164">164</span>            flush=True,  # المعامل المسمّى flush
+<span class="ln" id="L165">165</span>        )  # إغلاق القوس المفتوح في السطر السابق
+<span class="ln" id="L166">166</span>    elif args.token not in (&quot;auto&quot;, &quot;off&quot;):  # شرط: args.token ليس ضمن مجموعة
+<span class="ln" id="L167">167</span>        token = args.token  # إسناد args.token إلى token
+<span class="ln" id="L168">168</span> 
+<span class="ln" id="L169">169</span>    from .web.server import serve  # استيراد serve من الوحدة web.server
+<span class="ln" id="L170">170</span> 
+<span class="ln" id="L171">171</span>    shown = {&quot;url&quot;: &quot;&quot;, &quot;lan&quot;: &quot;&quot;}  # إسناد قاموس إلى shown
+<span class="ln" id="L172">172</span> 
+<span class="ln" id="L173">173</span>    def on_ready(real_port, real_token):  # تعريف الدالة on_ready(real_port, real_token)
+<span class="ln" id="L174">174</span>        base_local = f&quot;http://127.0.0.1:{real_port}/&quot;  # بناء نص منسّق وإسناده إلى base_local
+<span class="ln" id="L175">175</span>        query = f&quot;?token={real_token}&quot; if real_token else &quot;&quot;  # إسناد نص منسّق (f-string) إن real_token وإلا &#x27;&#x27; إلى query
+<span class="ln" id="L176">176</span>        shown[&quot;url&quot;] = base_local + query  # حساب جمع بين base_local وquery وإسناده إلى shown[&#x27;url&#x27;]
+<span class="ln" id="L177">177</span>        shown[&quot;lan&quot;] = &quot;&quot;  # إسناد القيمة الثابتة shown[&#x27;lan&#x27;]
+<span class="ln" id="L178">178</span>        if host not in (&quot;127.0.0.1&quot;, &quot;localhost&quot;):  # شرط: host ليس ضمن مجموعة
+<span class="ln" id="L179">179</span>            shown[&quot;lan&quot;] = f&quot;http://{local_ip()}:{real_port}/{query}&quot;  # بناء نص منسّق وإسناده إلى shown[&#x27;lan&#x27;]
+<span class="ln" id="L180">180</span>        print(banner(shown[&quot;url&quot;], shown[&quot;lan&quot;], real_token), flush=True)  # استدعاء print (معامل واحد، flush=…)
+<span class="ln" id="L181">181</span>        if not args.no_browser and not os.environ.get(&quot;KIRAPASS_NO_BROWSER&quot;):  # شرط مركّب (و)
+<span class="ln" id="L182">182</span>            try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L183">183</span>                webbrowser.open(shown[&quot;url&quot;])  # استدعاء webbrowser.open (معامل واحد)
+<span class="ln" id="L184">184</span>            except Exception:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L185">185</span>                pass  # سطر فارغ منطقياً (pass) — مطلوب صياغياً
+<span class="ln" id="L186">186</span> 
+<span class="ln" id="L187">187</span>    try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L188">188</span>        serve(host=host, port=port, token=token, on_ready=on_ready)  # استدعاء serve (host=…، port=…، token=…، on_ready=…)
+<span class="ln" id="L189">189</span>    except OSError as exc:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L190">190</span>        print(f&quot;  could not start the server on {host}:{port} -&gt; {exc}&quot;)  # استدعاء print (معامل واحد)
+<span class="ln" id="L191">191</span>        return 1  # إرجاع 1
+<span class="ln" id="L192">192</span>    except KeyboardInterrupt:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L193">193</span>        pass  # سطر فارغ منطقياً (pass) — مطلوب صياغياً
+<span class="ln" id="L194">194</span>    print(&quot;\n  stopped.&quot;)  # استدعاء print (معامل واحد)
+<span class="ln" id="L195">195</span>    return 0  # إرجاع 0
+<span class="ln" id="L196">196</span> 
+</code></pre></details>
+<script>
+document.getElementById("kp-jump").addEventListener("change", function (e) {
+  var n = parseInt(e.target.value, 10);
+  if (n > 0) { var el = document.getElementById("L" + n);
+    if (el) el.scrollIntoView({block: "center"}); }
+});
+if (location.hash) { var el = document.querySelector(location.hash);
+  if (el) setTimeout(function () { el.scrollIntoView({block: "center"}); }, 60); }
+</script>
+<footer class="docfoot">صفحة مولّدة آلياً من مصدر الكود · KiraPass —
+<code>files</code> · 2026-10-01 02:26</footer>
+</main>
+</div>
+<script src="../assets/docs.js"></script>
+<script>KPInit("files");</script>
+</body>
+</html>
