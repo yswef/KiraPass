@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ملف web/server.py · KiraPass</title>
+<link rel="stylesheet" href="../assets/docs.css">
+
+</head>
+<body>
+<div id="kp-layout">
+<main class="doc">
+<h1>ملف <code>web/server.py</code></h1>
+<p class="lead">سيرفر الويب: المسارات، التفويض، المهام — <code>kirapass/web/server.py</code></p>
+<div class="card info"><b>هذه الصفحة مولّدة آلياً</b> من مصدر الكود مباشرة (<code>tools/docs/build_docs.py</code>). إن غيّرت الكود فأعد توليدها: <code>python3 tools/docs/build_docs.py</code>. الشرح اليدوي الأوسع في <a href="../architecture.html">المعمارية</a> و<a href="../editing.html">دليل التعديل</a> و<a href="../danger.html">أماكن الخطر</a>.</div>
+<div class="grid3"><div class="card"><b>696</b><br>سطراً</div><div class="card"><b>34</b><br>دالة</div><div class="card"><b>3</b><br>صنف</div></div>
+<div class="note"><b>ملخّص المؤلف للملف (نصه الأصلي بالإنجليزية):</b> <span class="muted">The local web server: one page, four steps, all the answers as JSON.</span></div>
+<p><a class="btn primary" href="../src/server.html">افتح المصدر كاملاً مرقّماً</a></p>
+<h2 id="imports">الاستيرادات</h2><table class="t compact"><thead><tr><th>السطر</th><th>الاستيراد</th><th>لماذا</th></tr></thead><tbody>
+<tr><td class="mono">14</td><td class="mono">from __future__ import annotations</td><td>استيراد annotations من الوحدة __future__</td></tr>
+<tr><td class="mono">16</td><td class="mono">import hmac</td><td>استيراد الوحدة hmac من المكتبة</td></tr>
+<tr><td class="mono">17</td><td class="mono">import json</td><td>استيراد الوحدة json من المكتبة</td></tr>
+<tr><td class="mono">18</td><td class="mono">import os</td><td>استيراد الوحدة os من المكتبة</td></tr>
+<tr><td class="mono">19</td><td class="mono">import threading</td><td>استيراد الوحدة threading من المكتبة</td></tr>
+<tr><td class="mono">20</td><td class="mono">import time</td><td>استيراد الوحدة time من المكتبة</td></tr>
+<tr><td class="mono">21</td><td class="mono">import uuid</td><td>استيراد الوحدة uuid من المكتبة</td></tr>
+<tr><td class="mono">22</td><td class="mono">from concurrent.futures import ThreadPoolExecutor</td><td>استيراد ThreadPoolExecutor من الوحدة concurrent.futures</td></tr>
+<tr><td class="mono">23</td><td class="mono">from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer</td><td>استيراد BaseHTTPRequestHandler, ThreadingHTTPServer من الوحدة http.server</td></tr>
+<tr><td class="mono">24</td><td class="mono">from urllib.parse import parse_qs, urlsplit</td><td>استيراد parse_qs, urlsplit من الوحدة urllib.parse</td></tr>
+<tr><td class="mono">26</td><td class="mono">from .. import capture, config, engine, portals, store, verify</td><td>استيراد capture, config, engine, portals, store, verify من الوحدة .</td></tr>
+<tr><td class="mono">27</td><td class="mono">from ..httpclient import Session</td><td>استيراد Session من الوحدة httpclient</td></tr>
+<tr><td class="mono">28</td><td class="mono">from ..version_helpers import package_dir</td><td>استيراد package_dir من الوحدة version_helpers</td></tr>
+</tbody></table>
+<h2 id="vars">متغيرات وثوابت على مستوى الوحدة</h2><div class="scroll-x"><table class="t compact"><thead><tr><th>الاسم</th><th>السطر</th><th>القيمة</th><th>الشرح</th></tr></thead><tbody>
+<tr><td class="mono"><span class="tag var">STATIC</span></td><td class="mono"><a href="../src/server.html#L30">30</a></td><td class="mono">package_dir(&#x27;web&#x27;)</td><td>إسناد نتيجة استدعاء package_dir (معامل واحد) إلى STATIC</td></tr>
+</tbody></table></div>
+<h2 id="classes">الأصناف</h2>
+<div class="sym head" id="c-Job"><span class="tag mod">صنف</span> <b>Job</b> <a class="tag api" href="../src/server.html#L64">سطر 64</a><div>تعريف الصنف Job</div></div>
+<div class="sym body">دواله: <a href="#f-Job.__init__"><code>__init__</code></a> · <a href="#f-Job.run"><code>run</code></a> · <a href="#f-Job.as_dict"><code>as_dict</code></a></div>
+<div class="sym head" id="c-KiraServer"><span class="tag mod">صنف</span> <b>KiraServer</b> يرث من ThreadingHTTPServer <a class="tag api" href="../src/server.html#L94">سطر 94</a><div>تعريف الصنف KiraServer يرث من ThreadingHTTPServer</div></div>
+<div class="sym body">دواله: <a href="#f-KiraServer.server_bind"><code>server_bind</code></a> · <a href="#f-KiraServer.__init__"><code>__init__</code></a> · <a href="#f-KiraServer.submit"><code>submit</code></a> · <a href="#f-KiraServer.job"><code>job</code></a></div>
+<div class="sym head" id="c-Handler"><span class="tag mod">صنف</span> <b>Handler</b> يرث من BaseHTTPRequestHandler <a class="tag api" href="../src/server.html#L136">سطر 136</a><div>تعريف الصنف Handler يرث من BaseHTTPRequestHandler</div></div>
+<div class="sym body">دواله: <a href="#f-Handler.log_message"><code>log_message</code></a> · <a href="#f-Handler._send"><code>_send</code></a> · <a href="#f-Handler._json"><code>_json</code></a> · <a href="#f-Handler._error"><code>_error</code></a> · <a href="#f-Handler._body"><code>_body</code></a> · <a href="#f-Handler._authorized"><code>_authorized</code></a> · <a href="#f-Handler.do_GET"><code>do_GET</code></a> · <a href="#f-Handler.do_POST"><code>do_POST</code></a> · <a href="#f-Handler._static"><code>_static</code></a> · <a href="#f-Handler._api_get"><code>_api_get</code></a> · <a href="#f-Handler._api_post"><code>_api_post</code></a> · <a href="#f-Handler._internet_checks"><code>_internet_checks</code></a> · <a href="#f-Handler._probe_link"><code>_probe_link</code></a> · <a href="#f-Handler._scan"><code>_scan</code></a> · <a href="#f-Handler._preview"><code>_preview</code></a> · <a href="#f-Handler._guard"><code>_guard</code></a> · <a href="#f-Handler._capture_start"><code>_capture_start</code></a> · <a href="#f-Handler._capture_step"><code>_capture_step</code></a> · <a href="#f-Handler._capture_mark"><code>_capture_mark</code></a> · <a href="#f-Handler._capture_finish"><code>_capture_finish</code></a> · <a href="#f-Handler._capture_status"><code>_capture_status</code></a> · <a href="#f-Handler._capture_report"><code>_capture_report</code></a> · <a href="#f-Handler._capture_view"><code>_capture_view</code></a></div>
+<h2 id="funcs">الدوال — واحدة واحدة</h2>
+<div class="sym head" id="f-_safe_calibration_report"><span class="tag fn">دالة</span> <b>_safe_calibration_report(value, profile, key)</b>
+ <a class="tag api" href="../src/server.html#L34">سطر 34–57</a>
+<div>تنقيح تقرير المعايرة: حذف card_hint وsample_cards وكل مفتاح يحوي سرّاً. <span class="muted">(نص المؤلف الأصلي في docstring: Redact card hints and sensitive URL/query material from report text.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>5 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>low, out, sensitive_names</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/engine.html#f-_safe_url_shape"><code>_safe_url_shape</code></a><span class="muted">×1 سطر 54</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/server.html#f-Handler._api_post"><code>Handler._api_post</code></a> <span class="muted">(server.py:367)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-_json_bytes"><span class="tag fn">دالة</span> <b>_json_bytes(obj)</b>
+ <span class="muted">→ bytes</span>
+ <a class="tag api" href="../src/server.html#L60">سطر 60–61</a>
+<div>تعريف الدالة _json_bytes(obj) ترجع bytes</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/server.html#f-Handler._json"><code>Handler._json</code></a> <span class="muted">(server.py:162)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Job.__init__"><span class="tag fn">دالة</span> <b>Job.__init__(self, kind, fn)</b>
+ <a class="tag api" href="../src/server.html#L65">سطر 65–73</a>
+<div>تعريف الدالة __init__(self, kind, fn)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>يُسند إلى</th><td><code>self._fn, self.error, self.finished, self.id, self.kind, self.result, self.started, self.state</code></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Job.run"><span class="tag fn">دالة</span> <b>Job.run(self)</b>
+ <a class="tag api" href="../src/server.html#L75">سطر 75–86</a>
+<div>تعريف الدالة run(self)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>يُسند إلى</th><td><code>self.error, self.finished, self.result, self.state</code></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Job.as_dict"><span class="tag fn">دالة</span> <b>Job.as_dict(self)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/server.html#L88">سطر 88–91</a>
+<div>تعريف الدالة as_dict(self) ترجع dict</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-KiraServer.server_bind"><span class="tag fn">دالة</span> <b>KiraServer.server_bind(self)</b>
+ <a class="tag api" href="../src/server.html#L98">سطر 98–106</a>
+<div>تعريف الدالة server_bind(self) <span class="muted">(نص المؤلف الأصلي في docstring: Bind without socket.getfqdn(): that lookup can hang for seconds on)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>يُسند إلى</th><td><code>self.server_name, self.server_port</code></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-KiraServer.__init__"><span class="tag fn">دالة</span> <b>KiraServer.__init__(self, address, handler, token)</b>
+ <a class="tag api" href="../src/server.html#L108">سطر 108–118</a>
+<div>تعريف الدالة __init__(self, address, handler, token)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>يُسند إلى</th><td><code>self.captures, self.engine, self.jobs, self.jobs_lock, self.pool, self.started, self.store, self.token</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/store.html#f-Store"><code>Store</code></a><span class="muted">×1 سطر 111</span> · <a href="../files/engine.html#f-Engine"><code>Engine</code></a><span class="muted">×1 سطر 112</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-KiraServer.submit"><span class="tag fn">دالة</span> <b>KiraServer.submit(self, kind, fn)</b>
+ <span class="muted">→ Job</span>
+ <a class="tag api" href="../src/server.html#L121">سطر 121–129</a>
+<div>-- المهام ------------------------------------------------------------</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>job, stale</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/server.html#f-Job"><code>Job</code></a><span class="muted">×1 سطر 122 (نفس الملف)</span> · <a href="../files/server.html#f-KiraServer.submit"><code>KiraServer.submit</code></a><span class="muted">×1 سطر 128 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/server.html#f-KiraServer.submit"><code>KiraServer.submit</code></a> <span class="muted">(server.py:128)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-KiraServer.job"><span class="tag fn">دالة</span> <b>KiraServer.job(self, job_id)</b>
+ <a class="tag api" href="../src/server.html#L131">سطر 131–133</a>
+<div>تعريف الدالة job(self, job_id)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Handler.log_message"><span class="tag fn">دالة</span> <b>Handler.log_message(self, fmt, *args)</b>
+ <a class="tag api" href="../src/server.html#L141">سطر 141–143</a>
+<div>-- الأنابيب --------------------------------------------------------</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Handler._send"><span class="tag fn">دالة</span> <b>Handler._send(self, body, code, ctype, extra)</b>
+ <a class="tag api" href="../src/server.html#L145">سطر 145–159</a>
+<div>تعريف الدالة _send(self, body, code, ctype, extra)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>من يناديها</th><td><a href="../files/server.html#f-Handler._api_get"><code>Handler._api_get</code></a> <span class="muted">(server.py:298)</span> <a href="../files/server.html#f-Handler._api_get"><code>Handler._api_get</code></a> <span class="muted">(server.py:307)</span> <a href="../files/server.html#f-Handler._capture_report"><code>Handler._capture_report</code></a> <span class="muted">(server.py:655)</span> <a href="../files/server.html#f-Handler._capture_view"><code>Handler._capture_view</code></a> <span class="muted">(server.py:666)</span> <a href="../files/server.html#f-Handler._json"><code>Handler._json</code></a> <span class="muted">(server.py:162)</span> <a href="../files/server.html#f-Handler._static"><code>Handler._static</code></a> <span class="muted">(server.py:233)</span> <a href="../files/server.html#f-Handler._static"><code>Handler._static</code></a> <span class="muted">(server.py:235)</span> <a href="../files/server.html#f-Handler.do_GET"><code>Handler.do_GET</code></a> <span class="muted">(server.py:208)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Handler._json"><span class="tag fn">دالة</span> <b>Handler._json(self, obj, code)</b>
+ <a class="tag api" href="../src/server.html#L161">سطر 161–162</a>
+<div>تعريف الدالة _json(self, obj, code)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/server.html#f-Handler._send"><code>Handler._send</code></a><span class="muted">×1 سطر 162 (نفس الملف)</span> · <a href="../files/server.html#f-_json_bytes"><code>_json_bytes</code></a><span class="muted">×1 سطر 162 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/server.html#f-Handler._api_get"><code>Handler._api_get</code></a> <span class="muted">(server.py:241)</span> <a href="../files/server.html#f-Handler._api_get"><code>Handler._api_get</code></a> <span class="muted">(server.py:270)</span> <a href="../files/server.html#f-Handler._api_get"><code>Handler._api_get</code></a> <span class="muted">(server.py:277)</span> <a href="../files/server.html#f-Handler._api_get"><code>Handler._api_get</code></a> <span class="muted">(server.py:285)</span> <a href="../files/server.html#f-Handler._api_get"><code>Handler._api_get</code></a> <span class="muted">(server.py:290)</span> <a href="../files/server.html#f-Handler._api_get"><code>Handler._api_get</code></a> <span class="muted">(server.py:292)</span> <a href="../files/server.html#f-Handler._api_get"><code>Handler._api_get</code></a> <span class="muted">(server.py:301)</span> <a href="../files/server.html#f-Handler._api_get"><code>Handler._api_get</code></a> <span class="muted">(server.py:316)</span> <a href="../files/server.html#f-Handler._api_post"><code>Handler._api_post</code></a> <span class="muted">(server.py:337)</span> <a href="../files/server.html#f-Handler._api_post"><code>Handler._api_post</code></a> <span class="muted">(server.py:339)</span> <a href="../files/server.html#f-Handler._api_post"><code>Handler._api_post</code></a> <span class="muted">(server.py:343)</span> <a href="../files/server.html#f-Handler._api_post"><code>Handler._api_post</code></a> <span class="muted">(server.py:352)</span> <a href="../files/server.html#f-Handler._api_post"><code>Handler._api_post</code></a> <span class="muted">(server.py:376)</span> <a href="../files/server.html#f-Handler._api_post"><code>Handler._api_post</code></a> <span class="muted">(server.py:387)</span> <span class="muted">+21 غيرها</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Handler._error"><span class="tag fn">دالة</span> <b>Handler._error(self, message, code, **extra)</b>
+ <a class="tag api" href="../src/server.html#L164">سطر 164–165</a>
+<div>تعريف الدالة _error(self, message, code, **extra)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/server.html#f-Handler._json"><code>Handler._json</code></a><span class="muted">×1 سطر 165 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/server.html#f-Handler._api_get"><code>Handler._api_get</code></a> <span class="muted">(server.py:276)</span> <a href="../files/server.html#f-Handler._api_get"><code>Handler._api_get</code></a> <span class="muted">(server.py:289)</span> <a href="../files/server.html#f-Handler._api_get"><code>Handler._api_get</code></a> <span class="muted">(server.py:297)</span> <a href="../files/server.html#f-Handler._api_get"><code>Handler._api_get</code></a> <span class="muted">(server.py:310)</span> <a href="../files/server.html#f-Handler._api_get"><code>Handler._api_get</code></a> <span class="muted">(server.py:322)</span> <a href="../files/server.html#f-Handler._api_post"><code>Handler._api_post</code></a> <span class="muted">(server.py:423)</span> <a href="../files/server.html#f-Handler._api_post"><code>Handler._api_post</code></a> <span class="muted">(server.py:459)</span> <a href="../files/server.html#f-Handler._api_post"><code>Handler._api_post</code></a> <span class="muted">(server.py:465)</span> <a href="../files/server.html#f-Handler._api_post"><code>Handler._api_post</code></a> <span class="muted">(server.py:502)</span> <a href="../files/server.html#f-Handler._capture_finish"><code>Handler._capture_finish</code></a> <span class="muted">(server.py:636)</span> <a href="../files/server.html#f-Handler._capture_mark"><code>Handler._capture_mark</code></a> <span class="muted">(server.py:627)</span> <a href="../files/server.html#f-Handler._capture_report"><code>Handler._capture_report</code></a> <span class="muted">(server.py:649)</span> <a href="../files/server.html#f-Handler._capture_start"><code>Handler._capture_start</code></a> <span class="muted">(server.py:597)</span> <a href="../files/server.html#f-Handler._capture_start"><code>Handler._capture_start</code></a> <span class="muted">(server.py:601)</span> <span class="muted">+9 غيرها</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Handler._body"><span class="tag fn">دالة</span> <b>Handler._body(self)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/server.html#L167">سطر 167–179</a>
+<div>تعريف الدالة _body(self) ترجع dict</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>4 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>data, length, raw</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/server.html#f-Handler.do_POST"><code>Handler.do_POST</code></a> <span class="muted">(server.py:224)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Handler._authorized"><span class="tag fn">دالة</span> <b>Handler._authorized(self)</b>
+ <span class="muted">→ bool</span>
+ <a class="tag api" href="../src/server.html#L183">سطر 183–194</a>
+<div>العميل المحلي مسموح دائماً؛ وغيره يلزمه الرمز. المقارنة بـhmac.compare_digest (زمن ثابت) حتى لا يُستعاد الرمز من زمن الرد.</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>3 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>given, host, query</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/server.html#f-Handler.do_GET"><code>Handler.do_GET</code></a> <span class="muted">(server.py:209)</span> <a href="../files/server.html#f-Handler.do_POST"><code>Handler.do_POST</code></a> <span class="muted">(server.py:220)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Handler.do_GET"><span class="tag fn">دالة</span> <b>Handler.do_GET(self)</b>
+ <a class="tag api" href="../src/server.html#L199">سطر 199–217</a>
+<div>-- التوجيه --------------------------------------------------------- المسارات الثابتة (/ و/ui.js و/ui.css و/favicon.ico) تُخدم قبل التفويض عمداً حتى تستطيع الصفحة أن تطلب الرمز. /capture/view يأتي بعد الفحص.</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>8 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>route</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/server.html#f-Handler._static"><code>Handler._static</code></a><span class="muted">×3 سطر 202 (نفس الملف)</span> · <a href="../files/server.html#f-Handler._error"><code>Handler._error</code></a><span class="muted">×2 سطر 210 (نفس الملف)</span> · <a href="../files/server.html#f-Handler._send"><code>Handler._send</code></a><span class="muted">×1 سطر 208 (نفس الملف)</span> · <a href="../files/server.html#f-Handler._authorized"><code>Handler._authorized</code></a><span class="muted">×1 سطر 209 (نفس الملف)</span> · <a href="../files/server.html#f-Handler._capture_view"><code>Handler._capture_view</code></a><span class="muted">×1 سطر 212 (نفس الملف)</span> · <a href="../files/server.html#f-Handler._api_get"><code>Handler._api_get</code></a><span class="muted">×1 سطر 214 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Handler.do_POST"><span class="tag fn">دالة</span> <b>Handler.do_POST(self)</b>
+ <a class="tag api" href="../src/server.html#L219">سطر 219–227</a>
+<div>تعريف الدالة do_POST(self)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>3 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>route</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/server.html#f-Handler._error"><code>Handler._error</code></a><span class="muted">×2 سطر 221 (نفس الملف)</span> · <a href="../files/server.html#f-Handler._authorized"><code>Handler._authorized</code></a><span class="muted">×1 سطر 220 (نفس الملف)</span> · <a href="../files/server.html#f-Handler._api_post"><code>Handler._api_post</code></a><span class="muted">×1 سطر 224 (نفس الملف)</span> · <a href="../files/server.html#f-Handler._body"><code>Handler._body</code></a><span class="muted">×1 سطر 224 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Handler._static"><span class="tag fn">دالة</span> <b>Handler._static(self, name, ctype)</b>
+ <a class="tag api" href="../src/server.html#L229">سطر 229–235</a>
+<div>تعريف الدالة _static(self, name, ctype)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>path</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/server.html#f-Handler._send"><code>Handler._send</code></a><span class="muted">×2 سطر 233 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/server.html#f-Handler.do_GET"><code>Handler.do_GET</code></a> <span class="muted">(server.py:202)</span> <a href="../files/server.html#f-Handler.do_GET"><code>Handler.do_GET</code></a> <span class="muted">(server.py:204)</span> <a href="../files/server.html#f-Handler.do_GET"><code>Handler.do_GET</code></a> <span class="muted">(server.py:206)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Handler._api_get"><span class="tag fn">دالة</span> <b>Handler._api_get(self, route, query)</b>
+ <a class="tag api" href="../src/server.html#L238">سطر 238–322</a>
+<div>-- نقاط GET ---------------------------------------------------</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>17 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>content, events, job, name, names, path, prof, since, srv, status</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/server.html#f-Handler._json"><code>Handler._json</code></a><span class="muted">×8 سطر 241 (نفس الملف)</span> · <a href="../files/server.html#f-Handler._error"><code>Handler._error</code></a><span class="muted">×5 سطر 322 (نفس الملف)</span> · <a href="../files/server.html#f-Handler._send"><code>Handler._send</code></a><span class="muted">×2 سطر 298 (نفس الملف)</span> · <a href="../files/server.html#f-_profile_brief"><code>_profile_brief</code></a><span class="muted">×2 سطر 264 (نفس الملف)</span> · <a href="../files/server.html#f-Handler._capture_status"><code>Handler._capture_status</code></a><span class="muted">×1 سطر 318 (نفس الملف)</span> · <a href="../files/server.html#f-Handler._capture_report"><code>Handler._capture_report</code></a><span class="muted">×1 سطر 320 (نفس الملف)</span> · <a href="../files/store.html#f-sample_cards"><code>sample_cards</code></a><span class="muted">×1 سطر 278</span> · <a href="../files/store.html#f-space_size"><code>space_size</code></a><span class="muted">×1 سطر 279</span> · <a href="../files/store.html#f-validate"><code>validate</code></a><span class="muted">×1 سطر 280</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/server.html#f-Handler.do_GET"><code>Handler.do_GET</code></a> <span class="muted">(server.py:214)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Handler._api_post"><span class="tag fn">دالة</span> <b>Handler._api_post(self, route, data)</b>
+ <a class="tag api" href="../src/server.html#L325">سطر 325–502</a>
+<div>-- نقاط POST --------------------------------------------------</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>27 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>CONNECT_TIMEOUT, READ_TIMEOUT, checks, ct, days, freed, hard, job, keyword, known, name, ok, problems, prof, raw, report…</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/server.html#f-Handler._json"><code>Handler._json</code></a><span class="muted">×15 سطر 339 (نفس الملف)</span> · <a href="../files/store.html#f-migrate"><code>migrate</code></a><span class="muted">×6 سطر 332</span> · <a href="../files/server.html#f-Handler._error"><code>Handler._error</code></a><span class="muted">×4 سطر 502 (نفس الملف)</span> · <a href="../files/server.html#f-Handler._internet_checks"><code>Handler._internet_checks</code></a><span class="muted">×4 سطر 348 (نفس الملف)</span> · <a href="../files/server.html#f-_profile_brief"><code>_profile_brief</code></a><span class="muted">×3 سطر 340 (نفس الملف)</span> · <a href="../files/store.html#f-validate"><code>validate</code></a><span class="muted">×2 سطر 333</span> · <a href="../files/server.html#f-Handler._scan"><code>Handler._scan</code></a><span class="muted">×1 سطر 328 (نفس الملف)</span> · <a href="../files/server.html#f-Handler._preview"><code>Handler._preview</code></a><span class="muted">×1 سطر 330 (نفس الملف)</span> · <a href="../files/server.html#f-Handler._probe_link"><code>Handler._probe_link</code></a><span class="muted">×1 سطر 454 (نفس الملف)</span> · <a href="../files/engine.html#f-safe_profile_snapshot"><code>safe_profile_snapshot</code></a><span class="muted">×1 سطر 460</span> · <a href="../files/server.html#f-Handler._capture_start"><code>Handler._capture_start</code></a><span class="muted">×1 سطر 489 (نفس الملف)</span> · <a href="../files/server.html#f-Handler._capture_step"><code>Handler._capture_step</code></a><span class="muted">×1 سطر 491 (نفس الملف)</span> · <a href="../files/server.html#f-Handler._capture_mark"><code>Handler._capture_mark</code></a><span class="muted">×1 سطر 493 (نفس الملف)</span> · <a href="../files/server.html#f-Handler._capture_finish"><code>Handler._capture_finish</code></a><span class="muted">×1 سطر 495 (نفس الملف)</span> · <a href="../files/engine.html#f-Calibration.as_dict"><code>Calibration.as_dict</code></a><span class="muted">×1 سطر 360</span> · <a href="../files/store.html#f-Store"><code>Store</code></a><span class="muted">×1 سطر 426</span> · <a href="../files/engine.html#f-diagnose"><code>diagnose</code></a><span class="muted">×1 سطر 350</span> · <a href="../files/server.html#f-_safe_calibration_report"><code>_safe_calibration_report</code></a><span class="muted">×1 سطر 367 (نفس الملف)</span> · <a href="../files/engine.html#f-probe_lockout"><code>probe_lockout</code></a><span class="muted">×1 سطر 383</span> · <a href="../files/engine.html#f-calibrate"><code>calibrate</code></a><span class="muted">×1 سطر 360</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/server.html#f-Handler.do_POST"><code>Handler.do_POST</code></a> <span class="muted">(server.py:224)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Handler._internet_checks"><span class="tag fn">دالة</span> <b>Handler._internet_checks(self)</b>
+ <a class="tag api" href="../src/server.html#L505">سطر 505–508</a>
+<div>-- مساعدات ---------------------------------------------------------</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>custom</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/verify.html#f-resolve_internet_checks"><code>resolve_internet_checks</code></a><span class="muted">×1 سطر 508</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/server.html#f-Handler._api_post"><code>Handler._api_post</code></a> <span class="muted">(server.py:348)</span> <a href="../files/server.html#f-Handler._api_post"><code>Handler._api_post</code></a> <span class="muted">(server.py:357)</span> <a href="../files/server.html#f-Handler._api_post"><code>Handler._api_post</code></a> <span class="muted">(server.py:381)</span> <a href="../files/server.html#f-Handler._api_post"><code>Handler._api_post</code></a> <span class="muted">(server.py:391)</span> <a href="../files/server.html#f-Handler._scan"><code>Handler._scan</code></a> <span class="muted">(server.py:565)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Handler._probe_link"><span class="tag fn">دالة</span> <b>Handler._probe_link(self, data)</b>
+ <span class="muted">→ None</span>
+ <a class="tag api" href="../src/server.html#L510">سطر 510–546</a>
+<div>تعريف الدالة _probe_link(self, data) ترجع None <span class="muted">(نص المؤلف الأصلي في docstring: Single GET to the login URL — connectivity check, no guessing.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>3 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>err, form, ms, resp, session, t0, url</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/server.html#f-Handler._json"><code>Handler._json</code></a><span class="muted">×2 سطر 523 (نفس الملف)</span> · <a href="../files/httpclient.html#f-Session"><code>Session</code></a><span class="muted">×1 سطر 517</span> · <a href="../files/server.html#f-Handler._error"><code>Handler._error</code></a><span class="muted">×1 سطر 514 (نفس الملف)</span> · <a href="../files/portals.html#f-parse_form"><code>parse_form</code></a><span class="muted">×1 سطر 522</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/server.html#f-Handler._api_post"><code>Handler._api_post</code></a> <span class="muted">(server.py:454)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Handler._scan"><span class="tag fn">دالة</span> <b>Handler._scan(self, data)</b>
+ <span class="muted">→ None</span>
+ <a class="tag api" href="../src/server.html#L548">سطر 548–570</a>
+<div>تعريف الدالة _scan(self, data) ترجع None</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>err, internet, portal, session, t0, url</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/server.html#f-Handler._json"><code>Handler._json</code></a><span class="muted">×2 سطر 566 (نفس الملف)</span> · <a href="../files/httpclient.html#f-Session"><code>Session</code></a><span class="muted">×1 سطر 552</span> · <a href="../files/verify.html#f-probe_internet"><code>probe_internet</code></a><span class="muted">×1 سطر 564</span> · <a href="../files/portals.html#f-discover"><code>discover</code></a><span class="muted">×1 سطر 556</span> · <a href="../files/server.html#f-Handler._internet_checks"><code>Handler._internet_checks</code></a><span class="muted">×1 سطر 565 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/server.html#f-Handler._api_post"><code>Handler._api_post</code></a> <span class="muted">(server.py:328)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Handler._preview"><span class="tag fn">دالة</span> <b>Handler._preview(self, data)</b>
+ <span class="muted">→ None</span>
+ <a class="tag api" href="../src/server.html#L572">سطر 572–587</a>
+<div>تعريف الدالة _preview(self, data) ترجع None</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>prof, request_shape</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/store.html#f-migrate"><code>migrate</code></a><span class="muted">×1 سطر 573</span> · <a href="../files/server.html#f-Handler._json"><code>Handler._json</code></a><span class="muted">×1 سطر 581 (نفس الملف)</span> · <a href="../files/engine.html#f-safe_request_shape"><code>safe_request_shape</code></a><span class="muted">×1 سطر 577</span> · <a href="../files/store.html#f-space_size"><code>space_size</code></a><span class="muted">×1 سطر 582</span> · <a href="../files/store.html#f-variable_len"><code>variable_len</code></a><span class="muted">×1 سطر 583</span> · <a href="../files/store.html#f-sample_cards"><code>sample_cards</code></a><span class="muted">×1 سطر 584</span> · <a href="../files/store.html#f-validate"><code>validate</code></a><span class="muted">×1 سطر 585</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/server.html#f-Handler._api_post"><code>Handler._api_post</code></a> <span class="muted">(server.py:330)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Handler._guard"><span class="tag fn">دالة</span> <b>Handler._guard(self)</b>
+ <span class="muted">→ str</span>
+ <a class="tag api" href="../src/server.html#L589">سطر 589–592</a>
+<div>تعريف الدالة _guard(self) ترجع str</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>host, scheme</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/server.html#f-Handler._capture_start"><code>Handler._capture_start</code></a> <span class="muted">(server.py:599)</span> <a href="../files/server.html#f-Handler._capture_step"><code>Handler._capture_step</code></a> <span class="muted">(server.py:615)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Handler._capture_start"><span class="tag fn">دالة</span> <b>Handler._capture_start(self, data)</b>
+ <span class="muted">→ None</span>
+ <a class="tag api" href="../src/server.html#L594">سطر 594–610</a>
+<div>تعريف الدالة _capture_start(self, data) ترجع None</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>4 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>cap, err, public, url</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/server.html#f-Handler._json"><code>Handler._json</code></a><span class="muted">×2 سطر 610 (نفس الملف)</span> · <a href="../files/server.html#f-Handler._error"><code>Handler._error</code></a><span class="muted">×2 سطر 597 (نفس الملف)</span> · <a href="../files/server.html#f-Handler._guard"><code>Handler._guard</code></a><span class="muted">×1 سطر 599 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/server.html#f-Handler._api_post"><code>Handler._api_post</code></a> <span class="muted">(server.py:489)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Handler._capture_step"><span class="tag fn">دالة</span> <b>Handler._capture_step(self, data)</b>
+ <span class="muted">→ None</span>
+ <a class="tag api" href="../src/server.html#L612">سطر 612–620</a>
+<div>تعريف الدالة _capture_step(self, data) ترجع None</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>3 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>result</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/server.html#f-Handler._error"><code>Handler._error</code></a><span class="muted">×2 سطر 617 (نفس الملف)</span> · <a href="../files/server.html#f-Handler._json"><code>Handler._json</code></a><span class="muted">×1 سطر 620 (نفس الملف)</span> · <a href="../files/server.html#f-Handler._guard"><code>Handler._guard</code></a><span class="muted">×1 سطر 615 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/server.html#f-Handler._api_post"><code>Handler._api_post</code></a> <span class="muted">(server.py:491)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Handler._capture_mark"><span class="tag fn">دالة</span> <b>Handler._capture_mark(self, data)</b>
+ <span class="muted">→ None</span>
+ <a class="tag api" href="../src/server.html#L622">سطر 622–628</a>
+<div>تعريف الدالة _capture_mark(self, data) ترجع None</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>result</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/server.html#f-Handler._json"><code>Handler._json</code></a><span class="muted">×1 سطر 628 (نفس الملف)</span> · <a href="../files/server.html#f-Handler._error"><code>Handler._error</code></a><span class="muted">×1 سطر 627 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/server.html#f-Handler._api_post"><code>Handler._api_post</code></a> <span class="muted">(server.py:493)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Handler._capture_finish"><span class="tag fn">دالة</span> <b>Handler._capture_finish(self, data)</b>
+ <span class="muted">→ None</span>
+ <a class="tag api" href="../src/server.html#L630">سطر 630–637</a>
+<div>تعريف الدالة _capture_finish(self, data) ترجع None</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>result</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/server.html#f-Handler._json"><code>Handler._json</code></a><span class="muted">×1 سطر 637 (نفس الملف)</span> · <a href="../files/server.html#f-Handler._error"><code>Handler._error</code></a><span class="muted">×1 سطر 636 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/server.html#f-Handler._api_post"><code>Handler._api_post</code></a> <span class="muted">(server.py:495)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Handler._capture_status"><span class="tag fn">دالة</span> <b>Handler._capture_status(self, capture_id)</b>
+ <span class="muted">→ None</span>
+ <a class="tag api" href="../src/server.html#L639">سطر 639–643</a>
+<div>تعريف الدالة _capture_status(self, capture_id) ترجع None</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/server.html#f-Handler._json"><code>Handler._json</code></a><span class="muted">×1 سطر 641 (نفس الملف)</span> · <a href="../files/server.html#f-Handler._error"><code>Handler._error</code></a><span class="muted">×1 سطر 643 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/server.html#f-Handler._api_get"><code>Handler._api_get</code></a> <span class="muted">(server.py:318)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Handler._capture_report"><span class="tag fn">دالة</span> <b>Handler._capture_report(self, capture_id, download)</b>
+ <span class="muted">→ None</span>
+ <a class="tag api" href="../src/server.html#L645">سطر 645–655</a>
+<div>تعريف الدالة _capture_report(self, capture_id, download) ترجع None</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>body, extra, report</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/server.html#f-Handler._send"><code>Handler._send</code></a><span class="muted">×1 سطر 655 (نفس الملف)</span> · <a href="../files/server.html#f-Handler._error"><code>Handler._error</code></a><span class="muted">×1 سطر 649 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/server.html#f-Handler._api_get"><code>Handler._api_get</code></a> <span class="muted">(server.py:320)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Handler._capture_view"><span class="tag fn">دالة</span> <b>Handler._capture_view(self, query)</b>
+ <span class="muted">→ None</span>
+ <a class="tag api" href="../src/server.html#L657">سطر 657–667</a>
+<div>تعريف الدالة _capture_view(self, query) ترجع None</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>capture_id, token</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/server.html#f-Handler._send"><code>Handler._send</code></a><span class="muted">×1 سطر 666 (نفس الملف)</span> · <a href="../files/capture.html#f-view_page"><code>view_page</code></a><span class="muted">×1 سطر 666</span> · <a href="../files/server.html#f-Handler._error"><code>Handler._error</code></a><span class="muted">×1 سطر 662 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/server.html#f-Handler.do_GET"><code>Handler.do_GET</code></a> <span class="muted">(server.py:212)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-_profile_brief"><span class="tag fn">دالة</span> <b>_profile_brief(p)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/server.html#L670">سطر 670–680</a>
+<div>تعريف الدالة _profile_brief(p) ترجع dict</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/store.html#f-space_size"><code>space_size</code></a><span class="muted">×1 سطر 676</span> · <a href="../files/store.html#f-variable_len"><code>variable_len</code></a><span class="muted">×1 سطر 673</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/server.html#f-Handler._api_get"><code>Handler._api_get</code></a> <span class="muted">(server.py:264)</span> <a href="../files/server.html#f-Handler._api_get"><code>Handler._api_get</code></a> <span class="muted">(server.py:271)</span> <a href="../files/server.html#f-Handler._api_post"><code>Handler._api_post</code></a> <span class="muted">(server.py:340)</span> <a href="../files/server.html#f-Handler._api_post"><code>Handler._api_post</code></a> <span class="muted">(server.py:344)</span> <a href="../files/server.html#f-Handler._api_post"><code>Handler._api_post</code></a> <span class="muted">(server.py:477)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-serve"><span class="tag fn">دالة</span> <b>serve(host, port, token, on_ready)</b>
+ <span class="muted">→ None</span>
+ <a class="tag api" href="../src/server.html#L683">سطر 683–695</a>
+<div>تعريف الدالة serve(host, port, token, on_ready) ترجع None</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>يُسند إلى</th><td><code>httpd, real_port</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/server.html#f-KiraServer"><code>KiraServer</code></a><span class="muted">×1 سطر 685 (نفس الملف)</span> · <a href="../files/cli.html#f-main.on_ready"><code>main.on_ready</code></a><span class="muted">×1 سطر 688</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/cli.html#f-main"><code>main</code></a> <span class="muted">(cli.py:188)</span></td></tr>
+</table></div>
+<footer class="docfoot">صفحة مولّدة آلياً من مصدر الكود · KiraPass —
+<code>files</code> · 2026-10-01 02:26</footer>
+</main>
+</div>
+<script src="../assets/docs.js"></script>
+<script>KPInit("files");</script>
+</body>
+</html>

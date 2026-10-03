@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>مصدر config.py · KiraPass</title>
+<link rel="stylesheet" href="../assets/docs.css">
+
+</head>
+<body>
+<div id="kp-layout">
+<main class="doc">
+<h1>مصدر <code>config.py</code></h1>
+<p class="lead">كل الثوابت والمسارات والكلمات والمتغيرات البيئية — 263 سطراً. كل سطر يحمل تعليقه العربي.</p>
+<div class="card info"><b>هذه الصفحة مولّدة آلياً</b> من مصدر الكود مباشرة (<code>tools/docs/build_docs.py</code>). إن غيّرت الكود فأعد توليدها: <code>python3 tools/docs/build_docs.py</code>. الشرح اليدوي الأوسع في <a href="../architecture.html">المعمارية</a> و<a href="../editing.html">دليل التعديل</a> و<a href="../danger.html">أماكن الخطر</a>.</div>
+<p><a class="btn" href="../files/config.html">← صفحة الشرح</a> <label class="muted"> قفز إلى سطر: <input id="kp-jump" style="width:6rem" placeholder="123"></label></p>
+<details class="src" open><summary>المصدر كاملاً</summary><pre data-lines="263"><code>
+<span class="ln" id="L1">1</span># بداية نص متعدد الأسطر — الأسطر التالية نصّ حرفي لا كود، فلا يقبل تعليقاً
+<span class="ln" id="L2">2</span>&quot;&quot;&quot;Paths, defaults and constants for KiraPass.
+<span class="ln" id="L3">3</span> 
+<span class="ln" id="L4">4</span>Everything the tool writes on disk lives in one of the folders below, so the
+<span class="ln" id="L5">5</span>&quot;clear cache&quot; button can clean the whole tool in one shot and nothing is
+<span class="ln" id="L6">6</span>scattered around the project.
+<span class="ln" id="L7">7</span>&quot;&quot;&quot;  # نهاية النص متعدد الأسطر
+<span class="ln" id="L8">8</span> 
+<span class="ln" id="L9">9</span>from __future__ import annotations  # استيراد annotations من الوحدة __future__
+<span class="ln" id="L10">10</span> 
+<span class="ln" id="L11">11</span>import os  # استيراد الوحدة os من المكتبة
+<span class="ln" id="L12">12</span> 
+<span class="ln" id="L13">13</span>APP_NAME = &quot;KiraPass&quot;  # إسناد القيمة الثابتة APP_NAME
+<span class="ln" id="L14">14</span>VERSION = &quot;5.9.0&quot;  # إسناد القيمة الثابتة VERSION
+<span class="ln" id="L15">15</span> 
+<span class="ln" id="L16">16</span># --------------------------------------------------------------------------
+<span class="ln" id="L17">17</span># المجلدات
+<span class="ln" id="L18">18</span># --------------------------------------------------------------------------
+<span class="ln" id="L19">19</span>BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # إسناد نتيجة استدعاء os.path.dirname (معامل واحد) إلى BASE_DIR
+<span class="ln" id="L20">20</span> 
+<span class="ln" id="L21">21</span>DATA_DIR = os.path.join(BASE_DIR, &quot;kirapass_data&quot;)  # إسناد نتيجة استدعاء os.path.join (2 معاملات) إلى DATA_DIR
+<span class="ln" id="L22">22</span>PROFILES_FILE = os.path.join(DATA_DIR, &quot;profiles.json&quot;)  # إسناد نتيجة استدعاء os.path.join (2 معاملات) إلى PROFILES_FILE
+<span class="ln" id="L23">23</span>SETTINGS_FILE = os.path.join(DATA_DIR, &quot;settings.json&quot;)  # إسناد نتيجة استدعاء os.path.join (2 معاملات) إلى SETTINGS_FILE
+<span class="ln" id="L24">24</span>HITS_FILE = os.path.join(DATA_DIR, &quot;hits.txt&quot;)  # إسناد نتيجة استدعاء os.path.join (2 معاملات) إلى HITS_FILE
+<span class="ln" id="L25">25</span>RUN_DIR = os.path.join(DATA_DIR, &quot;runs&quot;)          # تقرير واحد لكل تشغيل
+<span class="ln" id="L26">26</span>REVIEW_DIR = os.path.join(DATA_DIR, &quot;review&quot;)     # صفحات لم نستطع الحكم عليها
+<span class="ln" id="L27">27</span>CACHE_DIR = os.path.join(DATA_DIR, &quot;cache&quot;)       # صفحات متعلَّمة / مؤقتة
+<span class="ln" id="L28">28</span>LOG_DIR = os.path.join(DATA_DIR, &quot;logs&quot;)  # إسناد نتيجة استدعاء os.path.join (2 معاملات) إلى LOG_DIR
+<span class="ln" id="L29">29</span> 
+<span class="ln" id="L30">30</span>ALL_DIRS = (DATA_DIR, RUN_DIR, REVIEW_DIR, CACHE_DIR, LOG_DIR)  # إسناد مجموعة إلى ALL_DIRS
+<span class="ln" id="L31">31</span> 
+<span class="ln" id="L32">32</span> 
+<span class="ln" id="L33">33</span>def set_data_dir(path: str) -&gt; str:  # تعريف الدالة set_data_dir(path) ترجع str
+<span class="ln" id="L34">34</span>    # بداية نص متعدد الأسطر — الأسطر التالية نصّ حرفي لا كود، فلا يقبل تعليقاً
+<span class="ln" id="L35">35</span>    &quot;&quot;&quot;Point every file the tool writes at another folder.
+<span class="ln" id="L36">36</span> 
+<span class="ln" id="L37">37</span>    The self-test uses this so `KiraPass.py --selftest` can never mix its
+<span class="ln" id="L38">38</span>    practice cards into the user&#x27;s real profiles, hits or reports.
+<span class="ln" id="L39">39</span>    &quot;&quot;&quot;  # نهاية النص متعدد الأسطر
+<span class="ln" id="L40">40</span>    global DATA_DIR, PROFILES_FILE, SETTINGS_FILE, HITS_FILE  # إعلان أن DATA_DIR, PROFILES_FILE, SETTINGS_FILE, HITS_FILE متغير عام (لا محلي)
+<span class="ln" id="L41">41</span>    global RUN_DIR, REVIEW_DIR, CACHE_DIR, LOG_DIR, ALL_DIRS  # إعلان أن RUN_DIR, REVIEW_DIR, CACHE_DIR, LOG_DIR, ALL_DIRS متغير عام (لا محلي)
+<span class="ln" id="L42">42</span>    DATA_DIR = os.path.abspath(path)  # إسناد نتيجة استدعاء os.path.abspath (معامل واحد) إلى DATA_DIR
+<span class="ln" id="L43">43</span>    PROFILES_FILE = os.path.join(DATA_DIR, &quot;profiles.json&quot;)  # إسناد نتيجة استدعاء os.path.join (2 معاملات) إلى PROFILES_FILE
+<span class="ln" id="L44">44</span>    SETTINGS_FILE = os.path.join(DATA_DIR, &quot;settings.json&quot;)  # إسناد نتيجة استدعاء os.path.join (2 معاملات) إلى SETTINGS_FILE
+<span class="ln" id="L45">45</span>    HITS_FILE = os.path.join(DATA_DIR, &quot;hits.txt&quot;)  # إسناد نتيجة استدعاء os.path.join (2 معاملات) إلى HITS_FILE
+<span class="ln" id="L46">46</span>    RUN_DIR = os.path.join(DATA_DIR, &quot;runs&quot;)  # إسناد نتيجة استدعاء os.path.join (2 معاملات) إلى RUN_DIR
+<span class="ln" id="L47">47</span>    REVIEW_DIR = os.path.join(DATA_DIR, &quot;review&quot;)  # إسناد نتيجة استدعاء os.path.join (2 معاملات) إلى REVIEW_DIR
+<span class="ln" id="L48">48</span>    CACHE_DIR = os.path.join(DATA_DIR, &quot;cache&quot;)  # إسناد نتيجة استدعاء os.path.join (2 معاملات) إلى CACHE_DIR
+<span class="ln" id="L49">49</span>    LOG_DIR = os.path.join(DATA_DIR, &quot;logs&quot;)  # إسناد نتيجة استدعاء os.path.join (2 معاملات) إلى LOG_DIR
+<span class="ln" id="L50">50</span>    ALL_DIRS = (DATA_DIR, RUN_DIR, REVIEW_DIR, CACHE_DIR, LOG_DIR)  # إسناد مجموعة إلى ALL_DIRS
+<span class="ln" id="L51">51</span>    os.makedirs(DATA_DIR, exist_ok=True)  # استدعاء os.makedirs (معامل واحد، exist_ok=…)
+<span class="ln" id="L52">52</span>    return DATA_DIR  # إرجاع DATA_DIR
+<span class="ln" id="L53">53</span> 
+<span class="ln" id="L54">54</span># ملفات النسخة القديمة — يحذفها «مسح البيانات».
+<span class="ln" id="L55">55</span>LEGACY_FILES = (  # إسناد مجموعة إلى LEGACY_FILES
+<span class="ln" id="L56">56</span>    os.path.join(BASE_DIR, &quot;kirapass_hits.txt&quot;),  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L57">57</span>    os.path.join(BASE_DIR, &quot;mikrotikbf_profiles.json&quot;),  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L58">58</span>    os.path.join(BASE_DIR, &quot;kirapass_profiles.json&quot;),  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L59">59</span>)  # إغلاق القوس المفتوح في السطر السابق
+<span class="ln" id="L60">60</span> 
+<span class="ln" id="L61">61</span># --------------------------------------------------------------------------
+<span class="ln" id="L62">62</span># افتراضيات الشبكة
+<span class="ln" id="L63">63</span># --------------------------------------------------------------------------
+<span class="ln" id="L64">64</span>USER_AGENT = (  # إسناد القيمة الثابتة USER_AGENT
+<span class="ln" id="L65">65</span>    &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 &quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L66">66</span>    &quot;(KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36&quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L67">67</span>)  # إغلاق القوس المفتوح في السطر السابق
+<span class="ln" id="L68">68</span> 
+<span class="ln" id="L69">69</span>BASE_HEADERS = {  # إسناد قاموس إلى BASE_HEADERS
+<span class="ln" id="L70">70</span>    &quot;User-Agent&quot;: USER_AGENT,  # مفتاح User-Agent في القاموس
+<span class="ln" id="L71">71</span>    &quot;Accept&quot;: &quot;text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8&quot;,  # مفتاح Accept في القاموس
+<span class="ln" id="L72">72</span>    &quot;Accept-Language&quot;: &quot;ar,en-US;q=0.9,en;q=0.8&quot;,  # مفتاح Accept-Language في القاموس
+<span class="ln" id="L73">73</span>    &quot;Upgrade-Insecure-Requests&quot;: &quot;1&quot;,  # مفتاح Upgrade-Insecure-Requests في القاموس
+<span class="ln" id="L74">74</span>}  # إغلاق القوس المفتوح في السطر السابق
+<span class="ln" id="L75">75</span> 
+<span class="ln" id="L76">76</span># يمكن رفع المهلات لراوترات RADIUS بطيئة جداً عبر متغيرات البيئة:
+<span class="ln" id="L77">77</span># KIRAPASS_CONNECT_TIMEOUT=8
+<span class="ln" id="L78">78</span># KIRAPASS_READ_TIMEOUT=15
+<span class="ln" id="L79">79</span>def _env_float(name: str, default: float) -&gt; float:  # تعريف الدالة _env_float(name, default) ترجع float
+<span class="ln" id="L80">80</span>    raw = os.environ.get(name, &quot;&quot;)  # إسناد نتيجة استدعاء os.environ.get (2 معاملات) إلى raw
+<span class="ln" id="L81">81</span>    if not raw:  # شرط معكوس: ليس raw
+<span class="ln" id="L82">82</span>        return default  # إرجاع default
+<span class="ln" id="L83">83</span>    try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L84">84</span>        value = float(raw)  # إسناد نتيجة استدعاء float (معامل واحد) إلى value
+<span class="ln" id="L85">85</span>    except ValueError:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L86">86</span>        return default  # إرجاع default
+<span class="ln" id="L87">87</span>    return max(0.5, min(value, 120.0))  # إرجاع max(0.5, min(value, 120.0))
+<span class="ln" id="L88">88</span> 
+<span class="ln" id="L89">89</span> 
+<span class="ln" id="L90">90</span>CONNECT_TIMEOUT = _env_float(&quot;KIRAPASS_CONNECT_TIMEOUT&quot;, 4.0)  # إسناد نتيجة استدعاء _env_float (2 معاملات) إلى CONNECT_TIMEOUT
+<span class="ln" id="L91">91</span>READ_TIMEOUT = _env_float(&quot;KIRAPASS_READ_TIMEOUT&quot;, 8.0)  # إسناد نتيجة استدعاء _env_float (2 معاملات) إلى READ_TIMEOUT
+<span class="ln" id="L92">92</span>ATTACK_READ_TIMEOUT = _env_float(&quot;KIRAPASS_ATTACK_READ_TIMEOUT&quot;, 5.0)  # إسناد نتيجة استدعاء _env_float (2 معاملات) إلى ATTACK_READ_TIMEOUT
+<span class="ln" id="L93">93</span>VERIFY_TLS = False         # بوابات الأسر تستخدم شهادات موقّعة ذاتياً
+<span class="ln" id="L94">94</span> 
+<span class="ln" id="L95">95</span>DEFAULT_THREADS = 12  # إسناد القيمة الثابتة DEFAULT_THREADS
+<span class="ln" id="L96">96</span>MIN_THREADS = 1  # إسناد القيمة الثابتة MIN_THREADS
+<span class="ln" id="L97">97</span>MAX_THREADS = 200  # إسناد القيمة الثابتة MAX_THREADS
+<span class="ln" id="L98">98</span>DEFAULT_ATTEMPTS = 2000  # إسناد القيمة الثابتة DEFAULT_ATTEMPTS
+<span class="ln" id="L99">99</span>MAX_ATTEMPTS = 20_000_000  # إسناد القيمة الثابتة MAX_ATTEMPTS
+<span class="ln" id="L100">100</span>DEFAULT_DELAY_MS = 0  # إسناد القيمة الثابتة DEFAULT_DELAY_MS
+<span class="ln" id="L101">101</span> 
+<span class="ln" id="L102">102</span># كم طلباً متتالياً يجوز أن يفشل (بلا رد HTTP إطلاقاً) قبل أن نتوقف
+<span class="ln" id="L103">103</span># ونقول للمستخدم إن الرابط انقطع بدل الادعاء بأن تلك البطاقات
+<span class="ln" id="L104">104</span># اختُبرت.
+<span class="ln" id="L105">105</span>SLOW_DIAG_AFTER = 8.0  # ثوانٍ: فوق هذا يُحسب الراوتر بطيئاً
+<span class="ln" id="L106">106</span>BURST_LIMIT = 20  # إسناد القيمة الثابتة BURST_LIMIT
+<span class="ln" id="L107">107</span># توقّف مبكراً بعد إخفاقات نقل متكررة. لا إعادة اتصال ولا انتظار
+<span class="ln" id="L108">108</span># ولا تغيير هوية بعد هذا التوقف؛ على المستخدم مراجعة مسؤول الشبكة.
+<span class="ln" id="L109">109</span>CONSECUTIVE_TRANSPORT_FAILURE_LIMIT = 3  # إسناد القيمة الثابتة CONSECUTIVE_TRANSPORT_FAILURE_LIMIT
+<span class="ln" id="L110">110</span>SILENCE_SECONDS = 6.0  # إسناد القيمة الثابتة SILENCE_SECONDS
+<span class="ln" id="L111">111</span> 
+<span class="ln" id="L112">112</span># --------------------------------------------------------------------------
+<span class="ln" id="L113">113</span># فحوص «هل الضيف متصل فعلاً؟»
+<span class="ln" id="L114">114</span># --------------------------------------------------------------------------
+<span class="ln" id="L115">115</span># بوابة الأسر تردّ على هذه بتحويل إلى صفحة الدخول.
+<span class="ln" id="L116">116</span># وعندما تعمل البطاقة نحصل على الرد المتوقع بدلاً من ذلك.
+<span class="ln" id="L117">117</span>#
+<span class="ln" id="L118">118</span># بعض الشبكات تحجب مواقع الفحص الثلاثة عمداً. عندها ضع
+<span class="ln" id="L119">119</span># روابط فحصك في متغير بيئة، والمداخل مفصولة بفواصل:
+<span class="ln" id="L120">120</span>#
+<span class="ln" id="L121">121</span># KIRAPASS_INTERNET_CHECKS=&quot;http://example.com/generate_204|204&quot;
+<span class="ln" id="L122">122</span># KIRAPASS_INTERNET_CHECKS=&quot;http://a.test/ok|200|OK,http://b.test/204|204&quot;
+<span class="ln" id="L123">123</span>#
+<span class="ln" id="L124">124</span># الصيغة:  الرابط|الحالة المتوقعة|النص المتوقع (اختياري)
+<span class="ln" id="L125">125</span>def _parse_internet_checks(raw: str) -&gt; tuple:  # تعريف الدالة _parse_internet_checks(raw) ترجع tuple
+<span class="ln" id="L126">126</span>    out = []  # إسناد قائمة إلى out
+<span class="ln" id="L127">127</span>    for item in (raw or &quot;&quot;).split(&quot;,&quot;):  # دورة على raw أو &#x27;&#x27;.split(&#x27;,&#x27;) باسم item
+<span class="ln" id="L128">128</span>        item = item.strip()  # إسناد نتيجة استدعاء item.strip إلى item
+<span class="ln" id="L129">129</span>        if not item:  # شرط معكوس: ليس item
+<span class="ln" id="L130">130</span>            continue  # الانتقال إلى الدورة التالية
+<span class="ln" id="L131">131</span>        bits = item.split(&quot;|&quot;)  # إسناد نتيجة استدعاء item.split (معامل واحد) إلى bits
+<span class="ln" id="L132">132</span>        url = bits[0].strip()  # إسناد نتيجة استدعاء bits[0].strip إلى url
+<span class="ln" id="L133">133</span>        if not url:  # شرط معكوس: ليس url
+<span class="ln" id="L134">134</span>            continue  # الانتقال إلى الدورة التالية
+<span class="ln" id="L135">135</span>        try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L136">136</span>            status = int(bits[1]) if len(bits) &gt; 1 and bits[1].strip() else 204  # إسناد int(bits[1]) إن مقارنة و bits[1].strip() وإلا 204 إلى status
+<span class="ln" id="L137">137</span>        except ValueError:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L138">138</span>            status = 204  # إسناد القيمة الثابتة status
+<span class="ln" id="L139">139</span>        text = bits[2].strip() if len(bits) &gt; 2 and bits[2].strip() else None  # إسناد bits[2].strip() إن مقارنة و bits[2].strip() وإلا None إلى text
+<span class="ln" id="L140">140</span>        out.append((url, status, text, &quot;custom&quot;))  # استدعاء out.append (معامل واحد)
+<span class="ln" id="L141">141</span>    return tuple(out)  # إرجاع tuple(out)
+<span class="ln" id="L142">142</span> 
+<span class="ln" id="L143">143</span> 
+<span class="ln" id="L144">144</span>INTERNET_CHECKS = _parse_internet_checks(  # دمج منطقي (أو) وإسناده إلى INTERNET_CHECKS
+<span class="ln" id="L145">145</span>    os.environ.get(&quot;KIRAPASS_INTERNET_CHECKS&quot;, &quot;&quot;)) or (  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L146">146</span>    # (الرابط، الحالة المتوقعة، النص المتوقع أو None، التسمية)
+<span class="ln" id="L147">147</span>    (&quot;http://connectivitycheck.gstatic.com/generate_204&quot;, 204, None, &quot;google204&quot;),  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L148">148</span>    (&quot;http://www.msftconnecttest.com/connecttest.txt&quot;, 200, &quot;Microsoft Connect Test&quot;, &quot;msft&quot;),  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L149">149</span>    (&quot;http://captive.apple.com/hotspot-detect.html&quot;, 200, &quot;Success&quot;, &quot;apple&quot;),  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L150">150</span>)  # إغلاق القوس المفتوح في السطر السابق
+<span class="ln" id="L151">151</span> 
+<span class="ln" id="L152">152</span># مضيفات إضافية تعني «البوابة أخرجتنا» عندما تظهر في Location.
+<span class="ln" id="L153">153</span>EXIT_HOST_MARKERS = (  # إسناد مجموعة إلى EXIT_HOST_MARKERS
+<span class="ln" id="L154">154</span>    &quot;msftconnecttest&quot;, &quot;gstatic&quot;, &quot;captive.apple&quot;, &quot;generate_204&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L155">155</span>    &quot;connectivitycheck&quot;, &quot;detectportal&quot;, &quot;google.com&quot;, &quot;icloud&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L156">156</span>)  # إغلاق القوس المفتوح في السطر السابق
+<span class="ln" id="L157">157</span> 
+<span class="ln" id="L158">158</span># صفحة ردّ تحمل هذه الكلمات تعني شبه دائماً «بطاقة خاطئة».
+<span class="ln" id="L159">159</span>REJECT_WORDS = (  # إسناد مجموعة إلى REJECT_WORDS
+<span class="ln" id="L160">160</span>    &quot;invalid username or password&quot;, &quot;invalid password&quot;, &quot;wrong password&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L161">161</span>    &quot;invalid user&quot;, &quot;unknown user&quot;, &quot;user not found&quot;, &quot;authentication failed&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L162">162</span>    &quot;login failed&quot;, &quot;failed to log in&quot;, &quot;access denied&quot;, &quot;not authorized&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L163">163</span>    &quot;incorrect&quot;, &quot;try again&quot;, &quot;error&quot;, &quot;denied&quot;, &quot;expired&quot;, &quot;already used&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L164">164</span>    &quot;no valid profile&quot;, &quot;voucher not found&quot;, &quot;code not found&quot;, &quot;صلاحية&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L165">165</span>    &quot;غير صحيح&quot;, &quot;خطأ&quot;, &quot;منتهي&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L166">166</span>)  # إغلاق القوس المفتوح في السطر السابق
+<span class="ln" id="L167">167</span> 
+<span class="ln" id="L168">168</span># صفحات/ردود تحمل هذه الكلمات تعني «الراوتر بدأ يحجبنا».
+<span class="ln" id="L169">169</span># أبقِ العبارات العربية/الفرنسية قصيرة حتى تعمل مطابقة الكلمة الكاملة،
+<span class="ln" id="L170">170</span># ولا تعتمد على كشف الحجب وحده ما دام نموذج الدخول ظاهراً (انظر
+<span class="ln" id="L171">171</span># engine._is_protective_reply) حتى لا يصير نص الرفض العادي حجباً كاذباً.
+<span class="ln" id="L172">172</span>BAN_WORDS = (  # إسناد مجموعة إلى BAN_WORDS
+<span class="ln" id="L173">173</span>    &quot;you are blocked&quot;, &quot;your ip is blocked&quot;, &quot;ip has been blocked&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L174">174</span>    &quot;address is blocked&quot;, &quot;access blocked&quot;, &quot;&lt;title&gt;blocked&quot;, &quot;blocked.html&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L175">175</span>    &quot;too many attempts&quot;, &quot;too many login attempts&quot;, &quot;too many failed&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L176">176</span>    &quot;banned&quot;, &quot;temporarily blocked&quot;, &quot;rate limit&quot;, &quot;slow down&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L177">177</span>    &quot;device is blocked&quot;, &quot;client is blocked&quot;, &quot;mac is blocked&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L178">178</span>    &quot;mac address blocked&quot;, &quot;session blocked&quot;, &quot;login attempts exceeded&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L179">179</span>    &quot;maximum login attempts&quot;, &quot;try again later&quot;, &quot;access temporarily denied&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L180">180</span>    # صفحات حجب بوابات الأسر بالعربية
+<span class="ln" id="L181">181</span>    &quot;محظور&quot;, &quot;تم حظر&quot;, &quot;تم حظرك&quot;, &quot;الحظر&quot;, &quot;محجوب&quot;, &quot;تم حجبك&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L182">182</span>    &quot;جهازك محظور&quot;, &quot;تم حظر الجهاز&quot;, &quot;تم حظر عنوان&quot;, &quot;محظور مؤقتا&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L183">183</span>    &quot;تجاوزت عدد المحاولات&quot;, &quot;محاولات كثيرة&quot;, &quot;حاول لاحقا&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L184">184</span>    # صفحات حجب بوابات الأسر بالفرنسية
+<span class="ln" id="L185">185</span>    &quot;vous êtes bloqué&quot;, &quot;vous etes bloque&quot;, &quot;accès bloqué&quot;, &quot;acces bloque&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L186">186</span>    &quot;ip bloquée&quot;, &quot;ip bloquee&quot;, &quot;temporairement bloqué&quot;, &quot;temporairement bloque&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L187">187</span>    &quot;trop de tentatives&quot;, &quot;tentatives de connexion&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L188">188</span>)  # إغلاق القوس المفتوح في السطر السابق
+<span class="ln" id="L189">189</span> 
+<span class="ln" id="L190">190</span># كلمات إيجابية: البطاقة مقبولة
+<span class="ln" id="L191">191</span>ACCEPT_WORDS = (  # إسناد مجموعة إلى ACCEPT_WORDS
+<span class="ln" id="L192">192</span>    &quot;you are logged in&quot;, &quot;logged in successfully&quot;, &quot;login successful&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L193">193</span>    &quot;welcome&quot;, &quot;status&quot;, &quot;remaining time&quot;, &quot;time left&quot;, &quot;uptime&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L194">194</span>    &quot;logout&quot;, &quot;log out&quot;, &quot;disconnect&quot;, &quot;session started&quot;, &quot;تم الدخول&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L195">195</span>    &quot;مرحبا&quot;, &quot;المتبقي&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L196">196</span>)  # إغلاق القوس المفتوح في السطر السابق
+<span class="ln" id="L197">197</span> 
+<span class="ln" id="L198">198</span># كم بطاقة خاطئة نرسلها لنتعلّم صفحة الرفض. كل واحدة منها
+<span class="ln" id="L199">199</span># فشل دخول عند الراوتر، لذلك نُبقّيها صغيرة: راوتر يُقفل بعد
+<span class="ln" id="L200">200</span># فشلين سيقفل بسبب تعلّمنا نفسه.
+<span class="ln" id="L201">201</span>CALIBRATION_PROBES = 3  # إسناد القيمة الثابتة CALIBRATION_PROBES
+<span class="ln" id="L202">202</span># البطاقة المعروفة الصالحة تُستخدم فقط لفحص شكل طلب صغير ومحدود.
+<span class="ln" id="L203">203</span># وإن لم تُثبت، توقّف واطلب من المسؤول مراجعة البوابة
+<span class="ln" id="L204">204</span># بدل التنقل بين عشرات محاولات الدخول والمخاطرة بقفل.
+<span class="ln" id="L205">205</span>KNOWN_CARD_TRIAL_LIMIT = 8  # إسناد القيمة الثابتة KNOWN_CARD_TRIAL_LIMIT
+<span class="ln" id="L206">206</span># اترك الراوتر يطبّق دخول البطاقة المعروفة قبل فحص الوصول الخارجي.
+<span class="ln" id="L207">207</span>KNOWN_CARD_VERIFY_DELAY_SECONDS = 1.0  # إسناد القيمة الثابتة KNOWN_CARD_VERIFY_DELAY_SECONDS
+<span class="ln" id="L208">208</span># تشخيص الحجب الاختياري محدود ويتوقف عند أول رد حجب.
+<span class="ln" id="L209">209</span>LOCKOUT_PROBE_MAX_FAILURES = 8  # إسناد القيمة الثابتة LOCKOUT_PROBE_MAX_FAILURES
+<span class="ln" id="L210">210</span># تشخيص الشبكة يستخدم عيّنات صغيرة ويتوقف عند أول رد حجب.
+<span class="ln" id="L211">211</span>DIAGNOSTIC_SAMPLE_LIMIT = 8  # إسناد القيمة الثابتة DIAGNOSTIC_SAMPLE_LIMIT
+<span class="ln" id="L212">212</span> 
+<span class="ln" id="L213">213</span># دع التشغيل يجد وتيرته: ادفع حتى يشتكي الراوتر ثم
+<span class="ln" id="L214">214</span># تراجع (زيادة جمعية / نقصان مضاعف). AUTO_PACE=0 يُبقي
+<span class="ln" id="L215">215</span># الأداة بالضبط على الوتيرة التي كتبها المستخدم.
+<span class="ln" id="L216">216</span>AUTO_PACE = os.environ.get(&quot;KIRAPASS_AUTO_PACE&quot;, &quot;1&quot;) not in (&quot;0&quot;, &quot;no&quot;, &quot;off&quot;)  # مقارنة (ليس ضمن) وإسناد النتيجة المنطقية إلى AUTO_PACE
+<span class="ln" id="L217">217</span>PACE_WINDOW_SECONDS = 3.0     # انظر ما الذي رجع كل 3 ثوانٍ
+<span class="ln" id="L218">218</span>PACE_BAD_RATIO = 0.02         # فوق 2% أخطاء/تقييد: هذا الراوتر اكتفى
+<span class="ln" id="L219">219</span>PACE_MAX_DELAY_MS = 4000      # لا أبطأ من هذا من تلقاء نفسها
+<span class="ln" id="L220">220</span>PACE_MAX_THREADS = 32         # سقف صارم لعدد الأيدي التي تضيفها بنفسها
+<span class="ln" id="L221">221</span> 
+<span class="ln" id="L222">222</span># اطلب صفحة الدخول مجدداً كل هذا العدد من المحاولات لكل عامل، حتى
+<span class="ln" id="L223">223</span># يبقى كوكي الجلسة والحقول المخفية طازجة كما يُبقيها
+<span class="ln" id="L224">224</span># المتصفح. 0 = اطلب مرة واحدة ولا تعد.
+<span class="ln" id="L225">225</span>WARMUP_EVERY = max(0, int(os.environ.get(&quot;KIRAPASS_WARMUP_EVERY&quot;, &quot;25&quot;)))  # إسناد نتيجة استدعاء max (2 معاملات) إلى WARMUP_EVERY
+<span class="ln" id="L226">226</span> 
+<span class="ln" id="L227">227</span># كم مرة يُسأل مجدداً عن بطاقة لم نحصل لها على إجابة إطلاقاً. الطلب قد
+<span class="ln" id="L228">228</span># يموت في الطريق (الراوتر يغلق المقبس، أو يصل الرد بعد
+<span class="ln" id="L229">229</span># مهلتنا) بينما الراوتر أخذه فعلاً — كهذه البطاقة ليست «مُختبَرة»، و
+<span class="ln" id="L230">230</span># تشغيل يجب ألا ينتهي بتخطّي البطاقة الوحيدة التي تعمل. فقط الطلبات
+<span class="ln" id="L231">231</span># بلا إجابة إطلاقاً تُعاد؛ وردّ REJECTED هو إجابة.
+<span class="ln" id="L232">232</span>MAX_CARD_RETRIES = 2  # إسناد القيمة الثابتة MAX_CARD_RETRIES
+<span class="ln" id="L233">233</span> 
+<span class="ln" id="L234">234</span># بعض الراوترات تُدخل الضيف وما تزال تردّ بصفحة الرفض. عندها
+<span class="ln" id="L235">235</span># الإشارة الوحيدة الصادقة هي الإنترنت نفسه: أثناء التشغيل نسأل
+<span class="ln" id="L236">236</span># «هل ما زلنا خلف الجدار؟» كل بضع ثوانٍ. وعندما ينقلب الجواب إلى
+<span class="ln" id="L237">237</span># «متصل»، فإحدى البطاقات التي أرسلناها لتوّنا فعلتها — تلك البطاقات هي
+<span class="ln" id="L238">238</span># المشتبه بها التي نسلّمها للمستخدم بدل أن نضيّعها.
+<span class="ln" id="L239">239</span>WATCH_INTERNET = True  # إسناد القيمة الثابتة WATCH_INTERNET
+<span class="ln" id="L240">240</span>WATCH_EVERY_SECONDS = 3.0  # إسناد القيمة الثابتة WATCH_EVERY_SECONDS
+<span class="ln" id="L241">241</span>WATCH_SUSPECTS = 40  # إسناد القيمة الثابتة WATCH_SUSPECTS
+<span class="ln" id="L242">242</span> 
+<span class="ln" id="L243">243</span># مضيفات نعتبرها «داخل البوابة» (فالتحويل إليها ليس خروجاً).
+<span class="ln" id="L244">244</span>PORTAL_HINT_WORDS = (&quot;login&quot;, &quot;hotspot&quot;, &quot;portal&quot;, &quot;welcome&quot;, &quot;splash&quot;, &quot;auth&quot;)  # إسناد مجموعة إلى PORTAL_HINT_WORDS
+<span class="ln" id="L245">245</span> 
+<span class="ln" id="L246">246</span># تحويل يحمل واحدة من هذه في رابطه ما زال البوابة — ليس
+<span class="ln" id="L247">247</span># دليلاً أن الضيف خرج (بعض الراوترات تقفز بك بين صفحاتها
+<span class="ln" id="L248">248</span># هي: /login ← /status ← /login، وكل قفزة كانت تبدو إصابة).
+<span class="ln" id="L249">249</span>PORTAL_URL_WORDS = (&quot;login&quot;, &quot;hotspot&quot;, &quot;portal&quot;, &quot;splash&quot;, &quot;auth&quot;, &quot;captive&quot;)  # إسناد مجموعة إلى PORTAL_URL_WORDS
+<span class="ln" id="L250">250</span> 
+<span class="ln" id="L251">251</span>DEFAULT_PREFIX = &quot;&quot;  # إسناد القيمة الثابتة DEFAULT_PREFIX
+<span class="ln" id="L252">252</span> 
+<span class="ln" id="L253">253</span># عتبات تُستخدم عندما تحتاج الأداة أن تتحدث عن حجم الفضاء.
+<span class="ln" id="L254">254</span>BIG_SPACE = 10 ** 12  # حساب أسّ بين 10 و12 وإسناده إلى BIG_SPACE
+<span class="ln" id="L255">255</span># تحذيرات ليّنة في الواجهة (لا تمنع أبداً): الفضاءات الكبيرة وأعداد الخيوط
+<span class="ln" id="L256">256</span># الشرسة ترفع احتمال قفل الراوتر في الاختبارات المصرّح بها.
+<span class="ln" id="L257">257</span>WARN_SPACE = 10 ** 9  # حساب أسّ بين 10 و9 وإسناده إلى WARN_SPACE
+<span class="ln" id="L258">258</span>WARN_THREADS = 50  # إسناد القيمة الثابتة WARN_THREADS
+<span class="ln" id="L259">259</span># تنظيف اختياري تلقائي لتقارير التشغيل الأقدم من هذا العدد من الأيام.
+<span class="ln" id="L260">260</span># 0 يعطّله. يمكن تجاوزه بـKIRAPASS_REPORT_RETENTION_DAYS.
+<span class="ln" id="L261">261</span>REPORT_RETENTION_DAYS = max(0, int(os.environ.get(  # إسناد نتيجة استدعاء max (2 معاملات) إلى REPORT_RETENTION_DAYS
+<span class="ln" id="L262">262</span>    &quot;KIRAPASS_REPORT_RETENTION_DAYS&quot;, &quot;30&quot;) or &quot;0&quot;))  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L263">263</span> 
+</code></pre></details>
+<script>
+document.getElementById("kp-jump").addEventListener("change", function (e) {
+  var n = parseInt(e.target.value, 10);
+  if (n > 0) { var el = document.getElementById("L" + n);
+    if (el) el.scrollIntoView({block: "center"}); }
+});
+if (location.hash) { var el = document.querySelector(location.hash);
+  if (el) setTimeout(function () { el.scrollIntoView({block: "center"}); }, 60); }
+</script>
+<footer class="docfoot">صفحة مولّدة آلياً من مصدر الكود · KiraPass —
+<code>files</code> · 2026-10-01 02:26</footer>
+</main>
+</div>
+<script src="../assets/docs.js"></script>
+<script>KPInit("files");</script>
+</body>
+</html>

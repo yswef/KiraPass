@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>البيانات على القرص · KiraPass</title>
+<link rel="stylesheet" href="assets/docs.css">
+</head>
+<body>
+<div id="kp-layout">
+<main class="doc">
+
+<h1>بنيات البيانات: ما تُخزّنه الأداة وما تمرّره</h1>
+<p class="lead">
+  قسمان: <b>(أ) البنى الحيّة</b> التي تتنقّل بين الدوال (الحكم، البصمة، المعايرة، الحدث، الحالة، الخطة،
+  دليل الحظر) — وهي ما ستعدّله إن غيّرت سلوك الأداة؛ و<b>(ب) ما يُكتب على القرص</b> داخل
+  <code>kirapass_data/</code> — شكله، من يكتبه، من يقرؤه، وهل فيه أسرار.
+</p>
+
+<h2 id="live">البنى الحيّة (في الذاكرة)</h2>
+
+<h3 id="verdict">الحكم — <code>fingerprint.Verdict</code></h3>
+<p>كائن صغير بـ<code>__slots__</code> (خمس خانات فقط) يمثّل إجابة واحدة عن ردّ واحد:</p>
+<table class="t compact">
+  <thead><tr><th>الخانة</th><th>النوع</th><th>المعنى</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">code</td><td class="mono">str</td>
+        <td>الحكم نفسه: <code>ACCEPTED_VERIFIED</code> · <code>ACCEPTED</code> ·
+            <code>ACCEPTED_UNVERIFIED</code> · <code>REJECTED</code> · <code>UNKNOWN</code> ·
+            <code>BANNED</code> · <code>RATE_LIMITED</code> · <code>CHALLENGE</code> —
+            وأيضاً عدّادَا <code>NET_ERROR</code> و<code>INTERNAL_ERROR</code> (ليسا أحكاماً)</td></tr>
+    <tr><td class="mono">reason</td><td class="mono">str</td><td>مفتاح آلية يشرح <b>بأي دليل</b> (<code>r_*</code>)</td></tr>
+    <tr><td class="mono">confidence</td><td class="mono">float 0–1</td><td>قوة الدليل؛ ≥0.85 تعني «نهائي»</td></tr>
+    <tr><td class="mono">data</td><td class="mono">dict</td><td>حقائق الرد: <code>status</code>, <code>redirect</code>, <code>words</code>, <code>online</code>, <code>len</code>…</td></tr>
+    <tr><td class="mono">evidence</td><td class="mono">dict</td><td>دليل إضافي للحالات الخاصة (الحجب، الكابتشا)</td></tr>
+  </tbody>
+</table>
+<p>خاصيتان محسوبتان: <code>is_hit</code> = الكود يبدأ بـ<code>ACCEPTED</code>؛
+<code>is_final</code> = <code>ACCEPTED_VERIFIED</code> أو <code>ACCEPTED</code> بثقة ≥0.85.
+و<code>as_dict()</code> تقرّب الثقة إلى رقمين — وهي الصيغة التي تُحفظ في <code>hits.txt</code> وصفحات المراجعة.</p>
+
+<h3 id="fingerprint">البصمة — <code>fingerprint.Fingerprinter</code></h3>
+<p>«كيف تبدو صفحة الرفض» — تُبنى من عيّنات ردود بطاقات خاطئة:</p>
+<table class="t compact">
+  <thead><tr><th>الخانة</th><th>المعنى</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">literals</td><td>مجموعة القيم التي تتغير وحدها (تُخفى بـ<code>#</code> قبل المقارنة)</td></tr>
+    <tr><td class="mono">patterns</td><td>قائمة تعابير نمطية متعلَّمة من تلك القيم</td></tr>
+    <tr><td class="mono">exact</td><td>كل العيّنات تطابقت بعد الإخفاء ⇒ نقارن بـSHA-256</td></tr>
+    <tr><td class="mono">reject_masked_sha</td><td>بصمة الصفحة المخفاة</td></tr>
+    <tr><td class="mono">reject_tokens</td><td>تسلسل رموز «الشكل» (الأرقام ⇒ <code>#</code>) للمقارنة التقريبية</td></tr>
+    <tr><td class="mono">reject_status / reject_len / reject_text</td><td>حالة HTTP وطول الصفحة ونصّها (أول 40,000 محرف)</td></tr>
+    <tr><td class="mono">reject_location_key</td><td>مفتاح التحويل لبطاقة خاطئة (فارغ = ليس تحويلاً أو يتغير وحده)</td></tr>
+    <tr><td class="mono">login_text</td><td>نص صفحة الدخول — يُستخدم لتمييز «ما زلنا في صفحة الدخول»</td></tr>
+    <tr><td class="mono">samples / note / dynamic_count</td><td>عدد العيّنات، ملاحظة، وعدد القيم المتغيّرة</td></tr>
+  </tbody>
+</table>
+
+<h3 id="cal">نتيجة المعايرة — <code>engine.Calibration</code> / <code>as_dict()</code></h3>
+<table class="t compact">
+  <thead><tr><th>المفتاح في <code>as_dict()</code></th><th>المحتوى</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">ok</td><td>هل نجحت المعايرة (بدونها لا يبدأ التخمين)</td></tr>
+    <tr><td class="mono">steps</td><td>مصفوفة <code>{id, ok, reason, detail}</code> لكل خطوة</td></tr>
+    <tr><td class="mono">internet</td><td>نتيجة فحص الإنترنت أثناء المعايرة</td></tr>
+    <tr><td class="mono">error</td><td>المفتاح الآلي للفشل (<code>no_rejection_baseline</code>, <code>known_card_not_proven</code>, …)</td></tr>
+    <tr><td class="mono">tuned</td><td>أي تركيب (pass_mode/dst/أعلام) أثبت البطاقة المعروفة، و<code>verified</code></td></tr>
+    <tr><td class="mono">applied_settings</td><td>الإعدادات التي <b>ستُطبَّق</b> على البروفايل (تُملأ فقط إن <code>tuned.verified</code>): الرابط، الطريقة، أسماء الحقول، وضع كلمة المرور، dst/popup، <code>extra_field_names</code> (أسماء فقط)، <code>field_names</code> (ترتيب الحقول كما سيُرسل)</td></tr>
+    <tr><td class="mono">success_words</td><td>كلمات النجاح المتعلَّمة</td></tr>
+    <tr><td class="mono">fingerprint</td><td>ملخّص البصمة: <code>exact</code>, <code>note</code>, <code>dynamic_tokens</code>, <code>masked_values</code>, <code>learned_patterns</code>, <code>reject_status</code>, <code>reject_length</code>, <code>samples</code></td></tr>
+    <tr><td class="mono">portal</td><td>معلومات البوابة (<code>portals.PortalInfo.as_dict()</code>): الحالة، النموذج، هل تحتاج JS…</td></tr>
+  </tbody>
+</table>
+
+<h3 id="event">الحدث — <code>Engine.emit()</code></h3>
+<pre data-lines="4"><code>{ "seq": 128, "t": 1759314612.481, "kind": "attempt", "data": { … } }</code></pre>
+<ul>
+  <li><code>seq</code> رقم تسلسلي يزيد تحت القفل — أساس الاستطلاع التزايدي
+      (<code>/api/run/status?since=</code>).</li>
+  <li><code>t</code> زمن يونكس بثلاثة أرقام عشرية.</li>
+  <li><code>kind</code> أحد: <code>state</code> · <code>calibration</code> · <code>attempt</code> ·
+      <code>stats</code> · <code>hit</code> · <code>review</code> · <code>throttle</code> ·
+      <code>resume</code> · <code>internet_opened</code> · <code>internal</code> ·
+      <code>error</code> · <code>report</code>.</li>
+  <li>الطابور <code>deque(maxlen=4000)</code> — الأحداث القديمة تُنسى من الذاكرة
+      (لكنها محفوظة في التقرير النهائي).</li>
+</ul>
+
+<h3 id="status">حالة التشغيل — <code>Engine.status()</code></h3>
+<p>أكبر بنية في الأداة، وتُرجع كاملة في كل استطلاع:</p>
+<div class="scroll-x">
+<table class="t compact">
+  <thead><tr><th>المفتاح</th><th>المحتوى</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">state</td><td><code>idle</code> · <code>calibrating</code> · <code>running</code> · <code>done</code></td></tr>
+    <tr><td class="mono">error</td><td>رسالة الاستثناء إن وقع</td></tr>
+    <tr><td class="mono">profile / plan</td><td>اسم البروفايل + الخطة (أدناه)</td></tr>
+    <tr><td class="mono">counters</td><td><code>Counter</code> بأحكام (<code>v_*</code>)</td></tr>
+    <tr><td class="mono">reason_counts</td><td><code>Counter</code> بأسباب (<code>r_*</code>)</td></tr>
+    <tr><td class="mono">net_kinds</td><td><code>Counter</code> بأنواع أخطاء النقل (<code>net_*</code>)</td></tr>
+    <tr><td class="mono">hits</td><td>قائمة الإصابات الكاملة</td></tr>
+    <tr><td class="mono">review / review_count</td><td>آخر 40 صفحة مراجعة + العدد الكلي</td></tr>
+    <tr><td class="mono">stop_reason / ban_evidence</td><td>سبب التوقف ودليل الحجب</td></tr>
+    <tr><td class="mono">progress</td><td><code>attempts</code> (ما جُرّب فعلاً) · <code>queued</code> ·
+        <code>dropped</code> (ما بقي في الطابور عند الإيقاف) · <code>total</code> (المخطَّط) ·
+        <code>covered</code> · <code>space</code> · <code>percent</code> (محسوب ومقصور على 100) ·
+        <code>eta_seconds</code> · <code>threads</code> (الحقيقية العاملة)</td></tr>
+    <tr><td class="mono">speed / elapsed</td><td>طلب/ثانية والزمن المنقضي</td></tr>
+    <tr><td class="mono">latency</td><td><code>avg_ms</code> و<code>p95_ms</code> من آخر 500 تأخير</td></tr>
+    <tr><td class="mono">throttle</td><td><code>delay_ms</code> الحالي · <code>base_ms</code> الذي كتبه المستخدم · <code>reason</code></td></tr>
+    <tr><td class="mono">calibration</td><td>بنية المعايرة أعلاه</td></tr>
+    <tr><td class="mono">internet_opened</td><td>نتيجة المراقب</td></tr>
+    <tr><td class="mono">diagnostics</td><td>نتيجة التشخيص إن طُلب</td></tr>
+    <tr><td class="mono">verify_enabled / seq</td><td>هل التحقق مفعّل، وآخر رقم تسلسلي</td></tr>
+  </tbody>
+</table>
+</div>
+<div class="note">يوجد أيضاً <code>status_snapshot()</code> الأخف (العدّادات + التقدم + السرعة +
+التباطؤ فقط) ويُستخدم داخل المحرك حيث لا حاجة لكل شيء.</div>
+
+<h3 id="plan">الخطة — <code>Engine.plan</code></h3>
+<pre data-lines="4"><code>{ "attempts": 2000, "threads": 12, "delay_ms": 0, "keyword": "",
+  "known_card": true, "known_card_preflight_only": false, "verify": true,
+  "resume": true, "verification_serialized": false, "effective_threads": 1 }</code></pre>
+<p><code>effective_threads</code> هو ما <b>سينفَّذ فعلاً</b>: يساوي <code>threads</code> عادةً،
+ويُجبَر على 1 عندما يكون التحقق ممكناً والجهاز خلف الجدار (راجع
+<a href="danger.html#verdict">أماكن الخطر</a>).</p>
+
+<h3 id="banev">دليل الحظر — <code>engine._ban_evidence()</code></h3>
+<table class="t compact">
+  <thead><tr><th>المفتاح</th><th>المحتوى</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">status</td><td>حالة HTTP للرد</td></tr>
+    <tr><td class="mono">word</td><td>عبارة الحجب المكتشفة (أو سبب الحالة)</td></tr>
+    <tr><td class="mono">has_form</td><td>هل نموذج الدخول ما زال ظاهراً في الصفحة —
+        إن كان ظاهراً فالكلمة وحدها <b>لا</b> تكفي لإعلان حجب</td></tr>
+    <tr><td class="mono">stop</td><td>هل هذا الدليل يستوجب التوقف</td></tr>
+    <tr><td class="mono">reason</td><td>نص مقروء للسبب</td></tr>
+    <tr><td class="mono">kind_hint</td><td>تصنيف مبدئي للمشرف فقط:
+        <code>captcha</code> · <code>rate_limit</code> · <code>http_block</code> ·
+        <code>page_block</code> · <code>unknown</code>.
+        <b>لا يُستخدم لاتخاذ قرار استئناف</b> — القرارات من <code>Verdict.code</code> فقط</td></tr>
+  </tbody>
+</table>
+
+<h3 id="job">المهمة الخلفية — <code>server.Job</code></h3>
+<p>المعايرة والتشخيص وقياس الحجب تعمل في <code>ThreadPoolExecutor(2)</code> والواجهة تستطلعها:</p>
+<pre data-lines="3"><code>{ "id": "…", "kind": "calibrate", "state": "running|done|error",
+  "result": { … }, "error": "" }</code></pre>
+
+<h2 id="disk">ما يُكتب على القرص</h2>
+<p>كل شيء داخل مجلد واحد: <code>kirapass_data/</code> بجوار <code>KiraPass.py</code>.
+هذا مقصود حتى يستطيع زر «مسح البيانات» أن ينظّف كل شيء دفعة واحدة.</p>
+
+<div class="card info">
+  <b>أهم قاعدة:</b> لا شيء يُكتب خارج <code>kirapass_data/</code> إلا ملفات بايثون المؤقتة
+  <code>__pycache__</code> (ويحذفها «مسح البيانات» أيضاً).
+  ولا يُكتب شيء إطلاقاً في سجل النظام أو في متصفح المستخدم
+  (عدا رمز الواجهة في <code>localStorage</code> من جهة المتصفح نفسه).
+</div>
+
+<h2 id="tree">خريطة المجلد</h2>
+<pre data-lines="14"><code>kirapass_data/
+├── profiles.json      ← البروفايلات المحفوظة (بلا أسرار حية)
+├── settings.json      ← إعدادات الواجهة العامة
+├── hits.txt           ← سجل الإصابات (سطر لكل بطاقة وُجدت) ★ أهم ملف
+├── runs/              ← تقرير JSON لكل تشغيل
+│   └── 20261001_143012_myprofile.json
+├── review/            ← صفحات HTML للردود غير الواضحة
+│   ├── index.json     ← فهرس هذه الصفحات (آخر 500 مدخل)
+│   └── 1759…_00123_0201242548.html
+├── cache/             ← (محجوز؛ لا يكتب فيه الإصدار الحالي شيئاً)
+└── logs/              ← (محجوز؛ لا يكتب فيه الإصدار الحالي شيئاً)</code></pre>
+
+<table class="t">
+  <thead><tr><th>المسار</th><th>من يكتبه</th><th>من يقرؤه</th><th>فيه أسرار؟</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">profiles.json</td><td><code>Store.save</code> ← <code>atomic_write</code></td>
+        <td><code>Store._load</code> عند كل إقلاع</td><td>لا (تُنقّى عند الحفظ)</td></tr>
+    <tr><td class="mono">settings.json</td><td><code>Store.set_setting</code></td>
+        <td><code>Store.get_setting</code></td><td>لا</td></tr>
+    <tr><td class="mono">hits.txt</td><td><code>Store.append_hit</code></td>
+        <td>المستخدم (ملف نصي) + <code>cache_info</code> للحجم</td><td><b>نعم</b> — أرقام البطاقات</td></tr>
+    <tr><td class="mono">runs/*.json</td><td><code>Store.save_run</code></td>
+        <td><code>/api/reports</code> و<code>/api/report</code></td><td>لا (<code>safe_profile_snapshot</code>)</td></tr>
+    <tr><td class="mono">review/*.html</td><td><code>Store.save_review</code></td>
+        <td><code>/api/review/file</code></td><td>منقّح (MAC/IP تُحذف)</td></tr>
+    <tr><td class="mono">review/index.json</td><td><code>Store.save_review</code></td>
+        <td><code>Store.list_review</code></td><td><b>نعم جزئياً</b> — رقم البطاقة</td></tr>
+    <tr><td class="mono">cache/, logs/</td><td>— (فارغان في الإصدار الحالي)</td>
+        <td>حجمهما فقط في <code>cache_info</code></td><td>لا</td></tr>
+    <tr><td class="mono">(ذاكرة فقط) تقارير المسجّل</td><td>—</td><td>—</td>
+        <td>تبقى في الذاكرة ولا تُكتب على القرص أبداً</td></tr>
+  </tbody>
+</table>
+
+<div class="note">
+  <b>ملاحظتان صادقتان عن الكود الحالي:</b>
+  <ul>
+    <li><code>cache/</code> و<code>logs/</code> يُنشئهما <code>ensure_dirs()</code> لكن لا يوجد
+        في هذا الإصدار أي كود يكتب فيهما ملفاً. هما موجودان حتى يظهر «مسح البيانات»
+        مكتملاً وحتى لا ينهار أي مسار قديم يتوقعهما.</li>
+    <li>تقارير المسجّل (<code>capture.py · Hub</code>) <b>لا تُحفظ على القرص إطلاقاً</b>:
+        تبقى في ذاكرة السيرفر (حتى 8 جلسات)، وتختفي عند إغلاق الأداة. ما يصل إلى القرص
+        هو فقط ما يختاره المستخدم صراحةً: تنزيل JSON أو «حفظ كبروفايل».</li>
+  </ul>
+</div>
+
+<h2 id="profiles">profiles.json</h2>
+<p>الشكل الخارجي:</p>
+<pre data-lines="6"><code>{
+  "schema": 5,
+  "saved": "2026-10-01 14:30:12",
+  "profiles": [ { …بروفايل… }, { …بروفايل… } ]
+}</code></pre>
+
+<p>الحقول الكاملة كما يعرّفها <code>store.new_profile()</code> (أي حقل غير موجود هنا
+<b>يُسقط</b> عند <code>migrate()</code> — راجع <a href="editing.html#recipe7">وصفة إضافة حقل</a>):</p>
+
+<div class="scroll-x">
+<table class="t compact">
+  <thead><tr><th>الحقل</th><th>النوع / الافتراضي</th><th>المعنى</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">schema</td><td class="mono">5</td><td>رقم نسخة الصيغة، لتحديث البروفايلات القديمة</td></tr>
+    <tr><td class="mono">name</td><td class="mono">""</td><td>المفتاح الوحيد للبروفايل (يُنظَّف بـ<code>clean()</code> إلى 60 محرفاً)</td></tr>
+    <tr><td class="mono">login_url</td><td class="mono">""</td><td>رابط صفحة/طلب الدخول</td></tr>
+    <tr><td class="mono">method</td><td class="mono">"post"</td><td><code>post</code> أو <code>get</code></td></tr>
+    <tr><td class="mono">user_field</td><td class="mono">"username"</td><td>اسم حقل البطاقة</td></tr>
+    <tr><td class="mono">pass_field</td><td class="mono">"password"</td><td>اسم حقل كلمة المرور</td></tr>
+    <tr><td class="mono">pass_mode</td><td class="mono">"empty"</td><td>ما يُرسل في حقل كلمة المرور (9 أوضاع — راجع <a href="texts.html">النصوص</a> و<code>PASS_MODES</code>)</td></tr>
+    <tr><td class="mono">pass_fixed</td><td class="mono">""</td><td>كلمة مرور ثابتة (وضع <code>fixed</code> فقط) — <b>لا تُصدَّر</b></td></tr>
+    <tr><td class="mono">extra_fields</td><td class="mono">{}</td><td>حقول ثابتة إضافية تُرسل مع كل طلب</td></tr>
+    <tr><td class="mono">dst_field</td><td class="mono">"dst"</td><td>اسم حقل الوجهة الأصلية</td></tr>
+    <tr><td class="mono">dst_value</td><td class="mono">""</td><td>قيمتها (إن كانت البوابة تتطلبها)</td></tr>
+    <tr><td class="mono">send_dst</td><td class="mono">true</td><td>هل نرسل <code>dst</code> أصلاً</td></tr>
+    <tr><td class="mono">popup_field</td><td class="mono">"popup"</td><td>اسم حقل النافذة المنبثقة</td></tr>
+    <tr><td class="mono">send_popup</td><td class="mono">true</td><td>هل نرسله</td></tr>
+    <tr><td class="mono">chap</td><td class="mono">null</td><td>إعداد <code>{id_field, challenge_field, mode}</code> لبوابات ميكروتيك CHAP</td></tr>
+    <tr><td class="mono">charset</td><td class="mono">"0123456789"</td><td>أبجدية التخمين (نص المحارف نفسها، لا اسمها)</td></tr>
+    <tr><td class="mono">length</td><td class="mono">10</td><td>طول البطاقة الكامل</td></tr>
+    <tr><td class="mono">prefix</td><td class="mono">""</td><td>جزء ثابت في أول البطاقة</td></tr>
+    <tr><td class="mono">suffix</td><td class="mono">""</td><td>جزء ثابت في آخر البطاقة</td></tr>
+    <tr><td class="mono">space_pos</td><td class="mono">0</td><td>كم بطاقة غُطّيت — أساس «المتابعة من حيث توقفت»</td></tr>
+    <tr><td class="mono">space_pass</td><td class="mono">0</td><td>رقم الدورة على الفضاء</td></tr>
+    <tr><td class="mono">walk_a</td><td class="mono">0</td><td>خطوة المسار (أولي نسبياً مع حجم الفضاء)</td></tr>
+    <tr><td class="mono">walk_b</td><td class="mono">0</td><td>بداية المسار</td></tr>
+    <tr><td class="mono">note</td><td class="mono">""</td><td>ملاحظة المستخدم</td></tr>
+    <tr><td class="mono">success_words</td><td class="mono">[]</td><td>كلمات نجاح متعلَّمة من صفحة نجاح حقيقية</td></tr>
+    <tr><td class="mono">success_url_contains</td><td class="mono">""</td><td>جزء رابط يظهر فقط عند النجاح</td></tr>
+    <tr><td class="mono">stats_url</td><td class="mono">""</td><td>رابط صفحة الحالة/الخروج (رأي ثانٍ عند التحقق)</td></tr>
+    <tr><td class="mono">capture_needs_browser_js</td><td class="mono">false</td><td>البوابة تحتاج JavaScript مجهولاً ⇒ لا يمكن أتمتتها</td></tr>
+    <tr><td class="mono">capture_block_reason</td><td class="mono">""</td><td>مفتاح آلية يشرح سبب منع الأتمتة</td></tr>
+    <tr><td class="mono">user_agent</td><td class="mono">""</td><td>ترويسة <code>User-Agent</code> الخاصة بهذه البوابة (فارغة = الافتراضية)</td></tr>
+    <tr><td class="mono">send_referer</td><td class="mono">true</td><td>هل نرسل <code>Referer</code> منقّى</td></tr>
+    <tr><td class="mono">ban_after</td><td class="mono">null</td><td>قياس «قِس حدّ الحظر»: بعد كم فشل يُحجب هذا الراوتر</td></tr>
+    <tr><td class="mono">clears_after</td><td class="mono">null</td><td>هل يزول الحجب ومتى (لا يُقاس آلياً — يُترك <code>null</code>)</td></tr>
+    <tr><td class="mono">safe_delay_ms</td><td class="mono">0</td><td>تأخير آمن بين الطلبات اقترحه القياس</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="card warn">
+  <b>الترحيل <code>store.migrate()</code>:</b> يقبل ملفات من النسخ القديمة
+  (<code>network_type</code> 1/2/3، <code>var_len</code>، <code>fixed_fields</code>،
+  <code>success_signature</code>، <code>walk.pos</code>، <code>method: "1"/"2"</code>)
+  ويحوّلها إلى الصيغة الحالية. وفي النهاية يمرّر <code>login_url</code> عبر
+  <code>sanitize_login_url</code> حتى تُحذف أي بطاقة/كلمة مرور قديمة منسوخة داخل رابط GET.
+</div>
+
+<h2 id="settings">settings.json</h2>
+<p>مفاتيح قليلة، كلها اختيارية (غائب = القيمة الافتراضية من <code>config.py</code> أو البيئة):</p>
+<table class="t compact">
+  <thead><tr><th>المفتاح</th><th>من يكتبه</th><th>أثره</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">lang</td><td>زر اللغة في الواجهة / <code>--lang</code></td>
+        <td><code>ar</code> أو <code>en</code> — لغة النصوص المعروضة</td></tr>
+    <tr><td class="mono">internet_check_url</td><td>الإعدادات المتقدمة</td>
+        <td>موقع فحص إضافي يُضاف إلى <code>INTERNET_CHECKS</code> (≤400 محرف)</td></tr>
+    <tr><td class="mono">connect_timeout</td><td>الإعدادات المتقدمة</td>
+        <td>يحدّث <code>config.CONNECT_TIMEOUT</code> فوراً (0.5–120 ثانية)</td></tr>
+    <tr><td class="mono">read_timeout</td><td>الإعدادات المتقدمة</td>
+        <td>يحدّث <code>config.READ_TIMEOUT</code> فوراً (0.5–120 ثانية)</td></tr>
+  </tbody>
+</table>
+<div class="note">الإعدادات <b>لا</b> تُخزَّن في ملف واحد لكل شيء: أشياء مثل
+  <code>auto_pace</code> و<code>warmup_every</code> تأتي من متغيرات البيئة
+  (<a href="env.html">صفحة البيئة</a>)، وأشياء مثل عدد المسارات والتأخير تأتي من الواجهة لكل تشغيل
+  ولا تُحفظ.</div>
+
+<h2 id="hits">hits.txt</h2>
+<p>ملف نصي عادي، سطر لكل إصابة. الصيغة الحرفية (من <code>engine._register_hit</code>):</p>
+<pre data-lines="1"><code>2026-10-01 14:30:12 card=0201242548 code=ACCEPTED_VERIFIED reason=learned_success_words {"status":200,"redirect":"","online":true,"words":["welcome"]}</code></pre>
+<ul>
+  <li>التاريخ والوقت بصيغة <code>%Y-%m-%d %H:%M:%S</code>.</li>
+  <li><code>card=</code> البطاقة الكاملة — <b>هذا هو الملف الوحيد الذي يحتوي أرقام بطاقات حقيقية</b>.</li>
+  <li><code>code=</code> و<code>reason=</code> مفاتيح آلية (ترجمتها في <a href="texts.html">صفحة النصوص</a>).</li>
+  <li>آخر السطر: <code>verdict.data</code> بصيغة JSON <b>مقصورة على 200 محرف</b> حتى لا ينتفخ الملف.</li>
+  <li>يُكتب بـ<code>append</code> — لا يُعاد كتابته ولا يُرتَّب. لحذفه: زر «مسح النتائج»
+      أو حذف الملف يدوياً.</li>
+</ul>
+
+<h2 id="runs">runs/*.json — تقرير التشغيل</h2>
+<p>اسم الملف: <code>السنةالشهراليوم_الساعةالدقيقةالثانية_اسمالبروفايل.json</code>
+(الاسم منقّى ومقصور على 24 محرفاً). يُحذف تلقائياً ما هو أقدم من
+<code>REPORT_RETENTION_DAYS</code> (افتراضياً 30 يوماً) عند كل حفظ تقرير جديد.</p>
+
+<p>الحقول كما يبنيها <code>engine._save_report()</code>:</p>
+<table class="t compact">
+  <thead><tr><th>المفتاح</th><th>المحتوى</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">tool / version / finished</td><td>هوية الأداة ووقت الانتهاء</td></tr>
+    <tr><td class="mono">profile / login_url</td><td>اسم البروفايل ورابطه</td></tr>
+    <tr><td class="mono">plan</td><td>الخطة كما بُنيت: الفضاء، البطاقات، المسارات، التحقق، المعايرة</td></tr>
+    <tr><td class="mono">result</td><td><code>stop_reason</code> · <code>hits</code> · <code>state</code> · <code>error</code></td></tr>
+    <tr><td class="mono">ban_evidence</td><td>دليل الحجب للمشرف (إن وُجد)</td></tr>
+    <tr><td class="mono">counters</td><td>عدّادات الأحكام: <code>v_ACCEPTED_VERIFIED</code>, <code>v_REJECTED</code>, <code>v_NET_ERROR</code>…</td></tr>
+    <tr><td class="mono">reason_counts</td><td>كم مرة ظهر كل سبب (<code>r_*</code>)</td></tr>
+    <tr><td class="mono">net_kinds</td><td>كم مرة ظهر كل نوع خطأ نقل (<code>net_*</code>)</td></tr>
+    <tr><td class="mono">progress</td><td><code>pos</code> · <code>space</code> · <code>done</code> · <code>dropped</code> · <code>unevaluated</code></td></tr>
+    <tr><td class="mono">speed / elapsed / latency</td><td>سرعة الطلبات، الزمن المنقضي، متوسط/أعلى تأخير</td></tr>
+    <tr><td class="mono">throttle_events</td><td>سجل كل تخفيض/رفع للوتيرة</td></tr>
+    <tr><td class="mono">calibration</td><td>نتيجة المعايرة كاملة (خطوات، أخطاء، بنية صفحة الرفض، شكل الطلب)</td></tr>
+    <tr><td class="mono">internet_opened</td><td>هل نزل الجدار أثناء التشغيل (نتيجة المراقب)</td></tr>
+    <tr><td class="mono">review_files</td><td>أسماء صفحات المراجعة المحفوظة في هذا التشغيل</td></tr>
+    <tr><td class="mono">profile_snapshot</td><td>البروفايل <b>منقّحاً</b>: <code>pass_fixed → [redacted]</code>، و<code>chap → وجود/عدم</code>، وأي حقل إضافي باسم سرّي ⇒ <code>[redacted]</code></td></tr>
+  </tbody>
+</table>
+
+<h2 id="review">review/ — الصفحات غير الواضحة</h2>
+<ul>
+  <li><b>اسم الملف:</b> <code>الوقت_رقممتسلسل(5 أرقام)_البطاقة(≤24 محرفاً).html</code>.</li>
+  <li><b>متى تُحفظ:</b> أي حكم <code>UNKNOWN</code> يصل إلى <code>Engine._save_unknown</code>،
+      بحد أقصى <b>50 صفحة لكل تشغيل</b> (<code>_unknown_saved</code>).</li>
+  <li><b>ما فيها:</b> نص الرد كما جاء، بعد تمريره بـ<code>redact_review_body</code>
+      (MAC ⇒ <code>[mac-redacted]</code> وIPv4 ⇒ <code>[ip-redacted]</code>)،
+      ومقصور على <b>400,000 محرف</b>.</li>
+  <li><b>الفهرس <code>index.json</code>:</b> مصفوفة مداخل
+      <code>{file, card, saved, code, reason, data}</code>، تُحفظ منها <b>آخر 500 مدخل فقط</b>
+      وتُعرض في الواجهة بترتيب معكوس (الأحدث أولاً).</li>
+  <li><b>كيف تُعرض:</b> داخل <code>&lt;iframe sandbox srcdoc=…&gt;</code> في الواجهة —
+      لا تُنفَّذ سكربتاتها أبداً.</li>
+</ul>
+
+<h2 id="capture">بيانات المسجّل (ذاكرة فقط)</h2>
+<table class="t compact">
+  <thead><tr><th>ما هو</th><th>أين يعيش</th><th>كيف يخرج</th></tr></thead>
+  <tbody>
+    <tr><td>جلسة تسجيل (الصفحة، الأحداث، الشكل المستنتَج)</td>
+        <td><code>capture.Hub.captures</code> — حد 8 جلسات، الأقدم تُغلق</td>
+        <td><code>/api/capture/report</code> (JSON) أو تنزيل من الصفحة</td></tr>
+    <tr><td>نسخة العرض المعزولة <code>html_view</code></td>
+        <td>داخل نفس الجلسة في الذاكرة</td>
+        <td><code>/capture/view?id=…</code> (يُعرض في iframe معزول)</td></tr>
+    <tr><td>أمر curl المنقّح</td><td>يُولَّد عند الطلب</td>
+        <td>يُنسخ/يُنزَّل يدوياً</td></tr>
+    <tr><td>بروفايل مبني من التسجيل</td><td>—</td>
+        <td>«حفظ كبروفايل» ⇒ <code>profiles.json</code> (بلا <code>pass_fixed</code> عند الاستيراد)</td></tr>
+  </tbody>
+</table>
+
+<h2 id="inspect">كيف تفحص البيانات بنفسك</h2>
+<table class="t compact">
+  <thead><tr><th>ماذا تريد</th><th>الأمر</th></tr></thead>
+  <tbody>
+    <tr><td>رؤية كل البروفايلات</td><td class="mono">python3 -c "import json;print(json.dumps(json.load(open('kirapass_data/profiles.json'))['profiles'],ensure_ascii=False,indent=2))"</td></tr>
+    <tr><td>رؤية الإصابات</td><td class="mono">cat kirapass_data/hits.txt</td></tr>
+    <tr><td>عدد التقارير</td><td class="mono">ls -1 kirapass_data/runs | wc -l</td></tr>
+    <tr><td>آخر تقرير</td><td class="mono">ls -t kirapass_data/runs | head -1</td></tr>
+    <tr><td>حجم كل شيء</td><td>من الواجهة: «البيانات والمساحة» (يقرأ <code>cache_info</code>)</td></tr>
+    <tr><td>فتح صفحة مراجعة</td><td class="mono">xdg-open kirapass_data/review/&lt;اسم&gt;.html</td></tr>
+  </tbody>
+</table>
+
+<h2 id="delete">الحذف والمساحة</h2>
+<p><code>store.clear_cache(scope)</code> — النطاقات الأربعة (وهي نفسها التي يعرضها
+<code>/api/cache/clear</code>):</p>
+<table class="t compact">
+  <thead><tr><th>النطاق</th><th>ماذا يحذف</th><th>ماذا يُبقي</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">temp</td><td><code>cache/</code> + <code>review/</code></td>
+        <td>الإصابات، التقارير، البروفايلات</td></tr>
+    <tr><td class="mono">results</td><td><code>runs/</code> + <code>logs/</code> + <code>hits.txt</code></td>
+        <td>البروفايلات وصفحات المراجعة</td></tr>
+    <tr><td class="mono">profiles</td><td><code>profiles.json</code></td>
+        <td>كل شيء آخر</td></tr>
+    <tr><td class="mono">all</td><td>كل ما سبق + ملفات النسخة القديمة
+        (<code>kirapass_hits.txt</code>, <code>mikrotikbf_profiles.json</code>,
+        <code>kirapass_profiles.json</code>) + مجلد البيانات كاملاً</td><td>الكود فقط</td></tr>
+  </tbody>
+</table>
+<p>بالإضافة إلى ذلك يحذف دائماً مجلدات <code>__pycache__</code> داخل مجلد المشروع،
+ويرجع <code>{scope, removed[], freed_bytes, freed_human}</code>.
+الأرقام محسوبة <b>فعلياً</b>: <code>_remove_path()</code> يقيس البايتات قبل الحذف
+ويميّز الملف من المجلد، و<code>seen_paths</code> يمنع عدّ نفس المجلد مرتين.</p>
+
+<div class="danger">
+  <b>قبل أن «تنظّف»:</b> <code>hits.txt</code> ليس كاش. هو السجل الوحيد للبطاقات التي وجدتها.
+  نطاق <code>temp</code> لا يلمسه عمداً؛ وإن أردت حذفه فاستخدم «مسح النتائج» وأنت تعرف ماذا تفعل.
+</div>
+
+<h2 id="privacy">ملخص الخصوصية</h2>
+<table class="t compact">
+  <thead><tr><th>نوع البيانات</th><th>هل يصل القرص</th><th>أين / منقّح؟</th></tr></thead>
+  <tbody>
+    <tr><td>رقم بطاقة ناجحة</td><td>نعم</td><td><code>hits.txt</code> + <code>review/index.json</code> (غير منقّح — هو النتيجة)</td></tr>
+    <tr><td>أرقام بطاقات مُجرَّبة وفشلت</td><td>لا</td><td>لا تُحفظ إطلاقاً (العدّادات فقط)</td></tr>
+    <tr><td>كلمة مرور ثابتة</td><td>لا</td><td><code>[redacted]</code> في التقارير؛ ولا تُستورد</td></tr>
+    <tr><td>تجزئة CHAP / قيمة كوكي</td><td>لا</td><td>أسماء فقط، لا قيم</td></tr>
+    <tr><td>نص صفحة راوتر</td><td>جزئياً</td><td><code>review/</code> فقط للحالات غير الواضحة، منقّحاً من MAC/IP</td></tr>
+    <tr><td>MAC / IP الضيف</td><td>لا</td><td>تُستبدل بـ<code>[mac-redacted]</code>/<code>[ip-redacted]</code></td></tr>
+    <tr><td>طلبات المسجّل</td><td>لا</td><td>ذاكرة فقط، والقيم السرّية <code>&lt;redacted&gt;</code></td></tr>
+  </tbody>
+</table>
+
+<footer class="docfoot">البيانات على القرص · KiraPass — <code>docs/site/data.html</code></footer>
+
+</main>
+</div>
+<script src="assets/docs.js"></script>
+<script>KPInit("data");</script>
+</body>
+</html>

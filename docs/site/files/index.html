@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>صفحات الملفات · KiraPass</title>
+<link rel="stylesheet" href="../assets/docs.css">
+
+</head>
+<body>
+<div id="kp-layout">
+<main class="doc">
+<h1>صفحات الملفات</h1>
+<p class="lead">صفحة لكل ملف في المشروع: ما فيه من دوال وأصناف ومتغيرات، ومن ينادي كل دالة، ورابط إلى المصدر كاملاً مرقّماً.</p>
+<div class="card info"><b>هذه الصفحة مولّدة آلياً</b> من مصدر الكود مباشرة (<code>tools/docs/build_docs.py</code>). إن غيّرت الكود فأعد توليدها: <code>python3 tools/docs/build_docs.py</code>. الشرح اليدوي الأوسع في <a href="../architecture.html">المعمارية</a> و<a href="../editing.html">دليل التعديل</a> و<a href="../danger.html">أماكن الخطر</a>.</div>
+<div class="scroll-x"><table class="t"><thead><tr><th>الملف</th><th>الدور</th><th>الأسطر</th><th>الدوال</th><th>الأصناف</th><th>المتغيرات</th><th>صفحات</th></tr></thead><tbody>
+<tr><td class="mono"><b>KiraPass.py</b><br><span class="muted">KiraPass.py</span></td><td>نقطة الدخول: يشغّل الأداة من سطر الأوامر</td><td>30</td><td>0</td><td>0</td><td>0</td><td><a class="btn" href="kirapass-py.html">الشرح</a> <a class="btn" href="../src/kirapass-py.html">المصدر</a></td></tr>
+<tr><td class="mono"><b>__init__.py</b><br><span class="muted">kirapass/__init__.py</span></td><td>تعريف الحزمة ورقم النسخة</td><td>16</td><td>0</td><td>0</td><td>2</td><td><a class="btn" href="init.html">الشرح</a> <a class="btn" href="../src/init.html">المصدر</a></td></tr>
+<tr><td class="mono"><b>__main__.py</b><br><span class="muted">kirapass/__main__.py</span></td><td>تشغيل بـpython -m kirapass</td><td>7</td><td>0</td><td>0</td><td>0</td><td><a class="btn" href="main-mod.html">الشرح</a> <a class="btn" href="../src/main-mod.html">المصدر</a></td></tr>
+<tr><td class="mono"><b>version_helpers.py</b><br><span class="muted">kirapass/version_helpers.py</span></td><td>مساعدات قراءة رقم النسخة</td><td>10</td><td>1</td><td>0</td><td>0</td><td><a class="btn" href="version-helpers.html">الشرح</a> <a class="btn" href="../src/version-helpers.html">المصدر</a></td></tr>
+<tr><td class="mono"><b>cli.py</b><br><span class="muted">kirapass/cli.py</span></td><td>سطر الأوامر: الخيارات، الطباعة، تشغيل السيرفر</td><td>196</td><td>8</td><td>0</td><td>0</td><td><a class="btn" href="cli.html">الشرح</a> <a class="btn" href="../src/cli.html">المصدر</a></td></tr>
+<tr><td class="mono"><b>config.py</b><br><span class="muted">kirapass/config.py</span></td><td>كل الثوابت والمسارات والكلمات والمتغيرات البيئية</td><td>263</td><td>3</td><td>0</td><td>56</td><td><a class="btn" href="config.html">الشرح</a> <a class="btn" href="../src/config.html">المصدر</a></td></tr>
+<tr><td class="mono"><b>errors.py</b><br><span class="muted">kirapass/errors.py</span></td><td>تحويل أي استثناء شبكة إلى كود ونص وتلميح</td><td>138</td><td>5</td><td>1</td><td>2</td><td><a class="btn" href="errors.html">الشرح</a> <a class="btn" href="../src/errors.html">المصدر</a></td></tr>
+<tr><td class="mono"><b>httpclient.py</b><br><span class="muted">kirapass/httpclient.py</span></td><td>عميل HTTP: الاتصال، الكوكيز، المهلات، التحويلات</td><td>378</td><td>28</td><td>3</td><td>1</td><td><a class="btn" href="httpclient.html">الشرح</a> <a class="btn" href="../src/httpclient.html">المصدر</a></td></tr>
+<tr><td class="mono"><b>verify.py</b><br><span class="muted">kirapass/verify.py</span></td><td>فحص حالة الإنترنت وصفحة الحالة وتسجيل الخروج</td><td>136</td><td>5</td><td>0</td><td>0</td><td><a class="btn" href="verify.html">الشرح</a> <a class="btn" href="../src/verify.html">المصدر</a></td></tr>
+<tr><td class="mono"><b>portals.py</b><br><span class="muted">kirapass/portals.py</span></td><td>قراءة صفحة البوابة واستخراج النموذج وبنائه</td><td>375</td><td>15</td><td>2</td><td>7</td><td><a class="btn" href="portals.html">الشرح</a> <a class="btn" href="../src/portals.html">المصدر</a></td></tr>
+<tr><td class="mono"><b>fingerprint.py</b><br><span class="muted">kirapass/fingerprint.py</span></td><td>البصمة والحَكَم: من الردّ إلى الحكم</td><td>598</td><td>27</td><td>3</td><td>12</td><td><a class="btn" href="fingerprint.html">الشرح</a> <a class="btn" href="../src/fingerprint.html">المصدر</a></td></tr>
+<tr><td class="mono"><b>store.py</b><br><span class="muted">kirapass/store.py</span></td><td>البروفايلات، الإعدادات، التقارير، المراجعة، المسح</td><td>570</td><td>34</td><td>1</td><td>5</td><td><a class="btn" href="store.html">الشرح</a> <a class="btn" href="../src/store.html">المصدر</a></td></tr>
+<tr><td class="mono"><b>engine.py</b><br><span class="muted">kirapass/engine.py</span></td><td>المحرك: المعايرة، التشغيل، الخيوط، المراقب، التقرير</td><td>2,416</td><td>63</td><td>2</td><td>2</td><td><a class="btn" href="engine.html">الشرح</a> <a class="btn" href="../src/engine.html">المصدر</a></td></tr>
+<tr><td class="mono"><b>capture.py</b><br><span class="muted">kirapass/capture.py</span></td><td>المسجّل اليدوي: اعتراض البوابة وتنقيح الأسرار</td><td>1,232</td><td>46</td><td>3</td><td>16</td><td><a class="btn" href="capture.html">الشرح</a> <a class="btn" href="../src/capture.html">المصدر</a></td></tr>
+<tr><td class="mono"><b>selftest.py</b><br><span class="muted">kirapass/selftest.py</span></td><td>15 سيناريو اختبار على راوترات وهمية</td><td>453</td><td>22</td><td>1</td><td>2</td><td><a class="btn" href="selftest.html">الشرح</a> <a class="btn" href="../src/selftest.html">المصدر</a></td></tr>
+<tr><td class="mono"><b>mockportal.py</b><br><span class="muted">kirapass/mockportal.py</span></td><td>راوتر وهمي كامل للاختبارات</td><td>432</td><td>23</td><td>4</td><td>4</td><td><a class="btn" href="mockportal.html">الشرح</a> <a class="btn" href="../src/mockportal.html">المصدر</a></td></tr>
+<tr><td class="mono"><b>web/server.py</b><br><span class="muted">kirapass/web/server.py</span></td><td>سيرفر الويب: المسارات، التفويض، المهام</td><td>696</td><td>34</td><td>3</td><td>1</td><td><a class="btn" href="server.html">الشرح</a> <a class="btn" href="../src/server.html">المصدر</a></td></tr>
+<tr><td class="mono"><b>web/ui.html</b><br><span class="muted">kirapass/web/ui.html</span></td><td>هيكل الصفحة: كل العناصر والمعرّفات</td><td>746</td><td>0</td><td>0</td><td>146</td><td><a class="btn" href="ui-html.html">الشرح</a> <a class="btn" href="../src/ui-html.html">المصدر</a></td></tr>
+<tr><td class="mono"><b>web/ui.js</b><br><span class="muted">kirapass/web/ui.js</span></td><td>منطق الصفحة: الترجمة، الاستطلاع، المعالجات</td><td>2,662</td><td>55</td><td>0</td><td>296</td><td><a class="btn" href="ui-js.html">الشرح</a> <a class="btn" href="../src/ui-js.html">المصدر</a></td></tr>
+<tr><td class="mono"><b>web/ui.css</b><br><span class="muted">kirapass/web/ui.css</span></td><td>التنسيقات: كل الأصناف والمتغيرات</td><td>481</td><td>0</td><td>0</td><td>190</td><td><a class="btn" href="ui-css.html">الشرح</a> <a class="btn" href="../src/ui-css.html">المصدر</a></td></tr>
+</tbody><tfoot><tr><th colspan="2">المجموع</th><th>11,835</th><th colspan="4"></th></tr></tfoot></table></div>
+<div class="note"><b>كيف تقرأ صفحة ملف:</b> كل دالة لها بطاقة فيها التوقيع، الشرح العربي، ما تُسنده وما تُرجعه، <b>الدوال التي تناديها</b> (مرتبطة بصفحاتها)، <b>ومن يناديها</b> مع الملف ورقم السطر.</div>
+<footer class="docfoot">صفحة مولّدة آلياً من مصدر الكود · KiraPass —
+<code>files</code> · 2026-10-01 02:26</footer>
+</main>
+</div>
+<script src="../assets/docs.js"></script>
+<script>KPInit("files");</script>
+</body>
+</html>

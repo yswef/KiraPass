@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>المصطلحات · KiraPass</title>
+<link rel="stylesheet" href="assets/docs.css">
+</head>
+<body>
+<div id="kp-layout">
+<main class="doc">
+
+<h1>قاموس المصطلحات</h1>
+<p class="lead">كل كلمة غريبة تظهر في الأداة أو في هذا التوثيق، مرتبة أبجدياً، مع مكانها في الكود.</p>
+
+<div class="scroll-x">
+<table class="t">
+  <thead><tr><th>المصطلح</th><th>بالإنجليزية / في الكود</th><th>المعنى المبسّط</th><th>أين في الكود</th></tr></thead>
+  <tbody>
+    <tr><td>بوابة أسر</td><td class="mono">captive portal</td>
+        <td>صفحة يطلبها الراوتر قبل أن يعطيك إنترنت (صفحة دخول الهوتسبوت).</td>
+        <td><code>portals.py</code> كله</td></tr>
+    <tr><td>خلف الجدار</td><td class="mono">WALLED</td>
+        <td>حالة الجهاز: كل طلب إنترنت يُحوَّل إلى صفحة الدخول (طبيعي قبل إدخال كرت).</td>
+        <td><code>verify.probe_internet</code></td></tr>
+    <tr><td>متصل فعلاً</td><td class="mono">ONLINE</td>
+        <td>مواقع الفحص ردّت كما يجب ⇒ الإنترنت مفتوح.</td>
+        <td><code>verify.probe_internet</code></td></tr>
+    <tr><td>كرت / بطاقة</td><td class="mono">card</td>
+        <td>رقم الدخول الذي يُخمَّن. يُرسل في حقل المستخدم غالباً.</td>
+        <td><code>store.decode_card</code></td></tr>
+    <tr><td>البادئة</td><td class="mono">prefix</td>
+        <td>الجزء الثابت في أول الكرت (لا يُخمَّن).</td>
+        <td><code>store.new_profile["prefix"]</code></td></tr>
+    <tr><td>اللاحقة</td><td class="mono">suffix</td>
+        <td>جزء ثابت في آخر الكرت (الواجهة لا تعرضه لكنه مدعوم).</td>
+        <td><code>store.variable_len</code></td></tr>
+    <tr><td>الفضاء</td><td class="mono">space / space_size</td>
+        <td>عدد كل الاحتمالات = (عدد المحارف)^(الطول المتغيّر).</td>
+        <td><code>store.space_size</code></td></tr>
+    <tr><td>الأبجدية</td><td class="mono">charset</td>
+        <td>مجموعة المحارف التي يُخمَّن منها (أرقام، حروف، hex…).</td>
+        <td><code>store.CHARSETS</code></td></tr>
+    <tr><td>الطول المتغيّر</td><td class="mono">variable_len</td>
+        <td>طول الكرت − البادئة − اللاحقة = كم رمزاً سنخمّنه.</td>
+        <td><code>store.variable_len</code></td></tr>
+    <tr><td>مسار المشي</td><td class="mono">walk (walk_a, walk_b)</td>
+        <td>ترتيب مخلوط لزيارة الفضاء: <code>(b + a×pos) mod space</code> بحيث
+            <code>a</code> أولي نسبياً مع <code>space</code> ⇒ يمر على كل بطاقة مرة واحدة
+            بلا تكرار.</td>
+        <td><code>store.card_at_walk_pos</code> · <code>engine._coprime</code></td></tr>
+    <tr><td>الموضع</td><td class="mono">space_pos</td>
+        <td>كم بطاقة غُطّيت في هذا المرور — أساس «المتابعة من حيث توقفت».</td>
+        <td>البروفايل + <code>Engine._run</code></td></tr>
+    <tr><td>المرور</td><td class="mono">space_pass</td>
+        <td>رقم الدورة على نفس الفضاء؛ عند دورة جديدة يتغيّر المسار.</td>
+        <td><code>Engine._run</code></td></tr>
+    <tr><td>معايرة</td><td class="mono">calibration</td>
+        <td>مرحلة التعلّم قبل التخمين: قراءة الصفحة، فحص الإنترنت، تعلّم صفحة الرفض،
+            ضبط شكل الطلب ببطاقة معروفة.</td>
+        <td><code>engine.calibrate</code></td></tr>
+    <tr><td>خط أساس الرفض</td><td class="mono">rejection baseline / fingerprint</td>
+        <td>«كيف تبدو صفحة الرفض» — تُبنى من بطاقات تجريبية خاطئة.</td>
+        <td><code>fingerprint.Fingerprinter.learn</code></td></tr>
+    <tr><td>بطاقات تجريبية</td><td class="mono">bench_cards / probes</td>
+        <td>3 بطاقات صحيحة الشكل لكنها خاطئة، تُرسل لنتعلّم الرد.</td>
+        <td><code>engine.bench_cards</code></td></tr>
+    <tr><td>القيم المتغيّرة</td><td class="mono">dynamic literals</td>
+        <td>قيم تتغير وحدها بين طلبين متطابقين (رمز جلسة، وقت، صدى الكرت).</td>
+        <td><code>fingerprint.learn_dynamic</code></td></tr>
+    <tr><td>الأنماط المتعلَّمة</td><td class="mono">learned patterns</td>
+        <td>بدل حفظ القيمة نحفظ شكلها: <code>\b[0-9a-fA-F]{8}\b</code>.</td>
+        <td><code>fingerprint.learn_patterns</code></td></tr>
+    <tr><td>الإخفاء</td><td class="mono">masking</td>
+        <td>استبدال القيم المتغيّرة بـ<code>#</code> قبل المقارنة.</td>
+        <td><code>fingerprint.mask_text</code></td></tr>
+    <tr><td>المقارنة الدقيقة</td><td class="mono">exact</td>
+        <td>بعد الإخفاء صارت كل عيّنات الرفض متطابقة ⇒ نقارن بـSHA-256.</td>
+        <td><code>Fingerprinter.reject_masked_sha</code></td></tr>
+    <tr><td>مقارنة الشكل</td><td class="mono">shape / struct_tokens</td>
+        <td>عندما تتغير الصفحة وحدها: نقارن تسلسل الرموز (الأرقام ⇒ <code>#</code>).</td>
+        <td><code>fingerprint.struct_tokens</code></td></tr>
+    <tr><td>حكم</td><td class="mono">Verdict</td>
+        <td>نتيجة محاولة واحدة: <code>code</code> + <code>reason</code> + <code>confidence</code>
+            + <code>data</code> + <code>evidence</code>.</td>
+        <td><code>fingerprint.Verdict</code></td></tr>
+    <tr><td>الحَكَم</td><td class="mono">Judge</td>
+        <td>الكائن الذي يحوّل ردّاً إلى حكم.</td>
+        <td><code>fingerprint.Judge.classify</code></td></tr>
+    <tr><td>إصابة</td><td class="mono">hit</td>
+        <td>حكم يبدأ كوده بـ<code>ACCEPTED</code>.</td>
+        <td><code>Verdict.is_hit</code></td></tr>
+    <tr><td>dst</td><td class="mono">dst / link-orig</td>
+        <td>«الوجهة الأصلية» التي كان الضيف يحاول فتحها؛ بعض البوابات تتطلبها في الطلب.</td>
+        <td><code>portals.FormInfo.dst_field/dst_value</code></td></tr>
+    <tr><td>popup</td><td class="mono">popup</td>
+        <td>حقل يخبر ميكروتيك أن الدخول من نافذة منبثقة.</td>
+        <td><code>build_fields</code></td></tr>
+    <tr><td>chap</td><td class="mono">chap / hexMD5 / md5.js</td>
+        <td>حيلة ميكروتيك: كلمة المرور تُرسل
+            <code>md5(chap-id + كلمة المرور + chap-challenge)</code> بدل النص.</td>
+        <td><code>portals.CHAP_CALL_RE</code> · <code>engine.password_value</code></td></tr>
+    <tr><td>وضع كلمة المرور</td><td class="mono">pass_mode</td>
+        <td>ما الذي يُرسل في حقل كلمة المرور (same/empty/omit/fixed/chap/…).</td>
+        <td><code>store.PASS_MODES</code></td></tr>
+    <tr><td>الحقول الإضافية</td><td class="mono">extra_fields</td>
+        <td>حقول مخفية ثابتة يجب أن ترسل مع كل طلب.</td>
+        <td><code>engine.build_fields</code></td></tr>
+    <tr><td>الإحماء</td><td class="mono">warm_up</td>
+        <td>طلب صفحة الدخول قبل الإرسال لأخذ الكوكي والحقول المخفية — كما يفعل المتصفح.</td>
+        <td><code>engine.warm_up</code></td></tr>
+    <tr><td>ابتلاع النموذج</td><td class="mono">absorb_form</td>
+        <td>أخذ أسماء الحقول والرابط والقيم المخفية من صفحة طازجة وتحديث البروفايل بها.</td>
+        <td><code>engine.absorb_form</code></td></tr>
+    <tr><td>شكل الطلب</td><td class="mono">request shape</td>
+        <td>الطريقة + الرابط + أسماء الحقول + الترويسات — بدون القيم السرّية.</td>
+        <td><code>engine.safe_request_shape</code></td></tr>
+    <tr><td>الجلسة</td><td class="mono">Session</td>
+        <td>اتصال HTTP واحد + مخزن كوكيز. جلسة واحدة لكل خيط عامل.</td>
+        <td><code>httpclient.Session</code></td></tr>
+    <tr><td>keep-alive</td><td class="mono">keep-alive</td>
+        <td>إعادة استخدام نفس الاتصال لعدة طلبات (السرعة الحقيقية على راوتر).</td>
+        <td><code>Session._connection</code></td></tr>
+    <tr><td>مهلة الاتصال</td><td class="mono">connect_timeout</td>
+        <td>كم ننتظر حتى يُفتح المقبس. فشلها = «لا يوجد رد عند فتح الاتصال».</td>
+        <td><code>Session._send_once</code></td></tr>
+    <tr><td>مهلة القراءة</td><td class="mono">read_timeout</td>
+        <td>كم ننتظر الرد بعد فتح الاتصال. فشلها = «الراوتر تأخر في الرد».</td>
+        <td><code>Session._send_once</code></td></tr>
+    <tr><td>خطأ نقل</td><td class="mono">transport failure</td>
+        <td>لم يصل أي رد (DNS/رفض/مهلة/قطع…).</td>
+        <td><code>errors.classify</code></td></tr>
+    <tr><td>نوع الخطأ</td><td class="mono">kind</td>
+        <td>كود ثابت للخطأ: <code>dns</code>, <code>refused</code>, <code>connect_timeout</code>,
+            <code>read_timeout</code>, <code>reset</code>, <code>stale</code>, <code>tls</code>,
+            <code>unreachable</code>, <code>bad_response</code>, <code>too_many_redirects</code>,
+            <code>proto</code>, <code>unknown</code>, <code>no_session</code>.</td>
+        <td><code>errors.KINDS</code></td></tr>
+    <tr><td>قابل للإعادة</td><td class="mono">retryable</td>
+        <td>هل يُعاد الطلب تلقائياً مرة واحدة (stale/reset/read_timeout/bad_response/unknown).</td>
+        <td><code>errors.RETRY_KINDS</code></td></tr>
+    <tr><td>حجب</td><td class="mono">BANNED</td>
+        <td>صفحة حجب صريحة أو HTTP 403.</td>
+        <td><code>Judge.classify</code> · <code>config.BAN_WORDS</code></td></tr>
+    <tr><td>تقييد طلبات</td><td class="mono">RATE_LIMITED</td>
+        <td>HTTP 429 أو 503 أو صفحة «slow down».</td>
+        <td><code>Judge.classify</code></td></tr>
+    <tr><td>كابتشا</td><td class="mono">CHALLENGE</td>
+        <td>ظهر اختبار بشري في الصفحة.</td>
+        <td><code>Judge.classify</code></td></tr>
+    <tr><td>رد غير واضح</td><td class="mono">UNKNOWN</td>
+        <td>ليس رفضاً وليس نجاحاً مثبتاً ⇒ يُحفظ للمراجعة.</td>
+        <td><code>Engine._save_unknown</code></td></tr>
+    <tr><td>صفحات المراجعة</td><td class="mono">review pages</td>
+        <td>HTML الردود غير الواضحة محفوظة في <code>kirapass_data/review/</code>.</td>
+        <td><code>store.save_review</code></td></tr>
+    <tr><td>دليل الحظر</td><td class="mono">ban_evidence</td>
+        <td>بنية للمشرف: الحالة، العبارة المكتشفة، هل نموذج الدخول ما زال ظاهراً،
+            تصنيف مبدئي. <b>ليست تلميح تجاوز</b>.</td>
+        <td><code>engine._ban_evidence</code></td></tr>
+    <tr><td>المراقب</td><td class="mono">watchdog</td>
+        <td>خيط يفحص كل 3 ثوانٍ: هل نزل الجدار أثناء التشغيل؟</td>
+        <td><code>Engine._start_watchdog</code></td></tr>
+    <tr><td>مشتبه بها</td><td class="mono">suspects</td>
+        <td>الكروت التي أُرسلت منذ آخر فحص إنترنت — أحدها فتح الشبكة ولا نعرف أيها.</td>
+        <td><code>Engine._since_check</code></td></tr>
+    <tr><td>التباطؤ</td><td class="mono">throttle / delay_ms</td>
+        <td>انتظار يُضاف بين الطلبات عند شكوى الراوتر.</td>
+        <td><code>Engine._apply_delay_pressure</code></td></tr>
+    <tr><td>ضبط الوتيرة</td><td class="mono">auto pace (AIMD)</td>
+        <td>زيادة جمعية/نقصان مضاعف: نزيد عند النظافة ونخفض للنصف عند الشكوى.</td>
+        <td><code>Engine._auto_pace</code></td></tr>
+    <tr><td>المسارات</td><td class="mono">threads / workers</td>
+        <td>عدد الطلبات المتوازية.</td>
+        <td><code>Engine._run</code></td></tr>
+    <tr><td>التحقق المسلسَل</td><td class="mono">verification_serialized</td>
+        <td>عندما يكون التحقق ممكناً يُجبَر التشغيل على مسار واحد حتى لا يُنسب
+            فتح الإنترنت إلى بطاقة أخرى.</td>
+        <td><code>Engine._run</code></td></tr>
+    <tr><td>فحص تمهيدي</td><td class="mono">preflight</td>
+        <td>تجربة البطاقة المعروفة مرة واحدة بشكلها الحالي قبل أي تخمين.</td>
+        <td><code>engine._known_card_preflight</code></td></tr>
+    <tr><td>ضبط الشكل</td><td class="mono">tuning</td>
+        <td>تجربة تركيبات محدودة (طريقة × dst × وضع كلمة المرور × الأعلام) لإثبات
+            البطاقة المعروفة.</td>
+        <td><code>engine._tune_with_known_card</code></td></tr>
+    <tr><td>بطاقة معروفة</td><td class="mono">known card</td>
+        <td>كرت مصرّح به تعرف أنه يعمل، يُستخدم لإثبات شكل الطلب وتعلّم كلمات النجاح.</td>
+        <td><code>calibrate(known_card=…)</code></td></tr>
+    <tr><td>كلمات النجاح</td><td class="mono">success_words</td>
+        <td>كلمات تعلّمتها الأداة من صفحة نجاح حقيقية (من كرتك).</td>
+        <td><code>engine._new_words</code> · <code>capture.learn_words</code></td></tr>
+    <tr><td>رابط النجاح</td><td class="mono">success_url_contains</td>
+        <td>جزء من الرابط يظهر فقط عند النجاح.</td>
+        <td><code>Judge.classify</code></td></tr>
+    <tr><td>صفحة الحالة</td><td class="mono">status page</td>
+        <td>صفحة الراوتر <code>/status</code> أو <code>/logout</code> كرأي ثانٍ.</td>
+        <td><code>verify.portal_status_page</code></td></tr>
+    <tr><td>تسجيل الخروج</td><td class="mono">logout</td>
+        <td>إرجاع الشبكة إلى حالة WALLED حتى لا نترك كرتاً مدفوعاً مستهلكاً.</td>
+        <td><code>verify.logout</code></td></tr>
+    <tr><td>بروفايل / ملف تعريفي</td><td class="mono">profile</td>
+        <td>كل إعدادات شبكة: الرابط، الحقول، الصيغة، الموضع.</td>
+        <td><code>store.new_profile</code></td></tr>
+    <tr><td>الترحيل</td><td class="mono">migrate</td>
+        <td>قبول بروفايل من أي نسخة قديمة بدون انهيار.</td>
+        <td><code>store.migrate</code></td></tr>
+    <tr><td>تقرير</td><td class="mono">run report</td>
+        <td>JSON كامل لكل تشغيل في <code>runs/</code>.</td>
+        <td><code>Engine._save_report</code></td></tr>
+    <tr><td>حدث</td><td class="mono">event</td>
+        <td>رسالة من المحرك إلى الصفحة: <code>attempt</code>, <code>hit</code>,
+            <code>stats</code>, <code>throttle</code>, <code>resume</code>, …</td>
+        <td><code>Engine.emit</code></td></tr>
+    <tr><td>مهمة</td><td class="mono">Job</td>
+        <td>عملية خلفية (معايرة/تشخيص/قياس حجب) تستطلعها الصفحة بـ<code>/api/job</code>.</td>
+        <td><code>server.Job</code></td></tr>
+    <tr><td>المسجّل</td><td class="mono">capture / recorder</td>
+        <td>بوابة تُفتح في إطار معزول وتُسجَّل طلباتها لتعلّم شكل الطلب.</td>
+        <td><code>capture.py</code></td></tr>
+    <tr><td>تنقيح</td><td class="mono">redaction</td>
+        <td>حذف الأسرار (كرت، كلمة مرور، تجزئة، قيمة كوكي، رمز حي) قبل الحفظ أو العرض.</td>
+        <td><code>capture.redact_fields</code> · <code>engine._safe_url_shape</code> · …</td></tr>
+    <tr><td>أصل معتم</td><td class="mono">opaque origin</td>
+        <td>إطار <code>sandbox</code> بلا <code>allow-same-origin</code>: كوده لا يملك هوية
+            ولا يصل إلى أداتك.</td>
+        <td><code>capture.VIEW_PAGE</code></td></tr>
+    <tr><td>اعتراض</td><td class="mono">interceptor</td>
+        <td>سكربت يُحقن في الصفحة ليعترض النماذج و<code>fetch</code> و<code>XHR</code>
+            ويرسلها للصفحة الأم.</td>
+        <td><code>capture.INTERCEPTOR</code></td></tr>
+    <tr><td>رمز الدخول</td><td class="mono">token</td>
+        <td>سرّ يُطبع عند فتح الواجهة على الشبكة المحلية ويُطلب مع كل طلب API.</td>
+        <td><code>cli.main</code> · <code>server._authorized</code></td></tr>
+    <tr><td>بوابة تدريب</td><td class="mono">practice portal</td>
+        <td>راوتر وهمي على جهازك للتجربة الآمنة.</td>
+        <td><code>tools/practice_portal.py</code></td></tr>
+    <tr><td>راوتر وهمي</td><td class="mono">MockPortal</td>
+        <td>محاكي بوابة للاختبارات يدعم كل أوضاع الفشل.</td>
+        <td><code>mockportal.py</code></td></tr>
+    <tr><td>الاختبار الذاتي</td><td class="mono">selftest</td>
+        <td>15 سيناريو على راوترات وهمية، في مجلد بيانات مؤقت.</td>
+        <td><code>selftest.py</code></td></tr>
+    <tr><td>مفاتيح آلية</td><td class="mono">machine keys</td>
+        <td>أسباب وحالات بنصوص إنجليزية ثابتة تترجمها الواجهة.</td>
+        <td><code>I18N</code> في <code>ui.js</code></td></tr>
+    <tr><td>المشتبه به الأول</td><td class="mono">INTERNET_CHECKS</td>
+        <td>ثلاثة مواقع معروفة تُستخدم لكشف هل نحن خلف بوابة.</td>
+        <td><code>config.INTERNET_CHECKS</code></td></tr>
+    <tr><td>علامة الخروج</td><td class="mono">EXIT_HOST_MARKERS</td>
+        <td>كلمات في <code>Location</code> تعني «البوابة أخرجتنا».</td>
+        <td><code>config.EXIT_HOST_MARKERS</code></td></tr>
+    <tr><td>كلمات البوابة</td><td class="mono">PORTAL_URL_WORDS</td>
+        <td>كلمات في رابط التحويل تعني «ما زلنا داخل البوابة» (ليس خروجاً).</td>
+        <td><code>config.PORTAL_URL_WORDS</code></td></tr>
+  </tbody>
+</table>
+</div>
+
+<footer class="docfoot">المصطلحات · KiraPass — <code>docs/site/glossary.html</code></footer>
+
+</main>
+</div>
+<script src="assets/docs.js"></script>
+<script>KPInit("glossary");</script>
+</body>
+</html>

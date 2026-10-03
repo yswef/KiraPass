@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>مصدر verify.py · KiraPass</title>
+<link rel="stylesheet" href="../assets/docs.css">
+
+</head>
+<body>
+<div id="kp-layout">
+<main class="doc">
+<h1>مصدر <code>verify.py</code></h1>
+<p class="lead">فحص حالة الإنترنت وصفحة الحالة وتسجيل الخروج — 136 سطراً. كل سطر يحمل تعليقه العربي.</p>
+<div class="card info"><b>هذه الصفحة مولّدة آلياً</b> من مصدر الكود مباشرة (<code>tools/docs/build_docs.py</code>). إن غيّرت الكود فأعد توليدها: <code>python3 tools/docs/build_docs.py</code>. الشرح اليدوي الأوسع في <a href="../architecture.html">المعمارية</a> و<a href="../editing.html">دليل التعديل</a> و<a href="../danger.html">أماكن الخطر</a>.</div>
+<p><a class="btn" href="../files/verify.html">← صفحة الشرح</a> <label class="muted"> قفز إلى سطر: <input id="kp-jump" style="width:6rem" placeholder="123"></label></p>
+<details class="src" open><summary>المصدر كاملاً</summary><pre data-lines="136"><code>
+<span class="ln" id="L1">1</span># بداية نص متعدد الأسطر — الأسطر التالية نصّ حرفي لا كود، فلا يقبل تعليقاً
+<span class="ln" id="L2">2</span>&quot;&quot;&quot;Check captive-portal and internet connectivity states.
+<span class="ln" id="L3">3</span> 
+<span class="ln" id="L4">4</span>The helpers distinguish an open internet connection, a captive-portal redirect,
+<span class="ln" id="L5">5</span>and an unavailable network, and preserve the evidence behind each result.
+<span class="ln" id="L6">6</span> 
+<span class="ln" id="L7">7</span>    internet_state()      before we touch any card:  ONLINE / WALLED / OFFLINE
+<span class="ln" id="L8">8</span>    verify_online()       after a card looked accepted: does internet work?
+<span class="ln" id="L9">9</span>    portal_status_page()  secondary check: the router&#x27;s own /status page
+<span class="ln" id="L10">10</span>&quot;&quot;&quot;  # نهاية النص متعدد الأسطر
+<span class="ln" id="L11">11</span> 
+<span class="ln" id="L12">12</span>from __future__ import annotations  # استيراد annotations من الوحدة __future__
+<span class="ln" id="L13">13</span> 
+<span class="ln" id="L14">14</span>from urllib.parse import urlsplit  # استيراد urlsplit من الوحدة urllib.parse
+<span class="ln" id="L15">15</span> 
+<span class="ln" id="L16">16</span>from . import config  # استيراد config من الوحدة .
+<span class="ln" id="L17">17</span> 
+<span class="ln" id="L18">18</span> 
+<span class="ln" id="L19">19</span>def resolve_internet_checks(custom=None) -&gt; tuple:  # تعريف الدالة resolve_internet_checks(custom) ترجع tuple
+<span class="ln" id="L20">20</span>    # بداية نص متعدد الأسطر — الأسطر التالية نصّ حرفي لا كود، فلا يقبل تعليقاً
+<span class="ln" id="L21">21</span>    &quot;&quot;&quot;Build the check list from an optional custom URL string or env default.
+<span class="ln" id="L22">22</span> 
+<span class="ln" id="L23">23</span>    `custom` accepts the same pipe format as KIRAPASS_INTERNET_CHECKS, e.g.
+<span class="ln" id="L24">24</span>    ``http://example.com/generate_204|204`` or a bare URL (expects HTTP 204).
+<span class="ln" id="L25">25</span>    &quot;&quot;&quot;  # نهاية النص متعدد الأسطر
+<span class="ln" id="L26">26</span>    if custom is None or custom == &quot;&quot;:  # شرط مركّب (أو)
+<span class="ln" id="L27">27</span>        return config.INTERNET_CHECKS  # إرجاع config.INTERNET_CHECKS
+<span class="ln" id="L28">28</span>    if isinstance(custom, (list, tuple)):  # شرط: نتيجة isinstance(custom, مجموعة)
+<span class="ln" id="L29">29</span>        return tuple(custom) if custom else config.INTERNET_CHECKS  # إرجاع tuple(custom) إن custom وإلا config.INTERNET_CHECKS
+<span class="ln" id="L30">30</span>    raw = str(custom).strip()  # إسناد نتيجة استدعاء str(custom).strip إلى raw
+<span class="ln" id="L31">31</span>    if not raw:  # شرط معكوس: ليس raw
+<span class="ln" id="L32">32</span>        return config.INTERNET_CHECKS  # إرجاع config.INTERNET_CHECKS
+<span class="ln" id="L33">33</span>    parsed = config._parse_internet_checks(raw)  # إسناد نتيجة استدعاء config._parse_internet_checks (معامل واحد) إلى parsed
+<span class="ln" id="L34">34</span>    return parsed or config.INTERNET_CHECKS  # إرجاع parsed أو config.INTERNET_CHECKS
+<span class="ln" id="L35">35</span> 
+<span class="ln" id="L36">36</span> 
+<span class="ln" id="L37">37</span># السؤال الوحيد المهم: هل هذا الجهاز متصل فعلاً الآن؟
+<span class="ln" id="L38">38</span># allow_redirects=False مقصود: التحويل إلى صفحة الدخول هو دليل WALLED.
+<span class="ln" id="L39">39</span># ترجع (state, detail) حيث state ∈ {ONLINE, WALLED, OFFLINE}.
+<span class="ln" id="L40">40</span>def probe_internet(session, checks=None, timeout=(3.0, 6.0)) -&gt; dict:  # تعريف الدالة probe_internet(session, checks, timeout) ترجع dict
+<span class="ln" id="L41">41</span>    # بداية نص متعدد الأسطر — الأسطر التالية نصّ حرفي لا كود، فلا يقبل تعليقاً
+<span class="ln" id="L42">42</span>    &quot;&quot;&quot;-&gt; {state, label, detail, status, location}
+<span class="ln" id="L43">43</span> 
+<span class="ln" id="L44">44</span>    state: ONLINE  -&gt; the check URL answered exactly as expected (no portal)
+<span class="ln" id="L45">45</span>           WALLED  -&gt; we were redirected to the portal (needs a card)
+<span class="ln" id="L46">46</span>           OFFLINE -&gt; nothing answered at all
+<span class="ln" id="L47">47</span>    &quot;&quot;&quot;  # نهاية النص متعدد الأسطر
+<span class="ln" id="L48">48</span>    last_error = None  # إسناد القيمة الثابتة last_error
+<span class="ln" id="L49">49</span>    for url, want_status, want_text, label in (checks or config.INTERNET_CHECKS):  # دورة على checks أو config.INTERNET_CHECKS باسم مجموعة
+<span class="ln" id="L50">50</span>        try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L51">51</span>            resp = session.get(url, allow_redirects=False, timeout=timeout)  # إسناد نتيجة استدعاء session.get (معامل واحد، allow_redirects=…، timeout=…) إلى resp
+<span class="ln" id="L52">52</span>        # تكملة السطر السابق داخل القوس
+<span class="ln" id="L53">53</span>        except Exception as exc:                       # noqa: BLE001
+<span class="ln" id="L54">54</span>            last_error = exc  # إسناد exc إلى last_error
+<span class="ln" id="L55">55</span>            continue  # الانتقال إلى الدورة التالية
+<span class="ln" id="L56">56</span>        body = resp.text or &quot;&quot;  # دمج منطقي (أو) وإسناده إلى body
+<span class="ln" id="L57">57</span>        if resp.status == want_status and (want_text is None or want_text in body):  # شرط مركّب (و)
+<span class="ln" id="L58">58</span>            return {&quot;state&quot;: &quot;ONLINE&quot;, &quot;label&quot;: label, &quot;detail&quot;: &quot;expected_answer&quot;,  # إرجاع قاموس
+<span class="ln" id="L59">59</span>                    &quot;status&quot;: resp.status, &quot;url&quot;: url, &quot;location&quot;: &quot;&quot;}  # مفتاح status في القاموس
+<span class="ln" id="L60">60</span>        if resp.is_redirect():  # شرط: نتيجة resp.is_redirect()
+<span class="ln" id="L61">61</span>            return {&quot;state&quot;: &quot;WALLED&quot;, &quot;label&quot;: label, &quot;detail&quot;: &quot;portal_redirect&quot;,  # إرجاع قاموس
+<span class="ln" id="L62">62</span>                    &quot;status&quot;: resp.status, &quot;url&quot;: url,  # مفتاح status في القاموس
+<span class="ln" id="L63">63</span>                    &quot;location&quot;: resp.location[:200]}  # مفتاح location في القاموس
+<span class="ln" id="L64">64</span>        if resp.status in (200, 204) and want_text and want_text not in body:  # شرط مركّب (و)
+<span class="ln" id="L65">65</span>            return {&quot;state&quot;: &quot;WALLED&quot;, &quot;label&quot;: label, &quot;detail&quot;: &quot;portal_page&quot;,  # إرجاع قاموس
+<span class="ln" id="L66">66</span>                    &quot;status&quot;: resp.status, &quot;url&quot;: url,  # مفتاح status في القاموس
+<span class="ln" id="L67">67</span>                    &quot;location&quot;: &quot;&quot;}  # مفتاح location في القاموس
+<span class="ln" id="L68">68</span>        if resp.status in (403, 429, 503):  # شرط: resp.status ضمن مجموعة
+<span class="ln" id="L69">69</span>            return {&quot;state&quot;: &quot;BLOCKED&quot;, &quot;label&quot;: label, &quot;detail&quot;: f&quot;http_{resp.status}&quot;,  # إرجاع قاموس
+<span class="ln" id="L70">70</span>                    &quot;status&quot;: resp.status, &quot;url&quot;: url, &quot;location&quot;: &quot;&quot;}  # مفتاح status في القاموس
+<span class="ln" id="L71">71</span>    # لم يردّ شيء إطلاقاً. قل *لماذا* بنفس الكلمات التي تستخدمها
+<span class="ln" id="L72">72</span>    # بقية الأداة (dns / refused / stale / tls …) حتى تستطيع الواجهة ترجمتها.
+<span class="ln" id="L73">73</span>    kind = &quot;no_answer&quot;  # إسناد القيمة الثابتة kind
+<span class="ln" id="L74">74</span>    if last_error is not None:  # شرط: last_error ليس نفسه None
+<span class="ln" id="L75">75</span>        try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L76">76</span>            from .errors import classify  # استيراد classify من الوحدة errors
+<span class="ln" id="L77">77</span>            kind = classify(last_error, &quot;&quot;).kind  # إسناد classify(last_error, &#x27;&#x27;).kind إلى kind
+<span class="ln" id="L78">78</span>        # تكملة السطر السابق داخل القوس
+<span class="ln" id="L79">79</span>        except Exception:                              # noqa: BLE001
+<span class="ln" id="L80">80</span>            kind = type(last_error).__name__  # إسناد type(last_error).__name__ إلى kind
+<span class="ln" id="L81">81</span>    return {&quot;state&quot;: &quot;OFFLINE&quot;, &quot;label&quot;: &quot;&quot;, &quot;detail&quot;: kind,  # إرجاع قاموس
+<span class="ln" id="L82">82</span>            &quot;status&quot;: 0, &quot;url&quot;: &quot;&quot;, &quot;location&quot;: &quot;&quot;}  # مفتاح status في القاموس
+<span class="ln" id="L83">83</span> 
+<span class="ln" id="L84">84</span> 
+<span class="ln" id="L85">85</span>def verify_online(session, checks=None, timeout=(3.0, 6.0)) -&gt; tuple:  # تعريف الدالة verify_online(session, checks, timeout) ترجع tuple
+<span class="ln" id="L86">86</span>    &quot;&quot;&quot;After a card is accepted: -&gt; (True/False, dict with the reason).&quot;&quot;&quot;  # نص توثيقي (docstring) يشرح ما يليه
+<span class="ln" id="L87">87</span>    info = probe_internet(session, checks=checks, timeout=timeout)  # إسناد نتيجة استدعاء probe_internet (معامل واحد، checks=…، timeout=…) إلى info
+<span class="ln" id="L88">88</span>    ok = info[&quot;state&quot;] == &quot;ONLINE&quot;  # مقارنة (يساوي) وإسناد النتيجة المنطقية إلى ok
+<span class="ln" id="L89">89</span>    return ok, info  # إرجاع مجموعة
+<span class="ln" id="L90">90</span> 
+<span class="ln" id="L91">91</span> 
+<span class="ln" id="L92">92</span>def portal_status_page(session, portal_url: str, timeout=(4.0, 8.0)) -&gt; dict:  # تعريف الدالة portal_status_page(session, portal_url, timeout) ترجع dict
+<span class="ln" id="L93">93</span>    &quot;&quot;&quot;Look for the router&#x27;s own status/logout page as a second opinion.&quot;&quot;&quot;  # نص توثيقي (docstring) يشرح ما يليه
+<span class="ln" id="L94">94</span>    parts = urlsplit(portal_url)  # إسناد نتيجة استدعاء urlsplit (معامل واحد) إلى parts
+<span class="ln" id="L95">95</span>    base = f&quot;{parts.scheme}://{parts.netloc}&quot;  # بناء نص منسّق وإسناده إلى base
+<span class="ln" id="L96">96</span>    for path in (&quot;/status&quot;, &quot;/status.html&quot;, &quot;/logout&quot;):  # دورة على مجموعة باسم path
+<span class="ln" id="L97">97</span>        url = base + path  # حساب جمع بين base وpath وإسناده إلى url
+<span class="ln" id="L98">98</span>        try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L99">99</span>            resp = session.get(url, allow_redirects=False, timeout=timeout)  # إسناد نتيجة استدعاء session.get (معامل واحد، allow_redirects=…، timeout=…) إلى resp
+<span class="ln" id="L100">100</span>        # تكملة السطر السابق داخل القوس
+<span class="ln" id="L101">101</span>        except Exception as exc:                       # noqa: BLE001
+<span class="ln" id="L102">102</span>            return {&quot;checked&quot;: False, &quot;reason&quot;: type(exc).__name__, &quot;url&quot;: url}  # إرجاع قاموس
+<span class="ln" id="L103">103</span>        body = (resp.text or &quot;&quot;).lower()  # إسناد نتيجة استدعاء resp.text أو &#x27;&#x27;.lower إلى body
+<span class="ln" id="L104">104</span>        if resp.status == 200 and not resp.is_redirect():  # شرط مركّب (و)
+<span class="ln" id="L105">105</span>            logged_in = any(w in body for w in  # إسناد نتيجة استدعاء any (معامل واحد) إلى logged_in
+<span class="ln" id="L106">106</span>                            (&quot;logout&quot;, &quot;log out&quot;, &quot;remaining&quot;, &quot;uptime&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L107">107</span>                             &quot;session&quot;, &quot;bytes&quot;, &quot;disconnect&quot;))  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L108">108</span>            login_form = (&#x27;type=&quot;password&quot;&#x27; in body or &quot;type=&#x27;password&#x27;&quot; in body  # دمج منطقي (أو) وإسناده إلى login_form
+<span class="ln" id="L109">109</span>                          or &quot;name=\&quot;password\&quot;&quot; in body)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L110">110</span>            return {&quot;checked&quot;: True, &quot;url&quot;: url, &quot;status&quot;: resp.status,  # إرجاع قاموس
+<span class="ln" id="L111">111</span>                    &quot;looks_logged_in&quot;: bool(logged_in and not login_form),  # مفتاح looks_logged_in في القاموس
+<span class="ln" id="L112">112</span>                    &quot;reason&quot;: &quot;status_page_reachable&quot;}  # مفتاح reason في القاموس
+<span class="ln" id="L113">113</span>        if resp.is_redirect():  # شرط: نتيجة resp.is_redirect()
+<span class="ln" id="L114">114</span>            return {&quot;checked&quot;: True, &quot;url&quot;: url, &quot;status&quot;: resp.status,  # إرجاع قاموس
+<span class="ln" id="L115">115</span>                    &quot;looks_logged_in&quot;: False, &quot;reason&quot;: &quot;redirected_to_login&quot;,  # مفتاح looks_logged_in في القاموس
+<span class="ln" id="L116">116</span>                    &quot;location&quot;: resp.location[:160]}  # مفتاح location في القاموس
+<span class="ln" id="L117">117</span>    return {&quot;checked&quot;: False, &quot;reason&quot;: &quot;no_status_page&quot;}  # إرجاع قاموس
+<span class="ln" id="L118">118</span> 
+<span class="ln" id="L119">119</span> 
+<span class="ln" id="L120">120</span># يعيد الشبكة إلى حالة WALLED حتى لا نترك بطاقة المستخدم مستهلكة.
+<span class="ln" id="L121">121</span># تأكيد الخروج شرط لكل دليل نجاح في المعايرة.
+<span class="ln" id="L122">122</span>def logout(session, portal_url: str, timeout=(4.0, 8.0)) -&gt; dict:  # تعريف الدالة logout(session, portal_url, timeout) ترجع dict
+<span class="ln" id="L123">123</span>    &quot;&quot;&quot;Log the test card out again so a paid card is not left consumed.&quot;&quot;&quot;  # نص توثيقي (docstring) يشرح ما يليه
+<span class="ln" id="L124">124</span>    parts = urlsplit(portal_url)  # إسناد نتيجة استدعاء urlsplit (معامل واحد) إلى parts
+<span class="ln" id="L125">125</span>    base = f&quot;{parts.scheme}://{parts.netloc}&quot;  # بناء نص منسّق وإسناده إلى base
+<span class="ln" id="L126">126</span>    for path in (&quot;/logout&quot;, &quot;/login?erase-cookie=on&quot;):  # دورة على مجموعة باسم path
+<span class="ln" id="L127">127</span>        url = base + path  # حساب جمع بين base وpath وإسناده إلى url
+<span class="ln" id="L128">128</span>        try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L129">129</span>            resp = session.get(url, allow_redirects=False, timeout=timeout)  # إسناد نتيجة استدعاء session.get (معامل واحد، allow_redirects=…، timeout=…) إلى resp
+<span class="ln" id="L130">130</span>        # تكملة السطر السابق داخل القوس
+<span class="ln" id="L131">131</span>        except Exception as exc:                       # noqa: BLE001
+<span class="ln" id="L132">132</span>            continue  # الانتقال إلى الدورة التالية
+<span class="ln" id="L133">133</span>        if resp.status in (200, 302):  # شرط: resp.status ضمن مجموعة
+<span class="ln" id="L134">134</span>            return {&quot;ok&quot;: True, &quot;url&quot;: url, &quot;status&quot;: resp.status}  # إرجاع قاموس
+<span class="ln" id="L135">135</span>    return {&quot;ok&quot;: False, &quot;reason&quot;: &quot;no_logout_endpoint&quot;}  # إرجاع قاموس
+<span class="ln" id="L136">136</span> 
+</code></pre></details>
+<script>
+document.getElementById("kp-jump").addEventListener("change", function (e) {
+  var n = parseInt(e.target.value, 10);
+  if (n > 0) { var el = document.getElementById("L" + n);
+    if (el) el.scrollIntoView({block: "center"}); }
+});
+if (location.hash) { var el = document.querySelector(location.hash);
+  if (el) setTimeout(function () { el.scrollIntoView({block: "center"}); }, 60); }
+</script>
+<footer class="docfoot">صفحة مولّدة آلياً من مصدر الكود · KiraPass —
+<code>files</code> · 2026-10-01 02:26</footer>
+</main>
+</div>
+<script src="../assets/docs.js"></script>
+<script>KPInit("files");</script>
+</body>
+</html>
