@@ -166,3 +166,70 @@ apart automatically**. Required safe behaviour:
 Stop reports include `ban_evidence` (status / word / has_form / kind_hint)
 when the cause is a block or rate-limit page, to help the admin diagnose —
 never to suggest a bypass.
+
+---
+
+## banned_by_router after one card — when the router never banned you
+
+### The report that reached us
+
+A stop report from a "تواصل" portal (`http://t.com/login`):
+
+```
+"counters":    {"BANNED": 1}
+"stop_reason": "banned_by_router"
+"progress":    {"attempts": 1, "dropped": 16, "total": 100}
+"ban_evidence":{"status": 200, "word": "blocked.html", "has_form": true,
+                "reason": "ban_page", "kind_hint": "page_block"}
+```
+
+The report contradicts itself: calibration (`reach_login_page`) recorded
+`http_ok_word_ignored` — "the page still offers the login form, so the block
+word in its text was ignored" — and yet the **first card** was called a ban.
+
+### The real cause
+
+That portal's own login page contains, inside its script:
+
+```js
+function checkCookie() {
+    var user = getCookie("username");
+    if (user >= 1000) { window.location = "blocked.html"; }   // <- here
+}
+```
+
+So the literal `blocked.html` is inside **every** reply the portal sends, ban or
+not — it is page furniture, not a verdict on the card. (A saved copy of that
+page is in this repository: `Example pages/شبكة تواصل نت.html`, line 51.)
+
+Two code paths read a reply, and they disagreed:
+
+| Path | Rule | Verdict on the same page |
+|---|---|---|
+| `engine._is_protective_reply` (calibration) | block word + **login form still there** ⇒ not a ban | `stop=False` ✔ |
+| `fingerprint.Judge.classify` (attempts) | block word ⇒ ban, no exception | `BANNED` ✘ |
+
+And `_check_stop_rules` stops the run at the **first** `BANNED`
+(`_ban_count >= 1`), so the whole space was dropped after a single card.
+
+### The fix
+
+A block phrase is removed from the list **only** when it already sat on the
+login page fetched before any card was sent (`Judge.ban_phrases`), and the words
+dropped are written into the report under
+`calibration.fingerprint.ignored_ban_words` — nothing is ignored silently. A
+phrase that shows up later (on the rejection page, or after a real lockout)
+still counts as a ban.
+
+Proof: `python3 KiraPass.py --selftest`
+
+```
+[PASS] ban_from_router_is_named_and_stops_the_run: banned=1 accepted=0 stop=banned_by_router
+[PASS] block_word_on_the_login_page_is_not_a_ban: banned=0 rejected=40
+       ignored_ban_words=['blocked.html'] stop=attempts_done
+```
+
+Together they pin both sides: a real ban still stops the run, and a block word
+printed on the login page no longer does. Before the fix, the second scenario
+failed with exactly the signature of your report:
+`banned=1 rejected=0 stop=banned_by_router`.

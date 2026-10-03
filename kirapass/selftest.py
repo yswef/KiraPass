@@ -193,6 +193,38 @@ def t_ban_is_reported():
                       f"stop={st.get('stop_reason')}")
 
 
+def t_block_word_on_the_login_page():
+    """A portal that *names* a block page in its own script is not blocking us.
+
+    Real case that killed a whole run on its first card: the portal's own
+    script holds `window.location = "blocked.html"` behind a browser-side
+    counter, so that literal is inside every reply it ever sends.  The
+    calibration step ignored it ("the page still offers the login form") but
+    the judge called the first wrong card BANNED - and a single BANNED is a
+    hard stop, so 99% of the space was dropped as a lie.
+    """
+    extra = ('<script>function checkCookie(){var u=getCookie("username");'
+             'if (u >= 1000) { window.location = "blocked.html"; }}</script>')
+    with MockPortal(valid_cards={"0299"}, pass_mode="empty",
+                    login_page_extra=extra) as portal:
+        info = scan(portal.url)
+        p = make_profile(portal.url, prefix="03", length=4, portal_info=info)
+        st, _eng = run_engine(p, attempts=40, threads=2,
+                              checks=mock_checks(portal))
+        c = st.get("counters", {})
+        ignored = (((st.get("calibration") or {}).get("fingerprint") or {})
+                   .get("ignored_ban_words") or [])
+        ok = (c.get("BANNED", 0) == 0
+              and st.get("stop_reason") != "banned_by_router"
+              and c.get("REJECTED", 0) >= 30
+              and "blocked.html" in ignored)
+        return Result("block_word_on_the_login_page_is_not_a_ban", ok,
+                      f"banned={c.get('BANNED', 0)} "
+                      f"rejected={c.get('REJECTED', 0)} "
+                      f"ignored_ban_words={ignored} "
+                      f"stop={st.get('stop_reason')}")
+
+
 def t_rate_limit_stops():
     with MockPortal(valid_cards={"0299"}, rate_limit_after=4,
                     pass_mode="empty") as portal:
@@ -385,6 +417,7 @@ SCENARIOS = (
     t_find_card,
     t_verified_hit_stops_before_shared_online_false_hits,
     t_ban_is_reported,
+    t_block_word_on_the_login_page,
     t_rate_limit_stops,
     t_dropped_connections,
     t_dead_target_stops,

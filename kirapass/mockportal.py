@@ -70,7 +70,8 @@ class PortalState:
                  drop_after=0, chap=False, prefix="02", length=6,
                  error_text=None, hide_success=False, require_session=False,
                  reject_shape=False, success_page=False,
-                 unknown_success_page=False, global_online_login_page=False):
+                 unknown_success_page=False, global_online_login_page=False,
+                 login_page_extra=""):
         self.valid_cards = set(valid_cards)
         self.pass_mode = pass_mode          # same | empty | chap
         self.method = method
@@ -96,6 +97,11 @@ class PortalState:
         # login request from the same device once its gateway session is open.
         # This reproduces false per-card verification under concurrent runs.
         self.global_online_login_page = global_online_login_page
+        # Raw markup added to EVERY login page this portal serves.  Used to
+        # reproduce the real portals whose own script mentions a block page
+        # (window.location = "blocked.html" behind a browser-side counter):
+        # the block word is then in every reply, ban or not.
+        self.login_page_extra = login_page_extra
         self.tokens = {}
         self.bad_requests = 0
         self.rate_limit_after = rate_limit_after
@@ -372,6 +378,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             nonce=nonce, message=message, tok_field=tok_field,
             chap_id=st.chap_id, chap_challenge=st.chap_challenge,
             mac_tail="33:44")
+        if st.login_page_extra:
+            html = html.replace("</body>", st.login_page_extra + "</body>")
         return self._reply(200, html)
 
 

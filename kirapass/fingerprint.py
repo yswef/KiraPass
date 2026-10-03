@@ -411,6 +411,24 @@ class Judge:
         self.accept_phrases = [w for w in config.ACCEPT_WORDS
                                if w not in reject_text and w not in login_text]
 
+        # The same rule protects the ban words, and it is the one that keeps a
+        # run alive: a block phrase the portal prints on the login page it
+        # hands out *before any card was sent* is part of the page, not a
+        # verdict about us.  Real example (a "تواصل" portal): its own script
+        # holds `window.location = "blocked.html"` behind a browser-side
+        # counter, so every reply it ever sends contains that literal.  The
+        # calibration step already ignored it there ("the page still offers
+        # the login form") while this judge called the very first attempt
+        # BANNED - and one BANNED is a hard stop, so the whole space was
+        # dropped after a single card.
+        # Only the untouched login page can excuse a word: a phrase that
+        # appears later (on the rejection page, or after a real lockout
+        # started) still counts as a ban.
+        self.ban_phrases = [w for w in config.BAN_WORDS if w not in login_text]
+        # Reported to the operator, so "we ignored this word" is never silent.
+        self.ignored_ban_phrases = [w for w in config.BAN_WORDS
+                                    if w in login_text]
+
     # -- helpers ---------------------------------------------------------
     @staticmethod
     def _has_any(haystack: str, needles) -> str:
@@ -437,8 +455,8 @@ class Judge:
         # --- the router is blocking us (checked FIRST: if the baseline was
         #     learned while already blocked, a ban page could otherwise look
         #     like an ordinary rejection) ----------------------------------
-        ban = self._has_phrase(raw_low, config.BAN_WORDS) or \
-            self._has_phrase(low, config.BAN_WORDS)
+        ban = self._has_phrase(raw_low, self.ban_phrases) or \
+            self._has_phrase(low, self.ban_phrases)
         if ban or resp.status in (403, 429, 503):
             if resp.status == 429 or (ban and ("rate limit" in ban
                                                or "slow down" in ban)):

@@ -399,6 +399,12 @@ class Calibration:
                     "reject_status": self.fingerprint.reject_status,
                     "reject_length": self.fingerprint.reject_len,
                     "samples": self.fingerprint.samples,
+                    # Block phrases this portal prints on its own login page:
+                    # they are page furniture, so they can never be read as a
+                    # ban.  Listed here so ignoring them is never invisible.
+                    "ignored_ban_words": [
+                        w for w in config.BAN_WORDS
+                        if w in (self.fingerprint.login_text or "").lower()][:8],
                 },
                 "portal": self.portal.as_dict() if self.portal else None}
 
