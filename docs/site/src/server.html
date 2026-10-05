@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>مصدر web/server.py · KiraPass</title>
+<link rel="stylesheet" href="../assets/docs.css">
+
+</head>
+<body>
+<div id="kp-layout">
+<main class="doc">
+<h1>مصدر <code>web/server.py</code></h1>
+<p class="lead">سيرفر الويب: المسارات، التفويض، المهام — 696 سطراً. كل سطر يحمل تعليقه العربي.</p>
+<div class="card info"><b>هذه الصفحة مولّدة آلياً</b> من مصدر الكود مباشرة (<code>tools/docs/build_docs.py</code>). إن غيّرت الكود فأعد توليدها: <code>python3 tools/docs/build_docs.py</code>. الشرح اليدوي الأوسع في <a href="../architecture.html">المعمارية</a> و<a href="../editing.html">دليل التعديل</a> و<a href="../danger.html">أماكن الخطر</a>.</div>
+<p><a class="btn" href="../files/server.html">← صفحة الشرح</a> <label class="muted"> قفز إلى سطر: <input id="kp-jump" style="width:6rem" placeholder="123"></label></p>
+<details class="src" open><summary>المصدر كاملاً</summary><pre data-lines="696"><code>
+<span class="ln" id="L1">1</span># بداية نص متعدد الأسطر — الأسطر التالية نصّ حرفي لا كود، فلا يقبل تعليقاً
+<span class="ln" id="L2">2</span>&quot;&quot;&quot;The local web server: one page, four steps, all the answers as JSON.
+<span class="ln" id="L3">3</span> 
+<span class="ln" id="L4">4</span>The tool is a *backend only*. It prints a link like
+<span class="ln" id="L5">5</span>`http://127.0.0.1:8770/` and everything happens in the browser - which is why
+<span class="ln" id="L6">6</span>it works the same on Windows, Linux, Android (Termux/Pydroid) and macOS, and
+<span class="ln" id="L7">7</span>why you can answer the questions with taps instead of typing in a terminal.
+<span class="ln" id="L8">8</span> 
+<span class="ln" id="L9">9</span>Security of the UI itself: it only ever answers on the machine it runs on
+<span class="ln" id="L10">10</span>unless the user explicitly opens it to the LAN (`--host 0.0.0.0`), and in that
+<span class="ln" id="L11">11</span>case a one-time token is required for every request.
+<span class="ln" id="L12">12</span>&quot;&quot;&quot;  # نهاية النص متعدد الأسطر
+<span class="ln" id="L13">13</span> 
+<span class="ln" id="L14">14</span>from __future__ import annotations  # استيراد annotations من الوحدة __future__
+<span class="ln" id="L15">15</span> 
+<span class="ln" id="L16">16</span>import hmac  # استيراد الوحدة hmac من المكتبة
+<span class="ln" id="L17">17</span>import json  # استيراد الوحدة json من المكتبة
+<span class="ln" id="L18">18</span>import os  # استيراد الوحدة os من المكتبة
+<span class="ln" id="L19">19</span>import threading  # استيراد الوحدة threading من المكتبة
+<span class="ln" id="L20">20</span>import time  # استيراد الوحدة time من المكتبة
+<span class="ln" id="L21">21</span>import uuid  # استيراد الوحدة uuid من المكتبة
+<span class="ln" id="L22">22</span>from concurrent.futures import ThreadPoolExecutor  # استيراد ThreadPoolExecutor من الوحدة concurrent.futures
+<span class="ln" id="L23">23</span>from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer  # استيراد BaseHTTPRequestHandler, ThreadingHTTPServer من الوحدة http.server
+<span class="ln" id="L24">24</span>from urllib.parse import parse_qs, urlsplit  # استيراد parse_qs, urlsplit من الوحدة urllib.parse
+<span class="ln" id="L25">25</span> 
+<span class="ln" id="L26">26</span>from .. import capture, config, engine, portals, store, verify  # استيراد capture, config, engine, portals, store, verify من الوحدة .
+<span class="ln" id="L27">27</span>from ..httpclient import Session  # استيراد Session من الوحدة httpclient
+<span class="ln" id="L28">28</span>from ..version_helpers import package_dir  # استيراد package_dir من الوحدة version_helpers
+<span class="ln" id="L29">29</span> 
+<span class="ln" id="L30">30</span>STATIC = package_dir(&quot;web&quot;)  # إسناد نتيجة استدعاء package_dir (معامل واحد) إلى STATIC
+<span class="ln" id="L31">31</span> 
+<span class="ln" id="L32">32</span> 
+<span class="ln" id="L33">33</span># تنقيح تقرير المعايرة: حذف card_hint وsample_cards وكل مفتاح يحوي سرّاً.
+<span class="ln" id="L34">34</span>def _safe_calibration_report(value, profile, key=&quot;&quot;):  # تعريف الدالة _safe_calibration_report(value, profile, key)
+<span class="ln" id="L35">35</span>    &quot;&quot;&quot;Redact card hints and sensitive URL/query material from report text.&quot;&quot;&quot;  # نص توثيقي (docstring) يشرح ما يليه
+<span class="ln" id="L36">36</span>    sensitive_names = {&quot;card_hint&quot;, &quot;sample_cards&quot;, &quot;cookie&quot;, &quot;cookies&quot;,  # إسناد مجموعة فريدة إلى sensitive_names
+<span class="ln" id="L37">37</span>                       &quot;token&quot;, &quot;csrf&quot;, &quot;challenge&quot;, &quot;password&quot;, &quot;pass_fixed&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L38">38</span>                       &quot;extra_fields&quot;}  # تكملة قيمة المفتاح/العنصر السابق
+<span class="ln" id="L39">39</span>    if isinstance(value, dict):  # شرط: نتيجة isinstance(value, dict)
+<span class="ln" id="L40">40</span>        out = {}  # إسناد قاموس إلى out
+<span class="ln" id="L41">41</span>        for name, item in value.items():  # دورة على value.items() باسم مجموعة
+<span class="ln" id="L42">42</span>            low = str(name).lower()  # إسناد نتيجة استدعاء str(name).lower إلى low
+<span class="ln" id="L43">43</span>            if low in sensitive_names or any(secret in low for secret in  # شرط مركّب (أو)
+<span class="ln" id="L44">44</span>                                             (&quot;cookie&quot;, &quot;csrf&quot;, &quot;token&quot;, &quot;challenge&quot;)):  # تكملة تعريف متعدد الأسطر
+<span class="ln" id="L45">45</span>                out[name] = &quot;[REDACTED]&quot;  # إسناد القيمة الثابتة out[name]
+<span class="ln" id="L46">46</span>            else:  # مفتاح else في القاموس
+<span class="ln" id="L47">47</span>                out[name] = _safe_calibration_report(item, profile, low)  # إسناد نتيجة استدعاء _safe_calibration_report (3 معاملات) إلى out[name]
+<span class="ln" id="L48">48</span>        return out  # إرجاع out
+<span class="ln" id="L49">49</span>    if isinstance(value, list):  # شرط: نتيجة isinstance(value, list)
+<span class="ln" id="L50">50</span>        return [_safe_calibration_report(item, profile, key) for item in value]  # إرجاع اشتقاق قائمة
+<span class="ln" id="L51">51</span>    if isinstance(value, str):  # شرط: نتيجة isinstance(value, str)
+<span class="ln" id="L52">52</span>        if key in {&quot;url&quot;, &quot;login_url&quot;, &quot;final_url&quot;, &quot;location&quot;, &quot;dst&quot;,  # شرط: key ضمن مجموعة فريدة
+<span class="ln" id="L53">53</span>                   &quot;dst_value&quot;}:  # تكملة تعريف متعدد الأسطر
+<span class="ln" id="L54">54</span>            return engine._safe_url_shape(value, profile)  # إرجاع engine._safe_url_shape(value, profile)
+<span class="ln" id="L55">55</span>        if key == &quot;text&quot;:  # شرط: key يساوي &#x27;text&#x27;
+<span class="ln" id="L56">56</span>            return &quot;[REDACTED]&quot;  # إرجاع &#x27;[REDACTED]&#x27;
+<span class="ln" id="L57">57</span>    return value  # إرجاع value
+<span class="ln" id="L58">58</span> 
+<span class="ln" id="L59">59</span> 
+<span class="ln" id="L60">60</span>def _json_bytes(obj) -&gt; bytes:  # تعريف الدالة _json_bytes(obj) ترجع bytes
+<span class="ln" id="L61">61</span>    return json.dumps(obj, ensure_ascii=False).encode(&quot;utf-8&quot;)  # إرجاع json.dumps(obj, ensure_ascii=False).encode(&#x27;utf-8&#x27;)
+<span class="ln" id="L62">62</span> 
+<span class="ln" id="L63">63</span> 
+<span class="ln" id="L64">64</span>class Job:  # تعريف الصنف Job
+<span class="ln" id="L65">65</span>    def __init__(self, kind: str, fn):  # تعريف الدالة __init__(self, kind, fn)
+<span class="ln" id="L66">66</span>        self.id = uuid.uuid4().hex[:12]  # إسناد uuid.uuid4().hex[] إلى self.id
+<span class="ln" id="L67">67</span>        self.kind = kind  # إسناد kind إلى self.kind
+<span class="ln" id="L68">68</span>        self.state = &quot;running&quot;  # إسناد القيمة الثابتة self.state
+<span class="ln" id="L69">69</span>        self.result = None  # إسناد القيمة الثابتة self.result
+<span class="ln" id="L70">70</span>        self.error = &quot;&quot;  # إسناد القيمة الثابتة self.error
+<span class="ln" id="L71">71</span>        self.started = time.time()  # إسناد نتيجة استدعاء time.time إلى self.started
+<span class="ln" id="L72">72</span>        self.finished = 0.0  # إسناد القيمة الثابتة self.finished
+<span class="ln" id="L73">73</span>        self._fn = fn  # إسناد fn إلى self._fn
+<span class="ln" id="L74">74</span> 
+<span class="ln" id="L75">75</span>    def run(self):  # تعريف الدالة run(self)
+<span class="ln" id="L76">76</span>        try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L77">77</span>            self.result = self._fn()  # إسناد نتيجة استدعاء self._fn إلى self.result
+<span class="ln" id="L78">78</span>            self.state = &quot;done&quot;  # إسناد القيمة الثابتة self.state
+<span class="ln" id="L79">79</span>        # تكملة السطر السابق داخل القوس
+<span class="ln" id="L80">80</span>        except Exception as exc:                          # noqa: BLE001
+<span class="ln" id="L81">81</span>            import traceback  # استيراد الوحدة traceback من المكتبة
+<span class="ln" id="L82">82</span>            self.error = f&quot;{type(exc).__name__}: {exc}&quot;  # بناء نص منسّق وإسناده إلى self.error
+<span class="ln" id="L83">83</span>            self.state = &quot;error&quot;  # إسناد القيمة الثابتة self.state
+<span class="ln" id="L84">84</span>            self.result = {&quot;trace&quot;: traceback.format_exc()[-1200:]}  # إسناد قاموس إلى self.result
+<span class="ln" id="L85">85</span>        finally:  # مفتاح finally في القاموس
+<span class="ln" id="L86">86</span>            self.finished = time.time()  # إسناد نتيجة استدعاء time.time إلى self.finished
+<span class="ln" id="L87">87</span> 
+<span class="ln" id="L88">88</span>    def as_dict(self) -&gt; dict:  # تعريف الدالة as_dict(self) ترجع dict
+<span class="ln" id="L89">89</span>        return {&quot;id&quot;: self.id, &quot;kind&quot;: self.kind, &quot;state&quot;: self.state,  # إرجاع قاموس
+<span class="ln" id="L90">90</span>                &quot;result&quot;: self.result, &quot;error&quot;: self.error,  # مفتاح result في القاموس
+<span class="ln" id="L91">91</span>                &quot;elapsed&quot;: round((self.finished or time.time()) - self.started, 1)}  # مفتاح elapsed في القاموس
+<span class="ln" id="L92">92</span> 
+<span class="ln" id="L93">93</span> 
+<span class="ln" id="L94">94</span>class KiraServer(ThreadingHTTPServer):  # تعريف الصنف KiraServer يرث من ThreadingHTTPServer
+<span class="ln" id="L95">95</span>    daemon_threads = True  # إسناد القيمة الثابتة daemon_threads
+<span class="ln" id="L96">96</span>    allow_reuse_address = True  # إسناد القيمة الثابتة allow_reuse_address
+<span class="ln" id="L97">97</span> 
+<span class="ln" id="L98">98</span>    def server_bind(self):  # تعريف الدالة server_bind(self)
+<span class="ln" id="L99">99</span>        # بداية نص متعدد الأسطر — الأسطر التالية نصّ حرفي لا كود، فلا يقبل تعليقاً
+<span class="ln" id="L100">100</span>        &quot;&quot;&quot;Bind without socket.getfqdn(): that lookup can hang for seconds on
+<span class="ln" id="L101">101</span>        a machine with a slow resolver, and we do not need the name at all.&quot;&quot;&quot;  # نهاية النص متعدد الأسطر
+<span class="ln" id="L102">102</span>        import socketserver  # استيراد الوحدة socketserver من المكتبة
+<span class="ln" id="L103">103</span>        socketserver.TCPServer.server_bind(self)  # استدعاء socketserver.TCPServer.server_bind (معامل واحد)
+<span class="ln" id="L104">104</span>        host, port = self.server_address[:2]  # إسناد self.server_address[] إلى مجموعة
+<span class="ln" id="L105">105</span>        self.server_name = host  # إسناد host إلى self.server_name
+<span class="ln" id="L106">106</span>        self.server_port = port  # إسناد port إلى self.server_port
+<span class="ln" id="L107">107</span> 
+<span class="ln" id="L108">108</span>    def __init__(self, address, handler, token: str = &quot;&quot;):  # تعريف الدالة __init__(self, address, handler, token)
+<span class="ln" id="L109">109</span>        super().__init__(address, handler)  # استدعاء super().__init__ (2 معاملات)
+<span class="ln" id="L110">110</span>        self.token = token or &quot;&quot;  # دمج منطقي (أو) وإسناده إلى self.token
+<span class="ln" id="L111">111</span>        self.store = store.Store()  # إسناد نتيجة استدعاء store.Store إلى self.store
+<span class="ln" id="L112">112</span>        self.engine = engine.Engine(self.store)  # إسناد نتيجة استدعاء engine.Engine (معامل واحد) إلى self.engine
+<span class="ln" id="L113">113</span>        self.jobs = {}  # إسناد قاموس إلى self.jobs
+<span class="ln" id="L114">114</span>        self.jobs_lock = threading.Lock()  # إسناد نتيجة استدعاء threading.Lock إلى self.jobs_lock
+<span class="ln" id="L115">115</span>        self.captures = capture.HUB  # إسناد capture.HUB إلى self.captures
+<span class="ln" id="L116">116</span>        self.pool = ThreadPoolExecutor(max_workers=2,  # إسناد نتيجة استدعاء ThreadPoolExecutor (max_workers=…، thread_name_prefix=…) إلى self.pool
+<span class="ln" id="L117">117</span>                                       thread_name_prefix=&quot;kirapass-job&quot;)  # المعامل المسمّى thread_name_prefix
+<span class="ln" id="L118">118</span>        self.started = time.time()  # إسناد نتيجة استدعاء time.time إلى self.started
+<span class="ln" id="L119">119</span> 
+<span class="ln" id="L120">120</span>    # -- المهام ------------------------------------------------------------
+<span class="ln" id="L121">121</span>    def submit(self, kind: str, fn) -&gt; Job:  # تعريف الدالة submit(self, kind, fn) ترجع Job
+<span class="ln" id="L122">122</span>        job = Job(kind, fn)  # إسناد نتيجة استدعاء Job (2 معاملات) إلى job
+<span class="ln" id="L123">123</span>        with self.jobs_lock:  # سياق مُدار: self.jobs_lock
+<span class="ln" id="L124">124</span>            self.jobs[job.id] = job  # إسناد job إلى self.jobs[job.id]
+<span class="ln" id="L125">125</span>            stale = sorted(self.jobs.values(), key=lambda j: j.started)[:-20]  # إسناد sorted(self.jobs.values(), key=دالة مجهولة)[] إلى stale
+<span class="ln" id="L126">126</span>            for old in stale:  # دورة على stale باسم old
+<span class="ln" id="L127">127</span>                self.jobs.pop(old.id, None)  # استدعاء self.jobs.pop (2 معاملات)
+<span class="ln" id="L128">128</span>        self.pool.submit(job.run)  # استدعاء self.pool.submit (معامل واحد)
+<span class="ln" id="L129">129</span>        return job  # إرجاع job
+<span class="ln" id="L130">130</span> 
+<span class="ln" id="L131">131</span>    def job(self, job_id: str):  # تعريف الدالة job(self, job_id)
+<span class="ln" id="L132">132</span>        with self.jobs_lock:  # سياق مُدار: self.jobs_lock
+<span class="ln" id="L133">133</span>            return self.jobs.get(job_id)  # إرجاع self.jobs.get(job_id)
+<span class="ln" id="L134">134</span> 
+<span class="ln" id="L135">135</span> 
+<span class="ln" id="L136">136</span>class Handler(BaseHTTPRequestHandler):  # تعريف الصنف Handler يرث من BaseHTTPRequestHandler
+<span class="ln" id="L137">137</span>    server_version = f&quot;{config.APP_NAME}/{config.VERSION}&quot;  # بناء نص منسّق وإسناده إلى server_version
+<span class="ln" id="L138">138</span>    protocol_version = &quot;HTTP/1.1&quot;  # إسناد القيمة الثابتة protocol_version
+<span class="ln" id="L139">139</span> 
+<span class="ln" id="L140">140</span>    # -- الأنابيب --------------------------------------------------------
+<span class="ln" id="L141">141</span>    def log_message(self, fmt, *args):        # أبقِ الطرفية نظيفة
+<span class="ln" id="L142">142</span>        if os.environ.get(&quot;KIRAPASS_DEBUG&quot;):  # شرط: نتيجة os.environ.get(&#x27;KIRAPASS_DEBUG&#x27;)
+<span class="ln" id="L143">143</span>            super().log_message(fmt, *args)  # استدعاء super().log_message (2 معاملات)
+<span class="ln" id="L144">144</span> 
+<span class="ln" id="L145">145</span>    def _send(self, body: bytes, code=200, ctype=&quot;application/json; charset=utf-8&quot;,  # تعريف الدالة _send(self, body, code, ctype, extra)
+<span class="ln" id="L146">146</span>              extra=None):  # المعامل المسمّى extra
+<span class="ln" id="L147">147</span>        self.send_response(code)  # استدعاء self.send_response (معامل واحد)
+<span class="ln" id="L148">148</span>        self.send_header(&quot;Content-Type&quot;, ctype)  # استدعاء self.send_header (2 معاملات)
+<span class="ln" id="L149">149</span>        self.send_header(&quot;Content-Length&quot;, str(len(body)))  # استدعاء self.send_header (2 معاملات)
+<span class="ln" id="L150">150</span>        self.send_header(&quot;Cache-Control&quot;, &quot;no-store&quot;)  # استدعاء self.send_header (2 معاملات)
+<span class="ln" id="L151">151</span>        self.send_header(&quot;X-Content-Type-Options&quot;, &quot;nosniff&quot;)  # استدعاء self.send_header (2 معاملات)
+<span class="ln" id="L152">152</span>        self.send_header(&quot;Referrer-Policy&quot;, &quot;no-referrer&quot;)  # استدعاء self.send_header (2 معاملات)
+<span class="ln" id="L153">153</span>        for key, value in (extra or {}).items():  # دورة على extra أو قاموس.items() باسم مجموعة
+<span class="ln" id="L154">154</span>            self.send_header(key, value)  # استدعاء self.send_header (2 معاملات)
+<span class="ln" id="L155">155</span>        self.end_headers()  # استدعاء self.end_headers
+<span class="ln" id="L156">156</span>        try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L157">157</span>            self.wfile.write(body)  # استدعاء self.wfile.write (معامل واحد)
+<span class="ln" id="L158">158</span>        except (BrokenPipeError, ConnectionResetError):  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L159">159</span>            pass  # سطر فارغ منطقياً (pass) — مطلوب صياغياً
+<span class="ln" id="L160">160</span> 
+<span class="ln" id="L161">161</span>    def _json(self, obj, code=200):  # تعريف الدالة _json(self, obj, code)
+<span class="ln" id="L162">162</span>        self._send(_json_bytes(obj), code)  # استدعاء self._send (2 معاملات)
+<span class="ln" id="L163">163</span> 
+<span class="ln" id="L164">164</span>    def _error(self, message, code=400, **extra):  # تعريف الدالة _error(self, message, code, **extra)
+<span class="ln" id="L165">165</span>        self._json({&quot;ok&quot;: False, &quot;error&quot;: message, **extra}, code)  # استدعاء self._json (2 معاملات)
+<span class="ln" id="L166">166</span> 
+<span class="ln" id="L167">167</span>    def _body(self) -&gt; dict:  # تعريف الدالة _body(self) ترجع dict
+<span class="ln" id="L168">168</span>        try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L169">169</span>            length = int(self.headers.get(&quot;Content-Length&quot;) or 0)  # إسناد نتيجة استدعاء int (معامل واحد) إلى length
+<span class="ln" id="L170">170</span>        except ValueError:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L171">171</span>            return {}  # إرجاع قاموس
+<span class="ln" id="L172">172</span>        if not length:  # شرط معكوس: ليس length
+<span class="ln" id="L173">173</span>            return {}  # إرجاع قاموس
+<span class="ln" id="L174">174</span>        raw = self.rfile.read(length)  # إسناد نتيجة استدعاء self.rfile.read (معامل واحد) إلى raw
+<span class="ln" id="L175">175</span>        try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L176">176</span>            data = json.loads(raw.decode(&quot;utf-8&quot;))  # إسناد نتيجة استدعاء json.loads (معامل واحد) إلى data
+<span class="ln" id="L177">177</span>            return data if isinstance(data, dict) else {}  # إرجاع data إن isinstance(data, dict) وإلا قاموس
+<span class="ln" id="L178">178</span>        except Exception:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L179">179</span>            return {}  # إرجاع قاموس
+<span class="ln" id="L180">180</span> 
+<span class="ln" id="L181">181</span>    # العميل المحلي مسموح دائماً؛ وغيره يلزمه الرمز.
+<span class="ln" id="L182">182</span>    # المقارنة بـhmac.compare_digest (زمن ثابت) حتى لا يُستعاد الرمز من زمن الرد.
+<span class="ln" id="L183">183</span>    def _authorized(self) -&gt; bool:  # تعريف الدالة _authorized(self) ترجع bool
+<span class="ln" id="L184">184</span>        host = self.client_address[0]  # إسناد self.client_address[0] إلى host
+<span class="ln" id="L185">185</span>        if host in (&quot;127.0.0.1&quot;, &quot;::1&quot;, &quot;localhost&quot;):  # شرط: host ضمن مجموعة
+<span class="ln" id="L186">186</span>            return True  # إرجاع True
+<span class="ln" id="L187">187</span>        if not self.server.token:  # شرط معكوس: ليس self.server.token
+<span class="ln" id="L188">188</span>            return True  # إرجاع True
+<span class="ln" id="L189">189</span>        query = parse_qs(urlsplit(self.path).query)  # إسناد نتيجة استدعاء parse_qs (معامل واحد) إلى query
+<span class="ln" id="L190">190</span>        given = (self.headers.get(&quot;X-KiraPass-Token&quot;)  # دمج منطقي (أو) وإسناده إلى given
+<span class="ln" id="L191">191</span>                 or (query.get(&quot;token&quot;) or [&quot;&quot;])[0])  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L192">192</span>        # زمن ثابت: رمز يُقارن بـ== يمكن استعادته بايتاً
+<span class="ln" id="L193">193</span>        # بايتاً من زمن الاستجابة
+<span class="ln" id="L194">194</span>        return hmac.compare_digest(given or &quot;&quot;, self.server.token)  # إرجاع hmac.compare_digest(given أو &#x27;&#x27;, self.server.token)
+<span class="ln" id="L195">195</span> 
+<span class="ln" id="L196">196</span>    # -- التوجيه ---------------------------------------------------------
+<span class="ln" id="L197">197</span>    # المسارات الثابتة (/ و/ui.js و/ui.css و/favicon.ico) تُخدم قبل التفويض عمداً
+<span class="ln" id="L198">198</span>    # حتى تستطيع الصفحة أن تطلب الرمز. /capture/view يأتي بعد الفحص.
+<span class="ln" id="L199">199</span>    def do_GET(self):  # تعريف الدالة do_GET(self)
+<span class="ln" id="L200">200</span>        route = urlsplit(self.path).path  # إسناد urlsplit(self.path).path إلى route
+<span class="ln" id="L201">201</span>        if route in (&quot;/&quot;, &quot;/index.html&quot;):  # شرط: route ضمن مجموعة
+<span class="ln" id="L202">202</span>            return self._static(&quot;ui.html&quot;, &quot;text/html; charset=utf-8&quot;)  # إرجاع self._static(&#x27;ui.html&#x27;, &#x27;text/html; charset=utf-8&#x27;)
+<span class="ln" id="L203">203</span>        if route == &quot;/ui.js&quot;:  # شرط: route يساوي &#x27;/ui.js&#x27;
+<span class="ln" id="L204">204</span>            return self._static(&quot;ui.js&quot;, &quot;application/javascript; charset=utf-8&quot;)  # إرجاع self._static(&#x27;ui.js&#x27;, &#x27;application/javascript; charset=utf-8&#x27;)
+<span class="ln" id="L205">205</span>        if route == &quot;/ui.css&quot;:  # شرط: route يساوي &#x27;/ui.css&#x27;
+<span class="ln" id="L206">206</span>            return self._static(&quot;ui.css&quot;, &quot;text/css; charset=utf-8&quot;)  # إرجاع self._static(&#x27;ui.css&#x27;, &#x27;text/css; charset=utf-8&#x27;)
+<span class="ln" id="L207">207</span>        if route == &quot;/favicon.ico&quot;:  # شرط: route يساوي &#x27;/favicon.ico&#x27;
+<span class="ln" id="L208">208</span>            return self._send(b&quot;&quot;, 204, &quot;image/x-icon&quot;)  # إرجاع self._send(b&#x27;&#x27;, 204, &#x27;image/x-icon&#x27;)
+<span class="ln" id="L209">209</span>        if not self._authorized():  # شرط معكوس: ليس self._authorized()
+<span class="ln" id="L210">210</span>            return self._error(&quot;unauthorized&quot;, 401)  # إرجاع self._error(&#x27;unauthorized&#x27;, 401)
+<span class="ln" id="L211">211</span>        if route == &quot;/capture/view&quot;:  # شرط: route يساوي &#x27;/capture/view&#x27;
+<span class="ln" id="L212">212</span>            return self._capture_view(parse_qs(urlsplit(self.path).query))  # إرجاع self._capture_view(parse_qs(urlsplit(self.path).query))
+<span class="ln" id="L213">213</span>        try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L214">214</span>            return self._api_get(route, parse_qs(urlsplit(self.path).query))  # إرجاع self._api_get(route, parse_qs(urlsplit(self.path).query))
+<span class="ln" id="L215">215</span>        # تكملة السطر السابق داخل القوس
+<span class="ln" id="L216">216</span>        except Exception as exc:                          # noqa: BLE001
+<span class="ln" id="L217">217</span>            return self._error(f&quot;{type(exc).__name__}: {exc}&quot;, 500)  # إرجاع self._error(نص منسّق (f-string), 500)
+<span class="ln" id="L218">218</span> 
+<span class="ln" id="L219">219</span>    def do_POST(self):  # تعريف الدالة do_POST(self)
+<span class="ln" id="L220">220</span>        if not self._authorized():  # شرط معكوس: ليس self._authorized()
+<span class="ln" id="L221">221</span>            return self._error(&quot;unauthorized&quot;, 401)  # إرجاع self._error(&#x27;unauthorized&#x27;, 401)
+<span class="ln" id="L222">222</span>        route = urlsplit(self.path).path  # إسناد urlsplit(self.path).path إلى route
+<span class="ln" id="L223">223</span>        try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L224">224</span>            return self._api_post(route, self._body())  # إرجاع self._api_post(route, self._body())
+<span class="ln" id="L225">225</span>        # تكملة السطر السابق داخل القوس
+<span class="ln" id="L226">226</span>        except Exception as exc:                          # noqa: BLE001
+<span class="ln" id="L227">227</span>            return self._error(f&quot;{type(exc).__name__}: {exc}&quot;, 500)  # إرجاع self._error(نص منسّق (f-string), 500)
+<span class="ln" id="L228">228</span> 
+<span class="ln" id="L229">229</span>    def _static(self, name: str, ctype: str):  # تعريف الدالة _static(self, name, ctype)
+<span class="ln" id="L230">230</span>        path = os.path.join(STATIC, name)  # إسناد نتيجة استدعاء os.path.join (2 معاملات) إلى path
+<span class="ln" id="L231">231</span>        try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L232">232</span>            with open(path, &quot;rb&quot;) as fh:  # سياق مُدار: open(path, &#x27;rb&#x27;) باسم fh
+<span class="ln" id="L233">233</span>                return self._send(fh.read(), 200, ctype)  # إرجاع self._send(fh.read(), 200, ctype)
+<span class="ln" id="L234">234</span>        except OSError:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L235">235</span>            return self._send(b&quot;missing asset&quot;, 404, &quot;text/plain; charset=utf-8&quot;)  # إرجاع self._send(b&#x27;missing asset&#x27;, 404, &#x27;text/plain; charset=utf-8&#x27;)
+<span class="ln" id="L236">236</span> 
+<span class="ln" id="L237">237</span>    # -- نقاط GET ---------------------------------------------------
+<span class="ln" id="L238">238</span>    def _api_get(self, route, query):  # تعريف الدالة _api_get(self, route, query)
+<span class="ln" id="L239">239</span>        srv = self.server  # إسناد self.server إلى srv
+<span class="ln" id="L240">240</span>        if route == &quot;/api/meta&quot;:  # شرط: route يساوي &#x27;/api/meta&#x27;
+<span class="ln" id="L241">241</span>            return self._json({  # إرجاع self._json(قاموس)
+<span class="ln" id="L242">242</span>                &quot;ok&quot;: True, &quot;app&quot;: config.APP_NAME, &quot;version&quot;: config.VERSION,  # مفتاح ok في القاموس
+<span class="ln" id="L243">243</span>                &quot;lang&quot;: srv.store.get_setting(&quot;lang&quot;, &quot;ar&quot;),  # مفتاح lang في القاموس
+<span class="ln" id="L244">244</span>                &quot;steps&quot;: [&quot;start&quot;, &quot;saved&quot;, &quot;profile-review&quot;, &quot;scan&quot;, &quot;format&quot;, &quot;run&quot;, &quot;results&quot;],  # مفتاح steps في القاموس
+<span class="ln" id="L245">245</span>                &quot;charsets&quot;: store.CHARSETS,  # مفتاح charsets في القاموس
+<span class="ln" id="L246">246</span>                &quot;pass_modes&quot;: list(store.PASS_MODES),  # مفتاح pass_modes في القاموس
+<span class="ln" id="L247">247</span>                &quot;defaults&quot;: {  # مفتاح defaults في القاموس
+<span class="ln" id="L248">248</span>                    &quot;threads&quot;: config.DEFAULT_THREADS,  # مفتاح threads في القاموس
+<span class="ln" id="L249">249</span>                    &quot;attempts&quot;: config.DEFAULT_ATTEMPTS,  # مفتاح attempts في القاموس
+<span class="ln" id="L250">250</span>                    &quot;delay_ms&quot;: config.DEFAULT_DELAY_MS,  # مفتاح delay_ms في القاموس
+<span class="ln" id="L251">251</span>                    &quot;connect_timeout&quot;: config.CONNECT_TIMEOUT,  # مفتاح connect_timeout في القاموس
+<span class="ln" id="L252">252</span>                    &quot;read_timeout&quot;: config.READ_TIMEOUT,  # مفتاح read_timeout في القاموس
+<span class="ln" id="L253">253</span>                    &quot;warn_space&quot;: config.WARN_SPACE,  # مفتاح warn_space في القاموس
+<span class="ln" id="L254">254</span>                    &quot;warn_threads&quot;: config.WARN_THREADS,  # مفتاح warn_threads في القاموس
+<span class="ln" id="L255">255</span>                },  # إغلاق القوس المفتوح في السطر السابق
+<span class="ln" id="L256">256</span>                &quot;presets&quot;: [  # مفتاح presets في القاموس
+<span class="ln" id="L257">257</span>                    {&quot;id&quot;: &quot;safe&quot;, &quot;threads&quot;: 4, &quot;attempts&quot;: 500, &quot;delay_ms&quot;: 60},  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L258">258</span>                    {&quot;id&quot;: &quot;normal&quot;, &quot;threads&quot;: 12, &quot;attempts&quot;: 2000, &quot;delay_ms&quot;: 0},  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L259">259</span>                    {&quot;id&quot;: &quot;fast&quot;, &quot;threads&quot;: 40, &quot;attempts&quot;: 10000, &quot;delay_ms&quot;: 0},  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L260">260</span>                ],  # إغلاق القوس المفتوح في السطر السابق
+<span class="ln" id="L261">261</span>                &quot;settings&quot;: dict(srv.store.settings or {}),  # مفتاح settings في القاموس
+<span class="ln" id="L262">262</span>                &quot;cache&quot;: srv.store.cache_info(),  # مفتاح cache في القاموس
+<span class="ln" id="L263">263</span>                &quot;data_dir&quot;: config.DATA_DIR,  # مفتاح data_dir في القاموس
+<span class="ln" id="L264">264</span>                &quot;profiles&quot;: [_profile_brief(p) for p in srv.store.all()],  # مفتاح profiles في القاموس
+<span class="ln" id="L265">265</span>                &quot;license&quot;: &quot;authorized_use_only&quot;,  # مفتاح license في القاموس
+<span class="ln" id="L266">266</span>                &quot;lan_open&quot;: self.server.server_address[0] not in (  # مفتاح lan_open في القاموس
+<span class="ln" id="L267">267</span>                    &quot;127.0.0.1&quot;, &quot;localhost&quot;, &quot;::1&quot;),  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L268">268</span>            })  # إغلاق القوس المفتوح في السطر السابق
+<span class="ln" id="L269">269</span>        if route == &quot;/api/profiles&quot;:  # شرط: route يساوي &#x27;/api/profiles&#x27;
+<span class="ln" id="L270">270</span>            return self._json({&quot;ok&quot;: True,  # إرجاع self._json(قاموس)
+<span class="ln" id="L271">271</span>                               &quot;profiles&quot;: [_profile_brief(p) for p in srv.store.all()]})  # مفتاح profiles في القاموس
+<span class="ln" id="L272">272</span>        if route == &quot;/api/profiles/get&quot;:  # شرط: route يساوي &#x27;/api/profiles/get&#x27;
+<span class="ln" id="L273">273</span>            name = (query.get(&quot;name&quot;) or [&quot;&quot;])[0]  # إسناد query.get(&#x27;name&#x27;) أو قائمة[0] إلى name
+<span class="ln" id="L274">274</span>            prof = srv.store.get(name)  # إسناد نتيجة استدعاء srv.store.get (معامل واحد) إلى prof
+<span class="ln" id="L275">275</span>            if not prof:  # شرط معكوس: ليس prof
+<span class="ln" id="L276">276</span>                return self._error(&quot;profile_not_found&quot;, 404)  # إرجاع self._error(&#x27;profile_not_found&#x27;, 404)
+<span class="ln" id="L277">277</span>            return self._json({&quot;ok&quot;: True, &quot;profile&quot;: prof,  # إرجاع self._json(قاموس)
+<span class="ln" id="L278">278</span>                               &quot;preview&quot;: store.sample_cards(prof, 3),  # مفتاح preview في القاموس
+<span class="ln" id="L279">279</span>                               &quot;space&quot;: store.space_size(prof),  # مفتاح space في القاموس
+<span class="ln" id="L280">280</span>                               &quot;problems&quot;: store.validate(prof)})  # مفتاح problems في القاموس
+<span class="ln" id="L281">281</span>        if route == &quot;/api/run/status&quot;:  # شرط: route يساوي &#x27;/api/run/status&#x27;
+<span class="ln" id="L282">282</span>            since = int((query.get(&quot;since&quot;) or [&quot;0&quot;])[0] or 0)  # إسناد نتيجة استدعاء int (معامل واحد) إلى since
+<span class="ln" id="L283">283</span>            status = srv.engine.status()  # إسناد نتيجة استدعاء srv.engine.status إلى status
+<span class="ln" id="L284">284</span>            events = srv.engine.events_since(since)  # إسناد نتيجة استدعاء srv.engine.events_since (معامل واحد) إلى events
+<span class="ln" id="L285">285</span>            return self._json({&quot;ok&quot;: True, &quot;status&quot;: status, &quot;events&quot;: events})  # إرجاع self._json(قاموس)
+<span class="ln" id="L286">286</span>        if route == &quot;/api/job&quot;:  # شرط: route يساوي &#x27;/api/job&#x27;
+<span class="ln" id="L287">287</span>            job = srv.job((query.get(&quot;id&quot;) or [&quot;&quot;])[0])  # إسناد نتيجة استدعاء srv.job (معامل واحد) إلى job
+<span class="ln" id="L288">288</span>            if not job:  # شرط معكوس: ليس job
+<span class="ln" id="L289">289</span>                return self._error(&quot;job_not_found&quot;, 404)  # إرجاع self._error(&#x27;job_not_found&#x27;, 404)
+<span class="ln" id="L290">290</span>            return self._json({&quot;ok&quot;: True, &quot;job&quot;: job.as_dict()})  # إرجاع self._json(قاموس)
+<span class="ln" id="L291">291</span>        if route == &quot;/api/review&quot;:  # شرط: route يساوي &#x27;/api/review&#x27;
+<span class="ln" id="L292">292</span>            return self._json({&quot;ok&quot;: True, &quot;items&quot;: srv.store.list_review()})  # إرجاع self._json(قاموس)
+<span class="ln" id="L293">293</span>        if route == &quot;/api/review/file&quot;:  # شرط: route يساوي &#x27;/api/review/file&#x27;
+<span class="ln" id="L294">294</span>            name = (query.get(&quot;name&quot;) or [&quot;&quot;])[0]  # إسناد query.get(&#x27;name&#x27;) أو قائمة[0] إلى name
+<span class="ln" id="L295">295</span>            content = srv.store.read_review(name)  # إسناد نتيجة استدعاء srv.store.read_review (معامل واحد) إلى content
+<span class="ln" id="L296">296</span>            if not content:  # شرط معكوس: ليس content
+<span class="ln" id="L297">297</span>                return self._error(&quot;review_file_not_found&quot;, 404)  # إرجاع self._error(&#x27;review_file_not_found&#x27;, 404)
+<span class="ln" id="L298">298</span>            return self._send(content.encode(&quot;utf-8&quot;, &quot;replace&quot;), 200,  # إرجاع self._send(content.encode(&#x27;utf-8&#x27;, &#x27;replace&#x27;), 200, &#x27;text/html; charset=utf-8&#x27;)
+<span class="ln" id="L299">299</span>                              &quot;text/html; charset=utf-8&quot;)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L300">300</span>        if route == &quot;/api/cache&quot;:  # شرط: route يساوي &#x27;/api/cache&#x27;
+<span class="ln" id="L301">301</span>            return self._json({&quot;ok&quot;: True, &quot;cache&quot;: srv.store.cache_info()})  # إرجاع self._json(قاموس)
+<span class="ln" id="L302">302</span>        if route == &quot;/api/report&quot;:  # شرط: route يساوي &#x27;/api/report&#x27;
+<span class="ln" id="L303">303</span>            name = (query.get(&quot;name&quot;) or [&quot;&quot;])[0]  # إسناد query.get(&#x27;name&#x27;) أو قائمة[0] إلى name
+<span class="ln" id="L304">304</span>            path = os.path.join(config.RUN_DIR, os.path.basename(name))  # إسناد نتيجة استدعاء os.path.join (2 معاملات) إلى path
+<span class="ln" id="L305">305</span>            try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L306">306</span>                with open(path, &quot;r&quot;, encoding=&quot;utf-8&quot;) as fh:  # سياق مُدار: open(path, &#x27;r&#x27;, encoding=&#x27;utf-8&#x27;) باسم fh
+<span class="ln" id="L307">307</span>                    return self._send(fh.read().encode(&quot;utf-8&quot;), 200,  # إرجاع self._send(fh.read().encode(&#x27;utf-8&#x27;), 200, &#x27;application/json; charset=utf-8&#x27;)
+<span class="ln" id="L308">308</span>                                      &quot;application/json; charset=utf-8&quot;)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L309">309</span>            except OSError:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L310">310</span>                return self._error(&quot;report_not_found&quot;, 404)  # إرجاع self._error(&#x27;report_not_found&#x27;, 404)
+<span class="ln" id="L311">311</span>        if route == &quot;/api/reports&quot;:  # شرط: route يساوي &#x27;/api/reports&#x27;
+<span class="ln" id="L312">312</span>            try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L313">313</span>                names = sorted(os.listdir(config.RUN_DIR), reverse=True)[:50]  # إسناد sorted(os.listdir(config.RUN_DIR), reverse=True)[] إلى names
+<span class="ln" id="L314">314</span>            except OSError:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L315">315</span>                names = []  # إسناد قائمة إلى names
+<span class="ln" id="L316">316</span>            return self._json({&quot;ok&quot;: True, &quot;reports&quot;: names})  # إرجاع self._json(قاموس)
+<span class="ln" id="L317">317</span>        if route == &quot;/api/capture/status&quot;:  # شرط: route يساوي &#x27;/api/capture/status&#x27;
+<span class="ln" id="L318">318</span>            return self._capture_status((query.get(&quot;id&quot;) or [&quot;&quot;])[0])  # إرجاع self._capture_status(query.get(&#x27;id&#x27;) أو قائمة[0])
+<span class="ln" id="L319">319</span>        if route == &quot;/api/capture/report&quot;:  # شرط: route يساوي &#x27;/api/capture/report&#x27;
+<span class="ln" id="L320">320</span>            return self._capture_report((query.get(&quot;id&quot;) or [&quot;&quot;])[0],  # إرجاع self._capture_report(query.get(&#x27;id&#x27;) أو قائمة[0], download=bool(query.get(&#x27;download&#x27;) أو قائمة[0]))
+<span class="ln" id="L321">321</span>                                        download=bool((query.get(&quot;download&quot;) or [&quot;&quot;])[0]))  # المعامل المسمّى download
+<span class="ln" id="L322">322</span>        return self._error(&quot;not_found&quot;, 404)  # إرجاع self._error(&#x27;not_found&#x27;, 404)
+<span class="ln" id="L323">323</span> 
+<span class="ln" id="L324">324</span>    # -- نقاط POST --------------------------------------------------
+<span class="ln" id="L325">325</span>    def _api_post(self, route, data):  # تعريف الدالة _api_post(self, route, data)
+<span class="ln" id="L326">326</span>        srv = self.server  # إسناد self.server إلى srv
+<span class="ln" id="L327">327</span>        if route == &quot;/api/scan&quot;:  # شرط: route يساوي &#x27;/api/scan&#x27;
+<span class="ln" id="L328">328</span>            return self._scan(data)  # إرجاع self._scan(data)
+<span class="ln" id="L329">329</span>        if route == &quot;/api/format/preview&quot;:  # شرط: route يساوي &#x27;/api/format/preview&#x27;
+<span class="ln" id="L330">330</span>            return self._preview(data)  # إرجاع self._preview(data)
+<span class="ln" id="L331">331</span>        if route == &quot;/api/profiles/save&quot;:  # شرط: route يساوي &#x27;/api/profiles/save&#x27;
+<span class="ln" id="L332">332</span>            prof = store.migrate(data.get(&quot;profile&quot;) or {})  # إسناد نتيجة استدعاء store.migrate (معامل واحد) إلى prof
+<span class="ln" id="L333">333</span>            problems = store.validate(prof)  # إسناد نتيجة استدعاء store.validate (معامل واحد) إلى problems
+<span class="ln" id="L334">334</span>            hard = [p for p in problems if p not in  # بناء اشتقاق قائمة وإسناده إلى hard
+<span class="ln" id="L335">335</span>                    (&quot;space_is_astronomically_big&quot;, &quot;needs_browser_js&quot;)]  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L336">336</span>            if hard:  # شرط: hard
+<span class="ln" id="L337">337</span>                return self._json({&quot;ok&quot;: False, &quot;problems&quot;: problems}, 400)  # إرجاع self._json(قاموس, 400)
+<span class="ln" id="L338">338</span>            saved = srv.store.put(prof)  # إسناد نتيجة استدعاء srv.store.put (معامل واحد) إلى saved
+<span class="ln" id="L339">339</span>            return self._json({&quot;ok&quot;: True, &quot;profile&quot;: saved,  # إرجاع self._json(قاموس)
+<span class="ln" id="L340">340</span>                               &quot;profiles&quot;: [_profile_brief(p) for p in srv.store.all()]})  # مفتاح profiles في القاموس
+<span class="ln" id="L341">341</span>        if route == &quot;/api/profiles/delete&quot;:  # شرط: route يساوي &#x27;/api/profiles/delete&#x27;
+<span class="ln" id="L342">342</span>            ok = srv.store.delete(data.get(&quot;name&quot;, &quot;&quot;))  # إسناد نتيجة استدعاء srv.store.delete (معامل واحد) إلى ok
+<span class="ln" id="L343">343</span>            return self._json({&quot;ok&quot;: ok,  # إرجاع self._json(قاموس)
+<span class="ln" id="L344">344</span>                               &quot;profiles&quot;: [_profile_brief(p) for p in srv.store.all()]})  # مفتاح profiles في القاموس
+<span class="ln" id="L345">345</span>        if route == &quot;/api/diagnose&quot;:  # شرط: route يساوي &#x27;/api/diagnose&#x27;
+<span class="ln" id="L346">346</span>            prof = store.migrate(data.get(&quot;profile&quot;) or {})  # إسناد نتيجة استدعاء store.migrate (معامل واحد) إلى prof
+<span class="ln" id="L347">347</span>            threads = int(data.get(&quot;threads&quot;) or 0)  # إسناد نتيجة استدعاء int (معامل واحد) إلى threads
+<span class="ln" id="L348">348</span>            checks = self._internet_checks()  # إسناد نتيجة استدعاء self._internet_checks إلى checks
+<span class="ln" id="L349">349</span>            job = srv.submit(&quot;diagnose&quot;,  # إسناد نتيجة استدعاء srv.submit (2 معاملات) إلى job
+<span class="ln" id="L350">350</span>                             lambda: engine.diagnose(prof, threads=threads,  # مفتاح lambda في القاموس
+<span class="ln" id="L351">351</span>                                                     checks=checks))  # المعامل المسمّى checks
+<span class="ln" id="L352">352</span>            return self._json({&quot;ok&quot;: True, &quot;job&quot;: job.as_dict()})  # إرجاع self._json(قاموس)
+<span class="ln" id="L353">353</span>        if route == &quot;/api/calibrate&quot;:  # شرط: route يساوي &#x27;/api/calibrate&#x27;
+<span class="ln" id="L354">354</span>            prof = store.migrate(data.get(&quot;profile&quot;) or {})  # إسناد نتيجة استدعاء store.migrate (معامل واحد) إلى prof
+<span class="ln" id="L355">355</span>            known = (data.get(&quot;known_card&quot;) or &quot;&quot;).strip()  # إسناد نتيجة استدعاء data.get(&#x27;known_card&#x27;) أو &#x27;&#x27;.strip إلى known
+<span class="ln" id="L356">356</span>            keyword = (data.get(&quot;keyword&quot;) or &quot;&quot;).strip()  # إسناد نتيجة استدعاء data.get(&#x27;keyword&#x27;) أو &#x27;&#x27;.strip إلى keyword
+<span class="ln" id="L357">357</span>            checks = self._internet_checks()  # إسناد نتيجة استدعاء self._internet_checks إلى checks
+<span class="ln" id="L358">358</span> 
+<span class="ln" id="L359">359</span>            def run_calibration():  # تعريف الدالة run_calibration()
+<span class="ln" id="L360">360</span>                result = engine.calibrate(prof, known_card=known,  # إسناد نتيجة استدعاء engine.calibrate(prof, known_card=known, keyword=keyword, checks=checks).as_dict إلى result
+<span class="ln" id="L361">361</span>                                          keyword=keyword,  # المعامل المسمّى keyword
+<span class="ln" id="L362">362</span>                                          checks=checks).as_dict()  # المعامل المسمّى checks
+<span class="ln" id="L363">363</span>                report = {  # إسناد قاموس إلى report
+<span class="ln" id="L364">364</span>                    &quot;tool&quot;: config.APP_NAME, &quot;version&quot;: config.VERSION,  # مفتاح tool في القاموس
+<span class="ln" id="L365">365</span>                    &quot;finished&quot;: time.strftime(&quot;%Y-%m-%d %H:%M:%S&quot;),  # مفتاح finished في القاموس
+<span class="ln" id="L366">366</span>                    &quot;kind&quot;: &quot;calibration&quot;, &quot;profile&quot;: prof.get(&quot;name&quot;, &quot;&quot;),  # مفتاح kind في القاموس
+<span class="ln" id="L367">367</span>                    &quot;calibration&quot;: _safe_calibration_report(result, prof),  # مفتاح calibration في القاموس
+<span class="ln" id="L368">368</span>                }  # إغلاق القوس المفتوح في السطر السابق
+<span class="ln" id="L369">369</span>                try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L370">370</span>                    result[&quot;report_file&quot;] = os.path.basename(srv.store.save_run(report))  # إسناد نتيجة استدعاء os.path.basename (معامل واحد) إلى result[&#x27;report_file&#x27;]
+<span class="ln" id="L371">371</span>                except OSError:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L372">372</span>                    result[&quot;report_file&quot;] = &quot;&quot;  # إسناد القيمة الثابتة result[&#x27;report_file&#x27;]
+<span class="ln" id="L373">373</span>                return result  # إرجاع result
+<span class="ln" id="L374">374</span> 
+<span class="ln" id="L375">375</span>            job = srv.submit(&quot;calibrate&quot;, run_calibration)  # إسناد نتيجة استدعاء srv.submit (2 معاملات) إلى job
+<span class="ln" id="L376">376</span>            return self._json({&quot;ok&quot;: True, &quot;job&quot;: job.as_dict()})  # إرجاع self._json(قاموس)
+<span class="ln" id="L377">377</span>        if route == &quot;/api/lockout&quot;:  # شرط: route يساوي &#x27;/api/lockout&#x27;
+<span class="ln" id="L378">378</span>            # فحص مُختار صراحةً ومحدود؛ المحرك يتوقف عند أول
+<span class="ln" id="L379">379</span>            # رد حجب ولا ينتظر زواله ولا يعيد بعده أبداً.
+<span class="ln" id="L380">380</span>            prof = store.migrate(data.get(&quot;profile&quot;) or {})  # إسناد نتيجة استدعاء store.migrate (معامل واحد) إلى prof
+<span class="ln" id="L381">381</span>            checks = self._internet_checks()  # إسناد نتيجة استدعاء self._internet_checks إلى checks
+<span class="ln" id="L382">382</span>            job = srv.submit(&quot;lockout&quot;,  # إسناد نتيجة استدعاء srv.submit (2 معاملات) إلى job
+<span class="ln" id="L383">383</span>                             lambda: engine.probe_lockout(  # مفتاح lambda في القاموس
+<span class="ln" id="L384">384</span>                                 prof,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L385">385</span>                                 max_failures=int(data.get(&quot;max_failures&quot;) or 8),  # المعامل المسمّى max_failures
+<span class="ln" id="L386">386</span>                                 checks=checks))  # المعامل المسمّى checks
+<span class="ln" id="L387">387</span>            return self._json({&quot;ok&quot;: True, &quot;job&quot;: job.as_dict()})  # إرجاع self._json(قاموس)
+<span class="ln" id="L388">388</span>        if route == &quot;/api/run/start&quot;:  # شرط: route يساوي &#x27;/api/run/start&#x27;
+<span class="ln" id="L389">389</span>            prof = store.migrate(data.get(&quot;profile&quot;) or {})  # إسناد نتيجة استدعاء store.migrate (معامل واحد) إلى prof
+<span class="ln" id="L390">390</span>            # طبّق رابط فحص الإنترنت المخصص من المسؤول لهذا التشغيل.
+<span class="ln" id="L391">391</span>            srv.engine.checks = self._internet_checks()  # إسناد نتيجة استدعاء self._internet_checks إلى srv.engine.checks
+<span class="ln" id="L392">392</span>            # احترم مهلة الاتصال المتقدمة من الإعدادات إن وُجدت.
+<span class="ln" id="L393">393</span>            ct = srv.store.get_setting(&quot;connect_timeout&quot;)  # إسناد نتيجة استدعاء srv.store.get_setting (معامل واحد) إلى ct
+<span class="ln" id="L394">394</span>            if ct:  # شرط: ct
+<span class="ln" id="L395">395</span>                try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L396">396</span>                    config.CONNECT_TIMEOUT = float(ct)  # إسناد نتيجة استدعاء float (معامل واحد) إلى config.CONNECT_TIMEOUT
+<span class="ln" id="L397">397</span>                except (TypeError, ValueError):  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L398">398</span>                    pass  # سطر فارغ منطقياً (pass) — مطلوب صياغياً
+<span class="ln" id="L399">399</span>            rt = srv.store.get_setting(&quot;read_timeout&quot;)  # إسناد نتيجة استدعاء srv.store.get_setting (معامل واحد) إلى rt
+<span class="ln" id="L400">400</span>            if rt:  # شرط: rt
+<span class="ln" id="L401">401</span>                try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L402">402</span>                    config.READ_TIMEOUT = float(rt)  # إسناد نتيجة استدعاء float (معامل واحد) إلى config.READ_TIMEOUT
+<span class="ln" id="L403">403</span>                except (TypeError, ValueError):  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L404">404</span>                    pass  # سطر فارغ منطقياً (pass) — مطلوب صياغياً
+<span class="ln" id="L405">405</span>            result = srv.engine.start(  # إسناد نتيجة استدعاء srv.engine.start (معامل واحد، attempts=…، threads=…، delay_ms=…، keyword=…، known_card=…، preflight_only=…، verify_after=…، auto_stop=…، resume=…) إلى result
+<span class="ln" id="L406">406</span>                prof,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L407">407</span>                attempts=int(data.get(&quot;attempts&quot;) or config.DEFAULT_ATTEMPTS),  # المعامل المسمّى attempts
+<span class="ln" id="L408">408</span>                threads=int(data.get(&quot;threads&quot;) or config.DEFAULT_THREADS),  # المعامل المسمّى threads
+<span class="ln" id="L409">409</span>                delay_ms=int(data.get(&quot;delay_ms&quot;) or 0),  # المعامل المسمّى delay_ms
+<span class="ln" id="L410">410</span>                keyword=(data.get(&quot;keyword&quot;) or &quot;&quot;).strip(),  # المعامل المسمّى keyword
+<span class="ln" id="L411">411</span>                known_card=(data.get(&quot;known_card&quot;) or &quot;&quot;).strip(),  # المعامل المسمّى known_card
+<span class="ln" id="L412">412</span>                preflight_only=bool(data.get(&quot;preflight_only&quot;, False)),  # المعامل المسمّى preflight_only
+<span class="ln" id="L413">413</span>                verify_after=bool(data.get(&quot;verify&quot;, True)),  # المعامل المسمّى verify_after
+<span class="ln" id="L414">414</span>                auto_stop=bool(data.get(&quot;auto_stop&quot;, True)),  # المعامل المسمّى auto_stop
+<span class="ln" id="L415">415</span>                resume=data.get(&quot;resume&quot;, True) is not False)  # المعامل المسمّى resume
+<span class="ln" id="L416">416</span>            return self._json(result, 200 if result.get(&quot;ok&quot;) else 400)  # إرجاع self._json(result, 200 إن result.get(&#x27;ok&#x27;) وإلا 400)
+<span class="ln" id="L417">417</span>        if route == &quot;/api/run/stop&quot;:  # شرط: route يساوي &#x27;/api/run/stop&#x27;
+<span class="ln" id="L418">418</span>            srv.engine.stop(&quot;user_stop&quot;)  # استدعاء srv.engine.stop (معامل واحد)
+<span class="ln" id="L419">419</span>            return self._json({&quot;ok&quot;: True})  # إرجاع self._json(قاموس)
+<span class="ln" id="L420">420</span>        if route == &quot;/api/cache/clear&quot;:  # شرط: route يساوي &#x27;/api/cache/clear&#x27;
+<span class="ln" id="L421">421</span>            scope = data.get(&quot;scope&quot;, &quot;temp&quot;)  # إسناد نتيجة استدعاء data.get (2 معاملات) إلى scope
+<span class="ln" id="L422">422</span>            if scope not in (&quot;temp&quot;, &quot;results&quot;, &quot;profiles&quot;, &quot;all&quot;):  # شرط: scope ليس ضمن مجموعة
+<span class="ln" id="L423">423</span>                return self._error(&quot;bad_scope&quot;, 400)  # إرجاع self._error(&#x27;bad_scope&#x27;, 400)
+<span class="ln" id="L424">424</span>            freed = srv.store.clear_cache(scope)  # إسناد نتيجة استدعاء srv.store.clear_cache (معامل واحد) إلى freed
+<span class="ln" id="L425">425</span>            if scope in (&quot;profiles&quot;, &quot;all&quot;):  # شرط: scope ضمن مجموعة
+<span class="ln" id="L426">426</span>                srv.store = store.Store()  # إسناد نتيجة استدعاء store.Store إلى srv.store
+<span class="ln" id="L427">427</span>                srv.engine.store = srv.store  # إسناد srv.store إلى srv.engine.store
+<span class="ln" id="L428">428</span>            return self._json({&quot;ok&quot;: True, &quot;cleared&quot;: freed,  # إرجاع self._json(قاموس)
+<span class="ln" id="L429">429</span>                               &quot;cache&quot;: srv.store.cache_info()})  # مفتاح cache في القاموس
+<span class="ln" id="L430">430</span>        if route == &quot;/api/settings&quot;:  # شرط: route يساوي &#x27;/api/settings&#x27;
+<span class="ln" id="L431">431</span>            if &quot;lang&quot; in data:  # شرط: &#x27;lang&#x27; ضمن data
+<span class="ln" id="L432">432</span>                srv.store.set_setting(&quot;lang&quot;, str(data[&quot;lang&quot;])[:5])  # استدعاء srv.store.set_setting (2 معاملات)
+<span class="ln" id="L433">433</span>            if &quot;internet_check_url&quot; in data:  # شرط: &#x27;internet_check_url&#x27; ضمن data
+<span class="ln" id="L434">434</span>                raw = str(data.get(&quot;internet_check_url&quot;) or &quot;&quot;).strip()[:400]  # إسناد str(data.get(&#x27;internet_check_url&#x27;) أو &#x27;&#x27;).strip()[] إلى raw
+<span class="ln" id="L435">435</span>                srv.store.set_setting(&quot;internet_check_url&quot;, raw)  # استدعاء srv.store.set_setting (2 معاملات)
+<span class="ln" id="L436">436</span>            if &quot;connect_timeout&quot; in data:  # شرط: &#x27;connect_timeout&#x27; ضمن data
+<span class="ln" id="L437">437</span>                try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L438">438</span>                    value = float(data.get(&quot;connect_timeout&quot;) or 0)  # إسناد نتيجة استدعاء float (معامل واحد) إلى value
+<span class="ln" id="L439">439</span>                    if 0.5 &lt;= value &lt;= 120:  # شرط: 0.5 أصغر أو يساوي value
+<span class="ln" id="L440">440</span>                        srv.store.set_setting(&quot;connect_timeout&quot;, value)  # استدعاء srv.store.set_setting (2 معاملات)
+<span class="ln" id="L441">441</span>                        config.CONNECT_TIMEOUT = value  # إسناد value إلى config.CONNECT_TIMEOUT
+<span class="ln" id="L442">442</span>                except (TypeError, ValueError):  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L443">443</span>                    pass  # سطر فارغ منطقياً (pass) — مطلوب صياغياً
+<span class="ln" id="L444">444</span>            if &quot;read_timeout&quot; in data:  # شرط: &#x27;read_timeout&#x27; ضمن data
+<span class="ln" id="L445">445</span>                try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L446">446</span>                    value = float(data.get(&quot;read_timeout&quot;) or 0)  # إسناد نتيجة استدعاء float (معامل واحد) إلى value
+<span class="ln" id="L447">447</span>                    if 0.5 &lt;= value &lt;= 120:  # شرط: 0.5 أصغر أو يساوي value
+<span class="ln" id="L448">448</span>                        srv.store.set_setting(&quot;read_timeout&quot;, value)  # استدعاء srv.store.set_setting (2 معاملات)
+<span class="ln" id="L449">449</span>                        config.READ_TIMEOUT = value  # إسناد value إلى config.READ_TIMEOUT
+<span class="ln" id="L450">450</span>                except (TypeError, ValueError):  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L451">451</span>                    pass  # سطر فارغ منطقياً (pass) — مطلوب صياغياً
+<span class="ln" id="L452">452</span>            return self._json({&quot;ok&quot;: True, &quot;settings&quot;: srv.store.settings})  # إرجاع self._json(قاموس)
+<span class="ln" id="L453">453</span>        if route == &quot;/api/probe-link&quot;:  # شرط: route يساوي &#x27;/api/probe-link&#x27;
+<span class="ln" id="L454">454</span>            return self._probe_link(data)  # إرجاع self._probe_link(data)
+<span class="ln" id="L455">455</span>        if route == &quot;/api/profiles/export&quot;:  # شرط: route يساوي &#x27;/api/profiles/export&#x27;
+<span class="ln" id="L456">456</span>            name = (data.get(&quot;name&quot;) or &quot;&quot;).strip()  # إسناد نتيجة استدعاء data.get(&#x27;name&#x27;) أو &#x27;&#x27;.strip إلى name
+<span class="ln" id="L457">457</span>            prof = srv.store.get(name) if name else None  # إسناد srv.store.get(name) إن name وإلا None إلى prof
+<span class="ln" id="L458">458</span>            if not prof:  # شرط معكوس: ليس prof
+<span class="ln" id="L459">459</span>                return self._error(&quot;profile_not_found&quot;, 404)  # إرجاع self._error(&#x27;profile_not_found&#x27;, 404)
+<span class="ln" id="L460">460</span>            safe = engine.safe_profile_snapshot(prof)  # إسناد نتيجة استدعاء engine.safe_profile_snapshot (معامل واحد) إلى safe
+<span class="ln" id="L461">461</span>            return self._json({&quot;ok&quot;: True, &quot;profile&quot;: safe})  # إرجاع self._json(قاموس)
+<span class="ln" id="L462">462</span>        if route == &quot;/api/profiles/import&quot;:  # شرط: route يساوي &#x27;/api/profiles/import&#x27;
+<span class="ln" id="L463">463</span>            raw = data.get(&quot;profile&quot;) or {}  # دمج منطقي (أو) وإسناده إلى raw
+<span class="ln" id="L464">464</span>            if not isinstance(raw, dict):  # شرط معكوس: ليس isinstance(raw, dict)
+<span class="ln" id="L465">465</span>                return self._error(&quot;bad_profile&quot;, 400)  # إرجاع self._error(&#x27;bad_profile&#x27;, 400)
+<span class="ln" id="L466">466</span>            prof = store.migrate(raw)  # إسناد نتيجة استدعاء store.migrate (معامل واحد) إلى prof
+<span class="ln" id="L467">467</span>            # لا تستورد أبداً أسراراً حيّة من ملف عُدّل يدوياً.
+<span class="ln" id="L468">468</span>            if prof.get(&quot;pass_fixed&quot;):  # شرط: نتيجة prof.get(&#x27;pass_fixed&#x27;)
+<span class="ln" id="L469">469</span>                prof[&quot;pass_fixed&quot;] = &quot;&quot;  # إسناد القيمة الثابتة prof[&#x27;pass_fixed&#x27;]
+<span class="ln" id="L470">470</span>            problems = store.validate(prof)  # إسناد نتيجة استدعاء store.validate (معامل واحد) إلى problems
+<span class="ln" id="L471">471</span>            hard = [p for p in problems if p not in  # بناء اشتقاق قائمة وإسناده إلى hard
+<span class="ln" id="L472">472</span>                    (&quot;space_is_astronomically_big&quot;, &quot;needs_browser_js&quot;)]  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L473">473</span>            if hard and not data.get(&quot;force&quot;):  # شرط مركّب (و)
+<span class="ln" id="L474">474</span>                return self._json({&quot;ok&quot;: False, &quot;problems&quot;: problems}, 400)  # إرجاع self._json(قاموس, 400)
+<span class="ln" id="L475">475</span>            saved = srv.store.put(prof)  # إسناد نتيجة استدعاء srv.store.put (معامل واحد) إلى saved
+<span class="ln" id="L476">476</span>            return self._json({&quot;ok&quot;: True, &quot;profile&quot;: saved,  # إرجاع self._json(قاموس)
+<span class="ln" id="L477">477</span>                               &quot;profiles&quot;: [_profile_brief(p)  # مفتاح profiles في القاموس
+<span class="ln" id="L478">478</span>                                            for p in srv.store.all()]})  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L479">479</span>        if route == &quot;/api/cache/cleanup-old&quot;:  # شرط: route يساوي &#x27;/api/cache/cleanup-old&#x27;
+<span class="ln" id="L480">480</span>            days = data.get(&quot;days&quot;)  # إسناد نتيجة استدعاء data.get (معامل واحد) إلى days
+<span class="ln" id="L481">481</span>            try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L482">482</span>                days = int(days) if days is not None else None  # إسناد int(days) إن مقارنة وإلا None إلى days
+<span class="ln" id="L483">483</span>            except (TypeError, ValueError):  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L484">484</span>                days = None  # إسناد القيمة الثابتة days
+<span class="ln" id="L485">485</span>            result = srv.store.cleanup_old_reports(days=days)  # إسناد نتيجة استدعاء srv.store.cleanup_old_reports (days=…) إلى result
+<span class="ln" id="L486">486</span>            return self._json({&quot;ok&quot;: True, &quot;cleanup&quot;: result,  # إرجاع self._json(قاموس)
+<span class="ln" id="L487">487</span>                               &quot;cache&quot;: srv.store.cache_info()})  # مفتاح cache في القاموس
+<span class="ln" id="L488">488</span>        if route == &quot;/api/capture/start&quot;:  # شرط: route يساوي &#x27;/api/capture/start&#x27;
+<span class="ln" id="L489">489</span>            return self._capture_start(data)  # إرجاع self._capture_start(data)
+<span class="ln" id="L490">490</span>        if route == &quot;/api/capture/step&quot;:  # شرط: route يساوي &#x27;/api/capture/step&#x27;
+<span class="ln" id="L491">491</span>            return self._capture_step(data)  # إرجاع self._capture_step(data)
+<span class="ln" id="L492">492</span>        if route == &quot;/api/capture/mark&quot;:  # شرط: route يساوي &#x27;/api/capture/mark&#x27;
+<span class="ln" id="L493">493</span>            return self._capture_mark(data)  # إرجاع self._capture_mark(data)
+<span class="ln" id="L494">494</span>        if route == &quot;/api/capture/finish&quot;:  # شرط: route يساوي &#x27;/api/capture/finish&#x27;
+<span class="ln" id="L495">495</span>            return self._capture_finish(data)  # إرجاع self._capture_finish(data)
+<span class="ln" id="L496">496</span>        if route == &quot;/api/quit&quot;:  # شرط: route يساوي &#x27;/api/quit&#x27;
+<span class="ln" id="L497">497</span>            # مستخدمو الهاتف (Termux/Pydroid) بلا Ctrl+C: دع الصفحة توقف
+<span class="ln" id="L498">498</span>            # الأداة. الإيقاف يعمل من خيطه الخاص — واستدعاؤه
+<span class="ln" id="L499">499</span>            # من داخل serve_forever سيسبب تعليقاً متبادلاً (deadlock).
+<span class="ln" id="L500">500</span>            threading.Timer(0.4, srv.shutdown).start()  # استدعاء threading.Timer(0.4, srv.shutdown).start
+<span class="ln" id="L501">501</span>            return self._json({&quot;ok&quot;: True, &quot;shutting_down&quot;: True})  # إرجاع self._json(قاموس)
+<span class="ln" id="L502">502</span>        return self._error(&quot;not_found&quot;, 404)  # إرجاع self._error(&#x27;not_found&#x27;, 404)
+<span class="ln" id="L503">503</span> 
+<span class="ln" id="L504">504</span>    # -- مساعدات ---------------------------------------------------------
+<span class="ln" id="L505">505</span>    def _internet_checks(self):  # تعريف الدالة _internet_checks(self)
+<span class="ln" id="L506">506</span>        custom = (self.server.store.get_setting(&quot;internet_check_url&quot;, &quot;&quot;)  # إسناد نتيجة استدعاء self.server.store.get_setting(&#x27;internet_check_url&#x27;, &#x27;&#x27;) أو &#x27;&#x27;.strip إلى custom
+<span class="ln" id="L507">507</span>                  or &quot;&quot;).strip()  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L508">508</span>        return verify.resolve_internet_checks(custom or None)  # إرجاع verify.resolve_internet_checks(custom أو None)
+<span class="ln" id="L509">509</span> 
+<span class="ln" id="L510">510</span>    def _probe_link(self, data) -&gt; None:  # تعريف الدالة _probe_link(self, data) ترجع None
+<span class="ln" id="L511">511</span>        &quot;&quot;&quot;Single GET to the login URL — connectivity check, no guessing.&quot;&quot;&quot;  # نص توثيقي (docstring) يشرح ما يليه
+<span class="ln" id="L512">512</span>        url = (data.get(&quot;url&quot;) or &quot;&quot;).strip()  # إسناد نتيجة استدعاء data.get(&#x27;url&#x27;) أو &#x27;&#x27;.strip إلى url
+<span class="ln" id="L513">513</span>        if not url:  # شرط معكوس: ليس url
+<span class="ln" id="L514">514</span>            return self._error(&quot;url_required&quot;, 400)  # إرجاع self._error(&#x27;url_required&#x27;, 400)
+<span class="ln" id="L515">515</span>        if not url.startswith((&quot;http://&quot;, &quot;https://&quot;)):  # شرط معكوس: ليس url.startswith(مجموعة)
+<span class="ln" id="L516">516</span>            url = &quot;http://&quot; + url.lstrip(&quot;/&quot;)  # حساب جمع بين &#x27;http://&#x27; وurl.lstrip(&#x27;/&#x27;) وإسناده إلى url
+<span class="ln" id="L517">517</span>        session = Session(allow_redirects=True)  # إسناد نتيجة استدعاء Session (allow_redirects=…) إلى session
+<span class="ln" id="L518">518</span>        t0 = time.time()  # إسناد نتيجة استدعاء time.time إلى t0
+<span class="ln" id="L519">519</span>        try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L520">520</span>            resp = session.get(url, allow_redirects=True)  # إسناد نتيجة استدعاء session.get (معامل واحد، allow_redirects=…) إلى resp
+<span class="ln" id="L521">521</span>            ms = round((time.time() - t0) * 1000)  # إسناد نتيجة استدعاء round (معامل واحد) إلى ms
+<span class="ln" id="L522">522</span>            form = portals.parse_form(resp.text or &quot;&quot;, resp.url or url)  # إسناد نتيجة استدعاء portals.parse_form (2 معاملات) إلى form
+<span class="ln" id="L523">523</span>            return self._json({  # إرجاع self._json(قاموس)
+<span class="ln" id="L524">524</span>                &quot;ok&quot;: True,  # مفتاح ok في القاموس
+<span class="ln" id="L525">525</span>                &quot;reachable&quot;: True,  # مفتاح reachable في القاموس
+<span class="ln" id="L526">526</span>                &quot;status&quot;: resp.status,  # مفتاح status في القاموس
+<span class="ln" id="L527">527</span>                &quot;ms&quot;: ms,  # مفتاح ms في القاموس
+<span class="ln" id="L528">528</span>                &quot;final_url&quot;: resp.url or url,  # مفتاح final_url في القاموس
+<span class="ln" id="L529">529</span>                &quot;has_login_form&quot;: bool(form and form.inputs),  # مفتاح has_login_form في القاموس
+<span class="ln" id="L530">530</span>                &quot;length&quot;: resp.length,  # مفتاح length في القاموس
+<span class="ln" id="L531">531</span>                &quot;hint&quot;: &quot;reachable&quot;,  # مفتاح hint في القاموس
+<span class="ln" id="L532">532</span>            })  # إغلاق القوس المفتوح في السطر السابق
+<span class="ln" id="L533">533</span>        # تكملة السطر السابق داخل القوس
+<span class="ln" id="L534">534</span>        except Exception as exc:                              # noqa: BLE001
+<span class="ln" id="L535">535</span>            from ..errors import classify  # استيراد classify من الوحدة errors
+<span class="ln" id="L536">536</span>            err = classify(exc, url)  # إسناد نتيجة استدعاء classify (2 معاملات) إلى err
+<span class="ln" id="L537">537</span>            return self._json({  # إرجاع self._json(قاموس)
+<span class="ln" id="L538">538</span>                &quot;ok&quot;: False,  # مفتاح ok في القاموس
+<span class="ln" id="L539">539</span>                &quot;reachable&quot;: False,  # مفتاح reachable في القاموس
+<span class="ln" id="L540">540</span>                &quot;error&quot;: err.kind,  # مفتاح error في القاموس
+<span class="ln" id="L541">541</span>                &quot;detail&quot;: err.text[:200],  # مفتاح detail في القاموس
+<span class="ln" id="L542">542</span>                &quot;hint&quot;: err.kind,  # مفتاح hint في القاموس
+<span class="ln" id="L543">543</span>                &quot;ms&quot;: round((time.time() - t0) * 1000),  # مفتاح ms في القاموس
+<span class="ln" id="L544">544</span>            })  # إغلاق القوس المفتوح في السطر السابق
+<span class="ln" id="L545">545</span>        finally:  # مفتاح finally في القاموس
+<span class="ln" id="L546">546</span>            session.close()  # استدعاء session.close
+<span class="ln" id="L547">547</span> 
+<span class="ln" id="L548">548</span>    def _scan(self, data) -&gt; None:  # تعريف الدالة _scan(self, data) ترجع None
+<span class="ln" id="L549">549</span>        url = (data.get(&quot;url&quot;) or &quot;&quot;).strip()  # إسناد نتيجة استدعاء data.get(&#x27;url&#x27;) أو &#x27;&#x27;.strip إلى url
+<span class="ln" id="L550">550</span>        if not url.startswith((&quot;http://&quot;, &quot;https://&quot;)):  # شرط معكوس: ليس url.startswith(مجموعة)
+<span class="ln" id="L551">551</span>            url = &quot;http://&quot; + url.lstrip(&quot;/&quot;)  # حساب جمع بين &#x27;http://&#x27; وurl.lstrip(&#x27;/&#x27;) وإسناده إلى url
+<span class="ln" id="L552">552</span>        session = Session(allow_redirects=True)  # إسناد نتيجة استدعاء Session (allow_redirects=…) إلى session
+<span class="ln" id="L553">553</span>        t0 = time.time()  # إسناد نتيجة استدعاء time.time إلى t0
+<span class="ln" id="L554">554</span>        try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L555">555</span>            try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L556">556</span>                portal = portals.discover(session, url)  # إسناد نتيجة استدعاء portals.discover (2 معاملات) إلى portal
+<span class="ln" id="L557">557</span>            # تكملة السطر السابق داخل القوس
+<span class="ln" id="L558">558</span>            except Exception as exc:                      # noqa: BLE001
+<span class="ln" id="L559">559</span>                from ..errors import classify  # استيراد classify من الوحدة errors
+<span class="ln" id="L560">560</span>                err = classify(exc, url)  # إسناد نتيجة استدعاء classify (2 معاملات) إلى err
+<span class="ln" id="L561">561</span>                return self._json({&quot;ok&quot;: False, &quot;error&quot;: f&quot;net_{err.kind}&quot;,  # إرجاع self._json(قاموس, 200)
+<span class="ln" id="L562">562</span>                                   &quot;detail&quot;: err.text[:200],  # مفتاح detail في القاموس
+<span class="ln" id="L563">563</span>                                   &quot;hint&quot;: err.short}, 200)  # مفتاح hint في القاموس
+<span class="ln" id="L564">564</span>            internet = verify.probe_internet(session,  # إسناد نتيجة استدعاء verify.probe_internet (معامل واحد، checks=…) إلى internet
+<span class="ln" id="L565">565</span>                                             checks=self._internet_checks())  # المعامل المسمّى checks
+<span class="ln" id="L566">566</span>            return self._json({&quot;ok&quot;: True, &quot;portal&quot;: portal.as_dict(),  # إرجاع self._json(قاموس)
+<span class="ln" id="L567">567</span>                               &quot;internet&quot;: internet,  # مفتاح internet في القاموس
+<span class="ln" id="L568">568</span>                               &quot;ms&quot;: round((time.time() - t0) * 1000)})  # مفتاح ms في القاموس
+<span class="ln" id="L569">569</span>        finally:  # مفتاح finally في القاموس
+<span class="ln" id="L570">570</span>            session.close()  # استدعاء session.close
+<span class="ln" id="L571">571</span> 
+<span class="ln" id="L572">572</span>    def _preview(self, data) -&gt; None:  # تعريف الدالة _preview(self, data) ترجع None
+<span class="ln" id="L573">573</span>        prof = store.migrate(data.get(&quot;profile&quot;) or {})  # إسناد نتيجة استدعاء store.migrate (معامل واحد) إلى prof
+<span class="ln" id="L574">574</span>        request_shape = None  # إسناد القيمة الثابتة request_shape
+<span class="ln" id="L575">575</span>        if prof.get(&quot;login_url&quot;):  # شرط: نتيجة prof.get(&#x27;login_url&#x27;)
+<span class="ln" id="L576">576</span>            try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L577">577</span>                request_shape = engine.safe_request_shape(prof, &quot;CARD&quot;)  # إسناد نتيجة استدعاء engine.safe_request_shape (2 معاملات) إلى request_shape
+<span class="ln" id="L578">578</span>            # تكملة السطر السابق داخل القوس
+<span class="ln" id="L579">579</span>            except Exception:                               # noqa: BLE001
+<span class="ln" id="L580">580</span>                request_shape = None  # إسناد القيمة الثابتة request_shape
+<span class="ln" id="L581">581</span>        return self._json({&quot;ok&quot;: True,  # إرجاع self._json(قاموس)
+<span class="ln" id="L582">582</span>                           &quot;space&quot;: store.space_size(prof),  # مفتاح space في القاموس
+<span class="ln" id="L583">583</span>                           &quot;variable_len&quot;: store.variable_len(prof),  # مفتاح variable_len في القاموس
+<span class="ln" id="L584">584</span>                           &quot;samples&quot;: store.sample_cards(prof, 4),  # مفتاح samples في القاموس
+<span class="ln" id="L585">585</span>                           &quot;problems&quot;: store.validate(prof),  # مفتاح problems في القاموس
+<span class="ln" id="L586">586</span>                           &quot;request_shape&quot;: request_shape,  # مفتاح request_shape في القاموس
+<span class="ln" id="L587">587</span>                           &quot;charset_size&quot;: len(set(prof.get(&quot;charset&quot;) or &quot;&quot;))})  # مفتاح charset_size في القاموس
+<span class="ln" id="L588">588</span> 
+<span class="ln" id="L589">589</span>    def _guard(self) -&gt; str:  # تعريف الدالة _guard(self) ترجع str
+<span class="ln" id="L590">590</span>        host = self.headers.get(&quot;Host&quot;) or &quot;127.0.0.1&quot;  # دمج منطقي (أو) وإسناده إلى host
+<span class="ln" id="L591">591</span>        scheme = &quot;https&quot; if self.headers.get(&quot;X-Forwarded-Proto&quot;) == &quot;https&quot; else &quot;http&quot;  # إسناد &#x27;https&#x27; إن مقارنة وإلا &#x27;http&#x27; إلى scheme
+<span class="ln" id="L592">592</span>        return f&quot;{scheme}://{host}&quot;  # إرجاع نص منسّق (f-string)
+<span class="ln" id="L593">593</span> 
+<span class="ln" id="L594">594</span>    def _capture_start(self, data) -&gt; None:  # تعريف الدالة _capture_start(self, data) ترجع None
+<span class="ln" id="L595">595</span>        url = (data.get(&quot;url&quot;) or &quot;&quot;).strip()  # إسناد نتيجة استدعاء data.get(&#x27;url&#x27;) أو &#x27;&#x27;.strip إلى url
+<span class="ln" id="L596">596</span>        if not url:  # شرط معكوس: ليس url
+<span class="ln" id="L597">597</span>            return self._error(&quot;url_missing&quot;)  # إرجاع self._error(&#x27;url_missing&#x27;)
+<span class="ln" id="L598">598</span>        try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L599">599</span>            cap = self.server.captures.start(url, guard=self._guard())  # إسناد نتيجة استدعاء self.server.captures.start (معامل واحد، guard=…) إلى cap
+<span class="ln" id="L600">600</span>        except ValueError as exc:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L601">601</span>            return self._error(str(exc))  # إرجاع self._error(str(exc))
+<span class="ln" id="L602">602</span>        # تكملة السطر السابق داخل القوس
+<span class="ln" id="L603">603</span>        except Exception as exc:                          # noqa: BLE001
+<span class="ln" id="L604">604</span>            from ..errors import classify  # استيراد classify من الوحدة errors
+<span class="ln" id="L605">605</span>            err = classify(exc, url)  # إسناد نتيجة استدعاء classify (2 معاملات) إلى err
+<span class="ln" id="L606">606</span>            return self._json({&quot;ok&quot;: False, &quot;error&quot;: f&quot;net_{err.kind}&quot;,  # إرجاع self._json(قاموس, 200)
+<span class="ln" id="L607">607</span>                               &quot;detail&quot;: err.text[:200], &quot;hint&quot;: err.short}, 200)  # مفتاح detail في القاموس
+<span class="ln" id="L608">608</span>        public = cap.as_public()  # إسناد نتيجة استدعاء cap.as_public إلى public
+<span class="ln" id="L609">609</span>        public[&quot;view&quot;] = &quot;/capture/view?id=&quot; + cap.id  # حساب جمع بين &#x27;/capture/view?id=&#x27; وcap.id وإسناده إلى public[&#x27;view&#x27;]
+<span class="ln" id="L610">610</span>        return self._json(public)  # إرجاع self._json(public)
+<span class="ln" id="L611">611</span> 
+<span class="ln" id="L612">612</span>    def _capture_step(self, data) -&gt; None:  # تعريف الدالة _capture_step(self, data) ترجع None
+<span class="ln" id="L613">613</span>        try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L614">614</span>            result = self.server.captures.step(  # إسناد نتيجة استدعاء self.server.captures.step (2 معاملات، guard=…) إلى result
+<span class="ln" id="L615">615</span>                data.get(&quot;id&quot;) or &quot;&quot;, data, guard=self._guard())  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L616">616</span>        except KeyError:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L617">617</span>            return self._error(&quot;capture_not_found&quot;, 404)  # إرجاع self._error(&#x27;capture_not_found&#x27;, 404)
+<span class="ln" id="L618">618</span>        except ValueError as exc:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L619">619</span>            return self._error(str(exc))  # إرجاع self._error(str(exc))
+<span class="ln" id="L620">620</span>        return self._json(result, 200 if result.get(&quot;ok&quot;) else 400)  # إرجاع self._json(result, 200 إن result.get(&#x27;ok&#x27;) وإلا 400)
+<span class="ln" id="L621">621</span> 
+<span class="ln" id="L622">622</span>    def _capture_mark(self, data) -&gt; None:  # تعريف الدالة _capture_mark(self, data) ترجع None
+<span class="ln" id="L623">623</span>        try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L624">624</span>            result = self.server.captures.mark(data.get(&quot;id&quot;) or &quot;&quot;,  # إسناد نتيجة استدعاء self.server.captures.mark (2 معاملات) إلى result
+<span class="ln" id="L625">625</span>                                               data.get(&quot;mark&quot;) or &quot;&quot;)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L626">626</span>        except KeyError:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L627">627</span>            return self._error(&quot;capture_not_found&quot;, 404)  # إرجاع self._error(&#x27;capture_not_found&#x27;, 404)
+<span class="ln" id="L628">628</span>        return self._json(result, 200 if result.get(&quot;ok&quot;) else 400)  # إرجاع self._json(result, 200 إن result.get(&#x27;ok&#x27;) وإلا 400)
+<span class="ln" id="L629">629</span> 
+<span class="ln" id="L630">630</span>    def _capture_finish(self, data) -&gt; None:  # تعريف الدالة _capture_finish(self, data) ترجع None
+<span class="ln" id="L631">631</span>        try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L632">632</span>            result = self.server.captures.finish(  # إسناد نتيجة استدعاء self.server.captures.finish (2 معاملات، hints=…) إلى result
+<span class="ln" id="L633">633</span>                data.get(&quot;id&quot;) or &quot;&quot;, self.server.store,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L634">634</span>                hints=data.get(&quot;profile&quot;) or {})  # المعامل المسمّى hints
+<span class="ln" id="L635">635</span>        except KeyError:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L636">636</span>            return self._error(&quot;capture_not_found&quot;, 404)  # إرجاع self._error(&#x27;capture_not_found&#x27;, 404)
+<span class="ln" id="L637">637</span>        return self._json(result)  # إرجاع self._json(result)
+<span class="ln" id="L638">638</span> 
+<span class="ln" id="L639">639</span>    def _capture_status(self, capture_id: str) -&gt; None:  # تعريف الدالة _capture_status(self, capture_id) ترجع None
+<span class="ln" id="L640">640</span>        try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L641">641</span>            return self._json(self.server.captures.status(capture_id))  # إرجاع self._json(self.server.captures.status(capture_id))
+<span class="ln" id="L642">642</span>        except KeyError:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L643">643</span>            return self._error(&quot;capture_not_found&quot;, 404)  # إرجاع self._error(&#x27;capture_not_found&#x27;, 404)
+<span class="ln" id="L644">644</span> 
+<span class="ln" id="L645">645</span>    def _capture_report(self, capture_id: str, download: bool = False) -&gt; None:  # تعريف الدالة _capture_report(self, capture_id, download) ترجع None
+<span class="ln" id="L646">646</span>        try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L647">647</span>            report = self.server.captures.report_of(capture_id)  # إسناد نتيجة استدعاء self.server.captures.report_of (معامل واحد) إلى report
+<span class="ln" id="L648">648</span>        except KeyError:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L649">649</span>            return self._error(&quot;capture_not_found&quot;, 404)  # إرجاع self._error(&#x27;capture_not_found&#x27;, 404)
+<span class="ln" id="L650">650</span>        body = json.dumps(report, ensure_ascii=False, indent=2).encode(&quot;utf-8&quot;)  # إسناد نتيجة استدعاء json.dumps(report, ensure_ascii=False, indent=2).encode (معامل واحد) إلى body
+<span class="ln" id="L651">651</span>        extra = {}  # إسناد قاموس إلى extra
+<span class="ln" id="L652">652</span>        if download:  # شرط: download
+<span class="ln" id="L653">653</span>            extra[&quot;Content-Disposition&quot;] = (  # إسناد القيمة الثابتة extra[&#x27;Content-Disposition&#x27;]
+<span class="ln" id="L654">654</span>                &#x27;attachment; filename=&quot;kirapass-capture.json&quot;&#x27;)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L655">655</span>        return self._send(body, 200, &quot;application/json; charset=utf-8&quot;, extra)  # إرجاع self._send(body, 200, &#x27;application/json; charset=utf-8&#x27;, …)
+<span class="ln" id="L656">656</span> 
+<span class="ln" id="L657">657</span>    def _capture_view(self, query) -&gt; None:  # تعريف الدالة _capture_view(self, query) ترجع None
+<span class="ln" id="L658">658</span>        capture_id = (query.get(&quot;id&quot;) or [&quot;&quot;])[0]  # إسناد query.get(&#x27;id&#x27;) أو قائمة[0] إلى capture_id
+<span class="ln" id="L659">659</span>        try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L660">660</span>            self.server.captures.get(capture_id)  # استدعاء self.server.captures.get (معامل واحد)
+<span class="ln" id="L661">661</span>        except KeyError:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L662">662</span>            return self._error(&quot;capture_not_found&quot;, 404)  # إرجاع self._error(&#x27;capture_not_found&#x27;, 404)
+<span class="ln" id="L663">663</span>        token = (self.headers.get(&quot;X-KiraPass-Token&quot;)  # دمج منطقي (أو) وإسناده إلى token
+<span class="ln" id="L664">664</span>                 or (query.get(&quot;token&quot;) or [&quot;&quot;])[0]  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L665">665</span>                 or self.server.token)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L666">666</span>        return self._send(capture.view_page(capture_id, token),  # إرجاع self._send(capture.view_page(capture_id, token), 200, &#x27;text/html; charset=utf-8&#x27;)
+<span class="ln" id="L667">667</span>                          200, &quot;text/html; charset=utf-8&quot;)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L668">668</span> 
+<span class="ln" id="L669">669</span> 
+<span class="ln" id="L670">670</span>def _profile_brief(p: dict) -&gt; dict:  # تعريف الدالة _profile_brief(p) ترجع dict
+<span class="ln" id="L671">671</span>    return {&quot;name&quot;: p.get(&quot;name&quot;, &quot;&quot;), &quot;login_url&quot;: p.get(&quot;login_url&quot;, &quot;&quot;),  # إرجاع قاموس
+<span class="ln" id="L672">672</span>            &quot;method&quot;: p.get(&quot;method&quot;, &quot;post&quot;),  # مفتاح method في القاموس
+<span class="ln" id="L673">673</span>            &quot;cards&quot;: f&quot;{p.get(&#x27;prefix&#x27;,&#x27;&#x27;)}[{store.variable_len(p)} with &quot;  # مفتاح cards في القاموس
+<span class="ln" id="L674">674</span>                     f&quot;{len(set(p.get(&#x27;charset&#x27;) or &#x27;&#x27;))} symbols]&quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L675">675</span>                     f&quot;{p.get(&#x27;suffix&#x27;,&#x27;&#x27;)}&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L676">676</span>            &quot;space&quot;: store.space_size(p),  # مفتاح space في القاموس
+<span class="ln" id="L677">677</span>            &quot;covered&quot;: p.get(&quot;space_pos&quot;, 0),  # مفتاح covered في القاموس
+<span class="ln" id="L678">678</span>            &quot;pass_mode&quot;: p.get(&quot;pass_mode&quot;, &quot;&quot;),  # مفتاح pass_mode في القاموس
+<span class="ln" id="L679">679</span>            &quot;dst_value&quot;: p.get(&quot;dst_value&quot;, &quot;&quot;),  # مفتاح dst_value في القاموس
+<span class="ln" id="L680">680</span>            &quot;success_words&quot;: p.get(&quot;success_words&quot;, [])[:6]}  # مفتاح success_words في القاموس
+<span class="ln" id="L681">681</span> 
+<span class="ln" id="L682">682</span> 
+<span class="ln" id="L683">683</span>def serve(host: str = &quot;127.0.0.1&quot;, port: int = 8770, token: str = &quot;&quot;,  # تعريف الدالة serve(host, port, token, on_ready) ترجع None
+<span class="ln" id="L684">684</span>          on_ready=None) -&gt; None:  # المعامل المسمّى on_ready
+<span class="ln" id="L685">685</span>    httpd = KiraServer((host, port), Handler, token=token)  # إسناد نتيجة استدعاء KiraServer (2 معاملات، token=…) إلى httpd
+<span class="ln" id="L686">686</span>    real_port = httpd.server_address[1]  # إسناد httpd.server_address[1] إلى real_port
+<span class="ln" id="L687">687</span>    if on_ready:  # شرط: on_ready
+<span class="ln" id="L688">688</span>        on_ready(real_port, httpd.token)  # استدعاء on_ready (2 معاملات)
+<span class="ln" id="L689">689</span>    try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L690">690</span>        httpd.serve_forever(poll_interval=0.4)  # استدعاء httpd.serve_forever (poll_interval=…)
+<span class="ln" id="L691">691</span>    except KeyboardInterrupt:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L692">692</span>        pass  # سطر فارغ منطقياً (pass) — مطلوب صياغياً
+<span class="ln" id="L693">693</span>    finally:  # مفتاح finally في القاموس
+<span class="ln" id="L694">694</span>        httpd.pool.shutdown(wait=False)  # استدعاء httpd.pool.shutdown (wait=…)
+<span class="ln" id="L695">695</span>        httpd.server_close()  # استدعاء httpd.server_close
+<span class="ln" id="L696">696</span> 
+</code></pre></details>
+<script>
+document.getElementById("kp-jump").addEventListener("change", function (e) {
+  var n = parseInt(e.target.value, 10);
+  if (n > 0) { var el = document.getElementById("L" + n);
+    if (el) el.scrollIntoView({block: "center"}); }
+});
+if (location.hash) { var el = document.querySelector(location.hash);
+  if (el) setTimeout(function () { el.scrollIntoView({block: "center"}); }, 60); }
+</script>
+<footer class="docfoot">صفحة مولّدة آلياً من مصدر الكود · KiraPass —
+<code>files</code> · 2026-10-01 02:26</footer>
+</main>
+</div>
+<script src="../assets/docs.js"></script>
+<script>KPInit("files");</script>
+</body>
+</html>

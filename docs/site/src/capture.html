@@ -1,0 +1,1267 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>مصدر capture.py · KiraPass</title>
+<link rel="stylesheet" href="../assets/docs.css">
+
+</head>
+<body>
+<div id="kp-layout">
+<main class="doc">
+<h1>مصدر <code>capture.py</code></h1>
+<p class="lead">المسجّل اليدوي: اعتراض البوابة وتنقيح الأسرار — 1232 سطراً. كل سطر يحمل تعليقه العربي.</p>
+<div class="card info"><b>هذه الصفحة مولّدة آلياً</b> من مصدر الكود مباشرة (<code>tools/docs/build_docs.py</code>). إن غيّرت الكود فأعد توليدها: <code>python3 tools/docs/build_docs.py</code>. الشرح اليدوي الأوسع في <a href="../architecture.html">المعمارية</a> و<a href="../editing.html">دليل التعديل</a> و<a href="../danger.html">أماكن الخطر</a>.</div>
+<p><a class="btn" href="../files/capture.html">← صفحة الشرح</a> <label class="muted"> قفز إلى سطر: <input id="kp-jump" style="width:6rem" placeholder="123"></label></p>
+<details class="src" open><summary>المصدر كاملاً</summary><pre data-lines="1232"><code>
+<span class="ln" id="L1">1</span># بداية نص متعدد الأسطر — الأسطر التالية نصّ حرفي لا كود، فلا يقبل تعليقاً
+<span class="ln" id="L2">2</span>&quot;&quot;&quot;Interactive, redacted browser-assisted portal recorder.
+<span class="ln" id="L3">3</span> 
+<span class="ln" id="L4">4</span>The operator logs in once through a sandboxed iframe with an opaque origin
+<span class="ln" id="L5">5</span>(no allow-same-origin). Portal JavaScript cannot read KiraPass files or call
+<span class="ln" id="L6">6</span>its API: forms and fetch/XHR never go to the portal directly and never to
+<span class="ln" id="L7">7</span>the local API; they are posted to the parent and replayed by a dedicated
+<span class="ln" id="L8">8</span>server-side Session that keeps cookies, rotating hidden tokens and redirects.
+<span class="ln" id="L9">9</span> 
+<span class="ln" id="L10">10</span>Nothing secret is written down. The JSON report keeps field names, lengths,
+<span class="ln" id="L11">11</span>safe fingerprints and cookie *names* - never a card number, a password or
+<span class="ln" id="L12">12</span>its hash, a cookie value, or a live CSRF/nonce/session token.
+<span class="ln" id="L13">13</span>&quot;&quot;&quot;  # نهاية النص متعدد الأسطر
+<span class="ln" id="L14">14</span>from __future__ import annotations  # استيراد annotations من الوحدة __future__
+<span class="ln" id="L15">15</span> 
+<span class="ln" id="L16">16</span>import hashlib  # استيراد الوحدة hashlib من المكتبة
+<span class="ln" id="L17">17</span>import html as htmlmod  # استيراد الوحدة html من المكتبة
+<span class="ln" id="L18">18</span>from html.parser import HTMLParser  # استيراد HTMLParser من الوحدة html.parser
+<span class="ln" id="L19">19</span>import json  # استيراد الوحدة json من المكتبة
+<span class="ln" id="L20">20</span>import re  # استيراد الوحدة re من المكتبة
+<span class="ln" id="L21">21</span>import threading  # استيراد الوحدة threading من المكتبة
+<span class="ln" id="L22">22</span>import time  # استيراد الوحدة time من المكتبة
+<span class="ln" id="L23">23</span>import uuid  # استيراد الوحدة uuid من المكتبة
+<span class="ln" id="L24">24</span>from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit  # استيراد parse_qsl, urlencode, urljoin, urlsplit, urlunsplit من الوحدة urllib.parse
+<span class="ln" id="L25">25</span> 
+<span class="ln" id="L26">26</span>from . import portals, store  # استيراد portals, store من الوحدة .
+<span class="ln" id="L27">27</span>from .httpclient import MAX_REDIRECTS, Session  # استيراد MAX_REDIRECTS, Session من الوحدة httpclient
+<span class="ln" id="L28">28</span> 
+<span class="ln" id="L29">29</span>SECRET_NAME_RE = re.compile(  # إسناد نتيجة استدعاء re.compile (2 معاملات) إلى SECRET_NAME_RE
+<span class="ln" id="L30">30</span>    r&quot;(pass|passwd|pwd|pin|user|username|login|card|voucher|account|&quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L31">31</span>    r&quot;token|csrf|nonce|session|chap|challenge|cookie|auth|secret|otp)&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L32">32</span>    re.I)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L33">33</span>TOKEN_NAME_RE = re.compile(  # إسناد نتيجة استدعاء re.compile (2 معاملات) إلى TOKEN_NAME_RE
+<span class="ln" id="L34">34</span>    r&quot;(token|csrf|nonce|session|chap|challenge|tok$|authenticity)&quot;, re.I)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L35">35</span>HEX32_RE = re.compile(r&quot;^[0-9a-fA-F]{32}$&quot;)  # إسناد نتيجة استدعاء re.compile (معامل واحد) إلى HEX32_RE
+<span class="ln" id="L36">36</span>HEX40_RE = re.compile(r&quot;^[0-9a-fA-F]{40}$&quot;)  # إسناد نتيجة استدعاء re.compile (معامل واحد) إلى HEX40_RE
+<span class="ln" id="L37">37</span>HEX64_RE = re.compile(r&quot;^[0-9a-fA-F]{64}$&quot;)  # إسناد نتيجة استدعاء re.compile (معامل واحد) إلى HEX64_RE
+<span class="ln" id="L38">38</span>WORD_RE = re.compile(r&quot;[A-Za-z\u0600-\u06FF]{4,}&quot;)  # إسناد نتيجة استدعاء re.compile (معامل واحد) إلى WORD_RE
+<span class="ln" id="L39">39</span>SKIP_WORDS = {  # إسناد مجموعة فريدة إلى SKIP_WORDS
+<span class="ln" id="L40">40</span>    &quot;html&quot;, &quot;head&quot;, &quot;body&quot;, &quot;div&quot;, &quot;span&quot;, &quot;form&quot;, &quot;input&quot;, &quot;script&quot;, &quot;style&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L41">41</span>    &quot;login&quot;, &quot;password&quot;, &quot;username&quot;, &quot;submit&quot;, &quot;button&quot;, &quot;true&quot;, &quot;false&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L42">42</span>    &quot;http&quot;, &quot;https&quot;, &quot;title&quot;, &quot;type&quot;, &quot;text&quot;, &quot;hidden&quot;, &quot;value&quot;, &quot;name&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L43">43</span>    &quot;connect&quot;, &quot;function&quot;, &quot;return&quot;, &quot;document&quot;, &quot;window&quot;, &quot;charset&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L44">44</span>    &quot;content&quot;, &quot;wrapper&quot;, &quot;main&quot;, &quot;session&quot;, &quot;popup&quot;, &quot;hotspot&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L45">45</span>    &quot;doctype&quot;, &quot;href&quot;, &quot;src&quot;, &quot;rel&quot;, &quot;meta&quot;, &quot;link&quot;, &quot;class&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L46">46</span>}  # إغلاق القوس المفتوح في السطر السابق
+<span class="ln" id="L47">47</span>STANDARD_HEADERS = {  # إسناد مجموعة فريدة إلى STANDARD_HEADERS
+<span class="ln" id="L48">48</span>    &quot;host&quot;, &quot;user-agent&quot;, &quot;cookie&quot;, &quot;content-type&quot;, &quot;content-length&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L49">49</span>    &quot;accept&quot;, &quot;accept-language&quot;, &quot;accept-encoding&quot;, &quot;connection&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L50">50</span>    &quot;referer&quot;, &quot;origin&quot;, &quot;upgrade-insecure-requests&quot;, &quot;cache-control&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L51">51</span>    &quot;pragma&quot;, &quot;accept-charset&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L52">52</span>}  # إغلاق القوس المفتوح في السطر السابق
+<span class="ln" id="L53">53</span>KNOWN_PASS_MODES = (&quot;same&quot;, &quot;empty&quot;, &quot;omit&quot;, &quot;md5user&quot;, &quot;sha1user&quot;,  # إسناد مجموعة إلى KNOWN_PASS_MODES
+<span class="ln" id="L54">54</span>                    &quot;sha256user&quot;, &quot;chap&quot;, &quot;chap_empty&quot;)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L55">55</span> 
+<span class="ln" id="L56">56</span>AR_UNKNOWN_JS = (  # إسناد القيمة الثابتة AR_UNKNOWN_JS
+<span class="ln" id="L57">57</span>    &quot;تحويل كلمة المرور في الصفحة يستخدم JavaScript مخصصاً غير معروف، &quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L58">58</span>    &quot;لذلك لا يمكن تشغيل التخمين الآلي بأمان.&quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L59">59</span>)  # إغلاق القوس المفتوح في السطر السابق
+<span class="ln" id="L60">60</span>AR_NEXT_UNKNOWN = (  # إسناد القيمة الثابتة AR_NEXT_UNKNOWN
+<span class="ln" id="L61">61</span>    &quot;الخطوة التالية: سجّل الدخول يدوياً عند الحاجة عبر المتصفح، وافتح دليل &quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L62">62</span>    &quot;المسجل في docs/GUIDE_AR.md (قسم «المسجل اليدوي») إن أردت تعلّم شكل &quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L63">63</span>    &quot;الطلب. التقرير المنقّح لا يحتوي رقم البطاقة ولا كلمة المرور، ويمكن &quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L64">64</span>    &quot;تصدير أمر curl منقّح من المسجل لمراجعته يدوياً.&quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L65">65</span>)  # إغلاق القوس المفتوح في السطر السابق
+<span class="ln" id="L66">66</span>AR_NEXT_UNKNOWN_EN = (  # إسناد القيمة الثابتة AR_NEXT_UNKNOWN_EN
+<span class="ln" id="L67">67</span>    &quot;Next: log in by hand in a browser when needed, and open docs/GUIDE_EN.md &quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L68">68</span>    &quot;(section «Manual recorder») if you want to learn the request shape. &quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L69">69</span>    &quot;The redacted report contains neither the card nor the password; the &quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L70">70</span>    &quot;recorder can also export a redacted curl command for manual review.&quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L71">71</span>)  # إغلاق القوس المفتوح في السطر السابق
+<span class="ln" id="L72">72</span>AR_HTTP200 = (  # إسناد القيمة الثابتة AR_HTTP200
+<span class="ln" id="L73">73</span>    &quot;HTTP 200 وحده ليس دليلاً على نجاح أو رفض. علّم الصفحة بنفسك &quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L74">74</span>    &quot;(نجاح / رفض / إحصائيات) حتى تتعلّم الأداة النمط.&quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L75">75</span>)  # إغلاق القوس المفتوح في السطر السابق
+<span class="ln" id="L76">76</span> 
+<span class="ln" id="L77">77</span> 
+<span class="ln" id="L78">78</span>def _safe_page_url(url: str) -&gt; str:  # تعريف الدالة _safe_page_url(url) ترجع str
+<span class="ln" id="L79">79</span>    return portals._safe_page_url(url)  # إرجاع portals._safe_page_url(url)
+<span class="ln" id="L80">80</span> 
+<span class="ln" id="L81">81</span> 
+<span class="ln" id="L82">82</span># يمنع كود البوابة من الوصول إلى واجهة الأداة المحلية (SSRF محلي).
+<span class="ln" id="L83">83</span>def is_kirapass_url(url: str, guard: str) -&gt; bool:  # تعريف الدالة is_kirapass_url(url, guard) ترجع bool
+<span class="ln" id="L84">84</span>    &quot;&quot;&quot;True when the portal is trying to talk to this KiraPass process.&quot;&quot;&quot;  # نص توثيقي (docstring) يشرح ما يليه
+<span class="ln" id="L85">85</span>    if not url:  # شرط معكوس: ليس url
+<span class="ln" id="L86">86</span>        return False  # إرجاع False
+<span class="ln" id="L87">87</span>    try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L88">88</span>        target = urlsplit(urljoin(guard or &quot;&quot;, url))  # إسناد نتيجة استدعاء urlsplit (معامل واحد) إلى target
+<span class="ln" id="L89">89</span>        guard_p = urlsplit(guard or &quot;&quot;)  # إسناد نتيجة استدعاء urlsplit (معامل واحد) إلى guard_p
+<span class="ln" id="L90">90</span>    except Exception:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L91">91</span>        return False  # إرجاع False
+<span class="ln" id="L92">92</span>    host = (target.hostname or &quot;&quot;).lower()  # إسناد نتيجة استدعاء target.hostname أو &#x27;&#x27;.lower إلى host
+<span class="ln" id="L93">93</span>    ghost = (guard_p.hostname or &quot;&quot;).lower()  # إسناد نتيجة استدعاء guard_p.hostname أو &#x27;&#x27;.lower إلى ghost
+<span class="ln" id="L94">94</span>    path = target.path or &quot;/&quot;  # دمج منطقي (أو) وإسناده إلى path
+<span class="ln" id="L95">95</span>    local = host in (&quot;127.0.0.1&quot;, &quot;localhost&quot;, &quot;::1&quot;, &quot;0.0.0.0&quot;) or (  # دمج منطقي (أو) وإسناده إلى local
+<span class="ln" id="L96">96</span>        ghost and host == ghost)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L97">97</span>    if not local:  # شرط معكوس: ليس local
+<span class="ln" id="L98">98</span>        return False  # إرجاع False
+<span class="ln" id="L99">99</span>    if guard_p.port and target.port and target.port == guard_p.port:  # شرط مركّب (و)
+<span class="ln" id="L100">100</span>        return True  # إرجاع True
+<span class="ln" id="L101">101</span>    if path.startswith(&quot;/api/&quot;) or path.startswith(&quot;/capture&quot;):  # شرط مركّب (أو)
+<span class="ln" id="L102">102</span>        return True  # إرجاع True
+<span class="ln" id="L103">103</span>    if path in (&quot;/&quot;, &quot;/ui.js&quot;, &quot;/ui.css&quot;, &quot;/index.html&quot;):  # شرط: path ضمن مجموعة
+<span class="ln" id="L104">104</span>        return True  # إرجاع True
+<span class="ln" id="L105">105</span>    return False  # إرجاع False
+<span class="ln" id="L106">106</span> 
+<span class="ln" id="L107">107</span> 
+<span class="ln" id="L108">108</span>def looks_secret_name(name: str) -&gt; bool:  # تعريف الدالة looks_secret_name(name) ترجع bool
+<span class="ln" id="L109">109</span>    return bool(SECRET_NAME_RE.search(name or &quot;&quot;))  # إرجاع bool(SECRET_NAME_RE.search(name أو &#x27;&#x27;))
+<span class="ln" id="L110">110</span> 
+<span class="ln" id="L111">111</span> 
+<span class="ln" id="L112">112</span>def looks_token_name(name: str) -&gt; bool:  # تعريف الدالة looks_token_name(name) ترجع bool
+<span class="ln" id="L113">113</span>    return bool(TOKEN_NAME_RE.search(name or &quot;&quot;))  # إرجاع bool(TOKEN_NAME_RE.search(name أو &#x27;&#x27;))
+<span class="ln" id="L114">114</span> 
+<span class="ln" id="L115">115</span> 
+<span class="ln" id="L116">116</span># قيمة طويلة بشكل hex أو base64 ⇒ تُعتبر رمزاً حياً وتُحذف.
+<span class="ln" id="L117">117</span>def looks_live_token(value: str) -&gt; bool:  # تعريف الدالة looks_live_token(value) ترجع bool
+<span class="ln" id="L118">118</span>    value = value or &quot;&quot;  # دمج منطقي (أو) وإسناده إلى value
+<span class="ln" id="L119">119</span>    if not value or len(value) &lt; 8:  # شرط مركّب (أو)
+<span class="ln" id="L120">120</span>        return False  # إرجاع False
+<span class="ln" id="L121">121</span>    if HEX32_RE.match(value):  # شرط: نتيجة HEX32_RE.match(value)
+<span class="ln" id="L122">122</span>        return True  # إرجاع True
+<span class="ln" id="L123">123</span>    if re.fullmatch(r&quot;[0-9a-fA-F]{8,64}&quot;, value) and len(value) &gt;= 12:  # شرط مركّب (و)
+<span class="ln" id="L124">124</span>        return True  # إرجاع True
+<span class="ln" id="L125">125</span>    if re.fullmatch(r&quot;[A-Za-z0-9._-]{16,}&quot;, value):  # شرط: نتيجة re.fullmatch(&#x27;[A-Za-z0-9._-]{16,}&#x27;, value)
+<span class="ln" id="L126">126</span>        return True  # إرجاع True
+<span class="ln" id="L127">127</span>    return False  # إرجاع False
+<span class="ln" id="L128">128</span> 
+<span class="ln" id="L129">129</span> 
+<span class="ln" id="L130">130</span>def field_shape(value: str) -&gt; dict:  # تعريف الدالة field_shape(value) ترجع dict
+<span class="ln" id="L131">131</span>    value = &quot;&quot; if value is None else str(value)  # إسناد &#x27;&#x27; إن مقارنة وإلا str(value) إلى value
+<span class="ln" id="L132">132</span>    classes = []  # إسناد قائمة إلى classes
+<span class="ln" id="L133">133</span>    if not value:  # شرط معكوس: ليس value
+<span class="ln" id="L134">134</span>        classes.append(&quot;empty&quot;)  # استدعاء classes.append (معامل واحد)
+<span class="ln" id="L135">135</span>    else:  # مفتاح else في القاموس
+<span class="ln" id="L136">136</span>        if re.fullmatch(r&quot;[0-9]+&quot;, value):  # شرط: نتيجة re.fullmatch(&#x27;[0-9]+&#x27;, value)
+<span class="ln" id="L137">137</span>            classes.append(&quot;digits&quot;)  # استدعاء classes.append (معامل واحد)
+<span class="ln" id="L138">138</span>        elif HEX32_RE.match(value):  # شرط: نتيجة HEX32_RE.match(value)
+<span class="ln" id="L139">139</span>            classes.append(&quot;hex32&quot;)  # استدعاء classes.append (معامل واحد)
+<span class="ln" id="L140">140</span>        elif re.fullmatch(r&quot;[0-9a-fA-F]+&quot;, value):  # شرط: نتيجة re.fullmatch(&#x27;[0-9a-fA-F]+&#x27;, value)
+<span class="ln" id="L141">141</span>            classes.append(&quot;hex&quot;)  # استدعاء classes.append (معامل واحد)
+<span class="ln" id="L142">142</span>        elif re.fullmatch(r&quot;[A-Za-z0-9]+&quot;, value):  # شرط: نتيجة re.fullmatch(&#x27;[A-Za-z0-9]+&#x27;, value)
+<span class="ln" id="L143">143</span>            classes.append(&quot;alnum&quot;)  # استدعاء classes.append (معامل واحد)
+<span class="ln" id="L144">144</span>        else:  # مفتاح else في القاموس
+<span class="ln" id="L145">145</span>            classes.append(&quot;other&quot;)  # استدعاء classes.append (معامل واحد)
+<span class="ln" id="L146">146</span>    return {&quot;length&quot;: len(value), &quot;class&quot;: classes[0]}  # إرجاع قاموس
+<span class="ln" id="L147">147</span> 
+<span class="ln" id="L148">148</span> 
+<span class="ln" id="L149">149</span># كل حقل باسم سرّي ⇒ يُحفظ طوله وتصنيفه فقط، ولا قيمته.
+<span class="ln" id="L150">150</span>def redact_fields(fields) -&gt; list:  # تعريف الدالة redact_fields(fields) ترجع list
+<span class="ln" id="L151">151</span>    out = []  # إسناد قائمة إلى out
+<span class="ln" id="L152">152</span>    if not isinstance(fields, dict):  # شرط معكوس: ليس isinstance(fields, dict)
+<span class="ln" id="L153">153</span>        return out  # إرجاع out
+<span class="ln" id="L154">154</span>    for name, value in fields.items():  # دورة على fields.items() باسم مجموعة
+<span class="ln" id="L155">155</span>        value = &quot;&quot; if value is None else str(value)  # إسناد &#x27;&#x27; إن مقارنة وإلا str(value) إلى value
+<span class="ln" id="L156">156</span>        item = {&quot;name&quot;: str(name), **field_shape(value)}  # إسناد قاموس إلى item
+<span class="ln" id="L157">157</span>        item[&quot;secret_name&quot;] = looks_secret_name(str(name))  # إسناد نتيجة استدعاء looks_secret_name (معامل واحد) إلى item[&#x27;secret_name&#x27;]
+<span class="ln" id="L158">158</span>        item[&quot;token_name&quot;] = looks_token_name(str(name))  # إسناد نتيجة استدعاء looks_token_name (معامل واحد) إلى item[&#x27;token_name&#x27;]
+<span class="ln" id="L159">159</span>        out.append(item)  # استدعاء out.append (معامل واحد)
+<span class="ln" id="L160">160</span>    return out  # إرجاع out
+<span class="ln" id="L161">161</span> 
+<span class="ln" id="L162">162</span> 
+<span class="ln" id="L163">163</span>def _md5(text: str) -&gt; str:  # تعريف الدالة _md5(text) ترجع str
+<span class="ln" id="L164">164</span>    return hashlib.md5((text or &quot;&quot;).encode(&quot;utf-8&quot;, &quot;replace&quot;)).hexdigest()  # إرجاع hashlib.md5(text أو &#x27;&#x27;.encode(&#x27;utf-8&#x27;, &#x27;replace&#x27;)).hexdigest()
+<span class="ln" id="L165">165</span> 
+<span class="ln" id="L166">166</span> 
+<span class="ln" id="L167">167</span>def _sha1(text: str) -&gt; str:  # تعريف الدالة _sha1(text) ترجع str
+<span class="ln" id="L168">168</span>    return hashlib.sha1((text or &quot;&quot;).encode(&quot;utf-8&quot;, &quot;replace&quot;)).hexdigest()  # إرجاع hashlib.sha1(text أو &#x27;&#x27;.encode(&#x27;utf-8&#x27;, &#x27;replace&#x27;)).hexdigest()
+<span class="ln" id="L169">169</span> 
+<span class="ln" id="L170">170</span> 
+<span class="ln" id="L171">171</span>def _sha256(text: str) -&gt; str:  # تعريف الدالة _sha256(text) ترجع str
+<span class="ln" id="L172">172</span>    return hashlib.sha256((text or &quot;&quot;).encode(&quot;utf-8&quot;, &quot;replace&quot;)).hexdigest()  # إرجاع hashlib.sha256(text أو &#x27;&#x27;.encode(&#x27;utf-8&#x27;, &#x27;replace&#x27;)).hexdigest()
+<span class="ln" id="L173">173</span> 
+<span class="ln" id="L174">174</span> 
+<span class="ln" id="L175">175</span># يستنتج وضع كلمة المرور من كود البوابة. تحويل JS مجهول ⇒
+<span class="ln" id="L176">176</span># needs_browser_js = True والأداة ترفض الأتمتة بدل أن تدّعي ما لا تعرفه.
+<span class="ln" id="L177">177</span>def infer_pass_mode(user_before, pass_before, user_after, pass_after,  # تعريف الدالة infer_pass_mode(user_before, pass_before, user_after, pass_after, html, sent_keys) ترجع dict
+<span class="ln" id="L178">178</span>                    html: str, sent_keys) -&gt; dict:  # مفتاح html في القاموس
+<span class="ln" id="L179">179</span>    # بداية نص متعدد الأسطر — الأسطر التالية نصّ حرفي لا كود، فلا يقبل تعليقاً
+<span class="ln" id="L180">180</span>    &quot;&quot;&quot;Learn only the patterns KiraPass can replay without a browser.
+<span class="ln" id="L181">181</span> 
+<span class="ln" id="L182">182</span>    Anything else sets needs_browser_js and must not be claimed automatable.
+<span class="ln" id="L183">183</span>    sha1(user) and sha256(user) are learned the same way as md5user when the
+<span class="ln" id="L184">184</span>    captured password hex matches those digests — no arbitrary JS is executed.
+<span class="ln" id="L185">185</span>    &quot;&quot;&quot;  # نهاية النص متعدد الأسطر
+<span class="ln" id="L186">186</span>    sent = {str(k) for k in (sent_keys or [])}  # بناء اشتقاق مجموعة وإسناده إلى sent
+<span class="ln" id="L187">187</span>    user_b = &quot;&quot; if user_before is None else str(user_before)  # إسناد &#x27;&#x27; إن مقارنة وإلا str(user_before) إلى user_b
+<span class="ln" id="L188">188</span>    user_a = &quot;&quot; if user_after is None else str(user_after)  # إسناد &#x27;&#x27; إن مقارنة وإلا str(user_after) إلى user_a
+<span class="ln" id="L189">189</span>    pass_b = None if pass_before is None else str(pass_before)  # إسناد None إن مقارنة وإلا str(pass_before) إلى pass_b
+<span class="ln" id="L190">190</span>    pass_a = None if pass_after is None else str(pass_after)  # إسناد None إن مقارنة وإلا str(pass_after) إلى pass_a
+<span class="ln" id="L191">191</span>    user = user_a or user_b  # دمج منطقي (أو) وإسناده إلى user
+<span class="ln" id="L192">192</span> 
+<span class="ln" id="L193">193</span>    pass_field_sent = any(looks_secret_name(k) and &quot;user&quot; not in k.lower()  # إسناد نتيجة استدعاء any (معامل واحد) إلى pass_field_sent
+<span class="ln" id="L194">194</span>                          and &quot;card&quot; not in k.lower()  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L195">195</span>                          and &quot;login&quot; not in k.lower()  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L196">196</span>                          and &quot;account&quot; not in k.lower()  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L197">197</span>                          for k in sent)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L198">198</span>    if sent and not pass_field_sent and pass_a in (None, &quot;&quot;):  # شرط مركّب (و)
+<span class="ln" id="L199">199</span>        return {&quot;pass_mode&quot;: &quot;omit&quot;, &quot;needs_browser_js&quot;: False,  # إرجاع قاموس
+<span class="ln" id="L200">200</span>                &quot;reason&quot;: &quot;omit&quot;, &quot;reason_ar&quot;: &quot;حقل كلمة المرور لم يُرسل.&quot;}  # مفتاح reason في القاموس
+<span class="ln" id="L201">201</span> 
+<span class="ln" id="L202">202</span>    chap = None  # إسناد القيمة الثابتة chap
+<span class="ln" id="L203">203</span>    form = portals.parse_form(html or &quot;&quot;, &quot;http://capture.invalid/&quot;)  # إسناد نتيجة استدعاء portals.parse_form (2 معاملات) إلى form
+<span class="ln" id="L204">204</span>    if form and form.chap:  # شرط مركّب (و)
+<span class="ln" id="L205">205</span>        chap = form.chap  # إسناد form.chap إلى chap
+<span class="ln" id="L206">206</span> 
+<span class="ln" id="L207">207</span>    if chap and pass_a and HEX32_RE.match(pass_a):  # شرط مركّب (و)
+<span class="ln" id="L208">208</span>        cid, chal = chap.get(&quot;id&quot;) or &quot;&quot;, chap.get(&quot;challenge&quot;) or &quot;&quot;  # إسناد مجموعة إلى مجموعة
+<span class="ln" id="L209">209</span>        if cid or chal:  # شرط مركّب (أو)
+<span class="ln" id="L210">210</span>            raw_candidates = []  # إسناد قائمة إلى raw_candidates
+<span class="ln" id="L211">211</span>            if pass_b is not None:  # شرط: pass_b ليس نفسه None
+<span class="ln" id="L212">212</span>                raw_candidates.append((&quot;typed&quot;, pass_b))  # استدعاء raw_candidates.append (معامل واحد)
+<span class="ln" id="L213">213</span>            raw_candidates.append((&quot;user&quot;, user))  # استدعاء raw_candidates.append (معامل واحد)
+<span class="ln" id="L214">214</span>            raw_candidates.append((&quot;empty&quot;, &quot;&quot;))  # استدعاء raw_candidates.append (معامل واحد)
+<span class="ln" id="L215">215</span>            for label, raw in raw_candidates:  # دورة على raw_candidates باسم مجموعة
+<span class="ln" id="L216">216</span>                if pass_a.lower() == _md5(f&quot;{cid}{raw}{chal}&quot;):  # شرط: pass_a.lower() يساوي _md5(نص منسّق (f-string))
+<span class="ln" id="L217">217</span>                    if label == &quot;empty&quot; or raw == &quot;&quot;:  # شرط مركّب (أو)
+<span class="ln" id="L218">218</span>                        mode = &quot;chap_empty&quot;  # إسناد القيمة الثابتة mode
+<span class="ln" id="L219">219</span>                    else:  # مفتاح else في القاموس
+<span class="ln" id="L220">220</span>                        mode = &quot;chap&quot;  # إسناد القيمة الثابتة mode
+<span class="ln" id="L221">221</span>                    return {&quot;pass_mode&quot;: mode, &quot;needs_browser_js&quot;: False,  # إرجاع قاموس
+<span class="ln" id="L222">222</span>                            &quot;reason&quot;: &quot;mikrotik_chap&quot;,  # مفتاح reason في القاموس
+<span class="ln" id="L223">223</span>                            &quot;reason_ar&quot;: &quot;MikroTik CHAP (hexMD5) معروف وقابل للأتمتة.&quot;}  # مفتاح reason_ar في القاموس
+<span class="ln" id="L224">224</span> 
+<span class="ln" id="L225">225</span>    if pass_a is not None and user and pass_a.lower() == _md5(user):  # شرط مركّب (و)
+<span class="ln" id="L226">226</span>        return {&quot;pass_mode&quot;: &quot;md5user&quot;, &quot;needs_browser_js&quot;: False,  # إرجاع قاموس
+<span class="ln" id="L227">227</span>                &quot;reason&quot;: &quot;md5user&quot;,  # مفتاح reason في القاموس
+<span class="ln" id="L228">228</span>                &quot;reason_ar&quot;: &quot;كلمة المرور = MD5 للبطاقة.&quot;}  # مفتاح reason_ar في القاموس
+<span class="ln" id="L229">229</span> 
+<span class="ln" id="L230">230</span>    # شرط مركّب (و)
+<span class="ln" id="L231">231</span>    if pass_a is not None and user and HEX40_RE.match(pass_a) and \
+<span class="ln" id="L232">232</span>            pass_a.lower() == _sha1(user):  # تكملة تعريف متعدد الأسطر
+<span class="ln" id="L233">233</span>        return {&quot;pass_mode&quot;: &quot;sha1user&quot;, &quot;needs_browser_js&quot;: False,  # إرجاع قاموس
+<span class="ln" id="L234">234</span>                &quot;reason&quot;: &quot;sha1user&quot;,  # مفتاح reason في القاموس
+<span class="ln" id="L235">235</span>                &quot;reason_ar&quot;: &quot;كلمة المرور = SHA1 للبطاقة.&quot;}  # مفتاح reason_ar في القاموس
+<span class="ln" id="L236">236</span> 
+<span class="ln" id="L237">237</span>    # شرط مركّب (و)
+<span class="ln" id="L238">238</span>    if pass_a is not None and user and HEX64_RE.match(pass_a) and \
+<span class="ln" id="L239">239</span>            pass_a.lower() == _sha256(user):  # تكملة تعريف متعدد الأسطر
+<span class="ln" id="L240">240</span>        return {&quot;pass_mode&quot;: &quot;sha256user&quot;, &quot;needs_browser_js&quot;: False,  # إرجاع قاموس
+<span class="ln" id="L241">241</span>                &quot;reason&quot;: &quot;sha256user&quot;,  # مفتاح reason في القاموس
+<span class="ln" id="L242">242</span>                &quot;reason_ar&quot;: &quot;كلمة المرور = SHA256 للبطاقة.&quot;}  # مفتاح reason_ar في القاموس
+<span class="ln" id="L243">243</span> 
+<span class="ln" id="L244">244</span>    if pass_a == &quot;&quot;:  # شرط: pass_a يساوي &#x27;&#x27;
+<span class="ln" id="L245">245</span>        return {&quot;pass_mode&quot;: &quot;empty&quot;, &quot;needs_browser_js&quot;: False,  # إرجاع قاموس
+<span class="ln" id="L246">246</span>                &quot;reason&quot;: &quot;empty&quot;, &quot;reason_ar&quot;: &quot;كلمة المرور أُرسلت فارغة.&quot;}  # مفتاح reason في القاموس
+<span class="ln" id="L247">247</span> 
+<span class="ln" id="L248">248</span>    if pass_a is not None and user and pass_a == user:  # شرط مركّب (و)
+<span class="ln" id="L249">249</span>        return {&quot;pass_mode&quot;: &quot;same&quot;, &quot;needs_browser_js&quot;: False,  # إرجاع قاموس
+<span class="ln" id="L250">250</span>                &quot;reason&quot;: &quot;same&quot;, &quot;reason_ar&quot;: &quot;كلمة المرور نفس البطاقة.&quot;}  # مفتاح reason في القاموس
+<span class="ln" id="L251">251</span> 
+<span class="ln" id="L252">252</span>    transformed = (pass_b is not None and pass_a is not None  # دمج منطقي (و) وإسناده إلى transformed
+<span class="ln" id="L253">253</span>                   and pass_a != pass_b)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L254">254</span>    custom_constant = (pass_a not in (None, &quot;&quot;, user)  # دمج منطقي (و) وإسناده إلى custom_constant
+<span class="ln" id="L255">255</span>                       and not transformed)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L256">256</span>    if transformed or custom_constant:  # شرط مركّب (أو)
+<span class="ln" id="L257">257</span>        return {  # إرجاع قاموس
+<span class="ln" id="L258">258</span>            &quot;pass_mode&quot;: &quot;&quot;,  # مفتاح pass_mode في القاموس
+<span class="ln" id="L259">259</span>            &quot;needs_browser_js&quot;: True,  # مفتاح needs_browser_js في القاموس
+<span class="ln" id="L260">260</span>            &quot;reason&quot;: &quot;unknown_js_transform&quot;,  # مفتاح reason في القاموس
+<span class="ln" id="L261">261</span>            &quot;reason_ar&quot;: AR_UNKNOWN_JS,  # مفتاح reason_ar في القاموس
+<span class="ln" id="L262">262</span>            &quot;next_ar&quot;: AR_NEXT_UNKNOWN,  # مفتاح next_ar في القاموس
+<span class="ln" id="L263">263</span>            &quot;next_en&quot;: AR_NEXT_UNKNOWN_EN,  # مفتاح next_en في القاموس
+<span class="ln" id="L264">264</span>        }  # إغلاق القوس المفتوح في السطر السابق
+<span class="ln" id="L265">265</span>    if pass_a is None and not sent:  # شرط مركّب (و)
+<span class="ln" id="L266">266</span>        return {&quot;pass_mode&quot;: &quot;empty&quot;, &quot;needs_browser_js&quot;: False,  # إرجاع قاموس
+<span class="ln" id="L267">267</span>                &quot;reason&quot;: &quot;empty&quot;, &quot;reason_ar&quot;: &quot;لا توجد كلمة مرور مرصودة.&quot;}  # مفتاح reason في القاموس
+<span class="ln" id="L268">268</span>    return {&quot;pass_mode&quot;: &quot;empty&quot;, &quot;needs_browser_js&quot;: False,  # إرجاع قاموس
+<span class="ln" id="L269">269</span>            &quot;reason&quot;: &quot;empty&quot;, &quot;reason_ar&quot;: &quot;لا يوجد تحويل؛ القيمة فارغة أو غير مرسلة.&quot;}  # مفتاح reason في القاموس
+<span class="ln" id="L270">270</span> 
+<span class="ln" id="L271">271</span> 
+<span class="ln" id="L272">272</span>def verdict_from_status(status: int, marked: str = &quot;&quot;) -&gt; str:  # تعريف الدالة verdict_from_status(status, marked) ترجع str
+<span class="ln" id="L273">273</span>    &quot;&quot;&quot;HTTP 200 is not success or rejection without a mark or other evidence.&quot;&quot;&quot;  # نص توثيقي (docstring) يشرح ما يليه
+<span class="ln" id="L274">274</span>    if marked in (&quot;success&quot;, &quot;reject&quot;, &quot;status&quot;, &quot;statistics&quot;):  # شرط: marked ضمن مجموعة
+<span class="ln" id="L275">275</span>        return marked if marked != &quot;statistics&quot; else &quot;status&quot;  # إرجاع marked إن مقارنة وإلا &#x27;status&#x27;
+<span class="ln" id="L276">276</span>    if status in (301, 302, 303, 307, 308):  # شرط: status ضمن مجموعة
+<span class="ln" id="L277">277</span>        return &quot;redirect&quot;  # إرجاع &#x27;redirect&#x27;
+<span class="ln" id="L278">278</span>    if status in (401, 403):  # شرط: status ضمن مجموعة
+<span class="ln" id="L279">279</span>        return &quot;forbidden&quot;  # إرجاع &#x27;forbidden&#x27;
+<span class="ln" id="L280">280</span>    if status == 429:  # شرط: status يساوي 429
+<span class="ln" id="L281">281</span>        return &quot;rate&quot;  # إرجاع &#x27;rate&#x27;
+<span class="ln" id="L282">282</span>    if status == 200:  # شرط: status يساوي 200
+<span class="ln" id="L283">283</span>        return &quot;unknown_http_200&quot;  # إرجاع &#x27;unknown_http_200&#x27;
+<span class="ln" id="L284">284</span>    return &quot;unknown&quot;  # إرجاع &#x27;unknown&#x27;
+<span class="ln" id="L285">285</span> 
+<span class="ln" id="L286">286</span> 
+<span class="ln" id="L287">287</span>def safe_url(url: str) -&gt; dict:  # تعريف الدالة safe_url(url) ترجع dict
+<span class="ln" id="L288">288</span>    parts = urlsplit(url or &quot;&quot;)  # إسناد نتيجة استدعاء urlsplit (معامل واحد) إلى parts
+<span class="ln" id="L289">289</span>    keys = [k for k, _ in parse_qsl(parts.query, keep_blank_values=True)]  # بناء اشتقاق قائمة وإسناده إلى keys
+<span class="ln" id="L290">290</span>    keys = [k for k in keys if not looks_secret_name(k)]  # بناء اشتقاق قائمة وإسناده إلى keys
+<span class="ln" id="L291">291</span>    return {  # إرجاع قاموس
+<span class="ln" id="L292">292</span>        &quot;scheme&quot;: parts.scheme,  # مفتاح scheme في القاموس
+<span class="ln" id="L293">293</span>        &quot;host&quot;: parts.hostname or &quot;&quot;,  # مفتاح host في القاموس
+<span class="ln" id="L294">294</span>        &quot;path&quot;: parts.path or &quot;/&quot;,  # مفتاح path في القاموس
+<span class="ln" id="L295">295</span>        &quot;query_keys&quot;: keys,  # مفتاح query_keys في القاموس
+<span class="ln" id="L296">296</span>    }  # إغلاق القوس المفتوح في السطر السابق
+<span class="ln" id="L297">297</span> 
+<span class="ln" id="L298">298</span> 
+<span class="ln" id="L299">299</span>def success_url_hint(url: str) -&gt; str:  # تعريف الدالة success_url_hint(url) ترجع str
+<span class="ln" id="L300">300</span>    parts = urlsplit(url or &quot;&quot;)  # إسناد نتيجة استدعاء urlsplit (معامل واحد) إلى parts
+<span class="ln" id="L301">301</span>    path = parts.path or &quot;/&quot;  # دمج منطقي (أو) وإسناده إلى path
+<span class="ln" id="L302">302</span>    if any(w in path.lower() for w in (&quot;login&quot;, &quot;logon&quot;, &quot;auth&quot;)):  # شرط: نتيجة any(مولّد)
+<span class="ln" id="L303">303</span>        return &quot;&quot;  # إرجاع &#x27;&#x27;
+<span class="ln" id="L304">304</span>    return path  # إرجاع path
+<span class="ln" id="L305">305</span> 
+<span class="ln" id="L306">306</span> 
+<span class="ln" id="L307">307</span>class _VisibleBodyText(HTMLParser):  # تعريف الصنف _VisibleBodyText يرث من HTMLParser
+<span class="ln" id="L308">308</span>    &quot;&quot;&quot;Collect text nodes in body; ignore head metadata and executable/style text.&quot;&quot;&quot;  # نص توثيقي (docstring) يشرح ما يليه
+<span class="ln" id="L309">309</span> 
+<span class="ln" id="L310">310</span>    _IGNORED = {&quot;head&quot;, &quot;script&quot;, &quot;style&quot;}  # إسناد مجموعة فريدة إلى _IGNORED
+<span class="ln" id="L311">311</span> 
+<span class="ln" id="L312">312</span>    def __init__(self):  # تعريف الدالة __init__(self)
+<span class="ln" id="L313">313</span>        super().__init__(convert_charrefs=True)  # استدعاء super().__init__ (convert_charrefs=…)
+<span class="ln" id="L314">314</span>        self.in_body = False  # إسناد القيمة الثابتة self.in_body
+<span class="ln" id="L315">315</span>        self.ignored = []  # إسناد قائمة إلى self.ignored
+<span class="ln" id="L316">316</span>        self.parts = []  # إسناد قائمة إلى self.parts
+<span class="ln" id="L317">317</span> 
+<span class="ln" id="L318">318</span>    def handle_starttag(self, tag, attrs):  # تعريف الدالة handle_starttag(self, tag, attrs)
+<span class="ln" id="L319">319</span>        tag = tag.lower()  # إسناد نتيجة استدعاء tag.lower إلى tag
+<span class="ln" id="L320">320</span>        if tag == &quot;body&quot;:  # شرط: tag يساوي &#x27;body&#x27;
+<span class="ln" id="L321">321</span>            self.in_body = True  # إسناد القيمة الثابتة self.in_body
+<span class="ln" id="L322">322</span>        if self.in_body and tag in self._IGNORED:  # شرط مركّب (و)
+<span class="ln" id="L323">323</span>            self.ignored.append(tag)  # استدعاء self.ignored.append (معامل واحد)
+<span class="ln" id="L324">324</span> 
+<span class="ln" id="L325">325</span>    def handle_endtag(self, tag):  # تعريف الدالة handle_endtag(self, tag)
+<span class="ln" id="L326">326</span>        tag = tag.lower()  # إسناد نتيجة استدعاء tag.lower إلى tag
+<span class="ln" id="L327">327</span>        if self.ignored and tag == self.ignored[-1]:  # شرط مركّب (و)
+<span class="ln" id="L328">328</span>            self.ignored.pop()  # استدعاء self.ignored.pop
+<span class="ln" id="L329">329</span>        if tag == &quot;body&quot;:  # شرط: tag يساوي &#x27;body&#x27;
+<span class="ln" id="L330">330</span>            self.in_body = False  # إسناد القيمة الثابتة self.in_body
+<span class="ln" id="L331">331</span> 
+<span class="ln" id="L332">332</span>    def handle_data(self, data):  # تعريف الدالة handle_data(self, data)
+<span class="ln" id="L333">333</span>        if self.in_body and not self.ignored:  # شرط مركّب (و)
+<span class="ln" id="L334">334</span>            self.parts.append(data)  # استدعاء self.parts.append (معامل واحد)
+<span class="ln" id="L335">335</span> 
+<span class="ln" id="L336">336</span> 
+<span class="ln" id="L337">337</span>def _visible_body_text(document: str) -&gt; str:  # تعريف الدالة _visible_body_text(document) ترجع str
+<span class="ln" id="L338">338</span>    &quot;&quot;&quot;Return body text only, never tags/attributes/head/script/style contents.&quot;&quot;&quot;  # نص توثيقي (docstring) يشرح ما يليه
+<span class="ln" id="L339">339</span>    parser = _VisibleBodyText()  # إسناد نتيجة استدعاء _VisibleBodyText إلى parser
+<span class="ln" id="L340">340</span>    try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L341">341</span>        parser.feed(document or &quot;&quot;)  # استدعاء parser.feed (معامل واحد)
+<span class="ln" id="L342">342</span>        parser.close()  # استدعاء parser.close
+<span class="ln" id="L343">343</span>    except Exception:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L344">344</span>        # HTMLParser متسامح عمداً، لكن ترميز بوابة مشوّه
+<span class="ln" id="L345">345</span>        # يجب أن يفشل مغلقاً بدل أن يتعلّم من مصدر HTML الخام.
+<span class="ln" id="L346">346</span>        return &quot;&quot;  # إرجاع &#x27;&#x27;
+<span class="ln" id="L347">347</span>    return &quot; &quot;.join(parser.parts)  # إرجاع &#x27; &#x27;.join(parser.parts)
+<span class="ln" id="L348">348</span> 
+<span class="ln" id="L349">349</span> 
+<span class="ln" id="L350">350</span>def _is_login_form(form) -&gt; bool:  # تعريف الدالة _is_login_form(form) ترجع bool
+<span class="ln" id="L351">351</span>    &quot;&quot;&quot;Require real username and password inputs, not a status-page action form.&quot;&quot;&quot;  # نص توثيقي (docstring) يشرح ما يليه
+<span class="ln" id="L352">352</span>    if not form:  # شرط معكوس: ليس form
+<span class="ln" id="L353">353</span>        return False  # إرجاع False
+<span class="ln" id="L354">354</span>    inputs = {str(name).lower(): str(kind).lower()  # بناء قاموس بالاشتقاق وإسناده إلى inputs
+<span class="ln" id="L355">355</span>              for name, kind in (form.inputs or [])}  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L356">356</span>    user_name = (form.user_field or &quot;&quot;).lower()  # إسناد نتيجة استدعاء form.user_field أو &#x27;&#x27;.lower إلى user_name
+<span class="ln" id="L357">357</span>    pass_name = (form.pass_field or &quot;&quot;).lower()  # إسناد نتيجة استدعاء form.pass_field أو &#x27;&#x27;.lower إلى pass_name
+<span class="ln" id="L358">358</span>    user_kind = inputs.get(user_name, &quot;&quot;)  # إسناد نتيجة استدعاء inputs.get (2 معاملات) إلى user_kind
+<span class="ln" id="L359">359</span>    pass_kind = inputs.get(pass_name, &quot;&quot;)  # إسناد نتيجة استدعاء inputs.get (2 معاملات) إلى pass_kind
+<span class="ln" id="L360">360</span>    has_user = bool(user_kind and user_kind not in  # إسناد نتيجة استدعاء bool (معامل واحد) إلى has_user
+<span class="ln" id="L361">361</span>                    (&quot;hidden&quot;, &quot;submit&quot;, &quot;button&quot;, &quot;reset&quot;, &quot;checkbox&quot;, &quot;radio&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L362">362</span>                     &quot;image&quot;, &quot;file&quot;))  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L363">363</span>    has_password = bool(pass_kind == &quot;password&quot; or  # إسناد نتيجة استدعاء bool (معامل واحد) إلى has_password
+<span class="ln" id="L364">364</span>                        any(part in pass_name for part in (&quot;pass&quot;, &quot;pwd&quot;, &quot;pin&quot;)))  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L365">365</span>    return has_user and has_password  # إرجاع has_user و has_password
+<span class="ln" id="L366">366</span> 
+<span class="ln" id="L367">367</span> 
+<span class="ln" id="L368">368</span># كلمات النجاح من نص body المرئي فقط (لا script ولا style ولا meta)،
+<span class="ln" id="L369">369</span># وتُحذف منها القيم التي أدخلها المستخدم حتى لا تُتعلَّم بطاقته ككلمة نجاح.
+<span class="ln" id="L370">370</span>def learn_words(text: str, strip_values=()) -&gt; list:  # تعريف الدالة learn_words(text, strip_values) ترجع list
+<span class="ln" id="L371">371</span>    # المصدر مستند HTML. وتحديداً، لا تتعلّم كلمات من
+<span class="ln" id="L372">372</span>    # خصائص meta مثل lang أو windows أو theme أو color أو apple أو touch أو icon
+<span class="ln" id="L373">373</span>    # أو sizes؛ فهي ليست نصاً يراه مستخدم البوابة.
+<span class="ln" id="L374">374</span>    blob = _visible_body_text(text or &quot;&quot;)  # إسناد نتيجة استدعاء _visible_body_text (معامل واحد) إلى blob
+<span class="ln" id="L375">375</span>    for value in strip_values:  # دورة على strip_values باسم value
+<span class="ln" id="L376">376</span>        if value and len(str(value)) &gt;= 4:  # شرط مركّب (و)
+<span class="ln" id="L377">377</span>            blob = blob.replace(str(value), &quot; &quot;)  # إسناد نتيجة استدعاء blob.replace (2 معاملات) إلى blob
+<span class="ln" id="L378">378</span>    words, seen = [], set()  # إسناد مجموعة إلى مجموعة
+<span class="ln" id="L379">379</span>    for word in WORD_RE.findall(blob):  # دورة على WORD_RE.findall(blob) باسم word
+<span class="ln" id="L380">380</span>        low = word.lower()  # إسناد نتيجة استدعاء word.lower إلى low
+<span class="ln" id="L381">381</span>        if low in SKIP_WORDS or low in seen:  # شرط مركّب (أو)
+<span class="ln" id="L382">382</span>            continue  # الانتقال إلى الدورة التالية
+<span class="ln" id="L383">383</span>        seen.add(low)  # استدعاء seen.add (معامل واحد)
+<span class="ln" id="L384">384</span>        words.append(word)  # استدعاء words.append (معامل واحد)
+<span class="ln" id="L385">385</span>        if len(words) &gt;= 8:  # شرط: len(words) أكبر أو يساوي 8
+<span class="ln" id="L386">386</span>            break  # قطع الحلقة فوراً
+<span class="ln" id="L387">387</span>    return words  # إرجاع words
+<span class="ln" id="L388">388</span> 
+<span class="ln" id="L389">389</span> 
+<span class="ln" id="L390">390</span>def cookie_names_from_session(session: Session) -&gt; list:  # تعريف الدالة cookie_names_from_session(session) ترجع list
+<span class="ln" id="L391">391</span>    names = getattr(session.cookies, &quot;names&quot;, None)  # إسناد نتيجة استدعاء getattr (3 معاملات) إلى names
+<span class="ln" id="L392">392</span>    if callable(names):  # شرط: نتيجة callable(names)
+<span class="ln" id="L393">393</span>        return list(names())  # إرجاع list(names())
+<span class="ln" id="L394">394</span>    jar = getattr(session.cookies, &quot;_jar&quot;, {}) or {}  # دمج منطقي (أو) وإسناده إلى jar
+<span class="ln" id="L395">395</span>    return sorted(jar.keys())  # إرجاع sorted(jar.keys())
+<span class="ln" id="L396">396</span> 
+<span class="ln" id="L397">397</span> 
+<span class="ln" id="L398">398</span>def custom_header_names(headers) -&gt; list:  # تعريف الدالة custom_header_names(headers) ترجع list
+<span class="ln" id="L399">399</span>    out = []  # إسناد قائمة إلى out
+<span class="ln" id="L400">400</span>    for key in (headers or {}):  # دورة على headers أو قاموس باسم key
+<span class="ln" id="L401">401</span>        low = str(key).lower()  # إسناد نتيجة استدعاء str(key).lower إلى low
+<span class="ln" id="L402">402</span>        if low in STANDARD_HEADERS or looks_secret_name(low):  # شرط مركّب (أو)
+<span class="ln" id="L403">403</span>            continue  # الانتقال إلى الدورة التالية
+<span class="ln" id="L404">404</span>        out.append(str(key))  # استدعاء out.append (معامل واحد)
+<span class="ln" id="L405">405</span>    return out  # إرجاع out
+<span class="ln" id="L406">406</span> 
+<span class="ln" id="L407">407</span> 
+<span class="ln" id="L408">408</span>def extra_fields_for_profile(fields: dict) -&gt; dict:  # تعريف الدالة extra_fields_for_profile(fields) ترجع dict
+<span class="ln" id="L409">409</span>    extras = {}  # إسناد قاموس إلى extras
+<span class="ln" id="L410">410</span>    for name, value in (fields or {}).items():  # دورة على fields أو قاموس.items() باسم مجموعة
+<span class="ln" id="L411">411</span>        low = (name or &quot;&quot;).lower()  # إسناد نتيجة استدعاء name أو &#x27;&#x27;.lower إلى low
+<span class="ln" id="L412">412</span>        if low in portals.CORE_FIELDS or looks_secret_name(name):  # شرط مركّب (أو)
+<span class="ln" id="L413">413</span>            continue  # الانتقال إلى الدورة التالية
+<span class="ln" id="L414">414</span>        if looks_token_name(name) or looks_live_token(str(value or &quot;&quot;)):  # شرط مركّب (أو)
+<span class="ln" id="L415">415</span>            continue  # الانتقال إلى الدورة التالية
+<span class="ln" id="L416">416</span>        extras[name] = str(value or &quot;&quot;)  # إسناد نتيجة استدعاء str (معامل واحد) إلى extras[name]
+<span class="ln" id="L417">417</span>    return extras  # إرجاع extras
+<span class="ln" id="L418">418</span> 
+<span class="ln" id="L419">419</span> 
+<span class="ln" id="L420">420</span>def _strip_hop(resp) -&gt; dict:  # تعريف الدالة _strip_hop(resp) ترجع dict
+<span class="ln" id="L421">421</span>    set_cookie = resp.header(&quot;set-cookie&quot;)  # إسناد نتيجة استدعاء resp.header (معامل واحد) إلى set_cookie
+<span class="ln" id="L422">422</span>    cookie_names = []  # إسناد قائمة إلى cookie_names
+<span class="ln" id="L423">423</span>    if set_cookie:  # شرط: set_cookie
+<span class="ln" id="L424">424</span>        for part in set_cookie.split(&quot;,&quot;):  # دورة على set_cookie.split(&#x27;,&#x27;) باسم part
+<span class="ln" id="L425">425</span>            piece = part.split(&quot;;&quot;, 1)[0]  # إسناد part.split(&#x27;;&#x27;, 1)[0] إلى piece
+<span class="ln" id="L426">426</span>            if &quot;=&quot; in piece:  # شرط: &#x27;=&#x27; ضمن piece
+<span class="ln" id="L427">427</span>                cookie_names.append(piece.split(&quot;=&quot;, 1)[0].strip())  # استدعاء cookie_names.append (معامل واحد)
+<span class="ln" id="L428">428</span>    return {  # إرجاع قاموس
+<span class="ln" id="L429">429</span>        &quot;status&quot;: resp.status,  # مفتاح status في القاموس
+<span class="ln" id="L430">430</span>        &quot;url&quot;: safe_url(resp.url),  # مفتاح url في القاموس
+<span class="ln" id="L431">431</span>        &quot;location&quot;: safe_url(resp.location) if resp.location else None,  # مفتاح location في القاموس
+<span class="ln" id="L432">432</span>        &quot;length&quot;: resp.length,  # مفتاح length في القاموس
+<span class="ln" id="L433">433</span>        &quot;content_type&quot;: (resp.header(&quot;content-type&quot;) or &quot;&quot;).split(&quot;;&quot;)[0],  # مفتاح content_type في القاموس
+<span class="ln" id="L434">434</span>        &quot;ms&quot;: round(getattr(resp, &quot;elapsed_ms&quot;, 0) or 0),  # مفتاح ms في القاموس
+<span class="ln" id="L435">435</span>        &quot;cookie_names&quot;: [n for n in cookie_names if n],  # مفتاح cookie_names في القاموس
+<span class="ln" id="L436">436</span>        &quot;custom_request_headers&quot;: custom_header_names(  # مفتاح custom_request_headers في القاموس
+<span class="ln" id="L437">437</span>            getattr(resp, &quot;request_headers&quot;, None)),  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L438">438</span>    }  # إغلاق القوس المفتوح في السطر السابق
+<span class="ln" id="L439">439</span> 
+<span class="ln" id="L440">440</span> 
+<span class="ln" id="L441">441</span># ---------------------------------------------------------------------------
+<span class="ln" id="L442">442</span># إعادة كتابة HTML + المعترض (يعمل داخل iframe بأصل معتم)
+<span class="ln" id="L443">443</span># ---------------------------------------------------------------------------
+<span class="ln" id="L444">444</span># بداية نص متعدد الأسطر — الأسطر التالية نصّ حرفي لا كود، فلا يقبل تعليقاً
+<span class="ln" id="L445">445</span>INTERCEPTOR = r&quot;&quot;&quot;
+<span class="ln" id="L446">446</span>(function () {
+<span class="ln" id="L447">447</span>  var CFG = window.__KP__ || {};
+<span class="ln" id="L448">448</span>  var parentWin = window.parent;
+<span class="ln" id="L449">449</span>  function serialize(form) {
+<span class="ln" id="L450">450</span>    var out = {}, i, el, name;
+<span class="ln" id="L451">451</span>    if (!form || !form.elements) return out;
+<span class="ln" id="L452">452</span>    for (i = 0; i &lt; form.elements.length; i++) {
+<span class="ln" id="L453">453</span>      el = form.elements[i];
+<span class="ln" id="L454">454</span>      name = el.name;
+<span class="ln" id="L455">455</span>      if (!name || el.disabled) continue;
+<span class="ln" id="L456">456</span>      if ((el.type === &quot;radio&quot; || el.type === &quot;checkbox&quot;) &amp;&amp; !el.checked) continue;
+<span class="ln" id="L457">457</span>      if (el.type === &quot;submit&quot; || el.type === &quot;button&quot; || el.type === &quot;reset&quot; || el.type === &quot;file&quot;) continue;
+<span class="ln" id="L458">458</span>      out[name] = el.value == null ? &quot;&quot; : String(el.value);
+<span class="ln" id="L459">459</span>    }
+<span class="ln" id="L460">460</span>    return out;
+<span class="ln" id="L461">461</span>  }
+<span class="ln" id="L462">462</span>  function forbidden(url) {
+<span class="ln" id="L463">463</span>    try {
+<span class="ln" id="L464">464</span>      var u = new URL(url, (document.querySelector(&quot;base&quot;) &amp;&amp; document.querySelector(&quot;base&quot;).href) || document.baseURI);
+<span class="ln" id="L465">465</span>      if (CFG.guard) {
+<span class="ln" id="L466">466</span>        var g = new URL(CFG.guard);
+<span class="ln" id="L467">467</span>        if (u.origin === g.origin) return true;
+<span class="ln" id="L468">468</span>      }
+<span class="ln" id="L469">469</span>      var host = (u.hostname || &quot;&quot;).toLowerCase();
+<span class="ln" id="L470">470</span>      if ((host === &quot;127.0.0.1&quot; || host === &quot;localhost&quot; || host === &quot;::1&quot;) &amp;&amp;
+<span class="ln" id="L471">471</span>          (u.pathname.indexOf(&quot;/api/&quot;) === 0 || u.pathname.indexOf(&quot;/capture&quot;) === 0))
+<span class="ln" id="L472">472</span>        return true;
+<span class="ln" id="L473">473</span>    } catch (e) {}
+<span class="ln" id="L474">474</span>    return false;
+<span class="ln" id="L475">475</span>  }
+<span class="ln" id="L476">476</span>  function post(msg) {
+<span class="ln" id="L477">477</span>    try { parentWin.postMessage(msg, &quot;*&quot;); } catch (e) {}
+<span class="ln" id="L478">478</span>  }
+<span class="ln" id="L479">479</span>  var pending = {};
+<span class="ln" id="L480">480</span>  var reqSeq = 0;
+<span class="ln" id="L481">481</span>  window.addEventListener(&quot;message&quot;, function (ev) {
+<span class="ln" id="L482">482</span>    var d = ev.data || {};
+<span class="ln" id="L483">483</span>    if (!d || d.type !== &quot;kp-http&quot;) return;
+<span class="ln" id="L484">484</span>    var waiter = pending[d.rid];
+<span class="ln" id="L485">485</span>    if (waiter) { delete pending[d.rid]; waiter(d); }
+<span class="ln" id="L486">486</span>  });
+<span class="ln" id="L487">487</span>  function sendAndWait(payload) {
+<span class="ln" id="L488">488</span>    var rid = &quot;r&quot; + (++reqSeq);
+<span class="ln" id="L489">489</span>    payload.rid = rid;
+<span class="ln" id="L490">490</span>    payload.id = CFG.id;
+<span class="ln" id="L491">491</span>    return new Promise(function (resolve) {
+<span class="ln" id="L492">492</span>      pending[rid] = resolve;
+<span class="ln" id="L493">493</span>      post(payload);
+<span class="ln" id="L494">494</span>      setTimeout(function () {
+<span class="ln" id="L495">495</span>        if (pending[rid]) {
+<span class="ln" id="L496">496</span>          delete pending[rid];
+<span class="ln" id="L497">497</span>          resolve({ status: 0, body: &quot;&quot;, content_type: &quot;text/plain&quot;, url: payload.url });
+<span class="ln" id="L498">498</span>        }
+<span class="ln" id="L499">499</span>      }, 20000);
+<span class="ln" id="L500">500</span>    });
+<span class="ln" id="L501">501</span>  }
+<span class="ln" id="L502">502</span>  document.addEventListener(&quot;submit&quot;, function (ev) {
+<span class="ln" id="L503">503</span>    var form = ev.target;
+<span class="ln" id="L504">504</span>    if (!form || !form.elements) return;
+<span class="ln" id="L505">505</span>    if (!form.__kpBefore) form.__kpBefore = serialize(form);
+<span class="ln" id="L506">506</span>  }, true);
+<span class="ln" id="L507">507</span>  document.addEventListener(&quot;submit&quot;, function (ev) {
+<span class="ln" id="L508">508</span>    var form = ev.target;
+<span class="ln" id="L509">509</span>    if (!form || !form.elements) return;
+<span class="ln" id="L510">510</span>    ev.preventDefault();
+<span class="ln" id="L511">511</span>    ev.stopPropagation();
+<span class="ln" id="L512">512</span>    var before = form.__kpBefore || serialize(form);
+<span class="ln" id="L513">513</span>    var after = serialize(form);
+<span class="ln" id="L514">514</span>    form.__kpBefore = null;
+<span class="ln" id="L515">515</span>    var action = form.getAttribute(&quot;action&quot;) || &quot;&quot;;
+<span class="ln" id="L516">516</span>    var url;
+<span class="ln" id="L517">517</span>    try { url = new URL(action, document.querySelector(&quot;base&quot;) ? document.querySelector(&quot;base&quot;).href : document.baseURI).href; }
+<span class="ln" id="L518">518</span>    catch (e) { url = action; }
+<span class="ln" id="L519">519</span>    if (forbidden(url)) { post({type:&quot;kp-blocked&quot;, url: url}); return; }
+<span class="ln" id="L520">520</span>    post({
+<span class="ln" id="L521">521</span>      type: &quot;kp-form&quot;,
+<span class="ln" id="L522">522</span>      method: (form.method || &quot;GET&quot;).toUpperCase(),
+<span class="ln" id="L523">523</span>      url: url,
+<span class="ln" id="L524">524</span>      content_type: &quot;application/x-www-form-urlencoded&quot;,
+<span class="ln" id="L525">525</span>      fields: after,
+<span class="ln" id="L526">526</span>      fields_before: before,
+<span class="ln" id="L527">527</span>      fields_after: after
+<span class="ln" id="L528">528</span>    });
+<span class="ln" id="L529">529</span>  }, false);
+<span class="ln" id="L530">530</span>  var nativeSubmit = HTMLFormElement.prototype.submit;
+<span class="ln" id="L531">531</span>  HTMLFormElement.prototype.submit = function () {
+<span class="ln" id="L532">532</span>    var before = serialize(this);
+<span class="ln" id="L533">533</span>    var action = this.getAttribute(&quot;action&quot;) || &quot;&quot;;
+<span class="ln" id="L534">534</span>    var url;
+<span class="ln" id="L535">535</span>    try { url = new URL(action, document.querySelector(&quot;base&quot;) ? document.querySelector(&quot;base&quot;).href : document.baseURI).href; }
+<span class="ln" id="L536">536</span>    catch (e) { url = action; }
+<span class="ln" id="L537">537</span>    if (forbidden(url)) { post({type:&quot;kp-blocked&quot;, url: url}); return; }
+<span class="ln" id="L538">538</span>    post({
+<span class="ln" id="L539">539</span>      type: &quot;kp-form&quot;,
+<span class="ln" id="L540">540</span>      method: (this.method || &quot;GET&quot;).toUpperCase(),
+<span class="ln" id="L541">541</span>      url: url,
+<span class="ln" id="L542">542</span>      content_type: &quot;application/x-www-form-urlencoded&quot;,
+<span class="ln" id="L543">543</span>      fields: before,
+<span class="ln" id="L544">544</span>      fields_before: before,
+<span class="ln" id="L545">545</span>      fields_after: before
+<span class="ln" id="L546">546</span>    });
+<span class="ln" id="L547">547</span>  };
+<span class="ln" id="L548">548</span>  document.addEventListener(&quot;click&quot;, function (ev) {
+<span class="ln" id="L549">549</span>    var a = ev.target &amp;&amp; ev.target.closest ? ev.target.closest(&quot;a&quot;) : null;
+<span class="ln" id="L550">550</span>    if (!a || !a.href) return;
+<span class="ln" id="L551">551</span>    if ((a.getAttribute(&quot;target&quot;) || &quot;&quot;) === &quot;_blank&quot;) return;
+<span class="ln" id="L552">552</span>    ev.preventDefault();
+<span class="ln" id="L553">553</span>    if (forbidden(a.href)) { post({type:&quot;kp-blocked&quot;, url: a.href}); return; }
+<span class="ln" id="L554">554</span>    post({ type: &quot;kp-nav&quot;, method: &quot;GET&quot;, url: a.href });
+<span class="ln" id="L555">555</span>  }, true);
+<span class="ln" id="L556">556</span>  var nativeFetch = window.fetch;
+<span class="ln" id="L557">557</span>  window.fetch = function (input, init) {
+<span class="ln" id="L558">558</span>    init = init || {};
+<span class="ln" id="L559">559</span>    var url = (typeof input === &quot;string&quot;) ? input : (input &amp;&amp; input.url) || &quot;&quot;;
+<span class="ln" id="L560">560</span>    try { url = new URL(url, document.querySelector(&quot;base&quot;) ? document.querySelector(&quot;base&quot;).href : document.baseURI).href; }
+<span class="ln" id="L561">561</span>    catch (e) {}
+<span class="ln" id="L562">562</span>    if (forbidden(url)) {
+<span class="ln" id="L563">563</span>      return Promise.reject(new TypeError(&quot;blocked&quot;));
+<span class="ln" id="L564">564</span>    }
+<span class="ln" id="L565">565</span>    var method = (init.method || &quot;GET&quot;).toUpperCase();
+<span class="ln" id="L566">566</span>    var headers = {};
+<span class="ln" id="L567">567</span>    try {
+<span class="ln" id="L568">568</span>      var h = init.headers;
+<span class="ln" id="L569">569</span>      if (h &amp;&amp; h.forEach) h.forEach(function (v, k) { headers[k] = v; });
+<span class="ln" id="L570">570</span>      else if (h) { for (var k in h) headers[k] = h[k]; }
+<span class="ln" id="L571">571</span>    } catch (e) {}
+<span class="ln" id="L572">572</span>    var fields = null, body = &quot;&quot;;
+<span class="ln" id="L573">573</span>    var ct = headers[&quot;Content-Type&quot;] || headers[&quot;content-type&quot;] || &quot;&quot;;
+<span class="ln" id="L574">574</span>    if (init.body &amp;&amp; typeof FormData !== &quot;undefined&quot; &amp;&amp; init.body instanceof FormData) {
+<span class="ln" id="L575">575</span>      fields = {};
+<span class="ln" id="L576">576</span>      init.body.forEach(function (v, k) { fields[k] = String(v); });
+<span class="ln" id="L577">577</span>      ct = ct || &quot;application/x-www-form-urlencoded&quot;;
+<span class="ln" id="L578">578</span>    } else if (typeof init.body === &quot;string&quot;) {
+<span class="ln" id="L579">579</span>      body = init.body.slice(0, 65536);
+<span class="ln" id="L580">580</span>    }
+<span class="ln" id="L581">581</span>    return sendAndWait({
+<span class="ln" id="L582">582</span>      type: &quot;kp-fetch&quot;, kind: &quot;fetch&quot;, method: method, url: url,
+<span class="ln" id="L583">583</span>      content_type: ct, fields: fields, body: body, headers: headers
+<span class="ln" id="L584">584</span>    }).then(function (d) {
+<span class="ln" id="L585">585</span>      return new Response(d.body || &quot;&quot;, {
+<span class="ln" id="L586">586</span>        status: d.status || 0,
+<span class="ln" id="L587">587</span>        headers: {&quot;Content-Type&quot;: d.content_type || &quot;text/plain&quot;}
+<span class="ln" id="L588">588</span>      });
+<span class="ln" id="L589">589</span>    });
+<span class="ln" id="L590">590</span>  };
+<span class="ln" id="L591">591</span>  var XHR = window.XMLHttpRequest;
+<span class="ln" id="L592">592</span>  if (XHR) {
+<span class="ln" id="L593">593</span>    var open = XHR.prototype.open;
+<span class="ln" id="L594">594</span>    var send = XHR.prototype.send;
+<span class="ln" id="L595">595</span>    var seth = XHR.prototype.setRequestHeader;
+<span class="ln" id="L596">596</span>    XHR.prototype.open = function (method, url) {
+<span class="ln" id="L597">597</span>      this.__kpMethod = method;
+<span class="ln" id="L598">598</span>      try { this.__kpUrl = new URL(url, document.querySelector(&quot;base&quot;) ? document.querySelector(&quot;base&quot;).href : document.baseURI).href; }
+<span class="ln" id="L599">599</span>      catch (e) { this.__kpUrl = url; }
+<span class="ln" id="L600">600</span>      this.__kpHeaders = {};
+<span class="ln" id="L601">601</span>      return open.apply(this, arguments);
+<span class="ln" id="L602">602</span>    };
+<span class="ln" id="L603">603</span>    XHR.prototype.setRequestHeader = function (k, v) {
+<span class="ln" id="L604">604</span>      this.__kpHeaders = this.__kpHeaders || {};
+<span class="ln" id="L605">605</span>      this.__kpHeaders[k] = v;
+<span class="ln" id="L606">606</span>      return seth.apply(this, arguments);
+<span class="ln" id="L607">607</span>    };
+<span class="ln" id="L608">608</span>    XHR.prototype.send = function (body) {
+<span class="ln" id="L609">609</span>      var self = this;
+<span class="ln" id="L610">610</span>      if (forbidden(self.__kpUrl)) {
+<span class="ln" id="L611">611</span>        self.status = 0;
+<span class="ln" id="L612">612</span>        if (self.onerror) self.onerror(new ProgressEvent(&quot;error&quot;));
+<span class="ln" id="L613">613</span>        return;
+<span class="ln" id="L614">614</span>      }
+<span class="ln" id="L615">615</span>      var fields = null, text = &quot;&quot;;
+<span class="ln" id="L616">616</span>      if (body &amp;&amp; typeof FormData !== &quot;undefined&quot; &amp;&amp; body instanceof FormData) {
+<span class="ln" id="L617">617</span>        fields = {};
+<span class="ln" id="L618">618</span>        body.forEach(function (v, k) { fields[k] = String(v); });
+<span class="ln" id="L619">619</span>      } else if (typeof body === &quot;string&quot;) {
+<span class="ln" id="L620">620</span>        text = body.slice(0, 65536);
+<span class="ln" id="L621">621</span>      }
+<span class="ln" id="L622">622</span>      sendAndWait({
+<span class="ln" id="L623">623</span>        type: &quot;kp-fetch&quot;, kind: &quot;xhr&quot;,
+<span class="ln" id="L624">624</span>        method: (self.__kpMethod || &quot;GET&quot;).toUpperCase(),
+<span class="ln" id="L625">625</span>        url: self.__kpUrl, fields: fields, body: text,
+<span class="ln" id="L626">626</span>        headers: self.__kpHeaders || {},
+<span class="ln" id="L627">627</span>        content_type: (self.__kpHeaders || {})[&quot;Content-Type&quot;] || &quot;&quot;
+<span class="ln" id="L628">628</span>      }).then(function (d) {
+<span class="ln" id="L629">629</span>        Object.defineProperty(self, &quot;status&quot;, {value: d.status || 0});
+<span class="ln" id="L630">630</span>        Object.defineProperty(self, &quot;responseText&quot;, {value: d.body || &quot;&quot;});
+<span class="ln" id="L631">631</span>        Object.defineProperty(self, &quot;response&quot;, {value: d.body || &quot;&quot;});
+<span class="ln" id="L632">632</span>        Object.defineProperty(self, &quot;readyState&quot;, {value: 4});
+<span class="ln" id="L633">633</span>        if (self.onreadystatechange) self.onreadystatechange();
+<span class="ln" id="L634">634</span>        if (self.onload) self.onload();
+<span class="ln" id="L635">635</span>      });
+<span class="ln" id="L636">636</span>    };
+<span class="ln" id="L637">637</span>  }
+<span class="ln" id="L638">638</span>})();
+<span class="ln" id="L639">639</span>&quot;&quot;&quot;  # نهاية النص متعدد الأسطر
+<span class="ln" id="L640">640</span> 
+<span class="ln" id="L641">641</span> 
+<span class="ln" id="L642">642</span># يعيد كتابة صفحة البوابة لتعمل داخل إطار معزول: CSP + base + اعتراض النماذج.
+<span class="ln" id="L643">643</span>def rewrite_html(page_html: str, base_url: str, capture_id: str,  # تعريف الدالة rewrite_html(page_html, base_url, capture_id, guard) ترجع str
+<span class="ln" id="L644">644</span>                 guard: str) -&gt; str:  # مفتاح guard في القاموس
+<span class="ln" id="L645">645</span>    raw = page_html or &quot;&lt;html&gt;&lt;head&gt;&lt;/head&gt;&lt;body&gt;&lt;/body&gt;&lt;/html&gt;&quot;  # دمج منطقي (أو) وإسناده إلى raw
+<span class="ln" id="L646">646</span>    cfg = json.dumps({&quot;id&quot;: capture_id, &quot;guard&quot;: guard or &quot;&quot;},  # إسناد نتيجة استدعاء json.dumps (معامل واحد، ensure_ascii=…) إلى cfg
+<span class="ln" id="L647">647</span>                     ensure_ascii=False)  # المعامل المسمّى ensure_ascii
+<span class="ln" id="L648">648</span>    base = htmlmod.escape(base_url or &quot;&quot;, quote=True)  # إسناد نتيجة استدعاء htmlmod.escape (معامل واحد، quote=…) إلى base
+<span class="ln" id="L649">649</span>    inject = (  # بناء نص منسّق وإسناده إلى inject
+<span class="ln" id="L650">650</span>        &#x27;&lt;meta http-equiv=&quot;Content-Security-Policy&quot; &#x27;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L651">651</span>        &#x27;content=&quot;connect-src \&#x27;none\&#x27;; form-action \&#x27;none\&#x27;&quot;&gt;&#x27;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L652">652</span>        f&#x27;&lt;base href=&quot;{base}&quot;&gt;&#x27;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L653">653</span>        f&quot;&lt;script&gt;window.__KP__={cfg};&lt;/script&gt;&quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L654">654</span>        f&quot;&lt;script&gt;{INTERCEPTOR}&lt;/script&gt;&quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L655">655</span>    )  # إغلاق القوس المفتوح في السطر السابق
+<span class="ln" id="L656">656</span>    if re.search(r&quot;&lt;head[^&gt;]*&gt;&quot;, raw, re.I):  # شرط: نتيجة re.search(&#x27;&lt;head[^&gt;]*&gt;&#x27;, raw, re.I)
+<span class="ln" id="L657">657</span>        return re.sub(r&quot;&lt;head[^&gt;]*&gt;&quot;, lambda m: m.group(0) + inject,  # إرجاع re.sub(&#x27;&lt;head[^&gt;]*&gt;&#x27;, دالة مجهولة, raw, count=1, flags=re.I)
+<span class="ln" id="L658">658</span>                      raw, count=1, flags=re.I)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L659">659</span>    return inject + raw  # إرجاع جمع
+<span class="ln" id="L660">660</span> 
+<span class="ln" id="L661">661</span> 
+<span class="ln" id="L662">662</span># بداية نص متعدد الأسطر — الأسطر التالية نصّ حرفي لا كود، فلا يقبل تعليقاً
+<span class="ln" id="L663">663</span>VIEW_PAGE = &quot;&quot;&quot;&lt;!DOCTYPE html&gt;
+<span class="ln" id="L664">664</span>&lt;html lang=&quot;ar&quot; dir=&quot;rtl&quot;&gt;
+<span class="ln" id="L665">665</span>&lt;head&gt;
+<span class="ln" id="L666">666</span>&lt;meta charset=&quot;utf-8&quot;&gt;
+<span class="ln" id="L667">667</span>&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;&gt;
+<span class="ln" id="L668">668</span>&lt;title&gt;مسجّل دخول البوابة — KiraPass&lt;/title&gt;
+<span class="ln" id="L669">669</span>&lt;link rel=&quot;stylesheet&quot; href=&quot;/ui.css&quot;&gt;
+<span class="ln" id="L670">670</span>&lt;style&gt;
+<span class="ln" id="L671">671</span>  body{margin:0;display:flex;flex-direction:column;min-height:100vh}
+<span class="ln" id="L672">672</span>  #bar{padding:.6rem .8rem;display:flex;flex-wrap:wrap;gap:.4rem;align-items:center;
+<span class="ln" id="L673">673</span>       border-bottom:1px solid rgba(127,127,127,.3);background:var(--bg,#111)}
+<span class="ln" id="L674">674</span>  #note{flex:1 1 12rem;font-size:.85rem;opacity:.9}
+<span class="ln" id="L675">675</span>  iframe{flex:1;width:100%%;border:0;background:#fff;min-height:60vh}
+<span class="ln" id="L676">676</span>  .warn{color:#c08000}
+<span class="ln" id="L677">677</span>&lt;/style&gt;
+<span class="ln" id="L678">678</span>&lt;/head&gt;
+<span class="ln" id="L679">679</span>&lt;body&gt;
+<span class="ln" id="L680">680</span>&lt;div id=&quot;bar&quot;&gt;
+<span class="ln" id="L681">681</span>  &lt;strong&gt;مسجّل الدخول&lt;/strong&gt;
+<span class="ln" id="L682">682</span>  &lt;span id=&quot;note&quot;&gt;سجّل دخولاً ناجحاً داخل الإطار، ثم علّم الصفحات.&lt;/span&gt;
+<span class="ln" id="L683">683</span>  &lt;button class=&quot;btn&quot; id=&quot;btnSuccess&quot;&gt;هذه صفحة النجاح&lt;/button&gt;
+<span class="ln" id="L684">684</span>  &lt;button class=&quot;btn&quot; id=&quot;btnReject&quot;&gt;هذه صفحة رفض&lt;/button&gt;
+<span class="ln" id="L685">685</span>  &lt;button class=&quot;btn&quot; id=&quot;btnStatus&quot;&gt;هذه صفحة الإحصائيات&lt;/button&gt;
+<span class="ln" id="L686">686</span>  &lt;button class=&quot;btn primary&quot; id=&quot;btnFinish&quot;&gt;إنهاء + تنزيل التقرير&lt;/button&gt;
+<span class="ln" id="L687">687</span>&lt;/div&gt;
+<span class="ln" id="L688">688</span>&lt;iframe id=&quot;portal&quot; sandbox=&quot;allow-scripts allow-forms&quot; referrerpolicy=&quot;no-referrer&quot;&gt;&lt;/iframe&gt;
+<span class="ln" id="L689">689</span>&lt;script&gt;
+<span class="ln" id="L690">690</span>(function(){
+<span class="ln" id="L691">691</span>  const ID = %s;
+<span class="ln" id="L692">692</span>  const TOKEN = %s;
+<span class="ln" id="L693">693</span>  const iframe = document.getElementById(&quot;portal&quot;);
+<span class="ln" id="L694">694</span>  const note = document.getElementById(&quot;note&quot;);
+<span class="ln" id="L695">695</span>  function withToken(path){
+<span class="ln" id="L696">696</span>    if (!TOKEN) return path;
+<span class="ln" id="L697">697</span>    return path + (path.indexOf(&quot;?&quot;)&gt;=0?&quot;&amp;&quot;:&quot;?&quot;) + &quot;token=&quot; + encodeURIComponent(TOKEN);
+<span class="ln" id="L698">698</span>  }
+<span class="ln" id="L699">699</span>  async function api(path, body){
+<span class="ln" id="L700">700</span>    const opt = {method: body ? &quot;POST&quot; : &quot;GET&quot;, headers: {}};
+<span class="ln" id="L701">701</span>    if (body){ opt.headers[&quot;Content-Type&quot;]=&quot;application/json&quot;; opt.body=JSON.stringify(body); }
+<span class="ln" id="L702">702</span>    const res = await fetch(withToken(path), opt);
+<span class="ln" id="L703">703</span>    return await res.json();
+<span class="ln" id="L704">704</span>  }
+<span class="ln" id="L705">705</span>  function show(msg, cls){
+<span class="ln" id="L706">706</span>    note.textContent = msg;
+<span class="ln" id="L707">707</span>    note.className = cls || &quot;&quot;;
+<span class="ln" id="L708">708</span>  }
+<span class="ln" id="L709">709</span>  function loadSrcdoc(html){
+<span class="ln" id="L710">710</span>    iframe.srcdoc = html || &quot;&lt;html&gt;&lt;body&gt;&lt;/body&gt;&lt;/html&gt;&quot;;
+<span class="ln" id="L711">711</span>  }
+<span class="ln" id="L712">712</span>  async function refresh(){
+<span class="ln" id="L713">713</span>    const st = await api(&quot;/api/capture/status?id=&quot; + encodeURIComponent(ID));
+<span class="ln" id="L714">714</span>    if (!st.ok){ show(st.error || &quot;تعذّر التحميل&quot;, &quot;warn&quot;); return; }
+<span class="ln" id="L715">715</span>    loadSrcdoc(st.html_view || &quot;&quot;);
+<span class="ln" id="L716">716</span>    if (st.needs_browser_js){
+<span class="ln" id="L717">717</span>      show((st.reason_ar || &quot;&quot;) + &quot; &quot; + (st.next_ar || &quot;&quot;), &quot;warn&quot;);
+<span class="ln" id="L718">718</span>    } else if (st.last_status){
+<span class="ln" id="L719">719</span>      show(&quot;HTTP &quot; + st.last_status + &quot; — &quot; + (st.hint_ar || &quot;علّم الصفحة إن كانت نجاحاً أو رفضاً.&quot;), &quot;&quot;);
+<span class="ln" id="L720">720</span>    }
+<span class="ln" id="L721">721</span>  }
+<span class="ln" id="L722">722</span>  async function step(payload){
+<span class="ln" id="L723">723</span>    payload.id = ID;
+<span class="ln" id="L724">724</span>    const r = await api(&quot;/api/capture/step&quot;, payload);
+<span class="ln" id="L725">725</span>    if (!r.ok){ show(r.error || &quot;فشلت الخطوة&quot;, &quot;warn&quot;); return r; }
+<span class="ln" id="L726">726</span>    if (payload.kind === &quot;fetch&quot; || payload.kind === &quot;xhr&quot; || payload.type === &quot;kp-fetch&quot;){
+<span class="ln" id="L727">727</span>      iframe.contentWindow.postMessage({
+<span class="ln" id="L728">728</span>        type:&quot;kp-http&quot;, rid: payload.rid,
+<span class="ln" id="L729">729</span>        status: (r.meta||{}).status || 0,
+<span class="ln" id="L730">730</span>        body: r.frame_body || &quot;&quot;,
+<span class="ln" id="L731">731</span>        content_type: (r.meta||{}).content_type || &quot;text/plain&quot;,
+<span class="ln" id="L732">732</span>        url: r.url || payload.url
+<span class="ln" id="L733">733</span>      }, &quot;*&quot;);
+<span class="ln" id="L734">734</span>    } else {
+<span class="ln" id="L735">735</span>      loadSrcdoc(r.html_view || &quot;&quot;);
+<span class="ln" id="L736">736</span>    }
+<span class="ln" id="L737">737</span>    if (r.needs_browser_js){
+<span class="ln" id="L738">738</span>      show((r.reason_ar||&quot;&quot;) + &quot; &quot; + (r.next_ar||&quot;&quot;), &quot;warn&quot;);
+<span class="ln" id="L739">739</span>    } else if ((r.meta||{}).status === 200 &amp;&amp; !r.marked){
+<span class="ln" id="L740">740</span>      show(&quot;HTTP 200 — &quot; + %s, &quot;&quot;);
+<span class="ln" id="L741">741</span>    }
+<span class="ln" id="L742">742</span>    return r;
+<span class="ln" id="L743">743</span>  }
+<span class="ln" id="L744">744</span>  window.addEventListener(&quot;message&quot;, function(ev){
+<span class="ln" id="L745">745</span>    if (ev.source !== iframe.contentWindow) return;
+<span class="ln" id="L746">746</span>    const d = ev.data || {};
+<span class="ln" id="L747">747</span>    if (d.type === &quot;kp-form&quot;){
+<span class="ln" id="L748">748</span>      step({
+<span class="ln" id="L749">749</span>        kind:&quot;form&quot;, method:d.method, url:d.url, content_type:d.content_type,
+<span class="ln" id="L750">750</span>        fields:d.fields, fields_before:d.fields_before, fields_after:d.fields_after
+<span class="ln" id="L751">751</span>      });
+<span class="ln" id="L752">752</span>    } else if (d.type === &quot;kp-nav&quot;){
+<span class="ln" id="L753">753</span>      step({kind:&quot;navigate&quot;, method:&quot;GET&quot;, url:d.url});
+<span class="ln" id="L754">754</span>    } else if (d.type === &quot;kp-fetch&quot;){
+<span class="ln" id="L755">755</span>      d.kind = d.kind || &quot;fetch&quot;;
+<span class="ln" id="L756">756</span>      step(d);
+<span class="ln" id="L757">757</span>    } else if (d.type === &quot;kp-blocked&quot;){
+<span class="ln" id="L758">758</span>      show(&quot;مُنع طلب نحو واجهة KiraPass المحلية.&quot;, &quot;warn&quot;);
+<span class="ln" id="L759">759</span>    }
+<span class="ln" id="L760">760</span>  });
+<span class="ln" id="L761">761</span>  async function mark(kind){
+<span class="ln" id="L762">762</span>    const r = await api(&quot;/api/capture/mark&quot;, {id:ID, mark:kind});
+<span class="ln" id="L763">763</span>    show(r.message_ar || (r.ok ? &quot;تم التعليم&quot; : (r.error || &quot;فشل&quot;)), r.ok ? &quot;&quot; : &quot;warn&quot;);
+<span class="ln" id="L764">764</span>  }
+<span class="ln" id="L765">765</span>  document.getElementById(&quot;btnSuccess&quot;).onclick = function(){ mark(&quot;success&quot;); };
+<span class="ln" id="L766">766</span>  document.getElementById(&quot;btnReject&quot;).onclick = function(){ mark(&quot;reject&quot;); };
+<span class="ln" id="L767">767</span>  document.getElementById(&quot;btnStatus&quot;).onclick = function(){ mark(&quot;status&quot;); };
+<span class="ln" id="L768">768</span>  document.getElementById(&quot;btnFinish&quot;).onclick = async function(){
+<span class="ln" id="L769">769</span>    const r = await api(&quot;/api/capture/finish&quot;, {id:ID});
+<span class="ln" id="L770">770</span>    if (!r.ok){ show(r.error || &quot;فشل الإنهاء&quot;, &quot;warn&quot;); return; }
+<span class="ln" id="L771">771</span>    if (r.needs_browser_js){
+<span class="ln" id="L772">772</span>      show((r.reason_ar||&quot;&quot;) + &quot; &quot; + (r.next_ar||&quot;&quot;), &quot;warn&quot;);
+<span class="ln" id="L773">773</span>    } else {
+<span class="ln" id="L774">774</span>      show(&quot;حُفظ التقرير والملف التعريفي.&quot;, &quot;&quot;);
+<span class="ln" id="L775">775</span>    }
+<span class="ln" id="L776">776</span>    if (r.report_name){
+<span class="ln" id="L777">777</span>      location.href = withToken(&quot;/api/capture/report?id=&quot; + encodeURIComponent(ID) + &quot;&amp;download=1&quot;);
+<span class="ln" id="L778">778</span>    }
+<span class="ln" id="L779">779</span>  };
+<span class="ln" id="L780">780</span>  refresh();
+<span class="ln" id="L781">781</span>})();
+<span class="ln" id="L782">782</span>&lt;/script&gt;
+<span class="ln" id="L783">783</span>&lt;/body&gt;
+<span class="ln" id="L784">784</span>&lt;/html&gt;
+<span class="ln" id="L785">785</span>&quot;&quot;&quot;  # نهاية النص متعدد الأسطر
+<span class="ln" id="L786">786</span> 
+<span class="ln" id="L787">787</span> 
+<span class="ln" id="L788">788</span>def view_page(capture_id: str, token: str = &quot;&quot;) -&gt; bytes:  # تعريف الدالة view_page(capture_id, token) ترجع bytes
+<span class="ln" id="L789">789</span>    page = VIEW_PAGE % (  # حساب باقي القسمة بين VIEW_PAGE ومجموعة وإسناده إلى page
+<span class="ln" id="L790">790</span>        json.dumps(capture_id),  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L791">791</span>        json.dumps(token or &quot;&quot;),  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L792">792</span>        json.dumps(AR_HTTP200),  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L793">793</span>    )  # إغلاق القوس المفتوح في السطر السابق
+<span class="ln" id="L794">794</span>    return page.encode(&quot;utf-8&quot;)  # إرجاع page.encode(&#x27;utf-8&#x27;)
+<span class="ln" id="L795">795</span> 
+<span class="ln" id="L796">796</span> 
+<span class="ln" id="L797">797</span>class Capture:  # تعريف الصنف Capture
+<span class="ln" id="L798">798</span>    def __init__(self, url: str, guard: str):  # تعريف الدالة __init__(self, url, guard)
+<span class="ln" id="L799">799</span>        self.id = uuid.uuid4().hex[:16]  # إسناد uuid.uuid4().hex[] إلى self.id
+<span class="ln" id="L800">800</span>        self.start_url = _safe_page_url(url)  # إسناد نتيجة استدعاء _safe_page_url (معامل واحد) إلى self.start_url
+<span class="ln" id="L801">801</span>        self.guard = guard or &quot;&quot;  # دمج منطقي (أو) وإسناده إلى self.guard
+<span class="ln" id="L802">802</span>        self.session = Session(allow_redirects=False)  # إسناد نتيجة استدعاء Session (allow_redirects=…) إلى self.session
+<span class="ln" id="L803">803</span>        self.created = time.time()  # إسناد نتيجة استدعاء time.time إلى self.created
+<span class="ln" id="L804">804</span>        self.html = &quot;&quot;  # إسناد القيمة الثابتة self.html
+<span class="ln" id="L805">805</span>        self.url = self.start_url  # إسناد self.start_url إلى self.url
+<span class="ln" id="L806">806</span>        self.last_status = 0  # إسناد القيمة الثابتة self.last_status
+<span class="ln" id="L807">807</span>        self.events = []  # إسناد قائمة إلى self.events
+<span class="ln" id="L808">808</span>        self.marks = []  # إسناد قائمة إلى self.marks
+<span class="ln" id="L809">809</span>        self.pass_learn = {&quot;pass_mode&quot;: &quot;&quot;, &quot;needs_browser_js&quot;: False,  # إسناد قاموس إلى self.pass_learn
+<span class="ln" id="L810">810</span>                           &quot;reason&quot;: &quot;&quot;, &quot;reason_ar&quot;: &quot;&quot;, &quot;next_ar&quot;: &quot;&quot;}  # مفتاح reason في القاموس
+<span class="ln" id="L811">811</span>        # أبقِ نموذج الدخول منفصلاً عن صفحات النجاح/الحالة اللاحقة، التي
+<span class="ln" id="L812">812</span>        # كثيراً ما تحتوي نماذج لا علاقة لها مثل erase-cookie.
+<span class="ln" id="L813">813</span>        self.form = None  # إسناد القيمة الثابتة self.form
+<span class="ln" id="L814">814</span>        self.login_html = &quot;&quot;  # إسناد القيمة الثابتة self.login_html
+<span class="ln" id="L815">815</span>        self.last_fields_redacted = []  # إسناد قائمة إلى self.last_fields_redacted
+<span class="ln" id="L816">816</span>        self._strip_values = []  # إسناد قائمة إلى self._strip_values
+<span class="ln" id="L817">817</span>        self.success_words = []  # إسناد قائمة إلى self.success_words
+<span class="ln" id="L818">818</span>        self.reject_words = []  # إسناد قائمة إلى self.reject_words
+<span class="ln" id="L819">819</span>        self.success_url_contains = &quot;&quot;  # إسناد القيمة الثابتة self.success_url_contains
+<span class="ln" id="L820">820</span>        self.stats_url = &quot;&quot;  # إسناد القيمة الثابتة self.stats_url
+<span class="ln" id="L821">821</span>        self.method = &quot;post&quot;  # إسناد القيمة الثابتة self.method
+<span class="ln" id="L822">822</span>        self.content_types = []  # إسناد قائمة إلى self.content_types
+<span class="ln" id="L823">823</span>        self.custom_headers = []  # إسناد قائمة إلى self.custom_headers
+<span class="ln" id="L824">824</span>        self.cookie_names = []  # إسناد قائمة إلى self.cookie_names
+<span class="ln" id="L825">825</span>        self.redirects = []  # إسناد قائمة إلى self.redirects
+<span class="ln" id="L826">826</span>        self.report = None  # إسناد القيمة الثابتة self.report
+<span class="ln" id="L827">827</span>        self.report_name = &quot;&quot;  # إسناد القيمة الثابتة self.report_name
+<span class="ln" id="L828">828</span>        self.profile = None  # إسناد القيمة الثابتة self.profile
+<span class="ln" id="L829">829</span>        self.hint_ar = AR_HTTP200  # إسناد AR_HTTP200 إلى self.hint_ar
+<span class="ln" id="L830">830</span>        self._last_raw_fields = {}  # إسناد قاموس إلى self._last_raw_fields
+<span class="ln" id="L831">831</span> 
+<span class="ln" id="L832">832</span>    def close(self):  # تعريف الدالة close(self)
+<span class="ln" id="L833">833</span>        try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L834">834</span>            self.session.close()  # استدعاء self.session.close
+<span class="ln" id="L835">835</span>        except Exception:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L836">836</span>            pass  # سطر فارغ منطقياً (pass) — مطلوب صياغياً
+<span class="ln" id="L837">837</span> 
+<span class="ln" id="L838">838</span>    def as_public(self) -&gt; dict:  # تعريف الدالة as_public(self) ترجع dict
+<span class="ln" id="L839">839</span>        return {  # إرجاع قاموس
+<span class="ln" id="L840">840</span>            &quot;ok&quot;: True,  # مفتاح ok في القاموس
+<span class="ln" id="L841">841</span>            &quot;id&quot;: self.id,  # مفتاح id في القاموس
+<span class="ln" id="L842">842</span>            &quot;url&quot;: self.url,  # مفتاح url في القاموس
+<span class="ln" id="L843">843</span>            &quot;last_status&quot;: self.last_status,  # مفتاح last_status في القاموس
+<span class="ln" id="L844">844</span>            &quot;html_view&quot;: rewrite_html(self.html, self.url, self.id, self.guard),  # مفتاح html_view في القاموس
+<span class="ln" id="L845">845</span>            &quot;needs_browser_js&quot;: bool(self.pass_learn.get(&quot;needs_browser_js&quot;)),  # مفتاح needs_browser_js في القاموس
+<span class="ln" id="L846">846</span>            &quot;reason_ar&quot;: self.pass_learn.get(&quot;reason_ar&quot;) or &quot;&quot;,  # مفتاح reason_ar في القاموس
+<span class="ln" id="L847">847</span>            &quot;next_ar&quot;: self.pass_learn.get(&quot;next_ar&quot;) or &quot;&quot;,  # مفتاح next_ar في القاموس
+<span class="ln" id="L848">848</span>            &quot;pass_mode&quot;: self.pass_learn.get(&quot;pass_mode&quot;) or &quot;&quot;,  # مفتاح pass_mode في القاموس
+<span class="ln" id="L849">849</span>            &quot;hint_ar&quot;: self.hint_ar,  # مفتاح hint_ar في القاموس
+<span class="ln" id="L850">850</span>            &quot;marks&quot;: list(self.marks),  # مفتاح marks في القاموس
+<span class="ln" id="L851">851</span>            &quot;cookie_names&quot;: list(self.cookie_names),  # مفتاح cookie_names في القاموس
+<span class="ln" id="L852">852</span>            &quot;report_name&quot;: self.report_name,  # مفتاح report_name في القاموس
+<span class="ln" id="L853">853</span>        }  # إغلاق القوس المفتوح في السطر السابق
+<span class="ln" id="L854">854</span> 
+<span class="ln" id="L855">855</span> 
+<span class="ln" id="L856">856</span>class Hub:  # تعريف الصنف Hub
+<span class="ln" id="L857">857</span>    def __init__(self):  # تعريف الدالة __init__(self)
+<span class="ln" id="L858">858</span>        self._lock = threading.Lock()  # إسناد نتيجة استدعاء threading.Lock إلى self._lock
+<span class="ln" id="L859">859</span>        self._items = {}  # إسناد قاموس إلى self._items
+<span class="ln" id="L860">860</span> 
+<span class="ln" id="L861">861</span>    def get(self, capture_id: str) -&gt; Capture:  # تعريف الدالة get(self, capture_id) ترجع Capture
+<span class="ln" id="L862">862</span>        with self._lock:  # سياق مُدار: self._lock
+<span class="ln" id="L863">863</span>            cap = self._items.get(capture_id)  # إسناد نتيجة استدعاء self._items.get (معامل واحد) إلى cap
+<span class="ln" id="L864">864</span>        if not cap:  # شرط معكوس: ليس cap
+<span class="ln" id="L865">865</span>            raise KeyError(&quot;capture_not_found&quot;)  # رفع KeyError(&#x27;capture_not_found&#x27;)
+<span class="ln" id="L866">866</span>        return cap  # إرجاع cap
+<span class="ln" id="L867">867</span> 
+<span class="ln" id="L868">868</span>    def _remember(self, cap: Capture) -&gt; None:  # تعريف الدالة _remember(self, cap) ترجع None
+<span class="ln" id="L869">869</span>        with self._lock:  # سياق مُدار: self._lock
+<span class="ln" id="L870">870</span>            self._items[cap.id] = cap  # إسناد cap إلى self._items[cap.id]
+<span class="ln" id="L871">871</span>            if len(self._items) &gt; 8:  # شرط: len(self._items) أكبر من 8
+<span class="ln" id="L872">872</span>                oldest = sorted(self._items.values(), key=lambda c: c.created)[:-8]  # إسناد sorted(self._items.values(), key=دالة مجهولة)[] إلى oldest
+<span class="ln" id="L873">873</span>                for old in oldest:  # دورة على oldest باسم old
+<span class="ln" id="L874">874</span>                    self._items.pop(old.id, None)  # استدعاء self._items.pop (2 معاملات)
+<span class="ln" id="L875">875</span>                    old.close()  # استدعاء old.close
+<span class="ln" id="L876">876</span> 
+<span class="ln" id="L877">877</span>    def start(self, url: str, guard: str = &quot;&quot;) -&gt; Capture:  # تعريف الدالة start(self, url, guard) ترجع Capture
+<span class="ln" id="L878">878</span>        if not (url or &quot;&quot;).startswith((&quot;http://&quot;, &quot;https://&quot;)):  # شرط معكوس: ليس url أو &#x27;&#x27;.startswith(مجموعة)
+<span class="ln" id="L879">879</span>            url = &quot;http://&quot; + (url or &quot;&quot;).lstrip(&quot;/&quot;)  # حساب جمع بين &#x27;http://&#x27; وurl أو &#x27;&#x27;.lstrip(&#x27;/&#x27;) وإسناده إلى url
+<span class="ln" id="L880">880</span>        if is_kirapass_url(url, guard):  # شرط: نتيجة is_kirapass_url(url, guard)
+<span class="ln" id="L881">881</span>            raise ValueError(&quot;target_is_kirapass&quot;)  # رفع ValueError(&#x27;target_is_kirapass&#x27;)
+<span class="ln" id="L882">882</span>        cap = Capture(url, guard)  # إسناد نتيجة استدعاء Capture (2 معاملات) إلى cap
+<span class="ln" id="L883">883</span>        self._exchange(cap, &quot;GET&quot;, cap.start_url, kind=&quot;navigate&quot;)  # استدعاء self._exchange (3 معاملات، kind=…)
+<span class="ln" id="L884">884</span>        self._remember(cap)  # استدعاء self._remember (معامل واحد)
+<span class="ln" id="L885">885</span>        return cap  # إرجاع cap
+<span class="ln" id="L886">886</span> 
+<span class="ln" id="L887">887</span>    def step(self, capture_id: str, payload: dict, guard: str = &quot;&quot;) -&gt; dict:  # تعريف الدالة step(self, capture_id, payload, guard) ترجع dict
+<span class="ln" id="L888">888</span>        cap = self.get(capture_id)  # إسناد نتيجة استدعاء self.get (معامل واحد) إلى cap
+<span class="ln" id="L889">889</span>        if guard:  # شرط: guard
+<span class="ln" id="L890">890</span>            cap.guard = guard  # إسناد guard إلى cap.guard
+<span class="ln" id="L891">891</span>        kind = (payload.get(&quot;kind&quot;) or payload.get(&quot;type&quot;) or &quot;navigate&quot;).lower()  # إسناد نتيجة استدعاء payload.get(&#x27;kind&#x27;) أو payload.get(&#x27;type&#x27;) أو &#x27;navigate&#x27;.lower إلى kind
+<span class="ln" id="L892">892</span>        if kind in (&quot;kp-form&quot;,):  # شرط: kind ضمن مجموعة
+<span class="ln" id="L893">893</span>            kind = &quot;form&quot;  # إسناد القيمة الثابتة kind
+<span class="ln" id="L894">894</span>        if kind in (&quot;kp-fetch&quot;, &quot;kp-xhr&quot;):  # شرط: kind ضمن مجموعة
+<span class="ln" id="L895">895</span>            kind = payload.get(&quot;kind&quot;) or &quot;fetch&quot;  # دمج منطقي (أو) وإسناده إلى kind
+<span class="ln" id="L896">896</span>        method = (payload.get(&quot;method&quot;) or &quot;GET&quot;).upper()  # إسناد نتيجة استدعاء payload.get(&#x27;method&#x27;) أو &#x27;GET&#x27;.upper إلى method
+<span class="ln" id="L897">897</span>        url = payload.get(&quot;url&quot;) or cap.url  # دمج منطقي (أو) وإسناده إلى url
+<span class="ln" id="L898">898</span>        if is_kirapass_url(url, cap.guard):  # شرط: نتيجة is_kirapass_url(url, cap.guard)
+<span class="ln" id="L899">899</span>            return {&quot;ok&quot;: False, &quot;error&quot;: &quot;blocked_kirapass_target&quot;}  # إرجاع قاموس
+<span class="ln" id="L900">900</span>        fields = payload.get(&quot;fields&quot;) if isinstance(payload.get(&quot;fields&quot;), dict) else None  # إسناد payload.get(&#x27;fields&#x27;) إن isinstance(payload.get(&#x27;fields&#x27;), dict) وإلا None إلى fields
+<span class="ln" id="L901">901</span>        before = payload.get(&quot;fields_before&quot;) if isinstance(payload.get(&quot;fields_before&quot;), dict) else None  # إسناد payload.get(&#x27;fields_before&#x27;) إن isinstance(payload.get(&#x27;fields_before&#x27;), dict) وإلا None إلى before
+<span class="ln" id="L902">902</span>        after = payload.get(&quot;fields_after&quot;) if isinstance(payload.get(&quot;fields_after&quot;), dict) else None  # إسناد payload.get(&#x27;fields_after&#x27;) إن isinstance(payload.get(&#x27;fields_after&#x27;), dict) وإلا None إلى after
+<span class="ln" id="L903">903</span>        headers = payload.get(&quot;headers&quot;) if isinstance(payload.get(&quot;headers&quot;), dict) else {}  # إسناد payload.get(&#x27;headers&#x27;) إن isinstance(payload.get(&#x27;headers&#x27;), dict) وإلا قاموس إلى headers
+<span class="ln" id="L904">904</span>        content_type = payload.get(&quot;content_type&quot;) or &quot;&quot;  # دمج منطقي (أو) وإسناده إلى content_type
+<span class="ln" id="L905">905</span>        body = payload.get(&quot;body&quot;) if isinstance(payload.get(&quot;body&quot;), str) else None  # إسناد payload.get(&#x27;body&#x27;) إن isinstance(payload.get(&#x27;body&#x27;), str) وإلا None إلى body
+<span class="ln" id="L906">906</span>        if after or before:  # شرط مركّب (أو)
+<span class="ln" id="L907">907</span>            self._learn_password(cap, before or {}, after or fields or {},  # استدعاء self._learn_password (4 معاملات)
+<span class="ln" id="L908">908</span>                                 (after or fields or {}).keys())  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L909">909</span>        if fields:  # شرط: fields
+<span class="ln" id="L910">910</span>            cap.last_fields_redacted = redact_fields(fields)  # إسناد نتيجة استدعاء redact_fields (معامل واحد) إلى cap.last_fields_redacted
+<span class="ln" id="L911">911</span>            cap._last_raw_fields = dict(fields)  # إسناد نتيجة استدعاء dict (معامل واحد) إلى cap._last_raw_fields
+<span class="ln" id="L912">912</span>            for key, value in fields.items():  # دورة على fields.items() باسم مجموعة
+<span class="ln" id="L913">913</span>                if looks_secret_name(key) and value:  # شرط مركّب (و)
+<span class="ln" id="L914">914</span>                    cap._strip_values.append(str(value))  # استدعاء cap._strip_values.append (معامل واحد)
+<span class="ln" id="L915">915</span>        data = fields  # إسناد fields إلى data
+<span class="ln" id="L916">916</span>        if data is None and body and &quot;json&quot; in (content_type or &quot;&quot;).lower():  # شرط مركّب (و)
+<span class="ln" id="L917">917</span>            try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L918">918</span>                parsed = json.loads(body)  # إسناد نتيجة استدعاء json.loads (معامل واحد) إلى parsed
+<span class="ln" id="L919">919</span>                data = parsed if isinstance(parsed, dict) else body  # إسناد parsed إن isinstance(parsed, dict) وإلا body إلى data
+<span class="ln" id="L920">920</span>            except Exception:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L921">921</span>                data = body  # إسناد body إلى data
+<span class="ln" id="L922">922</span>        elif data is None:  # شرط: data هو نفسه None
+<span class="ln" id="L923">923</span>            data = body  # إسناد body إلى data
+<span class="ln" id="L924">924</span>        frame_kind = &quot;fetch&quot; if kind in (&quot;fetch&quot;, &quot;xhr&quot;) else kind  # إسناد &#x27;fetch&#x27; إن مقارنة وإلا kind إلى frame_kind
+<span class="ln" id="L925">925</span>        resp, hops = self._exchange(  # إسناد نتيجة استدعاء self._exchange (3 معاملات، data=…، headers=…، content_type=…، kind=…) إلى مجموعة
+<span class="ln" id="L926">926</span>            cap, method, url, data=data, headers=headers,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L927">927</span>            content_type=content_type, kind=frame_kind)  # المعامل المسمّى content_type
+<span class="ln" id="L928">928</span>        public = cap.as_public()  # إسناد نتيجة استدعاء cap.as_public إلى public
+<span class="ln" id="L929">929</span>        public[&quot;ok&quot;] = True  # إسناد القيمة الثابتة public[&#x27;ok&#x27;]
+<span class="ln" id="L930">930</span>        public[&quot;meta&quot;] = hops[-1] if hops else {&quot;status&quot;: cap.last_status}  # إسناد hops[نفي/سالب] إن hops وإلا قاموس إلى public[&#x27;meta&#x27;]
+<span class="ln" id="L931">931</span>        public[&quot;redirects&quot;] = hops[:-1]  # إسناد hops[] إلى public[&#x27;redirects&#x27;]
+<span class="ln" id="L932">932</span>        public[&quot;frame_body&quot;] = cap.html if frame_kind in (&quot;fetch&quot;, &quot;xhr&quot;) else &quot;&quot;  # إسناد cap.html إن مقارنة وإلا &#x27;&#x27; إلى public[&#x27;frame_body&#x27;]
+<span class="ln" id="L933">933</span>        if frame_kind in (&quot;fetch&quot;, &quot;xhr&quot;):  # شرط: frame_kind ضمن مجموعة
+<span class="ln" id="L934">934</span>            public[&quot;frame_body&quot;] = resp.decode()[:400000] if resp is not None else &quot;&quot;  # إسناد resp.decode()[] إن مقارنة وإلا &#x27;&#x27; إلى public[&#x27;frame_body&#x27;]
+<span class="ln" id="L935">935</span>        public[&quot;url&quot;] = cap.url  # إسناد cap.url إلى public[&#x27;url&#x27;]
+<span class="ln" id="L936">936</span>        public[&quot;needs_browser_js&quot;] = bool(cap.pass_learn.get(&quot;needs_browser_js&quot;))  # إسناد نتيجة استدعاء bool (معامل واحد) إلى public[&#x27;needs_browser_js&#x27;]
+<span class="ln" id="L937">937</span>        public[&quot;reason_ar&quot;] = cap.pass_learn.get(&quot;reason_ar&quot;) or &quot;&quot;  # دمج منطقي (أو) وإسناده إلى public[&#x27;reason_ar&#x27;]
+<span class="ln" id="L938">938</span>        public[&quot;next_ar&quot;] = cap.pass_learn.get(&quot;next_ar&quot;) or &quot;&quot;  # دمج منطقي (أو) وإسناده إلى public[&#x27;next_ar&#x27;]
+<span class="ln" id="L939">939</span>        public[&quot;pass_mode&quot;] = cap.pass_learn.get(&quot;pass_mode&quot;) or &quot;&quot;  # دمج منطقي (أو) وإسناده إلى public[&#x27;pass_mode&#x27;]
+<span class="ln" id="L940">940</span>        public[&quot;marked&quot;] = bool(cap.marks)  # إسناد نتيجة استدعاء bool (معامل واحد) إلى public[&#x27;marked&#x27;]
+<span class="ln" id="L941">941</span>        return public  # إرجاع public
+<span class="ln" id="L942">942</span> 
+<span class="ln" id="L943">943</span>    # تعليم صفحة كنجاح/حالة مرفوض إن كان فيها نموذج دخول: وإلا تُتعلَّم
+<span class="ln" id="L944">944</span>    # صفحة الدخول نفسها كصفحة نجاح فيصبح كل رفض نجاحاً.
+<span class="ln" id="L945">945</span>    def mark(self, capture_id: str, mark: str) -&gt; dict:  # تعريف الدالة mark(self, capture_id, mark) ترجع dict
+<span class="ln" id="L946">946</span>        cap = self.get(capture_id)  # إسناد نتيجة استدعاء self.get (معامل واحد) إلى cap
+<span class="ln" id="L947">947</span>        mark = (mark or &quot;&quot;).lower().strip()  # إسناد نتيجة استدعاء mark أو &#x27;&#x27;.lower().strip إلى mark
+<span class="ln" id="L948">948</span>        if mark == &quot;statistics&quot;:  # شرط: mark يساوي &#x27;statistics&#x27;
+<span class="ln" id="L949">949</span>            mark = &quot;status&quot;  # إسناد القيمة الثابتة mark
+<span class="ln" id="L950">950</span>        if mark not in (&quot;success&quot;, &quot;reject&quot;, &quot;status&quot;):  # شرط: mark ليس ضمن مجموعة
+<span class="ln" id="L951">951</span>            return {&quot;ok&quot;: False, &quot;error&quot;: &quot;bad_mark&quot;}  # إرجاع قاموس
+<span class="ln" id="L952">952</span>        current_form = portals.parse_form(cap.html, cap.url)  # إسناد نتيجة استدعاء portals.parse_form (2 معاملات) إلى current_form
+<span class="ln" id="L953">953</span>        if mark in (&quot;success&quot;, &quot;status&quot;) and _is_login_form(current_form):  # شرط مركّب (و)
+<span class="ln" id="L954">954</span>            return {  # إرجاع قاموس
+<span class="ln" id="L955">955</span>                &quot;ok&quot;: False,  # مفتاح ok في القاموس
+<span class="ln" id="L956">956</span>                &quot;error&quot;: &quot;login_form_still_visible&quot;,  # مفتاح error في القاموس
+<span class="ln" id="L957">957</span>                &quot;message_ar&quot;: (  # مفتاح message_ar في القاموس
+<span class="ln" id="L958">958</span>                    &quot;ما زالت الصفحة تعرض نموذج الدخول؛ افتح صفحة النجاح أو &quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L959">959</span>                    &quot;الإحصائيات أولاً ثم علّمها.&quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L960">960</span>                ),  # إغلاق القوس المفتوح في السطر السابق
+<span class="ln" id="L961">961</span>            }  # إغلاق القوس المفتوح في السطر السابق
+<span class="ln" id="L962">962</span>        words = learn_words(cap.html, cap._strip_values)  # إسناد نتيجة استدعاء learn_words (2 معاملات) إلى words
+<span class="ln" id="L963">963</span>        entry = {&quot;mark&quot;: mark, &quot;url&quot;: safe_url(cap.url),  # إسناد قاموس إلى entry
+<span class="ln" id="L964">964</span>                 &quot;status&quot;: cap.last_status, &quot;words&quot;: words}  # مفتاح status في القاموس
+<span class="ln" id="L965">965</span>        for existing in cap.marks:  # دورة على cap.marks باسم existing
+<span class="ln" id="L966">966</span>            if (existing.get(&quot;mark&quot;) == mark and existing.get(&quot;url&quot;) == entry[&quot;url&quot;]  # شرط مركّب (و)
+<span class="ln" id="L967">967</span>                    and existing.get(&quot;status&quot;) == entry[&quot;status&quot;]  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L968">968</span>                    and existing.get(&quot;words&quot;) == words):  # تكملة تعريف متعدد الأسطر
+<span class="ln" id="L969">969</span>                return {&quot;ok&quot;: True, &quot;message_ar&quot;: &quot;هذه الصفحة مسجّلة بهذا التصنيف بالفعل.&quot;,  # إرجاع قاموس
+<span class="ln" id="L970">970</span>                        &quot;mark&quot;: existing}  # مفتاح mark في القاموس
+<span class="ln" id="L971">971</span>        cap.marks.append(entry)  # استدعاء cap.marks.append (معامل واحد)
+<span class="ln" id="L972">972</span>        if mark == &quot;success&quot;:  # شرط: mark يساوي &#x27;success&#x27;
+<span class="ln" id="L973">973</span>            cap.success_words = words  # إسناد words إلى cap.success_words
+<span class="ln" id="L974">974</span>            cap.success_url_contains = success_url_hint(cap.url)  # إسناد نتيجة استدعاء success_url_hint (معامل واحد) إلى cap.success_url_contains
+<span class="ln" id="L975">975</span>            msg = &quot;عُلّمت صفحة النجاح. سأحتفظ بالكلمات والرابط الآمن فقط.&quot;  # إسناد القيمة الثابتة msg
+<span class="ln" id="L976">976</span>        elif mark == &quot;reject&quot;:  # شرط: mark يساوي &#x27;reject&#x27;
+<span class="ln" id="L977">977</span>            cap.reject_words = words  # إسناد words إلى cap.reject_words
+<span class="ln" id="L978">978</span>            msg = &quot;عُلّمت صفحة الرفض.&quot;  # إسناد القيمة الثابتة msg
+<span class="ln" id="L979">979</span>        else:  # مفتاح else في القاموس
+<span class="ln" id="L980">980</span>            cap.stats_url = success_url_hint(cap.url) or (urlsplit(cap.url).path or &quot;/&quot;)  # دمج منطقي (أو) وإسناده إلى cap.stats_url
+<span class="ln" id="L981">981</span>            msg = &quot;عُلّمت صفحة الإحصائيات.&quot;  # إسناد القيمة الثابتة msg
+<span class="ln" id="L982">982</span>        return {&quot;ok&quot;: True, &quot;message_ar&quot;: msg, &quot;mark&quot;: entry}  # إرجاع قاموس
+<span class="ln" id="L983">983</span> 
+<span class="ln" id="L984">984</span>    def finish(self, capture_id: str, st: store.Store = None,  # تعريف الدالة finish(self, capture_id, st, hints) ترجع dict
+<span class="ln" id="L985">985</span>               hints: dict = None) -&gt; dict:  # مفتاح hints في القاموس
+<span class="ln" id="L986">986</span>        cap = self.get(capture_id)  # إسناد نتيجة استدعاء self.get (معامل واحد) إلى cap
+<span class="ln" id="L987">987</span>        report = self._build_report(cap)  # إسناد نتيجة استدعاء self._build_report (معامل واحد) إلى report
+<span class="ln" id="L988">988</span>        cap.report = report  # إسناد report إلى cap.report
+<span class="ln" id="L989">989</span>        profile = self._build_profile(cap, hints or {})  # إسناد نتيجة استدعاء self._build_profile (2 معاملات) إلى profile
+<span class="ln" id="L990">990</span>        cap.profile = profile  # إسناد profile إلى cap.profile
+<span class="ln" id="L991">991</span>        if st is not None:  # شرط: st ليس نفسه None
+<span class="ln" id="L992">992</span>            path = st.save_run(report)  # إسناد نتيجة استدعاء st.save_run (معامل واحد) إلى path
+<span class="ln" id="L993">993</span>            cap.report_name = os_basename(path)  # إسناد نتيجة استدعاء os_basename (معامل واحد) إلى cap.report_name
+<span class="ln" id="L994">994</span>            report[&quot;file&quot;] = cap.report_name  # إسناد cap.report_name إلى report[&#x27;file&#x27;]
+<span class="ln" id="L995">995</span>            try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L996">996</span>                saved = st.put(profile)  # إسناد نتيجة استدعاء st.put (معامل واحد) إلى saved
+<span class="ln" id="L997">997</span>                cap.profile = saved  # إسناد saved إلى cap.profile
+<span class="ln" id="L998">998</span>            except Exception:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L999">999</span>                pass  # سطر فارغ منطقياً (pass) — مطلوب صياغياً
+<span class="ln" id="L1000">1000</span>        cap.close()  # استدعاء cap.close
+<span class="ln" id="L1001">1001</span>        public = cap.as_public()  # إسناد نتيجة استدعاء cap.as_public إلى public
+<span class="ln" id="L1002">1002</span>        public[&quot;ok&quot;] = True  # إسناد القيمة الثابتة public[&#x27;ok&#x27;]
+<span class="ln" id="L1003">1003</span>        public[&quot;report&quot;] = report  # إسناد report إلى public[&#x27;report&#x27;]
+<span class="ln" id="L1004">1004</span>        public[&quot;profile&quot;] = cap.profile  # إسناد cap.profile إلى public[&#x27;profile&#x27;]
+<span class="ln" id="L1005">1005</span>        public[&quot;report_name&quot;] = cap.report_name  # إسناد cap.report_name إلى public[&#x27;report_name&#x27;]
+<span class="ln" id="L1006">1006</span>        public[&quot;needs_browser_js&quot;] = bool(profile.get(&quot;capture_needs_browser_js&quot;))  # إسناد نتيجة استدعاء bool (معامل واحد) إلى public[&#x27;needs_browser_js&#x27;]
+<span class="ln" id="L1007">1007</span>        public[&quot;reason_ar&quot;] = profile.get(&quot;capture_block_reason&quot;) or cap.pass_learn.get(&quot;reason_ar&quot;) or &quot;&quot;  # دمج منطقي (أو) وإسناده إلى public[&#x27;reason_ar&#x27;]
+<span class="ln" id="L1008">1008</span>        public[&quot;next_ar&quot;] = cap.pass_learn.get(&quot;next_ar&quot;) or (  # دمج منطقي (أو) وإسناده إلى public[&#x27;next_ar&#x27;]
+<span class="ln" id="L1009">1009</span>            AR_NEXT_UNKNOWN if profile.get(&quot;capture_needs_browser_js&quot;) else &quot;&quot;)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L1010">1010</span>        return public  # إرجاع public
+<span class="ln" id="L1011">1011</span> 
+<span class="ln" id="L1012">1012</span>    def status(self, capture_id: str) -&gt; dict:  # تعريف الدالة status(self, capture_id) ترجع dict
+<span class="ln" id="L1013">1013</span>        return self.get(capture_id).as_public()  # إرجاع self.get(capture_id).as_public()
+<span class="ln" id="L1014">1014</span> 
+<span class="ln" id="L1015">1015</span>    def report_of(self, capture_id: str) -&gt; dict:  # تعريف الدالة report_of(self, capture_id) ترجع dict
+<span class="ln" id="L1016">1016</span>        cap = self.get(capture_id)  # إسناد نتيجة استدعاء self.get (معامل واحد) إلى cap
+<span class="ln" id="L1017">1017</span>        if cap.report is None:  # شرط: cap.report هو نفسه None
+<span class="ln" id="L1018">1018</span>            cap.report = self._build_report(cap)  # إسناد نتيجة استدعاء self._build_report (معامل واحد) إلى cap.report
+<span class="ln" id="L1019">1019</span>        return cap.report  # إرجاع cap.report
+<span class="ln" id="L1020">1020</span> 
+<span class="ln" id="L1021">1021</span>    # -- الداخليات -------------------------------------------------------
+<span class="ln" id="L1022">1022</span>    def _learn_password(self, cap: Capture, before: dict, after: dict,  # تعريف الدالة _learn_password(self, cap, before, after, sent_keys) ترجع None
+<span class="ln" id="L1023">1023</span>                        sent_keys) -&gt; None:  # تكملة تعريف متعدد الأسطر
+<span class="ln" id="L1024">1024</span>        form = cap.form  # إسناد cap.form إلى form
+<span class="ln" id="L1025">1025</span>        if not _is_login_form(form):  # شرط معكوس: ليس _is_login_form(form)
+<span class="ln" id="L1026">1026</span>            return  # إنهاء الدالة بلا قيمة (ترجع None ضمناً)
+<span class="ln" id="L1027">1027</span>        user_f, pass_f = form.user_field, form.pass_field  # إسناد مجموعة إلى مجموعة
+<span class="ln" id="L1028">1028</span>        # نموذج فارغ لاحق (مثلاً erase-cookie على /status.html) ليس
+<span class="ln" id="L1029">1029</span>        # دليلاً على تحويل كلمة المرور. تعلّم فقط من إرسال
+<span class="ln" id="L1030">1030</span>        # أدخل فيه المسؤول فعلاً اسم مستخدم/بطاقة أو كلمة مرور.
+<span class="ln" id="L1031">1031</span>        entered = any(str(before.get(key) or &quot;&quot;).strip()  # إسناد نتيجة استدعاء any (معامل واحد) إلى entered
+<span class="ln" id="L1032">1032</span>                      for key in (user_f, pass_f))  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L1033">1033</span>        if not entered:  # شرط معكوس: ليس entered
+<span class="ln" id="L1034">1034</span>            return  # إنهاء الدالة بلا قيمة (ترجع None ضمناً)
+<span class="ln" id="L1035">1035</span>        learned = infer_pass_mode(  # إسناد نتيجة استدعاء infer_pass_mode (6 معاملات) إلى learned
+<span class="ln" id="L1036">1036</span>            before.get(user_f), before.get(pass_f),  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L1037">1037</span>            after.get(user_f), after.get(pass_f),  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L1038">1038</span>            cap.login_html, sent_keys)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L1039">1039</span>        cap.pass_learn = learned  # إسناد learned إلى cap.pass_learn
+<span class="ln" id="L1040">1040</span> 
+<span class="ln" id="L1041">1041</span>    def _exchange(self, cap: Capture, method: str, url: str, data=None,  # تعريف الدالة _exchange(self, cap, method, url, data, headers, content_type, kind)
+<span class="ln" id="L1042">1042</span>                  headers=None, content_type: str = &quot;&quot;, kind: str = &quot;navigate&quot;):  # المعامل المسمّى headers
+<span class="ln" id="L1043">1043</span>        extra = {}  # إسناد قاموس إلى extra
+<span class="ln" id="L1044">1044</span>        for key, value in (headers or {}).items():  # دورة على headers أو قاموس.items() باسم مجموعة
+<span class="ln" id="L1045">1045</span>            low = str(key).lower()  # إسناد نتيجة استدعاء str(key).lower إلى low
+<span class="ln" id="L1046">1046</span>            if low in (&quot;host&quot;, &quot;cookie&quot;, &quot;content-length&quot;, &quot;connection&quot;):  # شرط: low ضمن مجموعة
+<span class="ln" id="L1047">1047</span>                continue  # الانتقال إلى الدورة التالية
+<span class="ln" id="L1048">1048</span>            extra[key] = value  # إسناد value إلى extra[key]
+<span class="ln" id="L1049">1049</span>        if content_type and &quot;content-type&quot; not in {k.lower() for k in extra}:  # شرط مركّب (و)
+<span class="ln" id="L1050">1050</span>            extra[&quot;Content-Type&quot;] = content_type  # إسناد content_type إلى extra[&#x27;Content-Type&#x27;]
+<span class="ln" id="L1051">1051</span>        if cap.url and &quot;referer&quot; not in {k.lower() for k in extra}:  # شرط مركّب (و)
+<span class="ln" id="L1052">1052</span>            extra[&quot;Referer&quot;] = cap.url  # إسناد cap.url إلى extra[&#x27;Referer&#x27;]
+<span class="ln" id="L1053">1053</span>        # المتصفحات ترسل Origin مع نماذج POST وطلبات fetch/XHR، لا مع
+<span class="ln" id="L1054">1054</span>        # تنقّلات GET العادية. إضافته إلى GET ملتقط قد يغيّر
+<span class="ln" id="L1055">1055</span>        # ردّ البوابة مقارنة بسير متصفح المستخدم الناجح.
+<span class="ln" id="L1056">1056</span>        request_kind = (kind or &quot;&quot;).lower()  # إسناد نتيجة استدعاء kind أو &#x27;&#x27;.lower إلى request_kind
+<span class="ln" id="L1057">1057</span>        if (cap.url and (method.upper() != &quot;GET&quot; or  # شرط مركّب (و)
+<span class="ln" id="L1058">1058</span>                         request_kind in (&quot;fetch&quot;, &quot;xhr&quot;)) and  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L1059">1059</span>                &quot;origin&quot; not in {k.lower() for k in extra}):  # تكملة تعريف متعدد الأسطر
+<span class="ln" id="L1060">1060</span>            origin = urlsplit(cap.url)  # إسناد نتيجة استدعاء urlsplit (معامل واحد) إلى origin
+<span class="ln" id="L1061">1061</span>            if origin.scheme and origin.netloc:  # شرط مركّب (و)
+<span class="ln" id="L1062">1062</span>                extra[&quot;Origin&quot;] = f&quot;{origin.scheme}://{origin.netloc}&quot;  # بناء نص منسّق وإسناده إلى extra[&#x27;Origin&#x27;]
+<span class="ln" id="L1063">1063</span>        hops = []  # إسناد قائمة إلى hops
+<span class="ln" id="L1064">1064</span>        body = data  # إسناد data إلى body
+<span class="ln" id="L1065">1065</span>        last = None  # إسناد القيمة الثابتة last
+<span class="ln" id="L1066">1066</span>        orig_method = method  # إسناد method إلى orig_method
+<span class="ln" id="L1067">1067</span>        for _ in range(MAX_REDIRECTS + 1):  # دورة على range(جمع) باسم _
+<span class="ln" id="L1068">1068</span>            if is_kirapass_url(url, cap.guard):  # شرط: نتيجة is_kirapass_url(url, cap.guard)
+<span class="ln" id="L1069">1069</span>                raise ValueError(&quot;blocked_kirapass_target&quot;)  # رفع ValueError(&#x27;blocked_kirapass_target&#x27;)
+<span class="ln" id="L1070">1070</span>            if method == &quot;GET&quot; and isinstance(body, dict):  # شرط مركّب (و)
+<span class="ln" id="L1071">1071</span>                last = cap.session.request(  # إسناد نتيجة استدعاء cap.session.request (2 معاملات، params=…، headers=…، allow_redirects=…) إلى last
+<span class="ln" id="L1072">1072</span>                    method, url, params=body, headers=extra, allow_redirects=False)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L1073">1073</span>                body = None  # إسناد القيمة الثابتة body
+<span class="ln" id="L1074">1074</span>            else:  # مفتاح else في القاموس
+<span class="ln" id="L1075">1075</span>                last = cap.session.request(  # إسناد نتيجة استدعاء cap.session.request (2 معاملات، data=…، headers=…، allow_redirects=…) إلى last
+<span class="ln" id="L1076">1076</span>                    method, url, data=body, headers=extra, allow_redirects=False)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L1077">1077</span>            hop = _strip_hop(last)  # إسناد نتيجة استدعاء _strip_hop (معامل واحد) إلى hop
+<span class="ln" id="L1078">1078</span>            hops.append(hop)  # استدعاء hops.append (معامل واحد)
+<span class="ln" id="L1079">1079</span>            cap.redirects.append(hop)  # استدعاء cap.redirects.append (معامل واحد)
+<span class="ln" id="L1080">1080</span>            if content_type:  # شرط: content_type
+<span class="ln" id="L1081">1081</span>                cap.content_types.append(content_type.split(&quot;;&quot;)[0])  # استدعاء cap.content_types.append (معامل واحد)
+<span class="ln" id="L1082">1082</span>            cap.custom_headers = sorted(set(cap.custom_headers) |  # إسناد نتيجة استدعاء sorted (معامل واحد) إلى cap.custom_headers
+<span class="ln" id="L1083">1083</span>                                        set(hop.get(&quot;custom_request_headers&quot;) or []))  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L1084">1084</span>            cap.cookie_names = cookie_names_from_session(cap.session)  # إسناد نتيجة استدعاء cookie_names_from_session (معامل واحد) إلى cap.cookie_names
+<span class="ln" id="L1085">1085</span>            if not last.is_redirect():  # شرط معكوس: ليس last.is_redirect()
+<span class="ln" id="L1086">1086</span>                break  # قطع الحلقة فوراً
+<span class="ln" id="L1087">1087</span>            url = urljoin(url, last.location)  # إسناد نتيجة استدعاء urljoin (2 معاملات) إلى url
+<span class="ln" id="L1088">1088</span>            if last.status in (301, 302, 303) and method == &quot;POST&quot;:  # شرط مركّب (و)
+<span class="ln" id="L1089">1089</span>                method, body, extra = &quot;GET&quot;, None, {}  # إسناد مجموعة إلى مجموعة
+<span class="ln" id="L1090">1090</span>        cap.url = last.url if last is not None else url  # إسناد last.url إن مقارنة وإلا url إلى cap.url
+<span class="ln" id="L1091">1091</span>        cap.last_status = last.status if last is not None else 0  # إسناد last.status إن مقارنة وإلا 0 إلى cap.last_status
+<span class="ln" id="L1092">1092</span>        text = last.decode() if last is not None else &quot;&quot;  # إسناد last.decode() إن مقارنة وإلا &#x27;&#x27; إلى text
+<span class="ln" id="L1093">1093</span>        ctype = (last.header(&quot;content-type&quot;) if last is not None else &quot;&quot;) or &quot;&quot;  # دمج منطقي (أو) وإسناده إلى ctype
+<span class="ln" id="L1094">1094</span>        if &quot;html&quot; in ctype.lower() or text.lstrip()[:15].lower().startswith((&quot;&lt;!&quot;, &quot;&lt;html&quot;)):  # شرط مركّب (أو)
+<span class="ln" id="L1095">1095</span>            cap.html = text[:400000]  # إسناد text[] إلى cap.html
+<span class="ln" id="L1096">1096</span>            page_form = portals.parse_form(cap.html, cap.url)  # إسناد نتيجة استدعاء portals.parse_form (2 معاملات) إلى page_form
+<span class="ln" id="L1097">1097</span>            if _is_login_form(page_form):  # شرط: نتيجة _is_login_form(page_form)
+<span class="ln" id="L1098">1098</span>                cap.form = page_form  # إسناد page_form إلى cap.form
+<span class="ln" id="L1099">1099</span>                cap.login_html = cap.html  # إسناد cap.html إلى cap.login_html
+<span class="ln" id="L1100">1100</span>                cap.method = page_form.method  # إسناد page_form.method إلى cap.method
+<span class="ln" id="L1101">1101</span>        cap.events.append({  # استدعاء cap.events.append (معامل واحد)
+<span class="ln" id="L1102">1102</span>            &quot;kind&quot;: kind,  # مفتاح kind في القاموس
+<span class="ln" id="L1103">1103</span>            &quot;method&quot;: orig_method,  # مفتاح method في القاموس
+<span class="ln" id="L1104">1104</span>            &quot;content_type&quot;: (ctype.split(&quot;;&quot;)[0] if ctype else content_type),  # مفتاح content_type في القاموس
+<span class="ln" id="L1105">1105</span>            &quot;request_fields&quot;: list(cap.last_fields_redacted),  # مفتاح request_fields في القاموس
+<span class="ln" id="L1106">1106</span>            &quot;response&quot;: hops[-1] if hops else {},  # مفتاح response في القاموس
+<span class="ln" id="L1107">1107</span>            &quot;redirects&quot;: hops[:-1],  # مفتاح redirects في القاموس
+<span class="ln" id="L1108">1108</span>            &quot;cookie_names&quot;: list(cap.cookie_names),  # مفتاح cookie_names في القاموس
+<span class="ln" id="L1109">1109</span>            &quot;http_200_not_verdict&quot;: cap.last_status == 200,  # مفتاح http_200_not_verdict في القاموس
+<span class="ln" id="L1110">1110</span>        })  # إغلاق القوس المفتوح في السطر السابق
+<span class="ln" id="L1111">1111</span>        cap.last_fields_redacted = []  # إسناد قائمة إلى cap.last_fields_redacted
+<span class="ln" id="L1112">1112</span>        cap._last_raw_fields = {}  # إسناد قاموس إلى cap._last_raw_fields
+<span class="ln" id="L1113">1113</span>        return last, hops  # إرجاع مجموعة
+<span class="ln" id="L1114">1114</span> 
+<span class="ln" id="L1115">1115</span>    def _build_report(self, cap: Capture) -&gt; dict:  # تعريف الدالة _build_report(self, cap) ترجع dict
+<span class="ln" id="L1116">1116</span>        report = {  # إسناد قاموس إلى report
+<span class="ln" id="L1117">1117</span>            &quot;kind&quot;: &quot;capture&quot;,  # مفتاح kind في القاموس
+<span class="ln" id="L1118">1118</span>            &quot;profile&quot;: &quot;capture&quot;,  # مفتاح profile في القاموس
+<span class="ln" id="L1119">1119</span>            &quot;started&quot;: time.strftime(&quot;%Y-%m-%d %H:%M:%S&quot;,  # مفتاح started في القاموس
+<span class="ln" id="L1120">1120</span>                                     time.localtime(cap.created)),  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L1121">1121</span>            &quot;start_url&quot;: safe_url(cap.start_url),  # مفتاح start_url في القاموس
+<span class="ln" id="L1122">1122</span>            &quot;final_url&quot;: safe_url(cap.url),  # مفتاح final_url في القاموس
+<span class="ln" id="L1123">1123</span>            &quot;events&quot;: cap.events,  # مفتاح events في القاموس
+<span class="ln" id="L1124">1124</span>            &quot;marks&quot;: cap.marks,  # مفتاح marks في القاموس
+<span class="ln" id="L1125">1125</span>            &quot;pass_mode&quot;: cap.pass_learn.get(&quot;pass_mode&quot;) or &quot;&quot;,  # مفتاح pass_mode في القاموس
+<span class="ln" id="L1126">1126</span>            &quot;capture_needs_browser_js&quot;: bool(cap.pass_learn.get(&quot;needs_browser_js&quot;)),  # مفتاح capture_needs_browser_js في القاموس
+<span class="ln" id="L1127">1127</span>            &quot;reason&quot;: cap.pass_learn.get(&quot;reason&quot;) or &quot;&quot;,  # مفتاح reason في القاموس
+<span class="ln" id="L1128">1128</span>            &quot;reason_ar&quot;: cap.pass_learn.get(&quot;reason_ar&quot;) or &quot;&quot;,  # مفتاح reason_ar في القاموس
+<span class="ln" id="L1129">1129</span>            &quot;next_ar&quot;: cap.pass_learn.get(&quot;next_ar&quot;) or &quot;&quot;,  # مفتاح next_ar في القاموس
+<span class="ln" id="L1130">1130</span>            &quot;next_en&quot;: cap.pass_learn.get(&quot;next_en&quot;) or &quot;&quot;,  # مفتاح next_en في القاموس
+<span class="ln" id="L1131">1131</span>            &quot;success_words&quot;: list(cap.success_words),  # مفتاح success_words في القاموس
+<span class="ln" id="L1132">1132</span>            &quot;success_url_contains&quot;: cap.success_url_contains,  # مفتاح success_url_contains في القاموس
+<span class="ln" id="L1133">1133</span>            &quot;stats_url&quot;: cap.stats_url,  # مفتاح stats_url في القاموس
+<span class="ln" id="L1134">1134</span>            &quot;method&quot;: cap.method,  # مفتاح method في القاموس
+<span class="ln" id="L1135">1135</span>            &quot;content_types&quot;: sorted(set(cap.content_types)),  # مفتاح content_types في القاموس
+<span class="ln" id="L1136">1136</span>            &quot;custom_header_names&quot;: list(cap.custom_headers),  # مفتاح custom_header_names في القاموس
+<span class="ln" id="L1137">1137</span>            &quot;cookie_names&quot;: list(cap.cookie_names),  # مفتاح cookie_names في القاموس
+<span class="ln" id="L1138">1138</span>            &quot;form_fields&quot;: [i[&quot;name&quot;] for i in redact_fields(  # مفتاح form_fields في القاموس
+<span class="ln" id="L1139">1139</span>                cap.form.fields if cap.form else {})],  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L1140">1140</span>            &quot;http_200_policy&quot;: &quot;never_success_or_reject_without_mark_or_evidence&quot;,  # مفتاح http_200_policy في القاموس
+<span class="ln" id="L1141">1141</span>            &quot;curl_export&quot;: export_curl(cap),  # مفتاح curl_export في القاموس
+<span class="ln" id="L1142">1142</span>        }  # إغلاق القوس المفتوح في السطر السابق
+<span class="ln" id="L1143">1143</span>        try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L1144">1144</span>            scrubbed = _scrub(json.dumps(report, ensure_ascii=False),  # إسناد نتيجة استدعاء _scrub (2 معاملات) إلى scrubbed
+<span class="ln" id="L1145">1145</span>                              cap._strip_values)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L1146">1146</span>            return json.loads(scrubbed)  # إرجاع json.loads(scrubbed)
+<span class="ln" id="L1147">1147</span>        except Exception:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L1148">1148</span>            return report  # إرجاع report
+<span class="ln" id="L1149">1149</span> 
+<span class="ln" id="L1150">1150</span>    def _build_profile(self, cap: Capture, hints: dict) -&gt; dict:  # تعريف الدالة _build_profile(self, cap, hints) ترجع dict
+<span class="ln" id="L1151">1151</span>        form = cap.form or portals.parse_form(cap.html, cap.url)  # دمج منطقي (أو) وإسناده إلى form
+<span class="ln" id="L1152">1152</span>        needs = bool(cap.pass_learn.get(&quot;needs_browser_js&quot;))  # إسناد نتيجة استدعاء bool (معامل واحد) إلى needs
+<span class="ln" id="L1153">1153</span>        mode = cap.pass_learn.get(&quot;pass_mode&quot;) or &quot;&quot;  # دمج منطقي (أو) وإسناده إلى mode
+<span class="ln" id="L1154">1154</span>        if needs:  # شرط: needs
+<span class="ln" id="L1155">1155</span>            mode = mode if mode in KNOWN_PASS_MODES else &quot;empty&quot;  # إسناد mode إن مقارنة وإلا &#x27;empty&#x27; إلى mode
+<span class="ln" id="L1156">1156</span>        extra = extra_fields_for_profile(form.fields if form else {})  # إسناد نتيجة استدعاء extra_fields_for_profile (معامل واحد) إلى extra
+<span class="ln" id="L1157">1157</span>        host = (urlsplit(cap.start_url).hostname or &quot;capture&quot;).replace(&quot;.&quot;, &quot;-&quot;)  # إسناد نتيجة استدعاء urlsplit(cap.start_url).hostname أو &#x27;capture&#x27;.replace (2 معاملات) إلى host
+<span class="ln" id="L1158">1158</span>        prof = store.new_profile(  # إسناد نتيجة استدعاء store.new_profile (name=…، login_url=…، method=…، user_field=…، pass_field=…، pass_mode=…، extra_fields=…، dst_field=…، dst_value=…، popup_field=…، send_dst=…، send_popup=…، chap=…، success_words=…، success_url_contains=…، capture_needs_browser_js=…، capture_block_reason=…، stats_url=…، prefix=…، length=…، charset=…) إلى prof
+<span class="ln" id="L1159">1159</span>            name=hints.get(&quot;name&quot;) or host,  # المعامل المسمّى name
+<span class="ln" id="L1160">1160</span>            login_url=(form.action if form else &quot;&quot;) or cap.start_url,  # المعامل المسمّى login_url
+<span class="ln" id="L1161">1161</span>            method=(form.method if form else cap.method) or &quot;post&quot;,  # المعامل المسمّى method
+<span class="ln" id="L1162">1162</span>            user_field=(form.user_field if form else &quot;&quot;) or &quot;username&quot;,  # المعامل المسمّى user_field
+<span class="ln" id="L1163">1163</span>            pass_field=(form.pass_field if form else &quot;&quot;) or &quot;password&quot;,  # المعامل المسمّى pass_field
+<span class="ln" id="L1164">1164</span>            pass_mode=mode or &quot;empty&quot;,  # المعامل المسمّى pass_mode
+<span class="ln" id="L1165">1165</span>            extra_fields=extra,  # المعامل المسمّى extra_fields
+<span class="ln" id="L1166">1166</span>            dst_field=(form.dst_field if form else &quot;dst&quot;) or &quot;dst&quot;,  # المعامل المسمّى dst_field
+<span class="ln" id="L1167">1167</span>            dst_value=(form.dst_value if form else &quot;&quot;) or &quot;&quot;,  # المعامل المسمّى dst_value
+<span class="ln" id="L1168">1168</span>            popup_field=(form.popup_field if form else &quot;popup&quot;) or &quot;popup&quot;,  # المعامل المسمّى popup_field
+<span class="ln" id="L1169">1169</span>            send_dst=bool(form and form.dst_field in (form.fields or {})),  # المعامل المسمّى send_dst
+<span class="ln" id="L1170">1170</span>            send_popup=bool(form and form.popup_field in (form.fields or {})),  # المعامل المسمّى send_popup
+<span class="ln" id="L1171">1171</span>            chap=(form.chap if form else None),  # المعامل المسمّى chap
+<span class="ln" id="L1172">1172</span>            success_words=list(cap.success_words),  # المعامل المسمّى success_words
+<span class="ln" id="L1173">1173</span>            success_url_contains=cap.success_url_contains,  # المعامل المسمّى success_url_contains
+<span class="ln" id="L1174">1174</span>            capture_needs_browser_js=needs,  # المعامل المسمّى capture_needs_browser_js
+<span class="ln" id="L1175">1175</span>            capture_block_reason=(cap.pass_learn.get(&quot;reason_ar&quot;) or &quot;&quot;) if needs else &quot;&quot;,  # المعامل المسمّى capture_block_reason
+<span class="ln" id="L1176">1176</span>            stats_url=cap.stats_url,  # المعامل المسمّى stats_url
+<span class="ln" id="L1177">1177</span>            prefix=hints.get(&quot;prefix&quot;) or &quot;&quot;,  # المعامل المسمّى prefix
+<span class="ln" id="L1178">1178</span>            length=int(hints.get(&quot;length&quot;) or 10),  # المعامل المسمّى length
+<span class="ln" id="L1179">1179</span>            charset=hints.get(&quot;charset&quot;) or store.CHARSETS[&quot;digits&quot;],  # المعامل المسمّى charset
+<span class="ln" id="L1180">1180</span>        )  # إغلاق القوس المفتوح في السطر السابق
+<span class="ln" id="L1181">1181</span>        return prof  # إرجاع prof
+<span class="ln" id="L1182">1182</span> 
+<span class="ln" id="L1183">1183</span> 
+<span class="ln" id="L1184">1184</span>def os_basename(path: str) -&gt; str:  # تعريف الدالة os_basename(path) ترجع str
+<span class="ln" id="L1185">1185</span>    import os  # استيراد الوحدة os من المكتبة
+<span class="ln" id="L1186">1186</span>    return os.path.basename(path)  # إرجاع os.path.basename(path)
+<span class="ln" id="L1187">1187</span> 
+<span class="ln" id="L1188">1188</span> 
+<span class="ln" id="L1189">1189</span># أمر curl منقّح: كل قيمة سرّية ⇒ &lt;redacted&gt; والترويسات المخصصة أسماء فقط.
+<span class="ln" id="L1190">1190</span>def export_curl(cap: &quot;Capture&quot;) -&gt; str:  # تعريف الدالة export_curl(cap) ترجع str
+<span class="ln" id="L1191">1191</span>    # بداية نص متعدد الأسطر — الأسطر التالية نصّ حرفي لا كود، فلا يقبل تعليقاً
+<span class="ln" id="L1192">1192</span>    &quot;&quot;&quot;Build a redacted curl sketch of the last login request (no secrets).
+<span class="ln" id="L1193">1193</span> 
+<span class="ln" id="L1194">1194</span>    Values that look like secrets/tokens are replaced with placeholders so the
+<span class="ln" id="L1195">1195</span>    operator can study the request shape without storing credentials.
+<span class="ln" id="L1196">1196</span>    &quot;&quot;&quot;  # نهاية النص متعدد الأسطر
+<span class="ln" id="L1197">1197</span>    method = (cap.method or &quot;POST&quot;).upper()  # إسناد نتيجة استدعاء cap.method أو &#x27;POST&#x27;.upper إلى method
+<span class="ln" id="L1198">1198</span>    url = _safe_page_url(cap.url or cap.start_url or &quot;&quot;)  # إسناد نتيجة استدعاء _safe_page_url (معامل واحد) إلى url
+<span class="ln" id="L1199">1199</span>    parts = [f&quot;curl -X {method} &#x27;{url}&#x27;&quot;]  # إسناد قائمة إلى parts
+<span class="ln" id="L1200">1200</span>    for name in (cap.custom_headers or []):  # دورة على cap.custom_headers أو قائمة باسم name
+<span class="ln" id="L1201">1201</span>        parts.append(f&quot;  -H &#x27;{name}: &lt;redacted&gt;&#x27;&quot;)  # استدعاء parts.append (معامل واحد)
+<span class="ln" id="L1202">1202</span>    fields = []  # إسناد قائمة إلى fields
+<span class="ln" id="L1203">1203</span>    raw = getattr(cap, &quot;_last_raw_fields&quot;, None) or {}  # دمج منطقي (أو) وإسناده إلى raw
+<span class="ln" id="L1204">1204</span>    if not raw and cap.form and getattr(cap.form, &quot;fields&quot;, None):  # شرط مركّب (و)
+<span class="ln" id="L1205">1205</span>        raw = dict(cap.form.fields)  # إسناد نتيجة استدعاء dict (معامل واحد) إلى raw
+<span class="ln" id="L1206">1206</span>    for name, value in (raw or {}).items():  # دورة على raw أو قاموس.items() باسم مجموعة
+<span class="ln" id="L1207">1207</span>        key = str(name)  # إسناد نتيجة استدعاء str (معامل واحد) إلى key
+<span class="ln" id="L1208">1208</span>        if looks_secret_name(key) or looks_token_name(key) or looks_live_token(  # شرط مركّب (أو)
+<span class="ln" id="L1209">1209</span>                &quot;&quot; if value is None else str(value)):  # تكملة تعريف متعدد الأسطر
+<span class="ln" id="L1210">1210</span>            fields.append(f&quot;{key}=&lt;redacted&gt;&quot;)  # استدعاء fields.append (معامل واحد)
+<span class="ln" id="L1211">1211</span>        else:  # مفتاح else في القاموس
+<span class="ln" id="L1212">1212</span>            fields.append(f&quot;{key}={value}&quot;)  # استدعاء fields.append (معامل واحد)
+<span class="ln" id="L1213">1213</span>    if fields:  # شرط: fields
+<span class="ln" id="L1214">1214</span>        body = &quot;&amp;&quot;.join(fields)  # إسناد نتيجة استدعاء &#x27;&amp;&#x27;.join (معامل واحد) إلى body
+<span class="ln" id="L1215">1215</span>        parts.append(f&quot;  --data-raw &#x27;{body}&#x27;&quot;)  # استدعاء parts.append (معامل واحد)
+<span class="ln" id="L1216">1216</span>    parts.append(&quot;  # secrets redacted — for manual review only&quot;)  # استدعاء parts.append (معامل واحد)
+<span class="ln" id="L1217">1217</span>    return &quot; \\\n&quot;.join(parts)  # إرجاع &#x27; \\\n&#x27;.join(parts)
+<span class="ln" id="L1218">1218</span> 
+<span class="ln" id="L1219">1219</span> 
+<span class="ln" id="L1220">1220</span>def _scrub(blob: str, values) -&gt; str:  # تعريف الدالة _scrub(blob, values) ترجع str
+<span class="ln" id="L1221">1221</span>    out = blob  # إسناد blob إلى out
+<span class="ln" id="L1222">1222</span>    for value in values or []:  # دورة على values أو قائمة باسم value
+<span class="ln" id="L1223">1223</span>        text = str(value)  # إسناد نتيجة استدعاء str (معامل واحد) إلى text
+<span class="ln" id="L1224">1224</span>        if len(text) &gt;= 3:  # شرط: len(text) أكبر أو يساوي 3
+<span class="ln" id="L1225">1225</span>            out = out.replace(text, &quot;&quot;)  # إسناد نتيجة استدعاء out.replace (2 معاملات) إلى out
+<span class="ln" id="L1226">1226</span>            out = out.replace(json.dumps(text)[1:-1], &quot;&quot;)  # إسناد نتيجة استدعاء out.replace (2 معاملات) إلى out
+<span class="ln" id="L1227">1227</span>    return out  # إرجاع out
+<span class="ln" id="L1228">1228</span> 
+<span class="ln" id="L1229">1229</span> 
+<span class="ln" id="L1230">1230</span># المحور على مستوى الوحدة يستخدمه سيرفر الويب
+<span class="ln" id="L1231">1231</span>HUB = Hub()  # إسناد نتيجة استدعاء Hub إلى HUB
+<span class="ln" id="L1232">1232</span> 
+</code></pre></details>
+<script>
+document.getElementById("kp-jump").addEventListener("change", function (e) {
+  var n = parseInt(e.target.value, 10);
+  if (n > 0) { var el = document.getElementById("L" + n);
+    if (el) el.scrollIntoView({block: "center"}); }
+});
+if (location.hash) { var el = document.querySelector(location.hash);
+  if (el) setTimeout(function () { el.scrollIntoView({block: "center"}); }, 60); }
+</script>
+<footer class="docfoot">صفحة مولّدة آلياً من مصدر الكود · KiraPass —
+<code>files</code> · 2026-10-01 02:26</footer>
+</main>
+</div>
+<script src="../assets/docs.js"></script>
+<script>KPInit("files");</script>
+</body>
+</html>

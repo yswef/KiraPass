@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ملف httpclient.py · KiraPass</title>
+<link rel="stylesheet" href="../assets/docs.css">
+
+</head>
+<body>
+<div id="kp-layout">
+<main class="doc">
+<h1>ملف <code>httpclient.py</code></h1>
+<p class="lead">عميل HTTP: الاتصال، الكوكيز، المهلات، التحويلات — <code>kirapass/httpclient.py</code></p>
+<div class="card info"><b>هذه الصفحة مولّدة آلياً</b> من مصدر الكود مباشرة (<code>tools/docs/build_docs.py</code>). إن غيّرت الكود فأعد توليدها: <code>python3 tools/docs/build_docs.py</code>. الشرح اليدوي الأوسع في <a href="../architecture.html">المعمارية</a> و<a href="../editing.html">دليل التعديل</a> و<a href="../danger.html">أماكن الخطر</a>.</div>
+<div class="grid3"><div class="card"><b>378</b><br>سطراً</div><div class="card"><b>28</b><br>دالة</div><div class="card"><b>3</b><br>صنف</div></div>
+<div class="note"><b>ملخّص المؤلف للملف (نصه الأصلي بالإنجليزية):</b> <span class="muted">A small HTTP client built only on the python standard library.</span></div>
+<p><a class="btn primary" href="../src/httpclient.html">افتح المصدر كاملاً مرقّماً</a></p>
+<h2 id="imports">الاستيرادات</h2><table class="t compact"><thead><tr><th>السطر</th><th>الاستيراد</th><th>لماذا</th></tr></thead><tbody>
+<tr><td class="mono">15</td><td class="mono">from __future__ import annotations</td><td>استيراد annotations من الوحدة __future__</td></tr>
+<tr><td class="mono">17</td><td class="mono">import gzip</td><td>استيراد الوحدة gzip من المكتبة</td></tr>
+<tr><td class="mono">18</td><td class="mono">import http.client</td><td>استيراد الوحدة http.client من المكتبة</td></tr>
+<tr><td class="mono">19</td><td class="mono">import http.cookies</td><td>استيراد الوحدة http.cookies من المكتبة</td></tr>
+<tr><td class="mono">20</td><td class="mono">import json</td><td>استيراد الوحدة json من المكتبة</td></tr>
+<tr><td class="mono">21</td><td class="mono">import socket</td><td>استيراد الوحدة socket من المكتبة</td></tr>
+<tr><td class="mono">22</td><td class="mono">import ssl</td><td>استيراد الوحدة ssl من المكتبة</td></tr>
+<tr><td class="mono">23</td><td class="mono">import time</td><td>استيراد الوحدة time من المكتبة</td></tr>
+<tr><td class="mono">24</td><td class="mono">import urllib.parse</td><td>استيراد الوحدة urllib.parse من المكتبة</td></tr>
+<tr><td class="mono">25</td><td class="mono">import zlib</td><td>استيراد الوحدة zlib من المكتبة</td></tr>
+<tr><td class="mono">27</td><td class="mono">from . import config</td><td>استيراد config من الوحدة .</td></tr>
+<tr><td class="mono">28</td><td class="mono">from .errors import NetError, classify</td><td>استيراد NetError, classify من الوحدة errors</td></tr>
+</tbody></table>
+<h2 id="vars">متغيرات وثوابت على مستوى الوحدة</h2><div class="scroll-x"><table class="t compact"><thead><tr><th>الاسم</th><th>السطر</th><th>القيمة</th><th>الشرح</th></tr></thead><tbody>
+<tr><td class="mono"><span class="tag var">MAX_REDIRECTS</span></td><td class="mono"><a href="../src/httpclient.html#L30">30</a></td><td class="mono">8</td><td>إسناد القيمة الثابتة MAX_REDIRECTS</td></tr>
+</tbody></table></div>
+<h2 id="classes">الأصناف</h2>
+<div class="sym head" id="c-Response"><span class="tag mod">صنف</span> <b>Response</b> <a class="tag api" href="../src/httpclient.html#L33">سطر 33</a><div>تعريف الصنف Response</div></div>
+<div class="sym body">دواله: <a href="#f-Response.__init__"><code>__init__</code></a> · <a href="#f-Response.body"><code>body</code></a> · <a href="#f-Response.text"><code>text</code></a> · <a href="#f-Response.decode"><code>decode</code></a> · <a href="#f-Response.header"><code>header</code></a> · <a href="#f-Response.location"><code>location</code></a> · <a href="#f-Response.length"><code>length</code></a> · <a href="#f-Response.is_redirect"><code>is_redirect</code></a> · <a href="#f-Response.as_dict"><code>as_dict</code></a></div>
+<div class="sym head" id="c-CookieStore"><span class="tag mod">صنف</span> <b>CookieStore</b> <a class="tag api" href="../src/httpclient.html#L97">سطر 97</a><div>تعريف الصنف CookieStore</div></div>
+<div class="sym body">دواله: <a href="#f-CookieStore.__init__"><code>__init__</code></a> · <a href="#f-CookieStore.update"><code>update</code></a> · <a href="#f-CookieStore.header"><code>header</code></a> · <a href="#f-CookieStore.clear"><code>clear</code></a> · <a href="#f-CookieStore.names"><code>names</code></a> · <a href="#f-CookieStore.__len__"><code>__len__</code></a></div>
+<div class="sym head" id="c-Session"><span class="tag mod">صنف</span> <b>Session</b> <a class="tag api" href="../src/httpclient.html#L150">سطر 150</a><div>تعريف الصنف Session</div></div>
+<div class="sym body">دواله: <a href="#f-Session.__init__"><code>__init__</code></a> · <a href="#f-Session.__enter__"><code>__enter__</code></a> · <a href="#f-Session.__exit__"><code>__exit__</code></a> · <a href="#f-Session._ssl_context"><code>_ssl_context</code></a> · <a href="#f-Session._connection"><code>_connection</code></a> · <a href="#f-Session.close"><code>close</code></a> · <a href="#f-Session.request"><code>request</code></a> · <a href="#f-Session.get"><code>get</code></a> · <a href="#f-Session.post"><code>post</code></a> · <a href="#f-Session._send_once"><code>_send_once</code></a> · <a href="#f-Session._decompress"><code>_decompress</code></a></div>
+<h2 id="funcs">الدوال — واحدة واحدة</h2>
+<div class="sym head" id="f-Response.__init__"><span class="tag fn">دالة</span> <b>Response.__init__(self, status, headers, body, url, elapsed_ms, history, method, request_headers, reason)</b>
+ <a class="tag api" href="../src/httpclient.html#L39">سطر 39–49</a>
+<div>تعريف الدالة __init__(self, status, headers, body, url, elapsed_ms, history, method, request_headers, reason)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>يُسند إلى</th><td><code>self._body, self.elapsed_ms, self.headers, self.history, self.method, self.reason, self.request_headers, self.status, self.url</code></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Response.body"><span class="tag fn">دالة</span> <b>Response.body(self)</b>
+ <span class="muted">→ bytes</span>
+ <span class="tag var">@property</span>
+ <a class="tag api" href="../src/httpclient.html#L53">سطر 53–54</a>
+<div>تعريف الدالة body(self) ترجع bytes</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Response.text"><span class="tag fn">دالة</span> <b>Response.text(self)</b>
+ <span class="muted">→ str</span>
+ <span class="tag var">@property</span>
+ <a class="tag api" href="../src/httpclient.html#L57">سطر 57–58</a>
+<div>تعريف الدالة text(self) ترجع str</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/httpclient.html#f-Response.decode"><code>Response.decode</code></a><span class="muted">×1 سطر 58 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Response.decode"><span class="tag fn">دالة</span> <b>Response.decode(self, limit)</b>
+ <span class="muted">→ str</span>
+ <a class="tag api" href="../src/httpclient.html#L60">سطر 60–71</a>
+<div>تعريف الدالة decode(self, limit) ترجع str</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>charset, ctype, raw</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/httpclient.html#f-Response.header"><code>Response.header</code></a><span class="muted">×1 سطر 65 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/httpclient.html#f-Response.text"><code>Response.text</code></a> <span class="muted">(httpclient.py:58)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Response.header"><span class="tag fn">دالة</span> <b>Response.header(self, name, default)</b>
+ <span class="muted">→ str</span>
+ <a class="tag api" href="../src/httpclient.html#L73">سطر 73–74</a>
+<div>تعريف الدالة header(self, name, default) ترجع str</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/httpclient.html#f-Session.get"><code>Session.get</code></a><span class="muted">×1 سطر 74 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/httpclient.html#f-Response.decode"><code>Response.decode</code></a> <span class="muted">(httpclient.py:65)</span> <a href="../files/httpclient.html#f-Response.location"><code>Response.location</code></a> <span class="muted">(httpclient.py:78)</span> <a href="../files/httpclient.html#f-Session._send_once"><code>Session._send_once</code></a> <span class="muted">(httpclient.py:284)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Response.location"><span class="tag fn">دالة</span> <b>Response.location(self)</b>
+ <span class="muted">→ str</span>
+ <span class="tag var">@property</span>
+ <a class="tag api" href="../src/httpclient.html#L77">سطر 77–78</a>
+<div>تعريف الدالة location(self) ترجع str</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/httpclient.html#f-Response.header"><code>Response.header</code></a><span class="muted">×1 سطر 78 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Response.length"><span class="tag fn">دالة</span> <b>Response.length(self)</b>
+ <span class="muted">→ int</span>
+ <span class="tag var">@property</span>
+ <a class="tag api" href="../src/httpclient.html#L81">سطر 81–82</a>
+<div>تعريف الدالة length(self) ترجع int</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Response.is_redirect"><span class="tag fn">دالة</span> <b>Response.is_redirect(self)</b>
+ <span class="muted">→ bool</span>
+ <a class="tag api" href="../src/httpclient.html#L84">سطر 84–85</a>
+<div>تعريف الدالة is_redirect(self) ترجع bool</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Response.as_dict"><span class="tag fn">دالة</span> <b>Response.as_dict(self)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/httpclient.html#L87">سطر 87–94</a>
+<div>تعريف الدالة as_dict(self) ترجع dict</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-CookieStore.__init__"><span class="tag fn">دالة</span> <b>CookieStore.__init__(self)</b>
+ <a class="tag api" href="../src/httpclient.html#L100">سطر 100–101</a>
+<div>تعريف الدالة __init__(self)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>يُسند إلى</th><td><code>self._jar</code></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-CookieStore.update"><span class="tag fn">دالة</span> <b>CookieStore.update(self, url, set_cookie_headers)</b>
+ <span class="muted">→ None</span>
+ <a class="tag api" href="../src/httpclient.html#L104">سطر 104–120</a>
+<div>يحفظ Set-Cookie مع النطاق والمسار وsecure حتى لا يُرسل كوكي في غير مكانه.</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>يُسند إلى</th><td><code>domain, host, parsed, path</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/httpclient.html#f-Session.__init__"><code>Session.__init__</code></a> <span class="muted">(httpclient.py:158)</span> <a href="../files/httpclient.html#f-Session._send_once"><code>Session._send_once</code></a> <span class="muted">(httpclient.py:324)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-CookieStore.header"><span class="tag fn">دالة</span> <b>CookieStore.header(self, url)</b>
+ <span class="muted">→ str</span>
+ <a class="tag api" href="../src/httpclient.html#L122">سطر 122–136</a>
+<div>تعريف الدالة header(self, url) ترجع str</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>dom, host, out, parts, path</code></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-CookieStore.clear"><span class="tag fn">دالة</span> <b>CookieStore.clear(self)</b>
+ <span class="muted">→ None</span>
+ <a class="tag api" href="../src/httpclient.html#L138">سطر 138–139</a>
+<div>تعريف الدالة clear(self) ترجع None</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/httpclient.html#f-CookieStore.clear"><code>CookieStore.clear</code></a><span class="muted">×1 سطر 139 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/httpclient.html#f-CookieStore.clear"><code>CookieStore.clear</code></a> <span class="muted">(httpclient.py:139)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-CookieStore.names"><span class="tag fn">دالة</span> <b>CookieStore.names(self)</b>
+ <span class="muted">→ list</span>
+ <a class="tag api" href="../src/httpclient.html#L142">سطر 142–144</a>
+<div>أسماء الكوكيز فقط ولا القيم أبداً — القيم أسرار جلسات. <span class="muted">(نص المؤلف الأصلي في docstring: Cookie names only - never the values.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/capture.html#f-cookie_names_from_session"><code>cookie_names_from_session</code></a> <span class="muted">(capture.py:393)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-CookieStore.__len__"><span class="tag fn">دالة</span> <b>CookieStore.__len__(self)</b>
+ <span class="muted">→ int</span>
+ <a class="tag api" href="../src/httpclient.html#L146">سطر 146–147</a>
+<div>تعريف الدالة __len__(self) ترجع int</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Session.__init__"><span class="tag fn">دالة</span> <b>Session.__init__(self, headers, connect_timeout, read_timeout, verify_tls, allow_redirects)</b>
+ <a class="tag api" href="../src/httpclient.html#L153">سطر 153–167</a>
+<div>تعريف الدالة __init__(self, headers, connect_timeout, read_timeout, verify_tls, allow_redirects)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>يُسند إلى</th><td><code>self._conn, self._key, self._ssl_ctx, self.allow_redirects, self.connect_timeout, self.cookies, self.headers, self.read_timeout, self.stats, self.verify_tls</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/httpclient.html#f-CookieStore"><code>CookieStore</code></a><span class="muted">×1 سطر 163 (نفس الملف)</span> · <a href="../files/httpclient.html#f-CookieStore.update"><code>CookieStore.update</code></a><span class="muted">×1 سطر 158 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Session.__enter__"><span class="tag fn">دالة</span> <b>Session.__enter__(self)</b>
+ <span class="muted">→ &#x27;Session&#x27;</span>
+ <a class="tag api" href="../src/httpclient.html#L169">سطر 169–170</a>
+<div>تعريف الدالة __enter__(self) ترجع 'Session'</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Session.__exit__"><span class="tag fn">دالة</span> <b>Session.__exit__(self, *exc)</b>
+ <span class="muted">→ bool</span>
+ <a class="tag api" href="../src/httpclient.html#L172">سطر 172–174</a>
+<div>تعريف الدالة __exit__(self, *exc) ترجع bool</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/httpclient.html#f-Session.close"><code>Session.close</code></a><span class="muted">×1 سطر 173 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Session._ssl_context"><span class="tag fn">دالة</span> <b>Session._ssl_context(self)</b>
+ <a class="tag api" href="../src/httpclient.html#L177">سطر 177–183</a>
+<div>-- الاتصال -------------------------------------------------------</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>self._ssl_ctx</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/httpclient.html#f-Session._connection"><code>Session._connection</code></a> <span class="muted">(httpclient.py:193)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Session._connection"><span class="tag fn">دالة</span> <b>Session._connection(self, scheme, host, port)</b>
+ <a class="tag api" href="../src/httpclient.html#L185">سطر 185–198</a>
+<div>تعريف الدالة _connection(self, scheme, host, port)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>conn, key</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/httpclient.html#f-Session.close"><code>Session.close</code></a><span class="muted">×1 سطر 189 (نفس الملف)</span> · <a href="../files/httpclient.html#f-Session._ssl_context"><code>Session._ssl_context</code></a><span class="muted">×1 سطر 193 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/httpclient.html#f-Session._send_once"><code>Session._send_once</code></a> <span class="muted">(httpclient.py:298)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Session.close"><span class="tag fn">دالة</span> <b>Session.close(self)</b>
+ <a class="tag api" href="../src/httpclient.html#L200">سطر 200–207</a>
+<div>تعريف الدالة close(self)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>يُسند إلى</th><td><code>self._conn, self._key</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/httpclient.html#f-Session.close"><code>Session.close</code></a><span class="muted">×1 سطر 203 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/httpclient.html#f-Session.__exit__"><code>Session.__exit__</code></a> <span class="muted">(httpclient.py:173)</span> <a href="../files/httpclient.html#f-Session._connection"><code>Session._connection</code></a> <span class="muted">(httpclient.py:189)</span> <a href="../files/httpclient.html#f-Session._send_once"><code>Session._send_once</code></a> <span class="muted">(httpclient.py:309)</span> <a href="../files/httpclient.html#f-Session._send_once"><code>Session._send_once</code></a> <span class="muted">(httpclient.py:323)</span> <a href="../files/httpclient.html#f-Session._send_once"><code>Session._send_once</code></a> <span class="muted">(httpclient.py:332)</span> <a href="../files/httpclient.html#f-Session.close"><code>Session.close</code></a> <span class="muted">(httpclient.py:203)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Session.request"><span class="tag fn">دالة</span> <b>Session.request(self, method, url, params, data, headers, allow_redirects, timeout)</b>
+ <span class="muted">→ Response</span>
+ <a class="tag api" href="../src/httpclient.html#L211">سطر 211–256</a>
+<div>-- الطلبات --------------------------------------------------------- الواجهة العامة: إعادة محاولة صامتة واحدة على stale، ثم تصنيف الخطأ.</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يرفع استثناء</th><td>1 موضع <code>raise</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>body, elapsed_ms, follow, hdr_ct, history, method, post_headers, resp, sep, started, target, url</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/errors.html#f-NetError"><code>NetError</code></a><span class="muted">×1 سطر 256</span> · <a href="../files/httpclient.html#f-Session._send_once"><code>Session._send_once</code></a><span class="muted">×1 سطر 245 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/httpclient.html#f-Session.get"><code>Session.get</code></a> <span class="muted">(httpclient.py:259)</span> <a href="../files/httpclient.html#f-Session.post"><code>Session.post</code></a> <span class="muted">(httpclient.py:262)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Session.get"><span class="tag fn">دالة</span> <b>Session.get(self, url, **kw)</b>
+ <span class="muted">→ Response</span>
+ <a class="tag api" href="../src/httpclient.html#L258">سطر 258–259</a>
+<div>تعريف الدالة get(self, url, **kw) ترجع Response</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/httpclient.html#f-Session.request"><code>Session.request</code></a><span class="muted">×1 سطر 259 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/httpclient.html#f-Response.header"><code>Response.header</code></a> <span class="muted">(httpclient.py:74)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Session.post"><span class="tag fn">دالة</span> <b>Session.post(self, url, **kw)</b>
+ <span class="muted">→ Response</span>
+ <a class="tag api" href="../src/httpclient.html#L261">سطر 261–262</a>
+<div>تعريف الدالة post(self, url, **kw) ترجع Response</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/httpclient.html#f-Session.request"><code>Session.request</code></a><span class="muted">×1 سطر 262 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Session._send_once"><span class="tag fn">دالة</span> <b>Session._send_once(self, method, url, body, extra_headers, post_headers, timeout)</b>
+ <span class="muted">→ Response</span>
+ <a class="tag api" href="../src/httpclient.html#L268">سطر 268–338</a>
+<div>-- رحلة الذهاب والإياب الخام الواحدة ------------------------------- إرسال طلب واحد على اتصال موجود أو جديد. فصل مهلة الاتصال عن مهلة القراءة مقصود: بدونه يدمج بايثون المرحلتين في TimeoutError واحد فيبدو الراوتر الميت «بطيئاً» بدل «غير قابل للوصول».</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يرفع استثناء</th><td>6 موضع <code>raise</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>conn, connect_to, cookie, elapsed, err, hdrs, headers, host, last_exc, parts, path, payload, port, raw, read_to, scheme…</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/errors.html#f-NetError"><code>NetError</code></a><span class="muted">×4 سطر 272</span> · <a href="../files/httpclient.html#f-Session.close"><code>Session.close</code></a><span class="muted">×3 سطر 323 (نفس الملف)</span> · <a href="../files/httpclient.html#f-Response.header"><code>Response.header</code></a><span class="muted">×1 سطر 284 (نفس الملف)</span> · <a href="../files/httpclient.html#f-Session._connection"><code>Session._connection</code></a><span class="muted">×1 سطر 298 (نفس الملف)</span> · <a href="../files/httpclient.html#f-Session._decompress"><code>Session._decompress</code></a><span class="muted">×1 سطر 318 (نفس الملف)</span> · <a href="../files/httpclient.html#f-CookieStore.update"><code>CookieStore.update</code></a><span class="muted">×1 سطر 324 (نفس الملف)</span> · <a href="../files/httpclient.html#f-Response"><code>Response</code></a><span class="muted">×1 سطر 325 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/httpclient.html#f-Session.request"><code>Session.request</code></a> <span class="muted">(httpclient.py:245)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Session._decompress"><span class="tag fn">دالة</span> <b>Session._decompress(payload, encoding)</b>
+ <span class="muted">→ bytes</span>
+ <span class="tag var">@staticmethod</span>
+ <a class="tag api" href="../src/httpclient.html#L341">سطر 341–356</a>
+<div>تعريف الدالة _decompress(payload, encoding) ترجع bytes</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>6 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>enc</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/httpclient.html#f-Session._send_once"><code>Session._send_once</code></a> <span class="muted">(httpclient.py:318)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-open_url"><span class="tag fn">دالة</span> <b>open_url(url, timeout, headers)</b>
+ <span class="muted">→ Response</span>
+ <a class="tag api" href="../src/httpclient.html#L359">سطر 359–365</a>
+<div>تعريف الدالة open_url(url, timeout, headers) ترجع Response <span class="muted">(نص المؤلف الأصلي في docstring: One-shot GET with a throw-away session (used for quick checks).)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>s</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/httpclient.html#f-Session"><code>Session</code></a><span class="muted">×1 سطر 361 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-local_ip"><span class="tag fn">دالة</span> <b>local_ip()</b>
+ <span class="muted">→ str</span>
+ <a class="tag api" href="../src/httpclient.html#L368">سطر 368–377</a>
+<div>تعريف الدالة local_ip() ترجع str <span class="muted">(نص المؤلف الأصلي في docstring: Best-effort local IP, used to print the LAN link of the web UI.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>s</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/cli.html#f-main"><code>main</code></a> <span class="muted">(cli.py:179)</span> <a href="../files/cli.html#f-main.on_ready"><code>main.on_ready</code></a> <span class="muted">(cli.py:179)</span></td></tr>
+</table></div>
+<footer class="docfoot">صفحة مولّدة آلياً من مصدر الكود · KiraPass —
+<code>files</code> · 2026-10-01 02:26</footer>
+</main>
+</div>
+<script src="../assets/docs.js"></script>
+<script>KPInit("files");</script>
+</body>
+</html>

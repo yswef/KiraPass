@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>مصدر selftest.py · KiraPass</title>
+<link rel="stylesheet" href="../assets/docs.css">
+
+</head>
+<body>
+<div id="kp-layout">
+<main class="doc">
+<h1>مصدر <code>selftest.py</code></h1>
+<p class="lead">15 سيناريو اختبار على راوترات وهمية — 453 سطراً. كل سطر يحمل تعليقه العربي.</p>
+<div class="card info"><b>هذه الصفحة مولّدة آلياً</b> من مصدر الكود مباشرة (<code>tools/docs/build_docs.py</code>). إن غيّرت الكود فأعد توليدها: <code>python3 tools/docs/build_docs.py</code>. الشرح اليدوي الأوسع في <a href="../architecture.html">المعمارية</a> و<a href="../editing.html">دليل التعديل</a> و<a href="../danger.html">أماكن الخطر</a>.</div>
+<p><a class="btn" href="../files/selftest.html">← صفحة الشرح</a> <label class="muted"> قفز إلى سطر: <input id="kp-jump" style="width:6rem" placeholder="123"></label></p>
+<details class="src" open><summary>المصدر كاملاً</summary><pre data-lines="453"><code>
+<span class="ln" id="L1">1</span># بداية نص متعدد الأسطر — الأسطر التالية نصّ حرفي لا كود، فلا يقبل تعليقاً
+<span class="ln" id="L2">2</span>&quot;&quot;&quot;Self-test: prove the tool works without touching any real network.
+<span class="ln" id="L3">3</span> 
+<span class="ln" id="L4">4</span>    python3 KiraPass.py --selftest
+<span class="ln" id="L5">5</span> 
+<span class="ln" id="L6">6</span>It spins up local mock routers (see mockportal.py), including the exact
+<span class="ln" id="L7">7</span>situations that broke the old version:
+<span class="ln" id="L8">8</span> 
+<span class="ln" id="L9">9</span>    * a page whose session token changes on every request
+<span class="ln" id="L10">10</span>    * wrong cards that must NEVER be reported as a hit
+<span class="ln" id="L11">11</span>    * a router that bans you, one that rate limits you, one that drops
+<span class="ln" id="L12">12</span>      connections, a chap/md5.js portal, a GET portal, an old saved profile
+<span class="ln" id="L13">13</span>&quot;&quot;&quot;  # نهاية النص متعدد الأسطر
+<span class="ln" id="L14">14</span> 
+<span class="ln" id="L15">15</span>from __future__ import annotations  # استيراد annotations من الوحدة __future__
+<span class="ln" id="L16">16</span> 
+<span class="ln" id="L17">17</span>import os  # استيراد الوحدة os من المكتبة
+<span class="ln" id="L18">18</span>import shutil  # استيراد الوحدة shutil من المكتبة
+<span class="ln" id="L19">19</span>import sys  # استيراد الوحدة sys من المكتبة
+<span class="ln" id="L20">20</span>import time  # استيراد الوحدة time من المكتبة
+<span class="ln" id="L21">21</span> 
+<span class="ln" id="L22">22</span>from . import config, engine, portals, store  # استيراد config, engine, portals, store من الوحدة .
+<span class="ln" id="L23">23</span>from .httpclient import Session  # استيراد Session من الوحدة httpclient
+<span class="ln" id="L24">24</span>from .mockportal import MockPortal  # استيراد MockPortal من الوحدة mockportal
+<span class="ln" id="L25">25</span> 
+<span class="ln" id="L26">26</span> 
+<span class="ln" id="L27">27</span># ---------------------------------------------------------------------------
+<span class="ln" id="L28">28</span># مساعدات
+<span class="ln" id="L29">29</span># ---------------------------------------------------------------------------
+<span class="ln" id="L30">30</span>def make_profile(url: str, prefix=&quot;02&quot;, length=4, charset=&quot;0123456789&quot;,  # تعريف الدالة make_profile(url, prefix, length, charset, portal_info, **kw) ترجع dict
+<span class="ln" id="L31">31</span>                 portal_info=None, **kw) -&gt; dict:  # المعامل المسمّى portal_info
+<span class="ln" id="L32">32</span>    p = store.new_profile(login_url=url, prefix=prefix, length=length,  # إسناد نتيجة استدعاء store.new_profile (login_url=…، prefix=…، length=…، charset=…، name=…، pass_mode=…) إلى p
+<span class="ln" id="L33">33</span>                          charset=charset, name=&quot;selftest&quot;, pass_mode=&quot;empty&quot;)  # المعامل المسمّى charset
+<span class="ln" id="L34">34</span>    if portal_info:  # شرط: portal_info
+<span class="ln" id="L35">35</span>        form = portal_info.get(&quot;form&quot;) or {}  # دمج منطقي (أو) وإسناده إلى form
+<span class="ln" id="L36">36</span>        p.update({  # استدعاء p.update (معامل واحد)
+<span class="ln" id="L37">37</span>            &quot;login_url&quot;: form.get(&quot;action&quot;) or url,  # مفتاح login_url في القاموس
+<span class="ln" id="L38">38</span>            &quot;method&quot;: (form.get(&quot;method&quot;) or &quot;post&quot;).lower(),  # مفتاح method في القاموس
+<span class="ln" id="L39">39</span>            &quot;user_field&quot;: form.get(&quot;user_field&quot;) or &quot;username&quot;,  # مفتاح user_field في القاموس
+<span class="ln" id="L40">40</span>            &quot;pass_field&quot;: form.get(&quot;pass_field&quot;) or &quot;password&quot;,  # مفتاح pass_field في القاموس
+<span class="ln" id="L41">41</span>            &quot;extra_fields&quot;: form.get(&quot;extra_fields&quot;) or {},  # مفتاح extra_fields في القاموس
+<span class="ln" id="L42">42</span>            &quot;dst_field&quot;: form.get(&quot;dst_field&quot;) or &quot;dst&quot;,  # مفتاح dst_field في القاموس
+<span class="ln" id="L43">43</span>            &quot;dst_value&quot;: form.get(&quot;dst_value&quot;) or &quot;&quot;,  # مفتاح dst_value في القاموس
+<span class="ln" id="L44">44</span>            &quot;chap&quot;: form.get(&quot;chap&quot;) or None,  # مفتاح chap في القاموس
+<span class="ln" id="L45">45</span>        })  # إغلاق القوس المفتوح في السطر السابق
+<span class="ln" id="L46">46</span>    p.update(kw)  # استدعاء p.update (معامل واحد)
+<span class="ln" id="L47">47</span>    return p  # إرجاع p
+<span class="ln" id="L48">48</span> 
+<span class="ln" id="L49">49</span> 
+<span class="ln" id="L50">50</span>def mock_checks(portal) -&gt; tuple:  # تعريف الدالة mock_checks(portal) ترجع tuple
+<span class="ln" id="L51">51</span>    &quot;&quot;&quot;The mock router&#x27;s own internet endpoints - keeps tests off the internet.&quot;&quot;&quot;  # نص توثيقي (docstring) يشرح ما يليه
+<span class="ln" id="L52">52</span>    base = f&quot;http://127.0.0.1:{portal.port}&quot;  # بناء نص منسّق وإسناده إلى base
+<span class="ln" id="L53">53</span>    return ((base + &quot;/generate_204&quot;, 204, None, &quot;mock204&quot;),  # إرجاع مجموعة
+<span class="ln" id="L54">54</span>            (base + &quot;/connecttest.txt&quot;, 200, &quot;Microsoft Connect Test&quot;, &quot;mocktxt&quot;),  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L55">55</span>            (base + &quot;/hotspot-detect.html&quot;, 200, &quot;Success&quot;, &quot;mockapple&quot;))  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L56">56</span> 
+<span class="ln" id="L57">57</span> 
+<span class="ln" id="L58">58</span>def scan(url: str) -&gt; dict:  # تعريف الدالة scan(url) ترجع dict
+<span class="ln" id="L59">59</span>    session = Session(allow_redirects=True)  # إسناد نتيجة استدعاء Session (allow_redirects=…) إلى session
+<span class="ln" id="L60">60</span>    try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L61">61</span>        return portals.discover(session, url).as_dict()  # إرجاع portals.discover(session, url).as_dict()
+<span class="ln" id="L62">62</span>    finally:  # مفتاح finally في القاموس
+<span class="ln" id="L63">63</span>        session.close()  # استدعاء session.close
+<span class="ln" id="L64">64</span> 
+<span class="ln" id="L65">65</span> 
+<span class="ln" id="L66">66</span>_RUN_ID = [0]  # إسناد قائمة إلى _RUN_ID
+<span class="ln" id="L67">67</span> 
+<span class="ln" id="L68">68</span> 
+<span class="ln" id="L69">69</span>def run_engine(profile: dict, attempts: int, threads: int = 3,  # تعريف الدالة run_engine(profile, attempts, threads, timeout, checks, reset, **kw)
+<span class="ln" id="L70">70</span>               timeout: float = 90.0, checks=None, reset: bool = True, **kw):  # مفتاح timeout في القاموس
+<span class="ln" id="L71">71</span>    # بداية نص متعدد الأسطر — الأسطر التالية نصّ حرفي لا كود، فلا يقبل تعليقاً
+<span class="ln" id="L72">72</span>    &quot;&quot;&quot;Fresh, throw-away run: no resume state, nothing saved on disk.
+<span class="ln" id="L73">73</span> 
+<span class="ln" id="L74">74</span>    `reset=False` keeps `space_pos`/`walk_*` - that is how the &quot;continue where
+<span class="ln" id="L75">75</span>    you stopped&quot; path is tested (the UI sends them back with the profile).
+<span class="ln" id="L76">76</span>    &quot;&quot;&quot;  # نهاية النص متعدد الأسطر
+<span class="ln" id="L77">77</span>    _RUN_ID[0] += 1  # تحديث _RUN_ID[0] بعملية جمع
+<span class="ln" id="L78">78</span>    profile = dict(profile)  # إسناد نتيجة استدعاء dict (معامل واحد) إلى profile
+<span class="ln" id="L79">79</span>    profile.update({&quot;name&quot;: f&quot;selftest-{_RUN_ID[0]}&quot;})  # استدعاء profile.update (معامل واحد)
+<span class="ln" id="L80">80</span>    if reset:  # شرط: reset
+<span class="ln" id="L81">81</span>        profile.update({&quot;space_pos&quot;: 0, &quot;walk_a&quot;: 0, &quot;walk_b&quot;: 0})  # استدعاء profile.update (معامل واحد)
+<span class="ln" id="L82">82</span>    eng = engine.Engine(store.Store(), persist=False, checks=checks)  # إسناد نتيجة استدعاء engine.Engine (معامل واحد، persist=…، checks=…) إلى eng
+<span class="ln" id="L83">83</span>    res = eng.start(profile, attempts=attempts, threads=threads, **kw)  # إسناد نتيجة استدعاء eng.start (معامل واحد، attempts=…، threads=…، **=…) إلى res
+<span class="ln" id="L84">84</span>    if not res.get(&quot;ok&quot;):  # شرط معكوس: ليس res.get(&#x27;ok&#x27;)
+<span class="ln" id="L85">85</span>        return {&quot;state&quot;: &quot;rejected&quot;, &quot;error&quot;: res.get(&quot;error&quot;),  # إرجاع مجموعة
+<span class="ln" id="L86">86</span>                &quot;problems&quot;: res.get(&quot;problems&quot;, [])}, eng  # مفتاح problems في القاموس
+<span class="ln" id="L87">87</span>    deadline = time.time() + timeout  # حساب جمع بين time.time() وtimeout وإسناده إلى deadline
+<span class="ln" id="L88">88</span>    while eng.state in (&quot;calibrating&quot;, &quot;running&quot;, &quot;stopping&quot;):  # حلقة ما دام مقارنة
+<span class="ln" id="L89">89</span>        if time.time() &gt; deadline:  # شرط: time.time() أكبر من deadline
+<span class="ln" id="L90">90</span>            eng.stop(&quot;timeout&quot;)  # استدعاء eng.stop (معامل واحد)
+<span class="ln" id="L91">91</span>            break  # قطع الحلقة فوراً
+<span class="ln" id="L92">92</span>        time.sleep(0.05)  # استدعاء time.sleep (معامل واحد)
+<span class="ln" id="L93">93</span>    if eng.thread is not None:  # شرط: eng.thread ليس نفسه None
+<span class="ln" id="L94">94</span>        eng.thread.join(timeout=5)  # استدعاء eng.thread.join (timeout=…)
+<span class="ln" id="L95">95</span>    return eng.status(), eng  # إرجاع مجموعة
+<span class="ln" id="L96">96</span> 
+<span class="ln" id="L97">97</span> 
+<span class="ln" id="L98">98</span>class Result:  # تعريف الصنف Result
+<span class="ln" id="L99">99</span>    def __init__(self, name, ok, detail=&quot;&quot;):  # تعريف الدالة __init__(self, name, ok, detail)
+<span class="ln" id="L100">100</span>        self.name = name  # إسناد name إلى self.name
+<span class="ln" id="L101">101</span>        self.ok = ok  # إسناد ok إلى self.ok
+<span class="ln" id="L102">102</span>        self.detail = detail  # إسناد detail إلى self.detail
+<span class="ln" id="L103">103</span> 
+<span class="ln" id="L104">104</span>    def __str__(self):  # تعريف الدالة __str__(self)
+<span class="ln" id="L105">105</span>        mark = &quot;PASS&quot; if self.ok else &quot;FAIL&quot;  # إسناد &#x27;PASS&#x27; إن self.ok وإلا &#x27;FAIL&#x27; إلى mark
+<span class="ln" id="L106">106</span>        return f&quot;[{mark}] {self.name}: {self.detail}&quot;  # إرجاع نص منسّق (f-string)
+<span class="ln" id="L107">107</span> 
+<span class="ln" id="L108">108</span> 
+<span class="ln" id="L109">109</span># ---------------------------------------------------------------------------
+<span class="ln" id="L110">110</span># السيناريوهات
+<span class="ln" id="L111">111</span># ---------------------------------------------------------------------------
+<span class="ln" id="L112">112</span>def t_calibration():  # تعريف الدالة t_calibration()
+<span class="ln" id="L113">113</span>    &quot;&quot;&quot;The rejection baseline must be learned even with a changing token.&quot;&quot;&quot;  # نص توثيقي (docstring) يشرح ما يليه
+<span class="ln" id="L114">114</span>    with MockPortal(valid_cards={&quot;0299&quot;}, dynamic=True,  # سياق مُدار: MockPortal(valid_cards=مجموعة فريدة, dynamic=True, pass_mode=&#x27;empty&#x27;) باسم portal
+<span class="ln" id="L115">115</span>                    pass_mode=&quot;empty&quot;) as portal:  # المعامل المسمّى pass_mode
+<span class="ln" id="L116">116</span>        info = scan(portal.url)  # إسناد نتيجة استدعاء scan (معامل واحد) إلى info
+<span class="ln" id="L117">117</span>        p = make_profile(portal.url, portal_info=info)  # إسناد نتيجة استدعاء make_profile (معامل واحد، portal_info=…) إلى p
+<span class="ln" id="L118">118</span>        cal = engine.calibrate(p)  # إسناد نتيجة استدعاء engine.calibrate (معامل واحد) إلى cal
+<span class="ln" id="L119">119</span>        fp = cal.fingerprint  # إسناد cal.fingerprint إلى fp
+<span class="ln" id="L120">120</span>        ok = (cal.ok and fp is not None and fp.samples == 3  # دمج منطقي (و) وإسناده إلى ok
+<span class="ln" id="L121">121</span>              and (fp.exact or len(fp.literals) &gt;= 0))  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L122">122</span>        detail = (f&quot;baseline {&#x27;exact&#x27; if fp and fp.exact else &#x27;shaped&#x27;}, &quot;  # بناء نص منسّق وإسناده إلى detail
+<span class="ln" id="L123">123</span>                  f&quot;dynamic tokens={len(fp.literals) if fp else 0}, &quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L124">124</span>                  f&quot;status={fp.reject_status if fp else &#x27;-&#x27;}, &quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L125">125</span>                  f&quot;bytes={fp.reject_len if fp else &#x27;-&#x27;}&quot;)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L126">126</span>        return Result(&quot;calibration_learns_rejection_page&quot;, bool(ok), detail)  # إرجاع Result(&#x27;calibration_learns_rejection_page&#x27;, bool(ok), detail)
+<span class="ln" id="L127">127</span> 
+<span class="ln" id="L128">128</span> 
+<span class="ln" id="L129">129</span>def t_no_false_hits():  # تعريف الدالة t_no_false_hits()
+<span class="ln" id="L130">130</span>    &quot;&quot;&quot;50 wrong cards: zero accepted. This is the old bug, in a test.&quot;&quot;&quot;  # نص توثيقي (docstring) يشرح ما يليه
+<span class="ln" id="L131">131</span>    with MockPortal(valid_cards={&quot;0299&quot;}, pass_mode=&quot;empty&quot;) as portal:  # سياق مُدار: MockPortal(valid_cards=مجموعة فريدة, pass_mode=&#x27;empty&#x27;) باسم portal
+<span class="ln" id="L132">132</span>        info = scan(portal.url)  # إسناد نتيجة استدعاء scan (معامل واحد) إلى info
+<span class="ln" id="L133">133</span>        p = make_profile(portal.url, prefix=&quot;03&quot;, length=4, portal_info=info,  # إسناد نتيجة استدعاء make_profile (معامل واحد، prefix=…، length=…، portal_info=…، pass_mode=…) إلى p
+<span class="ln" id="L134">134</span>                         pass_mode=&quot;empty&quot;)  # المعامل المسمّى pass_mode
+<span class="ln" id="L135">135</span>        st, _eng = run_engine(p, attempts=50, threads=3,  # إسناد نتيجة استدعاء run_engine (معامل واحد، attempts=…، threads=…، checks=…) إلى مجموعة
+<span class="ln" id="L136">136</span>                              checks=mock_checks(portal))  # المعامل المسمّى checks
+<span class="ln" id="L137">137</span>        c = st.get(&quot;counters&quot;, {})  # إسناد نتيجة استدعاء st.get (2 معاملات) إلى c
+<span class="ln" id="L138">138</span>        accepted = sum(v for k, v in c.items() if k.startswith(&quot;ACCEPTED&quot;))  # إسناد نتيجة استدعاء sum (معامل واحد) إلى accepted
+<span class="ln" id="L139">139</span>        ok = accepted == 0 and c.get(&quot;REJECTED&quot;, 0) &gt;= 40  # دمج منطقي (و) وإسناده إلى ok
+<span class="ln" id="L140">140</span>        return Result(&quot;wrong_cards_are_never_reported_as_hits&quot;, ok,  # إرجاع Result(&#x27;wrong_cards_are_never_reported_as_hits&#x27;, ok, نص منسّق (f-string))
+<span class="ln" id="L141">141</span>                      f&quot;counters={dict(c)} accepted={accepted} &quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L142">142</span>                      f&quot;stop={st.get(&#x27;stop_reason&#x27;)} &quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L143">143</span>                      f&quot;progress={st.get(&#x27;progress&#x27;)}&quot;)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L144">144</span> 
+<span class="ln" id="L145">145</span> 
+<span class="ln" id="L146">146</span>def t_find_card():  # تعريف الدالة t_find_card()
+<span class="ln" id="L147">147</span>    &quot;&quot;&quot;The card that exists gets found AND verified against the internet.&quot;&quot;&quot;  # نص توثيقي (docstring) يشرح ما يليه
+<span class="ln" id="L148">148</span>    with MockPortal(valid_cards={&quot;0242&quot;}) as portal:  # سياق مُدار: MockPortal(valid_cards=مجموعة فريدة) باسم portal
+<span class="ln" id="L149">149</span>        info = scan(portal.url)  # إسناد نتيجة استدعاء scan (معامل واحد) إلى info
+<span class="ln" id="L150">150</span>        p = make_profile(portal.url, portal_info=info, pass_mode=&quot;empty&quot;)  # إسناد نتيجة استدعاء make_profile (معامل واحد، portal_info=…، pass_mode=…) إلى p
+<span class="ln" id="L151">151</span>        st, eng = run_engine(p, attempts=200, threads=4,  # إسناد نتيجة استدعاء run_engine (معامل واحد، attempts=…، threads=…، checks=…، known_card=…) إلى مجموعة
+<span class="ln" id="L152">152</span>                             checks=mock_checks(portal), known_card=&quot;0242&quot;)  # المعامل المسمّى checks
+<span class="ln" id="L153">153</span>        hits = st.get(&quot;hits&quot;, [])  # إسناد نتيجة استدعاء st.get (2 معاملات) إلى hits
+<span class="ln" id="L154">154</span>        ok = (bool(hits) and hits[0][&quot;card&quot;] == &quot;0242&quot;  # دمج منطقي (و) وإسناده إلى ok
+<span class="ln" id="L155">155</span>              and hits[0][&quot;code&quot;] == &quot;ACCEPTED_VERIFIED&quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L156">156</span>              and st.get(&quot;stop_reason&quot;) == &quot;found_verified&quot;)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L157">157</span>        return Result(&quot;finds_the_working_card_and_proves_internet&quot;, ok,  # إرجاع Result(&#x27;finds_the_working_card_and_proves_internet&#x27;, ok, نص منسّق (f-string))
+<span class="ln" id="L158">158</span>                      f&quot;hits={hits} stop={st.get(&#x27;stop_reason&#x27;)} &quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L159">159</span>                      f&quot;counters={st.get(&#x27;counters&#x27;)}&quot;)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L160">160</span> 
+<span class="ln" id="L161">161</span> 
+<span class="ln" id="L162">162</span>def t_verified_hit_stops_before_shared_online_false_hits():  # تعريف الدالة t_verified_hit_stops_before_shared_online_false_hits()
+<span class="ln" id="L163">163</span>    &quot;&quot;&quot;One device-wide online transition must not verify later wrong cards.&quot;&quot;&quot;  # نص توثيقي (docstring) يشرح ما يليه
+<span class="ln" id="L164">164</span>    with MockPortal(valid_cards={&quot;0242&quot;}, pass_mode=&quot;empty&quot;,  # سياق مُدار: MockPortal(valid_cards=مجموعة فريدة, pass_mode=&#x27;empty&#x27;, global_online_login_page=True) باسم portal
+<span class="ln" id="L165">165</span>                    global_online_login_page=True) as portal:  # المعامل المسمّى global_online_login_page
+<span class="ln" id="L166">166</span>        info = scan(portal.url)  # إسناد نتيجة استدعاء scan (معامل واحد) إلى info
+<span class="ln" id="L167">167</span>        p = make_profile(portal.url, portal_info=info, pass_mode=&quot;empty&quot;,  # إسناد نتيجة استدعاء make_profile (معامل واحد، portal_info=…، pass_mode=…، walk_a=…، walk_b=…، space_pos=…) إلى p
+<span class="ln" id="L168">168</span>                         walk_a=1, walk_b=24, space_pos=0)  # المعامل المسمّى walk_a
+<span class="ln" id="L169">169</span>        st, eng = run_engine(p, attempts=20, threads=8, reset=False,  # إسناد نتيجة استدعاء run_engine (معامل واحد، attempts=…، threads=…، reset=…، checks=…، known_card=…، auto_stop=…) إلى مجموعة
+<span class="ln" id="L170">170</span>                             checks=mock_checks(portal), known_card=&quot;0242&quot;,  # المعامل المسمّى checks
+<span class="ln" id="L171">171</span>                             auto_stop=False)  # المعامل المسمّى auto_stop
+<span class="ln" id="L172">172</span>        hits = st.get(&quot;hits&quot;, [])  # إسناد نتيجة استدعاء st.get (2 معاملات) إلى hits
+<span class="ln" id="L173">173</span>        ok = (len(hits) == 1 and hits[0][&quot;code&quot;] == &quot;ACCEPTED_VERIFIED&quot;  # دمج منطقي (و) وإسناده إلى ok
+<span class="ln" id="L174">174</span>              and st.get(&quot;stop_reason&quot;) == &quot;found_verified&quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L175">175</span>              and st.get(&quot;plan&quot;, {}).get(&quot;verification_serialized&quot;) is True  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L176">176</span>              and st.get(&quot;progress&quot;, {}).get(&quot;threads&quot;) == 1)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L177">177</span>        return Result(&quot;shared_online_state_does_not_create_extra_verified_hits&quot;,  # إرجاع Result(&#x27;shared_online_state_does_not_create_extra_verified_hits&#x27;, ok, نص منسّق (f-string))
+<span class="ln" id="L178">178</span>                      ok, f&quot;hits={len(hits)} stop={st.get(&#x27;stop_reason&#x27;)} &quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L179">179</span>                      f&quot;plan={st.get(&#x27;plan&#x27;)} counters={st.get(&#x27;counters&#x27;)}&quot;)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L180">180</span> 
+<span class="ln" id="L181">181</span> 
+<span class="ln" id="L182">182</span>def t_ban_is_reported():  # تعريف الدالة t_ban_is_reported()
+<span class="ln" id="L183">183</span>    &quot;&quot;&quot;A ban must be named as a ban - never as a hit or as &#x27;tested&#x27;.&quot;&quot;&quot;  # نص توثيقي (docstring) يشرح ما يليه
+<span class="ln" id="L184">184</span>    with MockPortal(valid_cards={&quot;0299&quot;}, ban_after=5, pass_mode=&quot;empty&quot;) as portal:  # سياق مُدار: MockPortal(valid_cards=مجموعة فريدة, ban_after=5, pass_mode=&#x27;empty&#x27;) باسم portal
+<span class="ln" id="L185">185</span>        info = scan(portal.url)  # إسناد نتيجة استدعاء scan (معامل واحد) إلى info
+<span class="ln" id="L186">186</span>        p = make_profile(portal.url, prefix=&quot;03&quot;, length=4, portal_info=info)  # إسناد نتيجة استدعاء make_profile (معامل واحد، prefix=…، length=…، portal_info=…) إلى p
+<span class="ln" id="L187">187</span>        st, _eng = run_engine(p, attempts=60, threads=2,  # إسناد نتيجة استدعاء run_engine (معامل واحد، attempts=…، threads=…، checks=…) إلى مجموعة
+<span class="ln" id="L188">188</span>                              checks=mock_checks(portal))  # المعامل المسمّى checks
+<span class="ln" id="L189">189</span>        c = st.get(&quot;counters&quot;, {})  # إسناد نتيجة استدعاء st.get (2 معاملات) إلى c
+<span class="ln" id="L190">190</span>        accepted = sum(v for k, v in c.items() if k.startswith(&quot;ACCEPTED&quot;))  # إسناد نتيجة استدعاء sum (معامل واحد) إلى accepted
+<span class="ln" id="L191">191</span>        ok = (c.get(&quot;BANNED&quot;, 0) &gt;= 1 and accepted == 0  # دمج منطقي (و) وإسناده إلى ok
+<span class="ln" id="L192">192</span>              and st.get(&quot;stop_reason&quot;) == &quot;banned_by_router&quot;)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L193">193</span>        return Result(&quot;ban_from_router_is_named_and_stops_the_run&quot;, ok,  # إرجاع Result(&#x27;ban_from_router_is_named_and_stops_the_run&#x27;, ok, نص منسّق (f-string))
+<span class="ln" id="L194">194</span>                      f&quot;banned={c.get(&#x27;BANNED&#x27;, 0)} accepted={accepted} &quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L195">195</span>                      f&quot;stop={st.get(&#x27;stop_reason&#x27;)}&quot;)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L196">196</span> 
+<span class="ln" id="L197">197</span> 
+<span class="ln" id="L198">198</span>def t_rate_limit_stops():  # تعريف الدالة t_rate_limit_stops()
+<span class="ln" id="L199">199</span>    with MockPortal(valid_cards={&quot;0299&quot;}, rate_limit_after=4,  # سياق مُدار: MockPortal(valid_cards=مجموعة فريدة, rate_limit_after=4, pass_mode=&#x27;empty&#x27;) باسم portal
+<span class="ln" id="L200">200</span>                    pass_mode=&quot;empty&quot;) as portal:  # المعامل المسمّى pass_mode
+<span class="ln" id="L201">201</span>        info = scan(portal.url)  # إسناد نتيجة استدعاء scan (معامل واحد) إلى info
+<span class="ln" id="L202">202</span>        p = make_profile(portal.url, prefix=&quot;03&quot;, length=4, portal_info=info)  # إسناد نتيجة استدعاء make_profile (معامل واحد، prefix=…، length=…، portal_info=…) إلى p
+<span class="ln" id="L203">203</span>        eng = engine.Engine(store.Store(), persist=False,  # إسناد نتيجة استدعاء engine.Engine (معامل واحد، persist=…، checks=…) إلى eng
+<span class="ln" id="L204">204</span>                            checks=mock_checks(portal))  # المعامل المسمّى checks
+<span class="ln" id="L205">205</span>        eng.start(dict(p, name=&quot;selftest-rate&quot;, space_pos=0, walk_a=0, walk_b=0),  # استدعاء eng.start (معامل واحد، attempts=…، threads=…)
+<span class="ln" id="L206">206</span>                  attempts=40, threads=2)  # المعامل المسمّى attempts
+<span class="ln" id="L207">207</span>        deadline = time.time() + 60  # حساب جمع بين time.time() و60 وإسناده إلى deadline
+<span class="ln" id="L208">208</span>        while eng.state in (&quot;calibrating&quot;, &quot;running&quot;) and time.time() &lt; deadline:  # حلقة ما دام مقارنة و مقارنة
+<span class="ln" id="L209">209</span>            time.sleep(0.05)  # استدعاء time.sleep (معامل واحد)
+<span class="ln" id="L210">210</span>        st = eng.status()  # إسناد نتيجة استدعاء eng.status إلى st
+<span class="ln" id="L211">211</span>        c = st.get(&quot;counters&quot;, {})  # إسناد نتيجة استدعاء st.get (2 معاملات) إلى c
+<span class="ln" id="L212">212</span>        delay = (st.get(&quot;throttle&quot;) or {}).get(&quot;delay_ms&quot;, 0)  # إسناد نتيجة استدعاء st.get(&#x27;throttle&#x27;) أو قاموس.get (2 معاملات) إلى delay
+<span class="ln" id="L213">213</span>        ok = (c.get(&quot;RATE_LIMITED&quot;, 0) &gt;= 1 and delay &gt; 0  # دمج منطقي (و) وإسناده إلى ok
+<span class="ln" id="L214">214</span>              and st.get(&quot;stop_reason&quot;) == &quot;rate_limited_by_router&quot;)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L215">215</span>        return Result(&quot;rate_limit_is_reported_and_stops_the_run&quot;, ok,  # إرجاع Result(&#x27;rate_limit_is_reported_and_stops_the_run&#x27;, ok, نص منسّق (f-string))
+<span class="ln" id="L216">216</span>                      f&quot;rate_limited={c.get(&#x27;RATE_LIMITED&#x27;, 0)} delay={delay}ms &quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L217">217</span>                      f&quot;reason={(st.get(&#x27;throttle&#x27;) or {}).get(&#x27;reason&#x27;)}&quot;)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L218">218</span> 
+<span class="ln" id="L219">219</span> 
+<span class="ln" id="L220">220</span>def t_dropped_connections():  # تعريف الدالة t_dropped_connections()
+<span class="ln" id="L221">221</span>    # بداية نص متعدد الأسطر — الأسطر التالية نصّ حرفي لا كود، فلا يقبل تعليقاً
+<span class="ln" id="L222">222</span>    &quot;&quot;&quot;Half the sockets are cut: retries must save the card, and nothing may
+<span class="ln" id="L223">223</span>    be reported as tested when it never got an answer.&quot;&quot;&quot;  # نهاية النص متعدد الأسطر
+<span class="ln" id="L224">224</span>    with MockPortal(valid_cards={&quot;0299&quot;}, drop_every=2,  # سياق مُدار: MockPortal(valid_cards=مجموعة فريدة, drop_every=2, pass_mode=&#x27;empty&#x27;) باسم portal
+<span class="ln" id="L225">225</span>                    pass_mode=&quot;empty&quot;) as portal:  # المعامل المسمّى pass_mode
+<span class="ln" id="L226">226</span>        info = scan(portal.url)  # إسناد نتيجة استدعاء scan (معامل واحد) إلى info
+<span class="ln" id="L227">227</span>        p = make_profile(portal.url, prefix=&quot;03&quot;, length=4, portal_info=info)  # إسناد نتيجة استدعاء make_profile (معامل واحد، prefix=…، length=…، portal_info=…) إلى p
+<span class="ln" id="L228">228</span>        st, _eng = run_engine(p, attempts=30, threads=3,  # إسناد نتيجة استدعاء run_engine (معامل واحد، attempts=…، threads=…، checks=…) إلى مجموعة
+<span class="ln" id="L229">229</span>                              checks=mock_checks(portal))  # المعامل المسمّى checks
+<span class="ln" id="L230">230</span>        c = st.get(&quot;counters&quot;, {})  # إسناد نتيجة استدعاء st.get (2 معاملات) إلى c
+<span class="ln" id="L231">231</span>        accepted = sum(v for k, v in c.items() if k.startswith(&quot;ACCEPTED&quot;))  # إسناد نتيجة استدعاء sum (معامل واحد) إلى accepted
+<span class="ln" id="L232">232</span>        pr = st.get(&quot;progress&quot;, {})  # إسناد نتيجة استدعاء st.get (2 معاملات) إلى pr
+<span class="ln" id="L233">233</span>        accounted = pr.get(&quot;attempts&quot;, 0) == pr.get(&quot;queued&quot;, -1)  # مقارنة (يساوي) وإسناد النتيجة المنطقية إلى accounted
+<span class="ln" id="L234">234</span>        ok = accepted == 0 and accounted and pr.get(&quot;dropped&quot;, 0) == 0  # دمج منطقي (و) وإسناده إلى ok
+<span class="ln" id="L235">235</span>        return Result(&quot;dropped_connections_are_counted_not_hidden&quot;, ok,  # إرجاع Result(&#x27;dropped_connections_are_counted_not_hidden&#x27;, ok, نص منسّق (f-string))
+<span class="ln" id="L236">236</span>                      f&quot;counters={dict(c)} progress={pr} accepted={accepted}&quot;)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L237">237</span> 
+<span class="ln" id="L238">238</span> 
+<span class="ln" id="L239">239</span>def t_dead_target_stops():  # تعريف الدالة t_dead_target_stops()
+<span class="ln" id="L240">240</span>    &quot;&quot;&quot;The router stops answering entirely: stop with that reason, honestly.&quot;&quot;&quot;  # نص توثيقي (docstring) يشرح ما يليه
+<span class="ln" id="L241">241</span>    with MockPortal(valid_cards={&quot;0299&quot;}, pass_mode=&quot;empty&quot;) as portal:  # سياق مُدار: MockPortal(valid_cards=مجموعة فريدة, pass_mode=&#x27;empty&#x27;) باسم portal
+<span class="ln" id="L242">242</span>        info = scan(portal.url)  # إسناد نتيجة استدعاء scan (معامل واحد) إلى info
+<span class="ln" id="L243">243</span>        p = make_profile(portal.url, prefix=&quot;03&quot;, length=4, portal_info=info)  # إسناد نتيجة استدعاء make_profile (معامل واحد، prefix=…، length=…، portal_info=…) إلى p
+<span class="ln" id="L244">244</span>        portal.state.drop_after = 12          # كل شيء يُقطع من هنا فصاعداً
+<span class="ln" id="L245">245</span>        st, _eng = run_engine(p, attempts=400, threads=3,  # إسناد نتيجة استدعاء run_engine (معامل واحد، attempts=…، threads=…، checks=…، timeout=…) إلى مجموعة
+<span class="ln" id="L246">246</span>                              checks=mock_checks(portal), timeout=60)  # المعامل المسمّى checks
+<span class="ln" id="L247">247</span>        c = st.get(&quot;counters&quot;, {})  # إسناد نتيجة استدعاء st.get (2 معاملات) إلى c
+<span class="ln" id="L248">248</span>        ok = (st.get(&quot;stop_reason&quot;) == &quot;target_unreachable&quot;  # دمج منطقي (و) وإسناده إلى ok
+<span class="ln" id="L249">249</span>              and c.get(&quot;NET_ERROR&quot;, 0) &gt;= config.CONSECUTIVE_TRANSPORT_FAILURE_LIMIT  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L250">250</span>              and not any(k.startswith(&quot;ACCEPTED&quot;) for k in c))  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L251">251</span>        return Result(&quot;dead_target_is_detected_and_stops_the_run&quot;, ok,  # إرجاع Result(&#x27;dead_target_is_detected_and_stops_the_run&#x27;, ok, نص منسّق (f-string))
+<span class="ln" id="L252">252</span>                      f&quot;stop={st.get(&#x27;stop_reason&#x27;)} counters={dict(c)} &quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L253">253</span>                      f&quot;kinds={st.get(&#x27;net_kinds&#x27;)}&quot;)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L254">254</span> 
+<span class="ln" id="L255">255</span> 
+<span class="ln" id="L256">256</span>def t_chap_portal():  # تعريف الدالة t_chap_portal()
+<span class="ln" id="L257">257</span>    &quot;&quot;&quot;MikroTik md5.js (chap) portal - the tool must find the right formula.&quot;&quot;&quot;  # نص توثيقي (docstring) يشرح ما يليه
+<span class="ln" id="L258">258</span>    with MockPortal(valid_cards={&quot;0242&quot;}, chap=True, pass_mode=&quot;chap&quot;) as portal:  # سياق مُدار: MockPortal(valid_cards=مجموعة فريدة, chap=True, pass_mode=&#x27;chap&#x27;) باسم portal
+<span class="ln" id="L259">259</span>        info = scan(portal.url)  # إسناد نتيجة استدعاء scan (معامل واحد) إلى info
+<span class="ln" id="L260">260</span>        p = make_profile(portal.url, portal_info=info, pass_mode=&quot;empty&quot;)  # إسناد نتيجة استدعاء make_profile (معامل واحد، portal_info=…، pass_mode=…) إلى p
+<span class="ln" id="L261">261</span>        cal = engine.calibrate(p, known_card=&quot;0242&quot;, checks=mock_checks(portal))  # إسناد نتيجة استدعاء engine.calibrate (معامل واحد، known_card=…، checks=…) إلى cal
+<span class="ln" id="L262">262</span>        tuned = cal.tuned or {}  # دمج منطقي (أو) وإسناده إلى tuned
+<span class="ln" id="L263">263</span>        ok = bool(tuned) and tuned.get(&quot;mode&quot;, &quot;&quot;).startswith(&quot;chap&quot;)  # دمج منطقي (و) وإسناده إلى ok
+<span class="ln" id="L264">264</span>        if not ok:  # شرط معكوس: ليس ok
+<span class="ln" id="L265">265</span>            return Result(&quot;chap_md5_portal_shape_is_discovered&quot;, False,  # إرجاع Result(&#x27;chap_md5_portal_shape_is_discovered&#x27;, False, نص منسّق (f-string))
+<span class="ln" id="L266">266</span>                          f&quot;tuned={tuned} steps={[s[&#x27;id&#x27;] + &#x27;:&#x27; + s[&#x27;reason&#x27;] for s in cal.steps]}&quot;)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L267">267</span>        # الآن تشغيل كامل بالشكل المكتشف
+<span class="ln" id="L268">268</span>        p2 = dict(cal.profile)  # إسناد نتيجة استدعاء dict (معامل واحد) إلى p2
+<span class="ln" id="L269">269</span>        st, _eng = run_engine(p2, attempts=200, threads=4,  # إسناد نتيجة استدعاء run_engine (معامل واحد، attempts=…، threads=…، checks=…) إلى مجموعة
+<span class="ln" id="L270">270</span>                              checks=mock_checks(portal))  # المعامل المسمّى checks
+<span class="ln" id="L271">271</span>        hits = st.get(&quot;hits&quot;, [])  # إسناد نتيجة استدعاء st.get (2 معاملات) إلى hits
+<span class="ln" id="L272">272</span>        ok = bool(hits) and hits[0][&quot;code&quot;] == &quot;ACCEPTED_VERIFIED&quot;  # دمج منطقي (و) وإسناده إلى ok
+<span class="ln" id="L273">273</span>        return Result(&quot;chap_md5_portal_shape_is_discovered&quot;, ok,  # إرجاع Result(&#x27;chap_md5_portal_shape_is_discovered&#x27;, ok, نص منسّق (f-string))
+<span class="ln" id="L274">274</span>                      f&quot;mode={tuned.get(&#x27;mode&#x27;)} verified={tuned.get(&#x27;verified&#x27;)} &quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L275">275</span>                      f&quot;hits={hits}&quot;)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L276">276</span> 
+<span class="ln" id="L277">277</span> 
+<span class="ln" id="L278">278</span>def t_get_portal():  # تعريف الدالة t_get_portal()
+<span class="ln" id="L279">279</span>    with MockPortal(valid_cards={&quot;0242&quot;}, method=&quot;get&quot;,  # سياق مُدار: MockPortal(valid_cards=مجموعة فريدة, method=&#x27;get&#x27;, pass_mode=&#x27;empty&#x27;) باسم portal
+<span class="ln" id="L280">280</span>                    pass_mode=&quot;empty&quot;) as portal:  # المعامل المسمّى pass_mode
+<span class="ln" id="L281">281</span>        info = scan(portal.url)  # إسناد نتيجة استدعاء scan (معامل واحد) إلى info
+<span class="ln" id="L282">282</span>        p = make_profile(portal.url, portal_info=info)  # إسناد نتيجة استدعاء make_profile (معامل واحد، portal_info=…) إلى p
+<span class="ln" id="L283">283</span>        st, _eng = run_engine(p, attempts=200, threads=4,  # إسناد نتيجة استدعاء run_engine (معامل واحد، attempts=…، threads=…، checks=…) إلى مجموعة
+<span class="ln" id="L284">284</span>                              checks=mock_checks(portal))  # المعامل المسمّى checks
+<span class="ln" id="L285">285</span>        hits = st.get(&quot;hits&quot;, [])  # إسناد نتيجة استدعاء st.get (2 معاملات) إلى hits
+<span class="ln" id="L286">286</span>        ok = bool(hits) and hits[0][&quot;card&quot;] == &quot;0242&quot;  # دمج منطقي (و) وإسناده إلى ok
+<span class="ln" id="L287">287</span>        return Result(&quot;get_style_portal_is_supported&quot;, ok,  # إرجاع Result(&#x27;get_style_portal_is_supported&#x27;, ok, نص منسّق (f-string))
+<span class="ln" id="L288">288</span>                      f&quot;method={(info.get(&#x27;form&#x27;) or {}).get(&#x27;method&#x27;)} hits={hits} &quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L289">289</span>                      f&quot;stop={st.get(&#x27;stop_reason&#x27;)} counters={st.get(&#x27;counters&#x27;)} &quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L290">290</span>                      f&quot;net={st.get(&#x27;net_kinds&#x27;)}&quot;)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L291">291</span> 
+<span class="ln" id="L292">292</span> 
+<span class="ln" id="L293">293</span>def t_legacy_profile():  # تعريف الدالة t_legacy_profile()
+<span class="ln" id="L294">294</span>    &quot;&quot;&quot;A profile saved by the OLD version must not crash the new one.&quot;&quot;&quot;  # نص توثيقي (docstring) يشرح ما يليه
+<span class="ln" id="L295">295</span>    old = {&quot;name&quot;: &quot;old-network&quot;, &quot;login_url&quot;: &quot;http://127.0.0.1:1/login&quot;,  # إسناد قاموس إلى old
+<span class="ln" id="L296">296</span>           &quot;method&quot;: &quot;2&quot;, &quot;network_type&quot;: &quot;1&quot;, &quot;var_len&quot;: 2, &quot;prefix&quot;: &quot;02&quot;,  # مفتاح method في القاموس
+<span class="ln" id="L297">297</span>           &quot;extras&quot;: True, &quot;dst_value&quot;: &quot;&quot;, &quot;pass_mode&quot;: &quot;empty&quot;}  # مفتاح extras في القاموس
+<span class="ln" id="L298">298</span>    p = store.migrate(old)  # إسناد نتيجة استدعاء store.migrate (معامل واحد) إلى p
+<span class="ln" id="L299">299</span>    problems = store.validate(p)  # إسناد نتيجة استدعاء store.validate (معامل واحد) إلى problems
+<span class="ln" id="L300">300</span>    with MockPortal(valid_cards={&quot;0242&quot;}, pass_mode=&quot;empty&quot;) as portal:  # سياق مُدار: MockPortal(valid_cards=مجموعة فريدة, pass_mode=&#x27;empty&#x27;) باسم portal
+<span class="ln" id="L301">301</span>        info = scan(portal.url)  # إسناد نتيجة استدعاء scan (معامل واحد) إلى info
+<span class="ln" id="L302">302</span>        p[&quot;login_url&quot;] = (info.get(&quot;form&quot;) or {}).get(&quot;action&quot;) or portal.url  # دمج منطقي (أو) وإسناده إلى p[&#x27;login_url&#x27;]
+<span class="ln" id="L303">303</span>        st, _eng = run_engine(p, attempts=200, threads=3,  # إسناد نتيجة استدعاء run_engine (معامل واحد، attempts=…، threads=…، checks=…، known_card=…) إلى مجموعة
+<span class="ln" id="L304">304</span>                              checks=mock_checks(portal), known_card=&quot;0242&quot;)  # المعامل المسمّى checks
+<span class="ln" id="L305">305</span>        hits = st.get(&quot;hits&quot;, [])  # إسناد نتيجة استدعاء st.get (2 معاملات) إلى hits
+<span class="ln" id="L306">306</span>        ok = bool(hits) and not [x for x in problems if x != &quot;space_is_astronomically_big&quot;]  # دمج منطقي (و) وإسناده إلى ok
+<span class="ln" id="L307">307</span>        return Result(&quot;old_profile_is_migrated_without_crashing&quot;, ok,  # إرجاع Result(&#x27;old_profile_is_migrated_without_crashing&#x27;, ok, نص منسّق (f-string))
+<span class="ln" id="L308">308</span>                      f&quot;migrated=&#x27;{p.get(&#x27;prefix&#x27;)}&#x27; len={p.get(&#x27;length&#x27;)} &quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L309">309</span>                      f&quot;problems={problems} hits={len(hits)}&quot;)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L310">310</span> 
+<span class="ln" id="L311">311</span> 
+<span class="ln" id="L312">312</span>def t_diagnose_dead_target():  # تعريف الدالة t_diagnose_dead_target()
+<span class="ln" id="L313">313</span>    r = engine.diagnose({&quot;login_url&quot;: &quot;http://127.0.0.1:9/login&quot;, &quot;prefix&quot;: &quot;02&quot;,  # إسناد نتيجة استدعاء engine.diagnose (معامل واحد) إلى r
+<span class="ln" id="L314">314</span>                         &quot;length&quot;: 4, &quot;charset&quot;: &quot;0123456789&quot;, &quot;name&quot;: &quot;dead&quot;})  # مفتاح length في القاموس
+<span class="ln" id="L315">315</span>    step = next((s for s in r.get(&quot;steps&quot;, []) if s[&quot;id&quot;] == &quot;reach&quot;), None)  # إسناد نتيجة استدعاء next (2 معاملات) إلى step
+<span class="ln" id="L316">316</span>    ok = bool(step) and not step[&quot;ok&quot;] and step[&quot;reason&quot;].startswith(&quot;net_&quot;)  # دمج منطقي (و) وإسناده إلى ok
+<span class="ln" id="L317">317</span>    return Result(&quot;diagnose_explains_a_dead_target&quot;, ok,  # إرجاع Result(&#x27;diagnose_explains_a_dead_target&#x27;, ok, نص منسّق (f-string))
+<span class="ln" id="L318">318</span>                  f&quot;reason={step[&#x27;reason&#x27;] if step else &#x27;-&#x27;}&quot;)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L319">319</span> 
+<span class="ln" id="L320">320</span> 
+<span class="ln" id="L321">321</span>def t_resume_continues():  # تعريف الدالة t_resume_continues()
+<span class="ln" id="L322">322</span>    # بداية نص متعدد الأسطر — الأسطر التالية نصّ حرفي لا كود، فلا يقبل تعليقاً
+<span class="ln" id="L323">323</span>    &quot;&quot;&quot;A second run must continue - not repeat the cards of the first one.
+<span class="ln" id="L324">324</span> 
+<span class="ln" id="L325">325</span>    The run position lives in the profile (`space_pos` + the shuffled walk).
+<span class="ln" id="L326">326</span>    The page sends it back with the profile, so the next run starts where the
+<span class="ln" id="L327">327</span>    previous one stopped; this scenario is that promise, tested.
+<span class="ln" id="L328">328</span>    &quot;&quot;&quot;  # نهاية النص متعدد الأسطر
+<span class="ln" id="L329">329</span>    with MockPortal(valid_cards={&quot;9999&quot;}, pass_mode=&quot;empty&quot;) as portal:  # سياق مُدار: MockPortal(valid_cards=مجموعة فريدة, pass_mode=&#x27;empty&#x27;) باسم portal
+<span class="ln" id="L330">330</span>        info = scan(portal.url)  # إسناد نتيجة استدعاء scan (معامل واحد) إلى info
+<span class="ln" id="L331">331</span>        p = make_profile(portal.url, prefix=&quot;03&quot;, length=4, portal_info=info)  # إسناد نتيجة استدعاء make_profile (معامل واحد، prefix=…، length=…، portal_info=…) إلى p
+<span class="ln" id="L332">332</span>        _st1, eng1 = run_engine(p, attempts=20, threads=2,  # إسناد نتيجة استدعاء run_engine (معامل واحد، attempts=…، threads=…، checks=…) إلى مجموعة
+<span class="ln" id="L333">333</span>                                checks=mock_checks(portal))  # المعامل المسمّى checks
+<span class="ln" id="L334">334</span>        resumed = dict(eng1.profile)      # بالضبط ما الذي ترسله الصفحة
+<span class="ln" id="L335">335</span>        st2, eng2 = run_engine(resumed, attempts=20, threads=2,  # إسناد نتيجة استدعاء run_engine (معامل واحد، attempts=…، threads=…، checks=…، reset=…) إلى مجموعة
+<span class="ln" id="L336">336</span>                               checks=mock_checks(portal), reset=False)  # المعامل المسمّى checks
+<span class="ln" id="L337">337</span>        pos1 = int(eng1.profile.get(&quot;space_pos&quot;, 0))  # إسناد نتيجة استدعاء int (معامل واحد) إلى pos1
+<span class="ln" id="L338">338</span>        pos2 = int(eng2.profile.get(&quot;space_pos&quot;, 0))  # إسناد نتيجة استدعاء int (معامل واحد) إلى pos2
+<span class="ln" id="L339">339</span>        same_walk = (eng1.profile.get(&quot;walk_a&quot;) == eng2.profile.get(&quot;walk_a&quot;)  # دمج منطقي (و) وإسناده إلى same_walk
+<span class="ln" id="L340">340</span>                     and eng1.profile.get(&quot;walk_b&quot;) == eng2.profile.get(&quot;walk_b&quot;))  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L341">341</span>        ok = pos1 == 20 and pos2 == 40 and same_walk  # دمج منطقي (و) وإسناده إلى ok
+<span class="ln" id="L342">342</span>        return Result(&quot;a_second_run_continues_where_the_first_stopped&quot;, ok,  # إرجاع Result(&#x27;a_second_run_continues_where_the_first_stopped&#x27;, ok, نص منسّق (f-string))
+<span class="ln" id="L343">343</span>                      f&quot;first_run_ended_at={pos1} second_run_ended_at={pos2} &quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L344">344</span>                      f&quot;same_walk={same_walk} counters={st2.get(&#x27;counters&#x27;)}&quot;)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L345">345</span> 
+<span class="ln" id="L346">346</span> 
+<span class="ln" id="L347">347</span>def t_cache_clear():  # تعريف الدالة t_cache_clear()
+<span class="ln" id="L348">348</span>    # بداية نص متعدد الأسطر — الأسطر التالية نصّ حرفي لا كود، فلا يقبل تعليقاً
+<span class="ln" id="L349">349</span>    &quot;&quot;&quot;Clearing the cache must not eat the results.
+<span class="ln" id="L350">350</span> 
+<span class="ln" id="L351">351</span>    `temp` removes review pages and cache folders but MUST leave the hits log
+<span class="ln" id="L352">352</span>    alone; only `results`/`all` are allowed to delete it.
+<span class="ln" id="L353">353</span>    &quot;&quot;&quot;  # نهاية النص متعدد الأسطر
+<span class="ln" id="L354">354</span>    st = store.Store()  # إسناد نتيجة استدعاء store.Store إلى st
+<span class="ln" id="L355">355</span>    saved = st.save_review(1, &quot;0201242548&quot;,  # إسناد نتيجة استدعاء st.save_review (4 معاملات) إلى saved
+<span class="ln" id="L356">356</span>                           {&quot;code&quot;: &quot;UNKNOWN&quot;, &quot;reason&quot;: &quot;reply_differs_not_proven&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L357">357</span>                            &quot;data&quot;: {}}, &quot;&lt;html&gt;interesting&lt;/html&gt;&quot;)  # مفتاح data في القاموس
+<span class="ln" id="L358">358</span>    st.append_hit(&quot;selftest card=0242 code=ACCEPTED_VERIFIED&quot;)  # استدعاء st.append_hit (معامل واحد)
+<span class="ln" id="L359">359</span>    before = len(st.list_review())  # إسناد نتيجة استدعاء len (معامل واحد) إلى before
+<span class="ln" id="L360">360</span>    temp = st.clear_cache(&quot;temp&quot;)  # إسناد نتيجة استدعاء st.clear_cache (معامل واحد) إلى temp
+<span class="ln" id="L361">361</span>    review_gone = before &gt;= 1 and not st.list_review()  # دمج منطقي (و) وإسناده إلى review_gone
+<span class="ln" id="L362">362</span>    hits_kept = os.path.exists(config.HITS_FILE)  # إسناد نتيجة استدعاء os.path.exists (معامل واحد) إلى hits_kept
+<span class="ln" id="L363">363</span>    results = st.clear_cache(&quot;results&quot;)  # إسناد نتيجة استدعاء st.clear_cache (معامل واحد) إلى results
+<span class="ln" id="L364">364</span>    hits_gone = not os.path.exists(config.HITS_FILE)  # إسناد نفي/سالب إلى hits_gone
+<span class="ln" id="L365">365</span>    ok = review_gone and hits_kept and hits_gone  # دمج منطقي (و) وإسناده إلى ok
+<span class="ln" id="L366">366</span>    return Result(&quot;clear_cache_scope_keeps_results_safe&quot;, ok,  # إرجاع Result(&#x27;clear_cache_scope_keeps_results_safe&#x27;, ok, نص منسّق (f-string))
+<span class="ln" id="L367">367</span>                  f&quot;saved={saved.get(&#x27;file&#x27;)} before={before} &quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L368">368</span>                  f&quot;temp_removed={temp.get(&#x27;removed&#x27;)} hits_after_temp={hits_kept} &quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L369">369</span>                  f&quot;results_removed={results.get(&#x27;removed&#x27;)} &quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L370">370</span>                  f&quot;freed={temp.get(&#x27;freed_human&#x27;)}&quot;)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L371">371</span> 
+<span class="ln" id="L372">372</span> 
+<span class="ln" id="L373">373</span>def t_format_preview():  # تعريف الدالة t_format_preview()
+<span class="ln" id="L374">374</span>    p = store.new_profile(prefix=&quot;020124&quot;, length=10, charset=&quot;0123456789&quot;)  # إسناد نتيجة استدعاء store.new_profile (prefix=…، length=…، charset=…) إلى p
+<span class="ln" id="L375">375</span>    ok = (store.variable_len(p) == 4 and store.space_size(p) == 10 ** 4  # دمج منطقي (و) وإسناده إلى ok
+<span class="ln" id="L376">376</span>          and all(len(c) == 10 and c.startswith(&quot;020124&quot;)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L377">377</span>                  for c in store.sample_cards(p, 3)))  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L378">378</span>    bad = store.validate(store.new_profile(prefix=&quot;020124&quot;, length=3))  # إسناد نتيجة استدعاء store.validate (معامل واحد) إلى bad
+<span class="ln" id="L379">379</span>    return Result(&quot;card_format_math_and_validation&quot;, ok and  # إرجاع Result(&#x27;card_format_math_and_validation&#x27;, ok و مقارنة, نص منسّق (f-string))
+<span class="ln" id="L380">380</span>                  &quot;length_not_bigger_than_prefix_and_suffix&quot; in bad,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L381">381</span>                  f&quot;samples={store.sample_cards(p, 3)} space={store.space_size(p)} &quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L382">382</span>                  f&quot;problems={bad}&quot;)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L383">383</span> 
+<span class="ln" id="L384">384</span> 
+<span class="ln" id="L385">385</span>SCENARIOS = (  # إسناد مجموعة إلى SCENARIOS
+<span class="ln" id="L386">386</span>    t_format_preview,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L387">387</span>    t_legacy_profile,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L388">388</span>    t_calibration,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L389">389</span>    t_no_false_hits,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L390">390</span>    t_find_card,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L391">391</span>    t_verified_hit_stops_before_shared_online_false_hits,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L392">392</span>    t_ban_is_reported,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L393">393</span>    t_rate_limit_stops,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L394">394</span>    t_dropped_connections,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L395">395</span>    t_dead_target_stops,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L396">396</span>    t_chap_portal,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L397">397</span>    t_get_portal,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L398">398</span>    t_diagnose_dead_target,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L399">399</span>    t_resume_continues,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L400">400</span>    t_cache_clear,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L401">401</span>)  # إغلاق القوس المفتوح في السطر السابق
+<span class="ln" id="L402">402</span> 
+<span class="ln" id="L403">403</span> 
+<span class="ln" id="L404">404</span># يشغّل السيناريوهات كلها داخل مجلد بيانات مؤقت حتى لا تختلط
+<span class="ln" id="L405">405</span># بطاقات التجربة ببروفايلات المستخدم الحقيقية.
+<span class="ln" id="L406">406</span>def run_all(verbose: bool = True, keep_files: bool = False) -&gt; dict:  # تعريف الدالة run_all(verbose, keep_files) ترجع dict
+<span class="ln" id="L407">407</span>    # بداية نص متعدد الأسطر — الأسطر التالية نصّ حرفي لا كود، فلا يقبل تعليقاً
+<span class="ln" id="L408">408</span>    &quot;&quot;&quot;Run every scenario inside a throw-away data folder.
+<span class="ln" id="L409">409</span> 
+<span class="ln" id="L410">410</span>    The self-test writes real reports and review pages; they must never land in
+<span class="ln" id="L411">411</span>    the user&#x27;s kirapass_data.  `keep_files=True` leaves them behind for
+<span class="ln" id="L412">412</span>    debugging and prints where they are.
+<span class="ln" id="L413">413</span>    &quot;&quot;&quot;  # نهاية النص متعدد الأسطر
+<span class="ln" id="L414">414</span>    import tempfile  # استيراد الوحدة tempfile من المكتبة
+<span class="ln" id="L415">415</span>    tmp = tempfile.mkdtemp(prefix=&quot;kirapass_selftest_&quot;)  # إسناد نتيجة استدعاء tempfile.mkdtemp (prefix=…) إلى tmp
+<span class="ln" id="L416">416</span>    config.set_data_dir(tmp)  # استدعاء config.set_data_dir (معامل واحد)
+<span class="ln" id="L417">417</span>    results = []  # إسناد قائمة إلى results
+<span class="ln" id="L418">418</span>    t_start = time.time()  # إسناد نتيجة استدعاء time.time إلى t_start
+<span class="ln" id="L419">419</span>    for fn in SCENARIOS:  # دورة على SCENARIOS باسم fn
+<span class="ln" id="L420">420</span>        t0 = time.time()  # إسناد نتيجة استدعاء time.time إلى t0
+<span class="ln" id="L421">421</span>        try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L422">422</span>            res = fn()  # إسناد نتيجة استدعاء fn إلى res
+<span class="ln" id="L423">423</span>        # تكملة السطر السابق داخل القوس
+<span class="ln" id="L424">424</span>        except Exception as exc:                          # noqa: BLE001
+<span class="ln" id="L425">425</span>            import traceback  # استيراد الوحدة traceback من المكتبة
+<span class="ln" id="L426">426</span>            res = Result(fn.__name__, False,  # إسناد نتيجة استدعاء Result (3 معاملات) إلى res
+<span class="ln" id="L427">427</span>                         f&quot;{type(exc).__name__}: {exc} &quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L428">428</span>                         f&quot;{traceback.format_exc().splitlines()[-1]}&quot;)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L429">429</span>        res.detail = f&quot;{res.detail} ({time.time() - t0:.1f}s)&quot;  # بناء نص منسّق وإسناده إلى res.detail
+<span class="ln" id="L430">430</span>        results.append(res)  # استدعاء results.append (معامل واحد)
+<span class="ln" id="L431">431</span>        if verbose:  # شرط: verbose
+<span class="ln" id="L432">432</span>            print((&quot;  &quot; + str(res)).ljust(110), flush=True)  # استدعاء print (معامل واحد، flush=…)
+<span class="ln" id="L433">433</span>    passed = sum(1 for r in results if r.ok)  # إسناد نتيجة استدعاء sum (معامل واحد) إلى passed
+<span class="ln" id="L434">434</span>    summary = {&quot;ok&quot;: passed == len(results), &quot;passed&quot;: passed,  # إسناد قاموس إلى summary
+<span class="ln" id="L435">435</span>               &quot;total&quot;: len(results), &quot;seconds&quot;: round(time.time() - t_start, 1),  # مفتاح total في القاموس
+<span class="ln" id="L436">436</span>               &quot;results&quot;: [{&quot;name&quot;: r.name, &quot;ok&quot;: r.ok, &quot;detail&quot;: r.detail}  # مفتاح results في القاموس
+<span class="ln" id="L437">437</span>                           for r in results]}  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L438">438</span>    summary[&quot;data_dir&quot;] = tmp  # إسناد tmp إلى summary[&#x27;data_dir&#x27;]
+<span class="ln" id="L439">439</span>    if keep_files:  # شرط: keep_files
+<span class="ln" id="L440">440</span>        if verbose:  # شرط: verbose
+<span class="ln" id="L441">441</span>            print(f&quot;\n  test files kept in: {tmp}&quot;)  # استدعاء print (معامل واحد)
+<span class="ln" id="L442">442</span>    else:  # مفتاح else في القاموس
+<span class="ln" id="L443">443</span>        shutil.rmtree(tmp, ignore_errors=True)  # استدعاء shutil.rmtree (معامل واحد، ignore_errors=…)
+<span class="ln" id="L444">444</span>    if verbose:  # شرط: verbose
+<span class="ln" id="L445">445</span>        print(f&quot;\n  {passed}/{len(results)} passed in {summary[&#x27;seconds&#x27;]}s&quot;  # استدعاء print (معامل واحد)
+<span class="ln" id="L446">446</span>              f&quot;  -&gt;  {&#x27;ALL GOOD&#x27; if summary[&#x27;ok&#x27;] else &#x27;SOMETHING FAILED&#x27;}&quot;)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L447">447</span>    return summary  # إرجاع summary
+<span class="ln" id="L448">448</span> 
+<span class="ln" id="L449">449</span> 
+<span class="ln" id="L450">450</span>if __name__ == &quot;__main__&quot;:  # شرط: __name__ يساوي &#x27;__main__&#x27;
+<span class="ln" id="L451">451</span>    print(&quot;KiraPass self-test (local mock routers only, no real network used)\n&quot;)  # استدعاء print (معامل واحد)
+<span class="ln" id="L452">452</span>    run_all(keep_files=&quot;--keep&quot; in sys.argv)  # استدعاء run_all (keep_files=…)
+<span class="ln" id="L453">453</span> 
+</code></pre></details>
+<script>
+document.getElementById("kp-jump").addEventListener("change", function (e) {
+  var n = parseInt(e.target.value, 10);
+  if (n > 0) { var el = document.getElementById("L" + n);
+    if (el) el.scrollIntoView({block: "center"}); }
+});
+if (location.hash) { var el = document.querySelector(location.hash);
+  if (el) setTimeout(function () { el.scrollIntoView({block: "center"}); }, 60); }
+</script>
+<footer class="docfoot">صفحة مولّدة آلياً من مصدر الكود · KiraPass —
+<code>files</code> · 2026-10-01 02:26</footer>
+</main>
+</div>
+<script src="../assets/docs.js"></script>
+<script>KPInit("files");</script>
+</body>
+</html>

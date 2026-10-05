@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ملف config.py · KiraPass</title>
+<link rel="stylesheet" href="../assets/docs.css">
+
+</head>
+<body>
+<div id="kp-layout">
+<main class="doc">
+<h1>ملف <code>config.py</code></h1>
+<p class="lead">كل الثوابت والمسارات والكلمات والمتغيرات البيئية — <code>kirapass/config.py</code></p>
+<div class="card info"><b>هذه الصفحة مولّدة آلياً</b> من مصدر الكود مباشرة (<code>tools/docs/build_docs.py</code>). إن غيّرت الكود فأعد توليدها: <code>python3 tools/docs/build_docs.py</code>. الشرح اليدوي الأوسع في <a href="../architecture.html">المعمارية</a> و<a href="../editing.html">دليل التعديل</a> و<a href="../danger.html">أماكن الخطر</a>.</div>
+<div class="grid3"><div class="card"><b>263</b><br>سطراً</div><div class="card"><b>3</b><br>دالة</div><div class="card"><b>0</b><br>صنف</div></div>
+<div class="note"><b>ملخّص المؤلف للملف (نصه الأصلي بالإنجليزية):</b> <span class="muted">Paths, defaults and constants for KiraPass.</span></div>
+<p><a class="btn primary" href="../src/config.html">افتح المصدر كاملاً مرقّماً</a></p>
+<h2 id="imports">الاستيرادات</h2><table class="t compact"><thead><tr><th>السطر</th><th>الاستيراد</th><th>لماذا</th></tr></thead><tbody>
+<tr><td class="mono">9</td><td class="mono">from __future__ import annotations</td><td>استيراد annotations من الوحدة __future__</td></tr>
+<tr><td class="mono">11</td><td class="mono">import os</td><td>استيراد الوحدة os من المكتبة</td></tr>
+</tbody></table>
+<h2 id="vars">متغيرات وثوابت على مستوى الوحدة</h2><div class="scroll-x"><table class="t compact"><thead><tr><th>الاسم</th><th>السطر</th><th>القيمة</th><th>الشرح</th></tr></thead><tbody>
+<tr><td class="mono"><span class="tag var">APP_NAME</span></td><td class="mono"><a href="../src/config.html#L13">13</a></td><td class="mono">&#x27;KiraPass&#x27;</td><td>إسناد القيمة الثابتة APP_NAME</td></tr>
+<tr><td class="mono"><span class="tag var">VERSION</span></td><td class="mono"><a href="../src/config.html#L14">14</a></td><td class="mono">&#x27;5.9.0&#x27;</td><td>إسناد القيمة الثابتة VERSION</td></tr>
+<tr><td class="mono"><span class="tag var">BASE_DIR</span></td><td class="mono"><a href="../src/config.html#L19">19</a></td><td class="mono">os.path.dirname(os.path.dirname(os.path.abspath(__file__)))</td><td>إسناد نتيجة استدعاء os.path.dirname (معامل واحد) إلى BASE_DIR</td></tr>
+<tr><td class="mono"><span class="tag var">DATA_DIR</span></td><td class="mono"><a href="../src/config.html#L21">21</a></td><td class="mono">os.path.join(BASE_DIR, &#x27;kirapass_data&#x27;)</td><td>إسناد نتيجة استدعاء os.path.join (2 معاملات) إلى DATA_DIR</td></tr>
+<tr><td class="mono"><span class="tag var">PROFILES_FILE</span></td><td class="mono"><a href="../src/config.html#L22">22</a></td><td class="mono">os.path.join(DATA_DIR, &#x27;profiles.json&#x27;)</td><td>إسناد نتيجة استدعاء os.path.join (2 معاملات) إلى PROFILES_FILE</td></tr>
+<tr><td class="mono"><span class="tag var">SETTINGS_FILE</span></td><td class="mono"><a href="../src/config.html#L23">23</a></td><td class="mono">os.path.join(DATA_DIR, &#x27;settings.json&#x27;)</td><td>إسناد نتيجة استدعاء os.path.join (2 معاملات) إلى SETTINGS_FILE</td></tr>
+<tr><td class="mono"><span class="tag var">HITS_FILE</span></td><td class="mono"><a href="../src/config.html#L24">24</a></td><td class="mono">os.path.join(DATA_DIR, &#x27;hits.txt&#x27;)</td><td>إسناد نتيجة استدعاء os.path.join (2 معاملات) إلى HITS_FILE</td></tr>
+<tr><td class="mono"><span class="tag var">RUN_DIR</span></td><td class="mono"><a href="../src/config.html#L25">25</a></td><td class="mono">os.path.join(DATA_DIR, &#x27;runs&#x27;)</td><td>تقرير واحد لكل تشغيل</td></tr>
+<tr><td class="mono"><span class="tag var">REVIEW_DIR</span></td><td class="mono"><a href="../src/config.html#L26">26</a></td><td class="mono">os.path.join(DATA_DIR, &#x27;review&#x27;)</td><td>صفحات لم نستطع الحكم عليها</td></tr>
+<tr><td class="mono"><span class="tag var">CACHE_DIR</span></td><td class="mono"><a href="../src/config.html#L27">27</a></td><td class="mono">os.path.join(DATA_DIR, &#x27;cache&#x27;)</td><td>صفحات متعلَّمة / مؤقتة</td></tr>
+<tr><td class="mono"><span class="tag var">LOG_DIR</span></td><td class="mono"><a href="../src/config.html#L28">28</a></td><td class="mono">os.path.join(DATA_DIR, &#x27;logs&#x27;)</td><td>إسناد نتيجة استدعاء os.path.join (2 معاملات) إلى LOG_DIR</td></tr>
+<tr><td class="mono"><span class="tag var">ALL_DIRS</span></td><td class="mono"><a href="../src/config.html#L30">30</a></td><td class="mono">(DATA_DIR, RUN_DIR, REVIEW_DIR, CACHE_DIR, LOG_DIR)</td><td>إسناد مجموعة إلى ALL_DIRS</td></tr>
+<tr><td class="mono"><span class="tag var">LEGACY_FILES</span></td><td class="mono"><a href="../src/config.html#L55">55</a></td><td class="mono">(os.path.join(BASE_DIR, &#x27;kirapass_hits.txt&#x27;), os.path.join(BASE_DIR, &#x27;</td><td>إسناد مجموعة إلى LEGACY_FILES</td></tr>
+<tr><td class="mono"><span class="tag var">USER_AGENT</span></td><td class="mono"><a href="../src/config.html#L64">64</a></td><td class="mono">&#x27;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, </td><td>إسناد القيمة الثابتة USER_AGENT</td></tr>
+<tr><td class="mono"><span class="tag var">BASE_HEADERS</span></td><td class="mono"><a href="../src/config.html#L69">69</a></td><td class="mono">{&#x27;User-Agent&#x27;: USER_AGENT, &#x27;Accept&#x27;: &#x27;text/html,application/xhtml+xml,</td><td>إسناد قاموس إلى BASE_HEADERS</td></tr>
+<tr><td class="mono"><span class="tag var">CONNECT_TIMEOUT</span></td><td class="mono"><a href="../src/config.html#L90">90</a></td><td class="mono">_env_float(&#x27;KIRAPASS_CONNECT_TIMEOUT&#x27;, 4.0)</td><td>إسناد نتيجة استدعاء _env_float (2 معاملات) إلى CONNECT_TIMEOUT</td></tr>
+<tr><td class="mono"><span class="tag var">READ_TIMEOUT</span></td><td class="mono"><a href="../src/config.html#L91">91</a></td><td class="mono">_env_float(&#x27;KIRAPASS_READ_TIMEOUT&#x27;, 8.0)</td><td>إسناد نتيجة استدعاء _env_float (2 معاملات) إلى READ_TIMEOUT</td></tr>
+<tr><td class="mono"><span class="tag var">ATTACK_READ_TIMEOUT</span></td><td class="mono"><a href="../src/config.html#L92">92</a></td><td class="mono">_env_float(&#x27;KIRAPASS_ATTACK_READ_TIMEOUT&#x27;, 5.0)</td><td>إسناد نتيجة استدعاء _env_float (2 معاملات) إلى ATTACK_READ_TIMEOUT</td></tr>
+<tr><td class="mono"><span class="tag var">VERIFY_TLS</span></td><td class="mono"><a href="../src/config.html#L93">93</a></td><td class="mono">False</td><td>بوابات الأسر تستخدم شهادات موقّعة ذاتياً</td></tr>
+<tr><td class="mono"><span class="tag var">DEFAULT_THREADS</span></td><td class="mono"><a href="../src/config.html#L95">95</a></td><td class="mono">12</td><td>إسناد القيمة الثابتة DEFAULT_THREADS</td></tr>
+<tr><td class="mono"><span class="tag var">MIN_THREADS</span></td><td class="mono"><a href="../src/config.html#L96">96</a></td><td class="mono">1</td><td>إسناد القيمة الثابتة MIN_THREADS</td></tr>
+<tr><td class="mono"><span class="tag var">MAX_THREADS</span></td><td class="mono"><a href="../src/config.html#L97">97</a></td><td class="mono">200</td><td>إسناد القيمة الثابتة MAX_THREADS</td></tr>
+<tr><td class="mono"><span class="tag var">DEFAULT_ATTEMPTS</span></td><td class="mono"><a href="../src/config.html#L98">98</a></td><td class="mono">2000</td><td>إسناد القيمة الثابتة DEFAULT_ATTEMPTS</td></tr>
+<tr><td class="mono"><span class="tag var">MAX_ATTEMPTS</span></td><td class="mono"><a href="../src/config.html#L99">99</a></td><td class="mono">20000000</td><td>إسناد القيمة الثابتة MAX_ATTEMPTS</td></tr>
+<tr><td class="mono"><span class="tag var">DEFAULT_DELAY_MS</span></td><td class="mono"><a href="../src/config.html#L100">100</a></td><td class="mono">0</td><td>إسناد القيمة الثابتة DEFAULT_DELAY_MS</td></tr>
+<tr><td class="mono"><span class="tag var">SLOW_DIAG_AFTER</span></td><td class="mono"><a href="../src/config.html#L105">105</a></td><td class="mono">8.0</td><td>ثوانٍ: فوق هذا يُحسب الراوتر بطيئاً</td></tr>
+<tr><td class="mono"><span class="tag var">BURST_LIMIT</span></td><td class="mono"><a href="../src/config.html#L106">106</a></td><td class="mono">20</td><td>إسناد القيمة الثابتة BURST_LIMIT</td></tr>
+<tr><td class="mono"><span class="tag var">CONSECUTIVE_TRANSPORT_FAILURE_LIMIT</span></td><td class="mono"><a href="../src/config.html#L109">109</a></td><td class="mono">3</td><td>إسناد القيمة الثابتة CONSECUTIVE_TRANSPORT_FAILURE_LIMIT</td></tr>
+<tr><td class="mono"><span class="tag var">SILENCE_SECONDS</span></td><td class="mono"><a href="../src/config.html#L110">110</a></td><td class="mono">6.0</td><td>إسناد القيمة الثابتة SILENCE_SECONDS</td></tr>
+<tr><td class="mono"><span class="tag var">INTERNET_CHECKS</span></td><td class="mono"><a href="../src/config.html#L144">144</a></td><td class="mono">_parse_internet_checks(os.environ.get(&#x27;KIRAPASS_INTERNET_CHECKS&#x27;, &#x27;&#x27;))</td><td>دمج منطقي (أو) وإسناده إلى INTERNET_CHECKS</td></tr>
+<tr><td class="mono"><span class="tag var">EXIT_HOST_MARKERS</span></td><td class="mono"><a href="../src/config.html#L153">153</a></td><td class="mono">(&#x27;msftconnecttest&#x27;, &#x27;gstatic&#x27;, &#x27;captive.apple&#x27;, &#x27;generate_204&#x27;, &#x27;conne</td><td>إسناد مجموعة إلى EXIT_HOST_MARKERS</td></tr>
+<tr><td class="mono"><span class="tag var">REJECT_WORDS</span></td><td class="mono"><a href="../src/config.html#L159">159</a></td><td class="mono">(&#x27;invalid username or password&#x27;, &#x27;invalid password&#x27;, &#x27;wrong password&#x27;,</td><td>إسناد مجموعة إلى REJECT_WORDS</td></tr>
+<tr><td class="mono"><span class="tag var">BAN_WORDS</span></td><td class="mono"><a href="../src/config.html#L172">172</a></td><td class="mono">(&#x27;you are blocked&#x27;, &#x27;your ip is blocked&#x27;, &#x27;ip has been blocked&#x27;, &#x27;addr</td><td>إسناد مجموعة إلى BAN_WORDS</td></tr>
+<tr><td class="mono"><span class="tag var">ACCEPT_WORDS</span></td><td class="mono"><a href="../src/config.html#L191">191</a></td><td class="mono">(&#x27;you are logged in&#x27;, &#x27;logged in successfully&#x27;, &#x27;login successful&#x27;, &#x27;w</td><td>إسناد مجموعة إلى ACCEPT_WORDS</td></tr>
+<tr><td class="mono"><span class="tag var">CALIBRATION_PROBES</span></td><td class="mono"><a href="../src/config.html#L201">201</a></td><td class="mono">3</td><td>إسناد القيمة الثابتة CALIBRATION_PROBES</td></tr>
+<tr><td class="mono"><span class="tag var">KNOWN_CARD_TRIAL_LIMIT</span></td><td class="mono"><a href="../src/config.html#L205">205</a></td><td class="mono">8</td><td>إسناد القيمة الثابتة KNOWN_CARD_TRIAL_LIMIT</td></tr>
+<tr><td class="mono"><span class="tag var">KNOWN_CARD_VERIFY_DELAY_SECONDS</span></td><td class="mono"><a href="../src/config.html#L207">207</a></td><td class="mono">1.0</td><td>إسناد القيمة الثابتة KNOWN_CARD_VERIFY_DELAY_SECONDS</td></tr>
+<tr><td class="mono"><span class="tag var">LOCKOUT_PROBE_MAX_FAILURES</span></td><td class="mono"><a href="../src/config.html#L209">209</a></td><td class="mono">8</td><td>إسناد القيمة الثابتة LOCKOUT_PROBE_MAX_FAILURES</td></tr>
+<tr><td class="mono"><span class="tag var">DIAGNOSTIC_SAMPLE_LIMIT</span></td><td class="mono"><a href="../src/config.html#L211">211</a></td><td class="mono">8</td><td>إسناد القيمة الثابتة DIAGNOSTIC_SAMPLE_LIMIT</td></tr>
+<tr><td class="mono"><span class="tag var">AUTO_PACE</span></td><td class="mono"><a href="../src/config.html#L216">216</a></td><td class="mono">os.environ.get(&#x27;KIRAPASS_AUTO_PACE&#x27;, &#x27;1&#x27;) not in (&#x27;0&#x27;, &#x27;no&#x27;, &#x27;off&#x27;)</td><td>مقارنة (ليس ضمن) وإسناد النتيجة المنطقية إلى AUTO_PACE</td></tr>
+<tr><td class="mono"><span class="tag var">PACE_WINDOW_SECONDS</span></td><td class="mono"><a href="../src/config.html#L217">217</a></td><td class="mono">3.0</td><td>انظر ما الذي رجع كل 3 ثوانٍ</td></tr>
+<tr><td class="mono"><span class="tag var">PACE_BAD_RATIO</span></td><td class="mono"><a href="../src/config.html#L218">218</a></td><td class="mono">0.02</td><td>فوق 2% أخطاء/تقييد: هذا الراوتر اكتفى</td></tr>
+<tr><td class="mono"><span class="tag var">PACE_MAX_DELAY_MS</span></td><td class="mono"><a href="../src/config.html#L219">219</a></td><td class="mono">4000</td><td>لا أبطأ من هذا من تلقاء نفسها</td></tr>
+<tr><td class="mono"><span class="tag var">PACE_MAX_THREADS</span></td><td class="mono"><a href="../src/config.html#L220">220</a></td><td class="mono">32</td><td>سقف صارم لعدد الأيدي التي تضيفها بنفسها</td></tr>
+<tr><td class="mono"><span class="tag var">WARMUP_EVERY</span></td><td class="mono"><a href="../src/config.html#L225">225</a></td><td class="mono">max(0, int(os.environ.get(&#x27;KIRAPASS_WARMUP_EVERY&#x27;, &#x27;25&#x27;)))</td><td>إسناد نتيجة استدعاء max (2 معاملات) إلى WARMUP_EVERY</td></tr>
+<tr><td class="mono"><span class="tag var">MAX_CARD_RETRIES</span></td><td class="mono"><a href="../src/config.html#L232">232</a></td><td class="mono">2</td><td>إسناد القيمة الثابتة MAX_CARD_RETRIES</td></tr>
+<tr><td class="mono"><span class="tag var">WATCH_INTERNET</span></td><td class="mono"><a href="../src/config.html#L239">239</a></td><td class="mono">True</td><td>إسناد القيمة الثابتة WATCH_INTERNET</td></tr>
+<tr><td class="mono"><span class="tag var">WATCH_EVERY_SECONDS</span></td><td class="mono"><a href="../src/config.html#L240">240</a></td><td class="mono">3.0</td><td>إسناد القيمة الثابتة WATCH_EVERY_SECONDS</td></tr>
+<tr><td class="mono"><span class="tag var">WATCH_SUSPECTS</span></td><td class="mono"><a href="../src/config.html#L241">241</a></td><td class="mono">40</td><td>إسناد القيمة الثابتة WATCH_SUSPECTS</td></tr>
+<tr><td class="mono"><span class="tag var">PORTAL_HINT_WORDS</span></td><td class="mono"><a href="../src/config.html#L244">244</a></td><td class="mono">(&#x27;login&#x27;, &#x27;hotspot&#x27;, &#x27;portal&#x27;, &#x27;welcome&#x27;, &#x27;splash&#x27;, &#x27;auth&#x27;)</td><td>إسناد مجموعة إلى PORTAL_HINT_WORDS</td></tr>
+<tr><td class="mono"><span class="tag var">PORTAL_URL_WORDS</span></td><td class="mono"><a href="../src/config.html#L249">249</a></td><td class="mono">(&#x27;login&#x27;, &#x27;hotspot&#x27;, &#x27;portal&#x27;, &#x27;splash&#x27;, &#x27;auth&#x27;, &#x27;captive&#x27;)</td><td>إسناد مجموعة إلى PORTAL_URL_WORDS</td></tr>
+<tr><td class="mono"><span class="tag var">DEFAULT_PREFIX</span></td><td class="mono"><a href="../src/config.html#L251">251</a></td><td class="mono">&#x27;&#x27;</td><td>إسناد القيمة الثابتة DEFAULT_PREFIX</td></tr>
+<tr><td class="mono"><span class="tag var">BIG_SPACE</span></td><td class="mono"><a href="../src/config.html#L254">254</a></td><td class="mono">10 ** 12</td><td>حساب أسّ بين 10 و12 وإسناده إلى BIG_SPACE</td></tr>
+<tr><td class="mono"><span class="tag var">WARN_SPACE</span></td><td class="mono"><a href="../src/config.html#L257">257</a></td><td class="mono">10 ** 9</td><td>حساب أسّ بين 10 و9 وإسناده إلى WARN_SPACE</td></tr>
+<tr><td class="mono"><span class="tag var">WARN_THREADS</span></td><td class="mono"><a href="../src/config.html#L258">258</a></td><td class="mono">50</td><td>إسناد القيمة الثابتة WARN_THREADS</td></tr>
+<tr><td class="mono"><span class="tag var">REPORT_RETENTION_DAYS</span></td><td class="mono"><a href="../src/config.html#L261">261</a></td><td class="mono">max(0, int(os.environ.get(&#x27;KIRAPASS_REPORT_RETENTION_DAYS&#x27;, &#x27;30&#x27;) or &#x27;</td><td>إسناد نتيجة استدعاء max (2 معاملات) إلى REPORT_RETENTION_DAYS</td></tr>
+</tbody></table></div>
+<h2 id="funcs">الدوال — واحدة واحدة</h2>
+<div class="sym head" id="f-set_data_dir"><span class="tag fn">دالة</span> <b>set_data_dir(path)</b>
+ <span class="muted">→ str</span>
+ <a class="tag api" href="../src/config.html#L33">سطر 33–52</a>
+<div>تعريف الدالة set_data_dir(path) ترجع str <span class="muted">(نص المؤلف الأصلي في docstring: Point every file the tool writes at another folder.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>ALL_DIRS, CACHE_DIR, DATA_DIR, HITS_FILE, LOG_DIR, PROFILES_FILE, REVIEW_DIR, RUN_DIR, SETTINGS_FILE</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/selftest.html#f-run_all"><code>run_all</code></a> <span class="muted">(selftest.py:416)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-_env_float"><span class="tag fn">دالة</span> <b>_env_float(name, default)</b>
+ <span class="muted">→ float</span>
+ <a class="tag api" href="../src/config.html#L79">سطر 79–87</a>
+<div>تعريف الدالة _env_float(name, default) ترجع float</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>3 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>raw, value</code></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-_parse_internet_checks"><span class="tag fn">دالة</span> <b>_parse_internet_checks(raw)</b>
+ <span class="muted">→ tuple</span>
+ <a class="tag api" href="../src/config.html#L125">سطر 125–141</a>
+<div>الصيغة:  الرابط|الحالة المتوقعة|النص المتوقع (اختياري)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>bits, item, out, status, text, url</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/verify.html#f-resolve_internet_checks"><code>resolve_internet_checks</code></a> <span class="muted">(verify.py:33)</span></td></tr>
+</table></div>
+<footer class="docfoot">صفحة مولّدة آلياً من مصدر الكود · KiraPass —
+<code>files</code> · 2026-10-01 02:26</footer>
+</main>
+</div>
+<script src="../assets/docs.js"></script>
+<script>KPInit("files");</script>
+</body>
+</html>

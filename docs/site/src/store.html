@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>مصدر store.py · KiraPass</title>
+<link rel="stylesheet" href="../assets/docs.css">
+
+</head>
+<body>
+<div id="kp-layout">
+<main class="doc">
+<h1>مصدر <code>store.py</code></h1>
+<p class="lead">البروفايلات، الإعدادات، التقارير، المراجعة، المسح — 570 سطراً. كل سطر يحمل تعليقه العربي.</p>
+<div class="card info"><b>هذه الصفحة مولّدة آلياً</b> من مصدر الكود مباشرة (<code>tools/docs/build_docs.py</code>). إن غيّرت الكود فأعد توليدها: <code>python3 tools/docs/build_docs.py</code>. الشرح اليدوي الأوسع في <a href="../architecture.html">المعمارية</a> و<a href="../editing.html">دليل التعديل</a> و<a href="../danger.html">أماكن الخطر</a>.</div>
+<p><a class="btn" href="../files/store.html">← صفحة الشرح</a> <label class="muted"> قفز إلى سطر: <input id="kp-jump" style="width:6rem" placeholder="123"></label></p>
+<details class="src" open><summary>المصدر كاملاً</summary><pre data-lines="570"><code>
+<span class="ln" id="L1">1</span># بداية نص متعدد الأسطر — الأسطر التالية نصّ حرفي لا كود، فلا يقبل تعليقاً
+<span class="ln" id="L2">2</span>&quot;&quot;&quot;Profiles, settings, reports and the &quot;clear cache&quot; logic - all in one place.
+<span class="ln" id="L3">3</span> 
+<span class="ln" id="L4">4</span>Profiles from the old version are **migrated automatically** instead of
+<span class="ln" id="L5">5</span>crashing.  That KeyError(&#x27;charset&#x27;) crash is one of the reasons the tool
+<span class="ln" id="L6">6</span>&quot;stopped working&quot; for a user who only replaced the .py file: the saved profile
+<span class="ln" id="L7">7</span>on disk was written by an older version.
+<span class="ln" id="L8">8</span>&quot;&quot;&quot;  # نهاية النص متعدد الأسطر
+<span class="ln" id="L9">9</span> 
+<span class="ln" id="L10">10</span>from __future__ import annotations  # استيراد annotations من الوحدة __future__
+<span class="ln" id="L11">11</span> 
+<span class="ln" id="L12">12</span>import glob  # استيراد الوحدة glob من المكتبة
+<span class="ln" id="L13">13</span>import json  # استيراد الوحدة json من المكتبة
+<span class="ln" id="L14">14</span>import os  # استيراد الوحدة os من المكتبة
+<span class="ln" id="L15">15</span>import re  # استيراد الوحدة re من المكتبة
+<span class="ln" id="L16">16</span>import shutil  # استيراد الوحدة shutil من المكتبة
+<span class="ln" id="L17">17</span>import time  # استيراد الوحدة time من المكتبة
+<span class="ln" id="L18">18</span> 
+<span class="ln" id="L19">19</span>from . import config  # استيراد config من الوحدة .
+<span class="ln" id="L20">20</span> 
+<span class="ln" id="L21">21</span>SCHEMA = 5  # إسناد القيمة الثابتة SCHEMA
+<span class="ln" id="L22">22</span>CHARSETS = {  # إسناد قاموس إلى CHARSETS
+<span class="ln" id="L23">23</span>    &quot;digits&quot;: &quot;0123456789&quot;,  # مفتاح digits في القاموس
+<span class="ln" id="L24">24</span>    &quot;lower&quot;: &quot;abcdefghijklmnopqrstuvwxyz&quot;,  # مفتاح lower في القاموس
+<span class="ln" id="L25">25</span>    &quot;upper&quot;: &quot;ABCDEFGHIJKLMNOPQRSTUVWXYZ&quot;,  # مفتاح upper في القاموس
+<span class="ln" id="L26">26</span>    &quot;alnum&quot;: &quot;0123456789abcdefghijklmnopqrstuvwxyz&quot;,  # مفتاح alnum في القاموس
+<span class="ln" id="L27">27</span>    &quot;alnum_upper&quot;: &quot;0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ&quot;,  # مفتاح alnum_upper في القاموس
+<span class="ln" id="L28">28</span>    &quot;hex&quot;: &quot;0123456789abcdef&quot;,  # مفتاح hex في القاموس
+<span class="ln" id="L29">29</span>    &quot;hex_upper&quot;: &quot;0123456789ABCDEF&quot;,  # مفتاح hex_upper في القاموس
+<span class="ln" id="L30">30</span>}  # إغلاق القوس المفتوح في السطر السابق
+<span class="ln" id="L31">31</span>PASS_MODES = (&quot;same&quot;, &quot;empty&quot;, &quot;omit&quot;, &quot;fixed&quot;, &quot;chap&quot;, &quot;chap_empty&quot;,  # إسناد مجموعة إلى PASS_MODES
+<span class="ln" id="L32">32</span>              &quot;md5user&quot;, &quot;sha1user&quot;, &quot;sha256user&quot;)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L33">33</span> 
+<span class="ln" id="L34">34</span> 
+<span class="ln" id="L35">35</span>def ensure_dirs() -&gt; None:  # تعريف الدالة ensure_dirs() ترجع None
+<span class="ln" id="L36">36</span>    for d in config.ALL_DIRS:  # دورة على config.ALL_DIRS باسم d
+<span class="ln" id="L37">37</span>        os.makedirs(d, exist_ok=True)  # استدعاء os.makedirs (معامل واحد، exist_ok=…)
+<span class="ln" id="L38">38</span> 
+<span class="ln" id="L39">39</span> 
+<span class="ln" id="L40">40</span># كتابة آمنة: ملف مؤقت ثم os.replace() — لا يرى القارئ نصف JSON أبداً.
+<span class="ln" id="L41">41</span># محاولتان تتحمّلان حذف المجلد أثناء الكتابة (زر «مسح البيانات»).
+<span class="ln" id="L42">42</span>def atomic_write(path: str, text: str) -&gt; None:  # تعريف الدالة atomic_write(path, text) ترجع None
+<span class="ln" id="L43">43</span>    # بداية نص متعدد الأسطر — الأسطر التالية نصّ حرفي لا كود، فلا يقبل تعليقاً
+<span class="ln" id="L44">44</span>    &quot;&quot;&quot;Write a file so that a reader never sees half of it.
+<span class="ln" id="L45">45</span> 
+<span class="ln" id="L46">46</span>    Tolerates the folder being deleted at the same moment (the user pressing
+<span class="ln" id="L47">47</span>    &quot;clear cache&quot; while a run is saving something).
+<span class="ln" id="L48">48</span>    &quot;&quot;&quot;  # نهاية النص متعدد الأسطر
+<span class="ln" id="L49">49</span>    for attempt in range(2):  # دورة على range(2) باسم attempt
+<span class="ln" id="L50">50</span>        try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L51">51</span>            ensure_dirs()  # استدعاء ensure_dirs
+<span class="ln" id="L52">52</span>            tmp = path + &quot;.tmp&quot;  # حساب جمع بين path و&#x27;.tmp&#x27; وإسناده إلى tmp
+<span class="ln" id="L53">53</span>            with open(tmp, &quot;w&quot;, encoding=&quot;utf-8&quot;) as fh:  # سياق مُدار: open(tmp, &#x27;w&#x27;, encoding=&#x27;utf-8&#x27;) باسم fh
+<span class="ln" id="L54">54</span>                fh.write(text)  # استدعاء fh.write (معامل واحد)
+<span class="ln" id="L55">55</span>            os.replace(tmp, path)  # استدعاء os.replace (2 معاملات)
+<span class="ln" id="L56">56</span>            return  # إنهاء الدالة بلا قيمة (ترجع None ضمناً)
+<span class="ln" id="L57">57</span>        except OSError:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L58">58</span>            if attempt:  # شرط: attempt
+<span class="ln" id="L59">59</span>                return  # إنهاء الدالة بلا قيمة (ترجع None ضمناً)
+<span class="ln" id="L60">60</span> 
+<span class="ln" id="L61">61</span> 
+<span class="ln" id="L62">62</span>def read_json(path: str, default):  # تعريف الدالة read_json(path, default)
+<span class="ln" id="L63">63</span>    try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L64">64</span>        with open(path, &quot;r&quot;, encoding=&quot;utf-8&quot;) as fh:  # سياق مُدار: open(path, &#x27;r&#x27;, encoding=&#x27;utf-8&#x27;) باسم fh
+<span class="ln" id="L65">65</span>            return json.load(fh)  # إرجاع json.load(fh)
+<span class="ln" id="L66">66</span>    except Exception:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L67">67</span>        return default  # إرجاع default
+<span class="ln" id="L68">68</span> 
+<span class="ln" id="L69">69</span> 
+<span class="ln" id="L70">70</span>def clean(name: str, limit: int = 60) -&gt; str:  # تعريف الدالة clean(name, limit) ترجع str
+<span class="ln" id="L71">71</span>    name = re.sub(r&quot;[^A-Za-z0-9_\u0600-\u06FF .-]+&quot;, &quot;_&quot;, (name or &quot;&quot;).strip())  # إسناد نتيجة استدعاء re.sub (3 معاملات) إلى name
+<span class="ln" id="L72">72</span>    return name[:limit] or &quot;profile&quot;  # إرجاع name[] أو &#x27;profile&#x27;
+<span class="ln" id="L73">73</span> 
+<span class="ln" id="L74">74</span> 
+<span class="ln" id="L75">75</span># ---------------------------------------------------------------------------
+<span class="ln" id="L76">76</span># مساعدات البروفايل (دوال صرفة — سهلة الاختبار)
+<span class="ln" id="L77">77</span># ---------------------------------------------------------------------------
+<span class="ln" id="L78">78</span># الصيغة الكاملة للبروفايل: أي حقل غير موجود هنا يُسقطه migrate().
+<span class="ln" id="L79">79</span># لذلك إضافة حقل جديد تبدأ دائماً من هذه الدالة.
+<span class="ln" id="L80">80</span>def new_profile(**kw) -&gt; dict:  # تعريف الدالة new_profile(**kw) ترجع dict
+<span class="ln" id="L81">81</span>    p = {  # إسناد قاموس إلى p
+<span class="ln" id="L82">82</span>        &quot;schema&quot;: SCHEMA,  # مفتاح schema في القاموس
+<span class="ln" id="L83">83</span>        &quot;name&quot;: &quot;&quot;,  # مفتاح name في القاموس
+<span class="ln" id="L84">84</span>        &quot;login_url&quot;: &quot;&quot;,  # مفتاح login_url في القاموس
+<span class="ln" id="L85">85</span>        &quot;method&quot;: &quot;post&quot;,  # مفتاح method في القاموس
+<span class="ln" id="L86">86</span>        &quot;user_field&quot;: &quot;username&quot;,  # مفتاح user_field في القاموس
+<span class="ln" id="L87">87</span>        &quot;pass_field&quot;: &quot;password&quot;,  # مفتاح pass_field في القاموس
+<span class="ln" id="L88">88</span>        &quot;pass_mode&quot;: &quot;empty&quot;,  # مفتاح pass_mode في القاموس
+<span class="ln" id="L89">89</span>        &quot;pass_fixed&quot;: &quot;&quot;,  # مفتاح pass_fixed في القاموس
+<span class="ln" id="L90">90</span>        &quot;extra_fields&quot;: {},  # مفتاح extra_fields في القاموس
+<span class="ln" id="L91">91</span>        &quot;dst_field&quot;: &quot;dst&quot;,  # مفتاح dst_field في القاموس
+<span class="ln" id="L92">92</span>        &quot;dst_value&quot;: &quot;&quot;,  # مفتاح dst_value في القاموس
+<span class="ln" id="L93">93</span>        &quot;send_dst&quot;: True,  # مفتاح send_dst في القاموس
+<span class="ln" id="L94">94</span>        &quot;popup_field&quot;: &quot;popup&quot;,  # مفتاح popup_field في القاموس
+<span class="ln" id="L95">95</span>        &quot;send_popup&quot;: True,  # مفتاح send_popup في القاموس
+<span class="ln" id="L96">96</span>        &quot;chap&quot;: None,  # مفتاح chap في القاموس
+<span class="ln" id="L97">97</span>        &quot;charset&quot;: CHARSETS[&quot;digits&quot;],  # مفتاح charset في القاموس
+<span class="ln" id="L98">98</span>        &quot;length&quot;: 10,  # مفتاح length في القاموس
+<span class="ln" id="L99">99</span>        &quot;prefix&quot;: &quot;&quot;,  # مفتاح prefix في القاموس
+<span class="ln" id="L100">100</span>        &quot;suffix&quot;: &quot;&quot;,  # مفتاح suffix في القاموس
+<span class="ln" id="L101">101</span>        &quot;space_pos&quot;: 0,  # مفتاح space_pos في القاموس
+<span class="ln" id="L102">102</span>        &quot;space_pass&quot;: 0,  # مفتاح space_pass في القاموس
+<span class="ln" id="L103">103</span>        &quot;walk_a&quot;: 0,  # مفتاح walk_a في القاموس
+<span class="ln" id="L104">104</span>        &quot;walk_b&quot;: 0,  # مفتاح walk_b في القاموس
+<span class="ln" id="L105">105</span>        &quot;note&quot;: &quot;&quot;,  # مفتاح note في القاموس
+<span class="ln" id="L106">106</span>        &quot;success_words&quot;: [],  # مفتاح success_words في القاموس
+<span class="ln" id="L107">107</span>        &quot;success_url_contains&quot;: &quot;&quot;,  # مفتاح success_url_contains في القاموس
+<span class="ln" id="L108">108</span>        &quot;stats_url&quot;: &quot;&quot;,  # مفتاح stats_url في القاموس
+<span class="ln" id="L109">109</span>        &quot;capture_needs_browser_js&quot;: False,  # مفتاح capture_needs_browser_js في القاموس
+<span class="ln" id="L110">110</span>        &quot;capture_block_reason&quot;: &quot;&quot;,  # مفتاح capture_block_reason في القاموس
+<span class="ln" id="L111">111</span>        # ما الذي قاسه فحص الحجب على هذا الراوتر (انظر
+<span class="ln" id="L112">112</span>        # engine.probe_lockout) — يستخدمه التشغيل لينتظر بالضبط
+<span class="ln" id="L113">113</span>        # ما يحتاجه هذا الراوتر بدل 45 ثانية مخمَّنة
+<span class="ln" id="L114">114</span>        # كيف يجب أن يبدو الطلب لهذه البوابة: بعضها يرفض
+<span class="ln" id="L115">115</span>        # أي شيء لا يبدو كالمتصفح الذي فحصها
+<span class="ln" id="L116">116</span>        &quot;user_agent&quot;: &quot;&quot;,  # مفتاح user_agent في القاموس
+<span class="ln" id="L117">117</span>        &quot;send_referer&quot;: True,  # مفتاح send_referer في القاموس
+<span class="ln" id="L118">118</span>        &quot;ban_after&quot;: None,  # مفتاح ban_after في القاموس
+<span class="ln" id="L119">119</span>        &quot;clears_after&quot;: None,  # مفتاح clears_after في القاموس
+<span class="ln" id="L120">120</span>        &quot;safe_delay_ms&quot;: 0,  # مفتاح safe_delay_ms في القاموس
+<span class="ln" id="L121">121</span>    }  # إغلاق القوس المفتوح في السطر السابق
+<span class="ln" id="L122">122</span>    p.update(kw)  # استدعاء p.update (معامل واحد)
+<span class="ln" id="L123">123</span>    return p  # إرجاع p
+<span class="ln" id="L124">124</span> 
+<span class="ln" id="L125">125</span> 
+<span class="ln" id="L126">126</span>def variable_len(p: dict) -&gt; int:  # تعريف الدالة variable_len(p) ترجع int
+<span class="ln" id="L127">127</span>    # إرجاع طرح
+<span class="ln" id="L128">128</span>    return int(p.get(&quot;length&quot;, 0)) - len(p.get(&quot;prefix&quot;, &quot;&quot;)) - \
+<span class="ln" id="L129">129</span>        len(p.get(&quot;suffix&quot;, &quot;&quot;))  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L130">130</span> 
+<span class="ln" id="L131">131</span> 
+<span class="ln" id="L132">132</span>def space_size(p: dict) -&gt; int:  # تعريف الدالة space_size(p) ترجع int
+<span class="ln" id="L133">133</span>    vlen = variable_len(p)  # إسناد نتيجة استدعاء variable_len (معامل واحد) إلى vlen
+<span class="ln" id="L134">134</span>    chars = len(set(p.get(&quot;charset&quot;, &quot;&quot;)))  # إسناد نتيجة استدعاء len (معامل واحد) إلى chars
+<span class="ln" id="L135">135</span>    if vlen &lt;= 0 or chars &lt; 2:  # شرط مركّب (أو)
+<span class="ln" id="L136">136</span>        return 0  # إرجاع 0
+<span class="ln" id="L137">137</span>    return chars ** vlen  # إرجاع أسّ
+<span class="ln" id="L138">138</span> 
+<span class="ln" id="L139">139</span> 
+<span class="ln" id="L140">140</span># يرجع قائمة مفاتيح آلية للمشاكل (فارغة = البروفايل صالح).
+<span class="ln" id="L141">141</span># space_is_astronomically_big تحذير لا مانع.
+<span class="ln" id="L142">142</span>def validate(p: dict) -&gt; list:  # تعريف الدالة validate(p) ترجع list
+<span class="ln" id="L143">143</span>    &quot;&quot;&quot;-&gt; list of machine-readable problems (empty = good to go).&quot;&quot;&quot;  # نص توثيقي (docstring) يشرح ما يليه
+<span class="ln" id="L144">144</span>    problems = []  # إسناد قائمة إلى problems
+<span class="ln" id="L145">145</span>    if not (p.get(&quot;login_url&quot;) or &quot;&quot;).startswith((&quot;http://&quot;, &quot;https://&quot;)):  # شرط معكوس: ليس p.get(&#x27;login_url&#x27;) أو &#x27;&#x27;.startswith(مجموعة)
+<span class="ln" id="L146">146</span>        problems.append(&quot;url_missing_or_invalid&quot;)  # استدعاء problems.append (معامل واحد)
+<span class="ln" id="L147">147</span>    if not p.get(&quot;user_field&quot;):  # شرط معكوس: ليس p.get(&#x27;user_field&#x27;)
+<span class="ln" id="L148">148</span>        problems.append(&quot;user_field_missing&quot;)  # استدعاء problems.append (معامل واحد)
+<span class="ln" id="L149">149</span>    vlen = variable_len(p)  # إسناد نتيجة استدعاء variable_len (معامل واحد) إلى vlen
+<span class="ln" id="L150">150</span>    if vlen &lt;= 0:  # شرط: vlen أصغر أو يساوي 0
+<span class="ln" id="L151">151</span>        problems.append(&quot;length_not_bigger_than_prefix_and_suffix&quot;)  # استدعاء problems.append (معامل واحد)
+<span class="ln" id="L152">152</span>    if len(set(p.get(&quot;charset&quot;) or &quot;&quot;)) &lt; 2:  # شرط: len(set(p.get(&#x27;charset&#x27;) أو &#x27;&#x27;)) أصغر من 2
+<span class="ln" id="L153">153</span>        problems.append(&quot;charset_too_small&quot;)  # استدعاء problems.append (معامل واحد)
+<span class="ln" id="L154">154</span>    if p.get(&quot;pass_mode&quot;) not in PASS_MODES:  # شرط: p.get(&#x27;pass_mode&#x27;) ليس ضمن PASS_MODES
+<span class="ln" id="L155">155</span>        problems.append(&quot;unknown_pass_mode&quot;)  # استدعاء problems.append (معامل واحد)
+<span class="ln" id="L156">156</span>    if p.get(&quot;pass_mode&quot;) == &quot;fixed&quot; and not p.get(&quot;pass_fixed&quot;):  # شرط مركّب (و)
+<span class="ln" id="L157">157</span>        problems.append(&quot;fixed_password_empty&quot;)  # استدعاء problems.append (معامل واحد)
+<span class="ln" id="L158">158</span>    if p.get(&quot;capture_needs_browser_js&quot;):  # شرط: نتيجة p.get(&#x27;capture_needs_browser_js&#x27;)
+<span class="ln" id="L159">159</span>        problems.append(&quot;needs_browser_js&quot;)  # استدعاء problems.append (معامل واحد)
+<span class="ln" id="L160">160</span>    if len(set(p.get(&quot;charset&quot;) or &quot;&quot;)) ** max(vlen, 1) &gt; config.BIG_SPACE:  # شرط: أسّ أكبر من config.BIG_SPACE
+<span class="ln" id="L161">161</span>        problems.append(&quot;space_is_astronomically_big&quot;)   # تحذير، لا مانع
+<span class="ln" id="L162">162</span>    return problems  # إرجاع problems
+<span class="ln" id="L163">163</span> 
+<span class="ln" id="L164">164</span> 
+<span class="ln" id="L165">165</span># رقم ⇒ بطاقة: تحويل بأساس عدد المحارف الفريدة المرتّبة.
+<span class="ln" id="L166">166</span># sorted(set(charset)) مقصود: أبجدية فيها تكرار تُنتج بطاقات مكرّرة.
+<span class="ln" id="L167">167</span>def decode_card(p: dict, index: int) -&gt; str:  # تعريف الدالة decode_card(p, index) ترجع str
+<span class="ln" id="L168">168</span>    charset = p.get(&quot;charset&quot;, &quot;&quot;)  # إسناد نتيجة استدعاء p.get (2 معاملات) إلى charset
+<span class="ln" id="L169">169</span>    vlen = variable_len(p)  # إسناد نتيجة استدعاء variable_len (معامل واحد) إلى vlen
+<span class="ln" id="L170">170</span>    base = len(set(charset))  # إسناد نتيجة استدعاء len (معامل واحد) إلى base
+<span class="ln" id="L171">171</span>    chars = sorted(set(charset))  # إسناد نتيجة استدعاء sorted (معامل واحد) إلى chars
+<span class="ln" id="L172">172</span>    out = []  # إسناد قائمة إلى out
+<span class="ln" id="L173">173</span>    for _ in range(vlen):  # دورة على range(vlen) باسم _
+<span class="ln" id="L174">174</span>        out.append(chars[index % base])  # استدعاء out.append (معامل واحد)
+<span class="ln" id="L175">175</span>        index //= base  # تحديث index بعملية قسمة صحيحة
+<span class="ln" id="L176">176</span>    return p.get(&quot;prefix&quot;, &quot;&quot;) + &quot;&quot;.join(out) + p.get(&quot;suffix&quot;, &quot;&quot;)  # إرجاع جمع
+<span class="ln" id="L177">177</span> 
+<span class="ln" id="L178">178</span> 
+<span class="ln" id="L179">179</span>def sample_cards(p: dict, count: int = 3) -&gt; list:  # تعريف الدالة sample_cards(p, count) ترجع list
+<span class="ln" id="L180">180</span>    space = space_size(p)  # إسناد نتيجة استدعاء space_size (معامل واحد) إلى space
+<span class="ln" id="L181">181</span>    if space &lt;= 0:  # شرط: space أصغر أو يساوي 0
+<span class="ln" id="L182">182</span>        return []  # إرجاع قائمة
+<span class="ln" id="L183">183</span>    picks = {0, space // 2, space - 1, space // 3}  # إسناد مجموعة فريدة إلى picks
+<span class="ln" id="L184">184</span>    return [decode_card(p, i) for i in sorted(picks)][:count]  # إرجاع اشتقاق قائمة[]
+<span class="ln" id="L185">185</span> 
+<span class="ln" id="L186">186</span> 
+<span class="ln" id="L187">187</span># مشي مخلوط بلا تكرار: (b + a*pos) mod space حيث a أولي نسبياً مع space.
+<span class="ln" id="L188">188</span>def card_at_walk_pos(p: dict, pos: int) -&gt; str:  # تعريف الدالة card_at_walk_pos(p, pos) ترجع str
+<span class="ln" id="L189">189</span>    &quot;&quot;&quot;Shuffled but repeat-free walk over the whole space.&quot;&quot;&quot;  # نص توثيقي (docstring) يشرح ما يليه
+<span class="ln" id="L190">190</span>    space = space_size(p)  # إسناد نتيجة استدعاء space_size (معامل واحد) إلى space
+<span class="ln" id="L191">191</span>    if space &lt;= 1:  # شرط: space أصغر أو يساوي 1
+<span class="ln" id="L192">192</span>        return decode_card(p, 0)  # إرجاع decode_card(p, 0)
+<span class="ln" id="L193">193</span>    a = int(p.get(&quot;walk_a&quot;, 0)) % space  # حساب باقي القسمة بين int(p.get(&#x27;walk_a&#x27;, 0)) وspace وإسناده إلى a
+<span class="ln" id="L194">194</span>    b = int(p.get(&quot;walk_b&quot;, 0)) % space  # حساب باقي القسمة بين int(p.get(&#x27;walk_b&#x27;, 0)) وspace وإسناده إلى b
+<span class="ln" id="L195">195</span>    if a == 0:  # شرط: a يساوي 0
+<span class="ln" id="L196">196</span>        a = 1  # إسناد القيمة الثابتة a
+<span class="ln" id="L197">197</span>    idx = (b + a * pos) % space  # حساب باقي القسمة بين جمع وspace وإسناده إلى idx
+<span class="ln" id="L198">198</span>    return decode_card(p, idx)  # إرجاع decode_card(p, idx)
+<span class="ln" id="L199">199</span> 
+<span class="ln" id="L200">200</span> 
+<span class="ln" id="L201">201</span># يقبل بروفايلاً من أي نسخة قديمة ويحوّله إلى الصيغة الحالية.
+<span class="ln" id="L202">202</span># في النهاية يمرّر login_url عبر sanitize_login_url حتى تُحذف أي بطاقة
+<span class="ln" id="L203">203</span># أو كلمة مرور قديمة منسوخة داخل رابط GET.
+<span class="ln" id="L204">204</span>def migrate(raw: dict) -&gt; dict:  # تعريف الدالة migrate(raw) ترجع dict
+<span class="ln" id="L205">205</span>    &quot;&quot;&quot;Accept a profile written by ANY older version of the tool.&quot;&quot;&quot;  # نص توثيقي (docstring) يشرح ما يليه
+<span class="ln" id="L206">206</span>    if not isinstance(raw, dict):  # شرط معكوس: ليس isinstance(raw, dict)
+<span class="ln" id="L207">207</span>        return new_profile()  # إرجاع new_profile()
+<span class="ln" id="L208">208</span>    p = new_profile()  # إسناد نتيجة استدعاء new_profile إلى p
+<span class="ln" id="L209">209</span>    p.update({k: v for k, v in raw.items() if k in p})  # استدعاء p.update (معامل واحد)
+<span class="ln" id="L210">210</span> 
+<span class="ln" id="L211">211</span>    nt = str(raw.get(&quot;network_type&quot;, &quot;1&quot;))  # إسناد نتيجة استدعاء str (معامل واحد) إلى nt
+<span class="ln" id="L212">212</span>    prefix = raw.get(&quot;prefix&quot;, p[&quot;prefix&quot;]) or &quot;&quot;  # دمج منطقي (أو) وإسناده إلى prefix
+<span class="ln" id="L213">213</span>    suffix = raw.get(&quot;suffix&quot;, p[&quot;suffix&quot;]) or &quot;&quot;  # دمج منطقي (أو) وإسناده إلى suffix
+<span class="ln" id="L214">214</span>    charset = raw.get(&quot;charset&quot;) or p[&quot;charset&quot;]  # دمج منطقي (أو) وإسناده إلى charset
+<span class="ln" id="L215">215</span>    vlen = raw.get(&quot;var_len&quot;)  # إسناد نتيجة استدعاء raw.get (معامل واحد) إلى vlen
+<span class="ln" id="L216">216</span>    if vlen:  # شرط: vlen
+<span class="ln" id="L217">217</span>        length = int(vlen) + len(prefix) + len(suffix)  # حساب جمع بين جمع وlen(suffix) وإسناده إلى length
+<span class="ln" id="L218">218</span>    else:  # مفتاح else في القاموس
+<span class="ln" id="L219">219</span>        length = int(raw.get(&quot;length&quot;, p[&quot;length&quot;]) or p[&quot;length&quot;])  # إسناد نتيجة استدعاء int (معامل واحد) إلى length
+<span class="ln" id="L220">220</span> 
+<span class="ln" id="L221">221</span>    if nt == &quot;3&quot;:  # شرط: nt يساوي &#x27;3&#x27;
+<span class="ln" id="L222">222</span>        # بروفايلات «اسم مستخدم + كلمة مرور مختلفة» القديمة: أبقِ شكل
+<span class="ln" id="L223">223</span>        # اسم المستخدم، ويصير جانب كلمة المرور قيمة ثابتة/مشتقة.
+<span class="ln" id="L224">224</span>        prefix = raw.get(&quot;u_prefix&quot;, prefix) or &quot;&quot;  # دمج منطقي (أو) وإسناده إلى prefix
+<span class="ln" id="L225">225</span>        suffix = raw.get(&quot;u_suffix&quot;, suffix) or &quot;&quot;  # دمج منطقي (أو) وإسناده إلى suffix
+<span class="ln" id="L226">226</span>        charset = raw.get(&quot;u_charset&quot;, charset) or charset  # دمج منطقي (أو) وإسناده إلى charset
+<span class="ln" id="L227">227</span>        length = int(raw.get(&quot;u_len&quot;, 0) or 0) + len(prefix) + len(suffix) or length  # دمج منطقي (أو) وإسناده إلى length
+<span class="ln" id="L228">228</span>        p[&quot;pass_mode&quot;] = &quot;fixed&quot;  # إسناد القيمة الثابتة p[&#x27;pass_mode&#x27;]
+<span class="ln" id="L229">229</span>    elif nt == &quot;2&quot; and raw.get(&quot;pass_mode&quot;) in (None, &quot;same&quot;):  # شرط مركّب (و)
+<span class="ln" id="L230">230</span>        p[&quot;pass_mode&quot;] = &quot;same&quot;  # إسناد القيمة الثابتة p[&#x27;pass_mode&#x27;]
+<span class="ln" id="L231">231</span>    elif p.get(&quot;pass_mode&quot;) in (None, &quot;&quot;):  # شرط: p.get(&#x27;pass_mode&#x27;) ضمن مجموعة
+<span class="ln" id="L232">232</span>        p[&quot;pass_mode&quot;] = &quot;empty&quot;  # إسناد القيمة الثابتة p[&#x27;pass_mode&#x27;]
+<span class="ln" id="L233">233</span> 
+<span class="ln" id="L234">234</span>    p.update({  # استدعاء p.update (معامل واحد)
+<span class="ln" id="L235">235</span>        &quot;charset&quot;: charset,  # مفتاح charset في القاموس
+<span class="ln" id="L236">236</span>        &quot;length&quot;: max(length, len(prefix) + len(suffix) + 1),  # مفتاح length في القاموس
+<span class="ln" id="L237">237</span>        &quot;prefix&quot;: prefix,  # مفتاح prefix في القاموس
+<span class="ln" id="L238">238</span>        &quot;suffix&quot;: suffix,  # مفتاح suffix في القاموس
+<span class="ln" id="L239">239</span>        &quot;method&quot;: &quot;post&quot; if str(raw.get(&quot;method&quot;, &quot;2&quot;)) in (&quot;2&quot;, &quot;post&quot;) else &quot;get&quot;,  # مفتاح method في القاموس
+<span class="ln" id="L240">240</span>        &quot;send_dst&quot;: bool(raw.get(&quot;send_dst&quot;)) if &quot;send_dst&quot; in raw  # مفتاح send_dst في القاموس
+<span class="ln" id="L241">241</span>                    else bool(raw.get(&quot;extras&quot;, True)),  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L242">242</span>        &quot;send_popup&quot;: bool(raw.get(&quot;send_popup&quot;)) if &quot;send_popup&quot; in raw  # مفتاح send_popup في القاموس
+<span class="ln" id="L243">243</span>                      else bool(raw.get(&quot;extras&quot;, True)),  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L244">244</span>        &quot;dst_value&quot;: raw.get(&quot;dst_value&quot;, &quot;&quot;),  # مفتاح dst_value في القاموس
+<span class="ln" id="L245">245</span>        &quot;dst_field&quot;: raw.get(&quot;dst_field&quot;) or &quot;dst&quot;,  # مفتاح dst_field في القاموس
+<span class="ln" id="L246">246</span>        &quot;popup_field&quot;: raw.get(&quot;popup_field&quot;) or &quot;popup&quot;,  # مفتاح popup_field في القاموس
+<span class="ln" id="L247">247</span>        &quot;extra_fields&quot;: raw.get(&quot;fixed_fields&quot;) or raw.get(&quot;extra_fields&quot;) or {},  # مفتاح extra_fields في القاموس
+<span class="ln" id="L248">248</span>        &quot;success_words&quot;: raw.get(&quot;success_signature&quot;) or raw.get(&quot;success_words&quot;) or [],  # مفتاح success_words في القاموس
+<span class="ln" id="L249">249</span>        &quot;success_url_contains&quot;: raw.get(&quot;success_url_contains&quot;, &quot;&quot;) or &quot;&quot;,  # مفتاح success_url_contains في القاموس
+<span class="ln" id="L250">250</span>        &quot;space_pos&quot;: int(raw.get(&quot;space_pos&quot;, 0) or 0),  # مفتاح space_pos في القاموس
+<span class="ln" id="L251">251</span>        &quot;space_pass&quot;: int(raw.get(&quot;space_pass&quot;, 0) or 0),  # مفتاح space_pass في القاموس
+<span class="ln" id="L252">252</span>        &quot;walk_a&quot;: int(raw.get(&quot;walk_a&quot;, 0) or 0),  # مفتاح walk_a في القاموس
+<span class="ln" id="L253">253</span>        &quot;walk_b&quot;: int(raw.get(&quot;walk_b&quot;, 0) or 0),  # مفتاح walk_b في القاموس
+<span class="ln" id="L254">254</span>        &quot;schema&quot;: SCHEMA,  # مفتاح schema في القاموس
+<span class="ln" id="L255">255</span>    })  # إغلاق القوس المفتوح في السطر السابق
+<span class="ln" id="L256">256</span>    if (raw.get(&quot;walk&quot;) or {}).get(&quot;pos&quot;):  # شرط: نتيجة raw.get(&#x27;walk&#x27;) أو قاموس.get(&#x27;pos&#x27;)
+<span class="ln" id="L257">257</span>        p[&quot;space_pos&quot;] = int(raw[&quot;walk&quot;][&quot;pos&quot;])  # إسناد نتيجة استدعاء int (معامل واحد) إلى p[&#x27;space_pos&#x27;]
+<span class="ln" id="L258">258</span>    # البروفايلات القديمة قد تحتوي رابط GET ناجحاً منسوخاً بالبطاقة
+<span class="ln" id="L259">259</span>    # وتجزئة كلمة المرور في استعلامه. أبقِ شكل طلبه، لا أسرار.
+<span class="ln" id="L260">260</span>    from .portals import sanitize_login_url  # استيراد sanitize_login_url من الوحدة portals
+<span class="ln" id="L261">261</span>    p[&quot;login_url&quot;] = sanitize_login_url(  # إسناد نتيجة استدعاء sanitize_login_url (3 معاملات) إلى p[&#x27;login_url&#x27;]
+<span class="ln" id="L262">262</span>        p.get(&quot;login_url&quot;, &quot;&quot;), p.get(&quot;user_field&quot;, &quot;username&quot;),  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L263">263</span>        p.get(&quot;pass_field&quot;, &quot;password&quot;))  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L264">264</span>    return p  # إرجاع p
+<span class="ln" id="L265">265</span> 
+<span class="ln" id="L266">266</span> 
+<span class="ln" id="L267">267</span># ---------------------------------------------------------------------------
+<span class="ln" id="L268">268</span># التخزين
+<span class="ln" id="L269">269</span># ---------------------------------------------------------------------------
+<span class="ln" id="L270">270</span>class Store:  # تعريف الصنف Store
+<span class="ln" id="L271">271</span>    def __init__(self):  # تعريف الدالة __init__(self)
+<span class="ln" id="L272">272</span>        ensure_dirs()  # استدعاء ensure_dirs
+<span class="ln" id="L273">273</span>        self.path = config.PROFILES_FILE  # إسناد config.PROFILES_FILE إلى self.path
+<span class="ln" id="L274">274</span>        self._profiles = self._load()  # إسناد نتيجة استدعاء self._load إلى self._profiles
+<span class="ln" id="L275">275</span>        self.settings = read_json(config.SETTINGS_FILE, {}) or {}  # دمج منطقي (أو) وإسناده إلى self.settings
+<span class="ln" id="L276">276</span> 
+<span class="ln" id="L277">277</span>    # -- البروفايلات ------------------------------------------------------
+<span class="ln" id="L278">278</span>    def _load(self) -&gt; dict:  # تعريف الدالة _load(self) ترجع dict
+<span class="ln" id="L279">279</span>        raw = read_json(self.path, {})  # إسناد نتيجة استدعاء read_json (2 معاملات) إلى raw
+<span class="ln" id="L280">280</span>        out = {}  # إسناد قاموس إلى out
+<span class="ln" id="L281">281</span>        if isinstance(raw, dict) and &quot;profiles&quot; in raw:  # شرط مركّب (و)
+<span class="ln" id="L282">282</span>            items = raw.get(&quot;profiles&quot;) or []  # دمج منطقي (أو) وإسناده إلى items
+<span class="ln" id="L283">283</span>        elif isinstance(raw, list):  # شرط: نتيجة isinstance(raw, list)
+<span class="ln" id="L284">284</span>            items = raw  # إسناد raw إلى items
+<span class="ln" id="L285">285</span>        else:  # مفتاح else في القاموس
+<span class="ln" id="L286">286</span>            items = [raw] if raw else []  # إسناد قائمة إن raw وإلا قائمة إلى items
+<span class="ln" id="L287">287</span>        for item in items:  # دورة على items باسم item
+<span class="ln" id="L288">288</span>            try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L289">289</span>                prof = migrate(item)  # إسناد نتيجة استدعاء migrate (معامل واحد) إلى prof
+<span class="ln" id="L290">290</span>            except Exception:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L291">291</span>                continue  # الانتقال إلى الدورة التالية
+<span class="ln" id="L292">292</span>            name = clean(prof.get(&quot;name&quot;) or &quot;&quot;)  # إسناد نتيجة استدعاء clean (معامل واحد) إلى name
+<span class="ln" id="L293">293</span>            if not name or name == &quot;profile&quot;:  # شرط مركّب (أو)
+<span class="ln" id="L294">294</span>                name = clean(prof.get(&quot;login_url&quot;, &quot;profile&quot;).split(&quot;//&quot;)[-1])  # إسناد نتيجة استدعاء clean (معامل واحد) إلى name
+<span class="ln" id="L295">295</span>            prof[&quot;name&quot;] = name  # إسناد name إلى prof[&#x27;name&#x27;]
+<span class="ln" id="L296">296</span>            out[name] = prof  # إسناد prof إلى out[name]
+<span class="ln" id="L297">297</span>        return out  # إرجاع out
+<span class="ln" id="L298">298</span> 
+<span class="ln" id="L299">299</span>    def save(self) -&gt; None:  # تعريف الدالة save(self) ترجع None
+<span class="ln" id="L300">300</span>        payload = {&quot;schema&quot;: SCHEMA, &quot;saved&quot;: time.strftime(&quot;%Y-%m-%d %H:%M:%S&quot;),  # إسناد قاموس إلى payload
+<span class="ln" id="L301">301</span>                   &quot;profiles&quot;: list(self._profiles.values())}  # مفتاح profiles في القاموس
+<span class="ln" id="L302">302</span>        atomic_write(self.path, json.dumps(payload, ensure_ascii=False, indent=2))  # استدعاء atomic_write (2 معاملات)
+<span class="ln" id="L303">303</span> 
+<span class="ln" id="L304">304</span>    def all(self) -&gt; list:  # تعريف الدالة all(self) ترجع list
+<span class="ln" id="L305">305</span>        return sorted(self._profiles.values(), key=lambda x: x.get(&quot;name&quot;, &quot;&quot;))  # إرجاع sorted(self._profiles.values(), key=دالة مجهولة)
+<span class="ln" id="L306">306</span> 
+<span class="ln" id="L307">307</span>    def get(self, name: str):  # تعريف الدالة get(self, name)
+<span class="ln" id="L308">308</span>        return self._profiles.get(clean(name))  # إرجاع self._profiles.get(clean(name))
+<span class="ln" id="L309">309</span> 
+<span class="ln" id="L310">310</span>    def put(self, profile: dict) -&gt; dict:  # تعريف الدالة put(self, profile) ترجع dict
+<span class="ln" id="L311">311</span>        prof = migrate(profile)  # إسناد نتيجة استدعاء migrate (معامل واحد) إلى prof
+<span class="ln" id="L312">312</span>        name = clean(prof.get(&quot;name&quot;) or  # إسناد نتيجة استدعاء clean (معامل واحد) إلى name
+<span class="ln" id="L313">313</span>                     prof.get(&quot;login_url&quot;, &quot;profile&quot;).split(&quot;//&quot;)[-1])  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L314">314</span>        if name == &quot;profile&quot;:  # شرط: name يساوي &#x27;profile&#x27;
+<span class="ln" id="L315">315</span>            name = f&quot;profile-{len(self._profiles) + 1}&quot;  # بناء نص منسّق وإسناده إلى name
+<span class="ln" id="L316">316</span>        prof[&quot;name&quot;] = name  # إسناد name إلى prof[&#x27;name&#x27;]
+<span class="ln" id="L317">317</span>        self._profiles[name] = prof  # إسناد prof إلى self._profiles[name]
+<span class="ln" id="L318">318</span>        self.save()  # استدعاء self.save
+<span class="ln" id="L319">319</span>        return prof  # إرجاع prof
+<span class="ln" id="L320">320</span> 
+<span class="ln" id="L321">321</span>    def delete(self, name: str) -&gt; bool:  # تعريف الدالة delete(self, name) ترجع bool
+<span class="ln" id="L322">322</span>        prof = self._profiles.pop(clean(name), None)  # إسناد نتيجة استدعاء self._profiles.pop (2 معاملات) إلى prof
+<span class="ln" id="L323">323</span>        if prof:  # شرط: prof
+<span class="ln" id="L324">324</span>            self.save()  # استدعاء self.save
+<span class="ln" id="L325">325</span>            return True  # إرجاع True
+<span class="ln" id="L326">326</span>        return False  # إرجاع False
+<span class="ln" id="L327">327</span> 
+<span class="ln" id="L328">328</span>    def get_setting(self, key, default=None):  # تعريف الدالة get_setting(self, key, default)
+<span class="ln" id="L329">329</span>        return self.settings.get(key, default)  # إرجاع self.settings.get(key, default)
+<span class="ln" id="L330">330</span> 
+<span class="ln" id="L331">331</span>    def set_setting(self, key, value) -&gt; None:  # تعريف الدالة set_setting(self, key, value) ترجع None
+<span class="ln" id="L332">332</span>        self.settings[key] = value  # إسناد value إلى self.settings[key]
+<span class="ln" id="L333">333</span>        atomic_write(config.SETTINGS_FILE, json.dumps(self.settings,  # استدعاء atomic_write (2 معاملات)
+<span class="ln" id="L334">334</span>                                                      ensure_ascii=False, indent=2))  # المعامل المسمّى ensure_ascii
+<span class="ln" id="L335">335</span> 
+<span class="ln" id="L336">336</span>    # -- التقارير / صفحات المراجعة ----------------------------------------
+<span class="ln" id="L337">337</span>    def save_review(self, seq: int, card: str, verdict: dict, body: str) -&gt; dict:  # تعريف الدالة save_review(self, seq, card, verdict, body) ترجع dict
+<span class="ln" id="L338">338</span>        ensure_dirs()  # استدعاء ensure_dirs
+<span class="ln" id="L339">339</span>        name = f&quot;{int(time.time())}_{seq:05d}_{clean(card, 24)}.html&quot;  # بناء نص منسّق وإسناده إلى name
+<span class="ln" id="L340">340</span>        path = os.path.join(config.REVIEW_DIR, name)  # إسناد نتيجة استدعاء os.path.join (2 معاملات) إلى path
+<span class="ln" id="L341">341</span>        try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L342">342</span>            with open(path, &quot;w&quot;, encoding=&quot;utf-8&quot;) as fh:  # سياق مُدار: open(path, &#x27;w&#x27;, encoding=&#x27;utf-8&#x27;) باسم fh
+<span class="ln" id="L343">343</span>                fh.write(redact_review_body(body or &quot;&quot;)[:400000])  # استدعاء fh.write (معامل واحد)
+<span class="ln" id="L344">344</span>        except OSError:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L345">345</span>            return {}  # إرجاع قاموس
+<span class="ln" id="L346">346</span>        try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L347">347</span>            index = read_json(os.path.join(config.REVIEW_DIR, &quot;index.json&quot;), [])  # إسناد نتيجة استدعاء read_json (2 معاملات) إلى index
+<span class="ln" id="L348">348</span>            index.append({&quot;file&quot;: name, &quot;card&quot;: card,  # استدعاء index.append (معامل واحد)
+<span class="ln" id="L349">349</span>                          &quot;saved&quot;: time.strftime(&quot;%Y-%m-%d %H:%M:%S&quot;),  # مفتاح saved في القاموس
+<span class="ln" id="L350">350</span>                          **{k: verdict.get(k)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L351">351</span>                             for k in (&quot;code&quot;, &quot;reason&quot;, &quot;data&quot;)}})  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L352">352</span>            atomic_write(os.path.join(config.REVIEW_DIR, &quot;index.json&quot;),  # استدعاء atomic_write (2 معاملات)
+<span class="ln" id="L353">353</span>                         json.dumps(index[-500:], ensure_ascii=False, indent=2))  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L354">354</span>        except OSError:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L355">355</span>            pass  # سطر فارغ منطقياً (pass) — مطلوب صياغياً
+<span class="ln" id="L356">356</span>        return {&quot;file&quot;: name, &quot;card&quot;: card, &quot;reason&quot;: verdict.get(&quot;reason&quot;),  # إرجاع قاموس
+<span class="ln" id="L357">357</span>                &quot;data&quot;: verdict.get(&quot;data&quot;)}  # مفتاح data في القاموس
+<span class="ln" id="L358">358</span> 
+<span class="ln" id="L359">359</span>    def list_review(self) -&gt; list:  # تعريف الدالة list_review(self) ترجع list
+<span class="ln" id="L360">360</span>        index = read_json(os.path.join(config.REVIEW_DIR, &quot;index.json&quot;), [])  # إسناد نتيجة استدعاء read_json (2 معاملات) إلى index
+<span class="ln" id="L361">361</span>        return list(reversed(index))  # إرجاع list(reversed(index))
+<span class="ln" id="L362">362</span> 
+<span class="ln" id="L363">363</span>    def read_review(self, name: str) -&gt; str:  # تعريف الدالة read_review(self, name) ترجع str
+<span class="ln" id="L364">364</span>        safe = os.path.basename(name)  # إسناد نتيجة استدعاء os.path.basename (معامل واحد) إلى safe
+<span class="ln" id="L365">365</span>        path = os.path.join(config.REVIEW_DIR, safe)  # إسناد نتيجة استدعاء os.path.join (2 معاملات) إلى path
+<span class="ln" id="L366">366</span>        try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L367">367</span>            with open(path, &quot;r&quot;, encoding=&quot;utf-8&quot;, errors=&quot;replace&quot;) as fh:  # سياق مُدار: open(path, &#x27;r&#x27;, encoding=&#x27;utf-8&#x27;, errors=&#x27;replace&#x27;) باسم fh
+<span class="ln" id="L368">368</span>                return fh.read()  # إرجاع fh.read()
+<span class="ln" id="L369">369</span>        except OSError:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L370">370</span>            return &quot;&quot;  # إرجاع &#x27;&#x27;
+<span class="ln" id="L371">371</span> 
+<span class="ln" id="L372">372</span>    def save_run(self, report: dict) -&gt; str:  # تعريف الدالة save_run(self, report) ترجع str
+<span class="ln" id="L373">373</span>        ensure_dirs()  # استدعاء ensure_dirs
+<span class="ln" id="L374">374</span>        self.cleanup_old_reports()  # استدعاء self.cleanup_old_reports
+<span class="ln" id="L375">375</span>        name = time.strftime(&quot;%Y%m%d_%H%M%S&quot;) + &quot;_&quot; + clean(report.get(&quot;profile&quot;, &quot;run&quot;), 24)  # حساب جمع بين جمع وclean(report.get(&#x27;profile&#x27;, &#x27;run&#x27;), 24) وإسناده إلى name
+<span class="ln" id="L376">376</span>        path = os.path.join(config.RUN_DIR, name + &quot;.json&quot;)  # إسناد نتيجة استدعاء os.path.join (2 معاملات) إلى path
+<span class="ln" id="L377">377</span>        atomic_write(path, json.dumps(report, ensure_ascii=False, indent=2))  # استدعاء atomic_write (2 معاملات)
+<span class="ln" id="L378">378</span>        return path  # إرجاع path
+<span class="ln" id="L379">379</span> 
+<span class="ln" id="L380">380</span>    def cleanup_old_reports(self, days: int = None) -&gt; dict:  # تعريف الدالة cleanup_old_reports(self, days) ترجع dict
+<span class="ln" id="L381">381</span>        # بداية نص متعدد الأسطر — الأسطر التالية نصّ حرفي لا كود، فلا يقبل تعليقاً
+<span class="ln" id="L382">382</span>        &quot;&quot;&quot;Delete run reports older than `days` (default from config).
+<span class="ln" id="L383">383</span> 
+<span class="ln" id="L384">384</span>        Optional and never touches hits/profiles. Returns how many files went.
+<span class="ln" id="L385">385</span>        &quot;&quot;&quot;  # نهاية النص متعدد الأسطر
+<span class="ln" id="L386">386</span>        retain = config.REPORT_RETENTION_DAYS if days is None else int(days)  # إسناد config.REPORT_RETENTION_DAYS إن مقارنة وإلا int(days) إلى retain
+<span class="ln" id="L387">387</span>        if retain &lt;= 0:  # شرط: retain أصغر أو يساوي 0
+<span class="ln" id="L388">388</span>            return {&quot;removed&quot;: 0, &quot;freed_bytes&quot;: 0, &quot;days&quot;: retain}  # إرجاع قاموس
+<span class="ln" id="L389">389</span>        cutoff = time.time() - retain * 86400  # حساب طرح بين time.time() وضرب وإسناده إلى cutoff
+<span class="ln" id="L390">390</span>        removed, freed = 0, 0  # إسناد مجموعة إلى مجموعة
+<span class="ln" id="L391">391</span>        try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L392">392</span>            names = os.listdir(config.RUN_DIR)  # إسناد نتيجة استدعاء os.listdir (معامل واحد) إلى names
+<span class="ln" id="L393">393</span>        except OSError:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L394">394</span>            return {&quot;removed&quot;: 0, &quot;freed_bytes&quot;: 0, &quot;days&quot;: retain}  # إرجاع قاموس
+<span class="ln" id="L395">395</span>        for name in names:  # دورة على names باسم name
+<span class="ln" id="L396">396</span>            if not name.endswith(&quot;.json&quot;):  # شرط معكوس: ليس name.endswith(&#x27;.json&#x27;)
+<span class="ln" id="L397">397</span>                continue  # الانتقال إلى الدورة التالية
+<span class="ln" id="L398">398</span>            path = os.path.join(config.RUN_DIR, name)  # إسناد نتيجة استدعاء os.path.join (2 معاملات) إلى path
+<span class="ln" id="L399">399</span>            try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L400">400</span>                if os.path.getmtime(path) &lt; cutoff:  # شرط: os.path.getmtime(path) أصغر من cutoff
+<span class="ln" id="L401">401</span>                    size = os.path.getsize(path)  # إسناد نتيجة استدعاء os.path.getsize (معامل واحد) إلى size
+<span class="ln" id="L402">402</span>                    os.remove(path)  # استدعاء os.remove (معامل واحد)
+<span class="ln" id="L403">403</span>                    removed += 1  # تحديث removed بعملية جمع
+<span class="ln" id="L404">404</span>                    freed += size  # تحديث freed بعملية جمع
+<span class="ln" id="L405">405</span>            except OSError:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L406">406</span>                continue  # الانتقال إلى الدورة التالية
+<span class="ln" id="L407">407</span>        return {&quot;removed&quot;: removed, &quot;freed_bytes&quot;: freed, &quot;days&quot;: retain}  # إرجاع قاموس
+<span class="ln" id="L408">408</span> 
+<span class="ln" id="L409">409</span>    def append_hit(self, line: str) -&gt; None:  # تعريف الدالة append_hit(self, line) ترجع None
+<span class="ln" id="L410">410</span>        ensure_dirs()  # استدعاء ensure_dirs
+<span class="ln" id="L411">411</span>        with open(config.HITS_FILE, &quot;a&quot;, encoding=&quot;utf-8&quot;) as fh:  # سياق مُدار: open(config.HITS_FILE, &#x27;a&#x27;, encoding=&#x27;utf-8&#x27;) باسم fh
+<span class="ln" id="L412">412</span>            fh.write(line.rstrip() + &quot;\n&quot;)  # استدعاء fh.write (معامل واحد)
+<span class="ln" id="L413">413</span> 
+<span class="ln" id="L414">414</span>    # -- الكاش ------------------------------------------------------------
+<span class="ln" id="L415">415</span>    def cache_info(self) -&gt; dict:  # تعريف الدالة cache_info(self) ترجع dict
+<span class="ln" id="L416">416</span>        info = {&quot;folders&quot;: {}, &quot;files&quot;: {}, &quot;total_bytes&quot;: 0}  # إسناد قاموس إلى info
+<span class="ln" id="L417">417</span>        for label, folder in ((&quot;review&quot;, config.REVIEW_DIR),  # دورة على مجموعة باسم مجموعة
+<span class="ln" id="L418">418</span>                              (&quot;runs&quot;, config.RUN_DIR),  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L419">419</span>                              (&quot;cache&quot;, config.CACHE_DIR),  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L420">420</span>                              (&quot;logs&quot;, config.LOG_DIR)):  # تكملة تعريف متعدد الأسطر
+<span class="ln" id="L421">421</span>            size, count = _dir_size(folder)  # إسناد نتيجة استدعاء _dir_size (معامل واحد) إلى مجموعة
+<span class="ln" id="L422">422</span>            info[&quot;folders&quot;][label] = {&quot;files&quot;: count, &quot;bytes&quot;: size,  # إسناد قاموس إلى info[&#x27;folders&#x27;][label]
+<span class="ln" id="L423">423</span>                                      &quot;path&quot;: folder}  # مفتاح path في القاموس
+<span class="ln" id="L424">424</span>            info[&quot;total_bytes&quot;] += size  # تحديث info[&#x27;total_bytes&#x27;] بعملية جمع
+<span class="ln" id="L425">425</span>        for path in (config.HITS_FILE,) + config.LEGACY_FILES:  # دورة على جمع باسم path
+<span class="ln" id="L426">426</span>            if os.path.exists(path):  # شرط: نتيجة os.path.exists(path)
+<span class="ln" id="L427">427</span>                size = os.path.getsize(path)  # إسناد نتيجة استدعاء os.path.getsize (معامل واحد) إلى size
+<span class="ln" id="L428">428</span>                info[&quot;files&quot;][os.path.basename(path)] = size  # إسناد size إلى info[&#x27;files&#x27;][os.path.basename(path)]
+<span class="ln" id="L429">429</span>                info[&quot;total_bytes&quot;] += size  # تحديث info[&#x27;total_bytes&#x27;] بعملية جمع
+<span class="ln" id="L430">430</span>        prof = config.PROFILES_FILE  # إسناد config.PROFILES_FILE إلى prof
+<span class="ln" id="L431">431</span>        info[&quot;profiles&quot;] = {&quot;file&quot;: os.path.basename(prof),  # إسناد قاموس إلى info[&#x27;profiles&#x27;]
+<span class="ln" id="L432">432</span>                            &quot;count&quot;: len(self._profiles),  # مفتاح count في القاموس
+<span class="ln" id="L433">433</span>                            &quot;bytes&quot;: os.path.getsize(prof) if os.path.exists(prof) else 0}  # مفتاح bytes في القاموس
+<span class="ln" id="L434">434</span>        return info  # إرجاع info
+<span class="ln" id="L435">435</span> 
+<span class="ln" id="L436">436</span>    def clear_cache(self, scope: str = &quot;temp&quot;) -&gt; dict:  # تعريف الدالة clear_cache(self, scope) ترجع dict
+<span class="ln" id="L437">437</span>        # بداية نص متعدد الأسطر — الأسطر التالية نصّ حرفي لا كود، فلا يقبل تعليقاً
+<span class="ln" id="L438">438</span>        &quot;&quot;&quot;Delete tool data by scope.
+<span class="ln" id="L439">439</span> 
+<span class="ln" id="L440">440</span>        temp     -&gt; saved review pages + cache folders (never the hits log)
+<span class="ln" id="L441">441</span>        results  -&gt; run reports, logs and hits.txt
+<span class="ln" id="L442">442</span>        profiles -&gt; profiles.json
+<span class="ln" id="L443">443</span>        all      -&gt; everything above + legacy files from the old version
+<span class="ln" id="L444">444</span>        &quot;&quot;&quot;  # نهاية النص متعدد الأسطر
+<span class="ln" id="L445">445</span>        removed, freed = [], 0  # إسناد مجموعة إلى مجموعة
+<span class="ln" id="L446">446</span>        targets = []  # إسناد قائمة إلى targets
+<span class="ln" id="L447">447</span>        if scope in (&quot;temp&quot;, &quot;all&quot;):  # شرط: scope ضمن مجموعة
+<span class="ln" id="L448">448</span>            targets += [config.CACHE_DIR, config.REVIEW_DIR]  # تحديث targets بعملية جمع
+<span class="ln" id="L449">449</span>        if scope in (&quot;results&quot;, &quot;all&quot;):  # شرط: scope ضمن مجموعة
+<span class="ln" id="L450">450</span>            # سجل الإصابات من النتائج، لا من تنظيف «المؤقت»:
+<span class="ln" id="L451">451</span>            # مسح الكاش يجب ألا يحذف أبداً بطاقات وُجدت بصمت
+<span class="ln" id="L452">452</span>            targets += [config.RUN_DIR, config.LOG_DIR, config.HITS_FILE]  # تحديث targets بعملية جمع
+<span class="ln" id="L453">453</span>        always = []  # إسناد قائمة إلى always
+<span class="ln" id="L454">454</span>        if scope == &quot;all&quot;:  # شرط: scope يساوي &#x27;all&#x27;
+<span class="ln" id="L455">455</span>            always += list(config.LEGACY_FILES)  # تحديث always بعملية جمع
+<span class="ln" id="L456">456</span>            targets += [config.DATA_DIR]  # تحديث targets بعملية جمع
+<span class="ln" id="L457">457</span>        for path in targets + always:  # دورة على جمع باسم path
+<span class="ln" id="L458">458</span>            if not os.path.exists(path):  # شرط معكوس: ليس os.path.exists(path)
+<span class="ln" id="L459">459</span>                continue                      # لا تسرد ما لم يكن موجوداً
+<span class="ln" id="L460">460</span>            freed += _remove_path(path)  # تحديث freed بعملية جمع
+<span class="ln" id="L461">461</span>            removed.append(os.path.basename(path))  # استدعاء removed.append (معامل واحد)
+<span class="ln" id="L462">462</span>        if scope in (&quot;profiles&quot;, &quot;all&quot;) and os.path.exists(config.PROFILES_FILE):  # شرط مركّب (و)
+<span class="ln" id="L463">463</span>            try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L464">464</span>                os.remove(config.PROFILES_FILE)  # استدعاء os.remove (معامل واحد)
+<span class="ln" id="L465">465</span>                removed.append(os.path.basename(config.PROFILES_FILE))  # استدعاء removed.append (معامل واحد)
+<span class="ln" id="L466">466</span>                self._profiles = {}  # إسناد قاموس إلى self._profiles
+<span class="ln" id="L467">467</span>            except OSError:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L468">468</span>                pass  # سطر فارغ منطقياً (pass) — مطلوب صياغياً
+<span class="ln" id="L469">469</span>        # كاشات البايت كود للأداة نفسها (نمطا glob
+<span class="ln" id="L470">470</span>        # متداخلان — بدون هذه المجموعة كان نفس المجلد يُحسب مرتين
+<span class="ln" id="L471">471</span>        # وكان رقم «المحرَّر» كذبة)
+<span class="ln" id="L472">472</span>        seen_paths = set()  # إسناد نتيجة استدعاء set إلى seen_paths
+<span class="ln" id="L473">473</span>        for pattern in (&quot;**/__pycache__&quot;, &quot;__pycache__&quot;):  # دورة على مجموعة باسم pattern
+<span class="ln" id="L474">474</span>            for path in glob.glob(os.path.join(config.BASE_DIR, pattern),  # دورة على glob.glob(os.path.join(config.BASE_DIR, pattern), recursive=True) باسم path
+<span class="ln" id="L475">475</span>                                  recursive=True):  # المعامل المسمّى recursive
+<span class="ln" id="L476">476</span>                key = os.path.normpath(path)  # إسناد نتيجة استدعاء os.path.normpath (معامل واحد) إلى key
+<span class="ln" id="L477">477</span>                if key in seen_paths:  # شرط: key ضمن seen_paths
+<span class="ln" id="L478">478</span>                    continue  # الانتقال إلى الدورة التالية
+<span class="ln" id="L479">479</span>                seen_paths.add(key)  # استدعاء seen_paths.add (معامل واحد)
+<span class="ln" id="L480">480</span>                size, _ = _dir_size(path)  # إسناد نتيجة استدعاء _dir_size (معامل واحد) إلى مجموعة
+<span class="ln" id="L481">481</span>                shutil.rmtree(path, ignore_errors=True)  # استدعاء shutil.rmtree (معامل واحد، ignore_errors=…)
+<span class="ln" id="L482">482</span>                freed += size  # تحديث freed بعملية جمع
+<span class="ln" id="L483">483</span>                removed.append(os.path.relpath(path, config.BASE_DIR))  # استدعاء removed.append (معامل واحد)
+<span class="ln" id="L484">484</span>        ensure_dirs()  # استدعاء ensure_dirs
+<span class="ln" id="L485">485</span>        return {&quot;scope&quot;: scope, &quot;removed&quot;: sorted(set(removed)),  # إرجاع قاموس
+<span class="ln" id="L486">486</span>                &quot;freed_bytes&quot;: freed, &quot;freed_human&quot;: human_size(freed)}  # مفتاح freed_bytes في القاموس
+<span class="ln" id="L487">487</span> 
+<span class="ln" id="L488">488</span> 
+<span class="ln" id="L489">489</span>def _dir_size(path: str) -&gt; tuple:  # تعريف الدالة _dir_size(path) ترجع tuple
+<span class="ln" id="L490">490</span>    total, count = 0, 0  # إسناد مجموعة إلى مجموعة
+<span class="ln" id="L491">491</span>    if not os.path.isdir(path):  # شرط معكوس: ليس os.path.isdir(path)
+<span class="ln" id="L492">492</span>        return 0, 0  # إرجاع مجموعة
+<span class="ln" id="L493">493</span>    for root, _dirs, files in os.walk(path):  # دورة على os.walk(path) باسم مجموعة
+<span class="ln" id="L494">494</span>        for f in files:  # دورة على files باسم f
+<span class="ln" id="L495">495</span>            try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L496">496</span>                total += os.path.getsize(os.path.join(root, f))  # تحديث total بعملية جمع
+<span class="ln" id="L497">497</span>                count += 1  # تحديث count بعملية جمع
+<span class="ln" id="L498">498</span>            except OSError:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L499">499</span>                continue  # الانتقال إلى الدورة التالية
+<span class="ln" id="L500">500</span>    return total, count  # إرجاع مجموعة
+<span class="ln" id="L501">501</span> 
+<span class="ln" id="L502">502</span> 
+<span class="ln" id="L503">503</span># يميّز الملف من المجلد ويرجع البايتات المحررة فعلاً.
+<span class="ln" id="L504">504</span># shutil.rmtree على ملف لا يفعل شيئاً بصمت — هكذا كانت hits.txt تُحسب محذوفة.
+<span class="ln" id="L505">505</span>def _remove_path(path: str) -&gt; int:  # تعريف الدالة _remove_path(path) ترجع int
+<span class="ln" id="L506">506</span>    # بداية نص متعدد الأسطر — الأسطر التالية نصّ حرفي لا كود، فلا يقبل تعليقاً
+<span class="ln" id="L507">507</span>    &quot;&quot;&quot;Delete a file or a folder and return the bytes really freed.
+<span class="ln" id="L508">508</span> 
+<span class="ln" id="L509">509</span>    `shutil.rmtree(..., ignore_errors=True)` silently does nothing when handed
+<span class="ln" id="L510">510</span>    a *file* - which is how the old code managed to list hits.txt as &quot;removed&quot;
+<span class="ln" id="L511">511</span>    without removing it.  This helper never lies about what it did.
+<span class="ln" id="L512">512</span>    &quot;&quot;&quot;  # نهاية النص متعدد الأسطر
+<span class="ln" id="L513">513</span>    if os.path.isdir(path) and not os.path.islink(path):  # شرط مركّب (و)
+<span class="ln" id="L514">514</span>        size, _ = _dir_size(path)  # إسناد نتيجة استدعاء _dir_size (معامل واحد) إلى مجموعة
+<span class="ln" id="L515">515</span>        shutil.rmtree(path, ignore_errors=True)  # استدعاء shutil.rmtree (معامل واحد، ignore_errors=…)
+<span class="ln" id="L516">516</span>        return size  # إرجاع size
+<span class="ln" id="L517">517</span>    try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L518">518</span>        size = os.path.getsize(path)  # إسناد نتيجة استدعاء os.path.getsize (معامل واحد) إلى size
+<span class="ln" id="L519">519</span>        os.remove(path)  # استدعاء os.remove (معامل واحد)
+<span class="ln" id="L520">520</span>        return size  # إرجاع size
+<span class="ln" id="L521">521</span>    except OSError:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L522">522</span>        return 0  # إرجاع 0
+<span class="ln" id="L523">523</span> 
+<span class="ln" id="L524">524</span> 
+<span class="ln" id="L525">525</span># أنماط MAC / IPv4 المستخدمة عند تنقية HTML المراجعة قبل القرص.
+<span class="ln" id="L526">526</span>_REVIEW_MAC_RE = re.compile(  # إسناد نتيجة استدعاء re.compile (معامل واحد) إلى _REVIEW_MAC_RE
+<span class="ln" id="L527">527</span>    r&quot;\b(?:[0-9a-fA-F]{2}[:-]){5}[0-9a-fA-F]{2}\b&quot;)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L528">528</span>_REVIEW_IP_RE = re.compile(  # إسناد نتيجة استدعاء re.compile (معامل واحد) إلى _REVIEW_IP_RE
+<span class="ln" id="L529">529</span>    r&quot;\b(?:(?:25[0-5]|2[0-4]\d|[01]?\d?\d)\.){3}&quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L530">530</span>    r&quot;(?:25[0-5]|2[0-4]\d|[01]?\d?\d)\b&quot;)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L531">531</span> 
+<span class="ln" id="L532">532</span> 
+<span class="ln" id="L533">533</span># يحذف MAC وIPv4 من صفحات المراجعة قبل كتابتها على القرص.
+<span class="ln" id="L534">534</span>def redact_review_body(body: str) -&gt; str:  # تعريف الدالة redact_review_body(body) ترجع str
+<span class="ln" id="L535">535</span>    # بداية نص متعدد الأسطر — الأسطر التالية نصّ حرفي لا كود، فلا يقبل تعليقاً
+<span class="ln" id="L536">536</span>    &quot;&quot;&quot;Strip client MAC/IP addresses from review pages before saving.
+<span class="ln" id="L537">537</span> 
+<span class="ln" id="L538">538</span>    Review HTML can echo the guest device identity; keep the page shape for
+<span class="ln" id="L539">539</span>    the operator without storing those identifiers on disk.
+<span class="ln" id="L540">540</span>    &quot;&quot;&quot;  # نهاية النص متعدد الأسطر
+<span class="ln" id="L541">541</span>    text = body or &quot;&quot;  # دمج منطقي (أو) وإسناده إلى text
+<span class="ln" id="L542">542</span>    text = _REVIEW_MAC_RE.sub(&quot;[mac-redacted]&quot;, text)  # إسناد نتيجة استدعاء _REVIEW_MAC_RE.sub (2 معاملات) إلى text
+<span class="ln" id="L543">543</span>    text = _REVIEW_IP_RE.sub(&quot;[ip-redacted]&quot;, text)  # إسناد نتيجة استدعاء _REVIEW_IP_RE.sub (2 معاملات) إلى text
+<span class="ln" id="L544">544</span>    return text  # إرجاع text
+<span class="ln" id="L545">545</span> 
+<span class="ln" id="L546">546</span> 
+<span class="ln" id="L547">547</span>def human_size(num: int) -&gt; str:  # تعريف الدالة human_size(num) ترجع str
+<span class="ln" id="L548">548</span>    value = float(num)  # إسناد نتيجة استدعاء float (معامل واحد) إلى value
+<span class="ln" id="L549">549</span>    for unit in (&quot;B&quot;, &quot;KB&quot;, &quot;MB&quot;, &quot;GB&quot;):  # دورة على مجموعة باسم unit
+<span class="ln" id="L550">550</span>        if value &lt; 1024 or unit == &quot;GB&quot;:  # شرط مركّب (أو)
+<span class="ln" id="L551">551</span>            return f&quot;{int(value)} B&quot; if unit == &quot;B&quot; else f&quot;{value:.1f} {unit}&quot;  # إرجاع نص منسّق (f-string) إن مقارنة وإلا نص منسّق (f-string)
+<span class="ln" id="L552">552</span>        value /= 1024.0  # تحديث value بعملية قسمة
+<span class="ln" id="L553">553</span>    return f&quot;{value:.1f} GB&quot;  # إرجاع نص منسّق (f-string)
+<span class="ln" id="L554">554</span> 
+<span class="ln" id="L555">555</span> 
+<span class="ln" id="L556">556</span>def load_legacy_profiles() -&gt; list:  # تعريف الدالة load_legacy_profiles() ترجع list
+<span class="ln" id="L557">557</span>    &quot;&quot;&quot;Import profiles written by the old version, if any exist.&quot;&quot;&quot;  # نص توثيقي (docstring) يشرح ما يليه
+<span class="ln" id="L558">558</span>    out = []  # إسناد قائمة إلى out
+<span class="ln" id="L559">559</span>    for path in (config.LEGACY_FILES[1], config.LEGACY_FILES[2]):  # دورة على مجموعة باسم path
+<span class="ln" id="L560">560</span>        raw = read_json(path, None)  # إسناد نتيجة استدعاء read_json (2 معاملات) إلى raw
+<span class="ln" id="L561">561</span>        if not raw:  # شرط معكوس: ليس raw
+<span class="ln" id="L562">562</span>            continue  # الانتقال إلى الدورة التالية
+<span class="ln" id="L563">563</span>        items = raw if isinstance(raw, list) else raw.get(&quot;profiles&quot;, [raw])  # إسناد raw إن isinstance(raw, list) وإلا raw.get(&#x27;profiles&#x27;, قائمة) إلى items
+<span class="ln" id="L564">564</span>        for item in items or []:  # دورة على items أو قائمة باسم item
+<span class="ln" id="L565">565</span>            try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L566">566</span>                out.append(migrate(item))  # استدعاء out.append (معامل واحد)
+<span class="ln" id="L567">567</span>            except Exception:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L568">568</span>                continue  # الانتقال إلى الدورة التالية
+<span class="ln" id="L569">569</span>    return out  # إرجاع out
+<span class="ln" id="L570">570</span> 
+</code></pre></details>
+<script>
+document.getElementById("kp-jump").addEventListener("change", function (e) {
+  var n = parseInt(e.target.value, 10);
+  if (n > 0) { var el = document.getElementById("L" + n);
+    if (el) el.scrollIntoView({block: "center"}); }
+});
+if (location.hash) { var el = document.querySelector(location.hash);
+  if (el) setTimeout(function () { el.scrollIntoView({block: "center"}); }, 60); }
+</script>
+<footer class="docfoot">صفحة مولّدة آلياً من مصدر الكود · KiraPass —
+<code>files</code> · 2026-10-01 02:26</footer>
+</main>
+</div>
+<script src="../assets/docs.js"></script>
+<script>KPInit("files");</script>
+</body>
+</html>

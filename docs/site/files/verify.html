@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ملف verify.py · KiraPass</title>
+<link rel="stylesheet" href="../assets/docs.css">
+
+</head>
+<body>
+<div id="kp-layout">
+<main class="doc">
+<h1>ملف <code>verify.py</code></h1>
+<p class="lead">فحص حالة الإنترنت وصفحة الحالة وتسجيل الخروج — <code>kirapass/verify.py</code></p>
+<div class="card info"><b>هذه الصفحة مولّدة آلياً</b> من مصدر الكود مباشرة (<code>tools/docs/build_docs.py</code>). إن غيّرت الكود فأعد توليدها: <code>python3 tools/docs/build_docs.py</code>. الشرح اليدوي الأوسع في <a href="../architecture.html">المعمارية</a> و<a href="../editing.html">دليل التعديل</a> و<a href="../danger.html">أماكن الخطر</a>.</div>
+<div class="grid3"><div class="card"><b>136</b><br>سطراً</div><div class="card"><b>5</b><br>دالة</div><div class="card"><b>0</b><br>صنف</div></div>
+<div class="note"><b>ملخّص المؤلف للملف (نصه الأصلي بالإنجليزية):</b> <span class="muted">Check captive-portal and internet connectivity states.</span></div>
+<p><a class="btn primary" href="../src/verify.html">افتح المصدر كاملاً مرقّماً</a></p>
+<h2 id="imports">الاستيرادات</h2><table class="t compact"><thead><tr><th>السطر</th><th>الاستيراد</th><th>لماذا</th></tr></thead><tbody>
+<tr><td class="mono">12</td><td class="mono">from __future__ import annotations</td><td>استيراد annotations من الوحدة __future__</td></tr>
+<tr><td class="mono">14</td><td class="mono">from urllib.parse import urlsplit</td><td>استيراد urlsplit من الوحدة urllib.parse</td></tr>
+<tr><td class="mono">16</td><td class="mono">from . import config</td><td>استيراد config من الوحدة .</td></tr>
+</tbody></table>
+<h2 id="funcs">الدوال — واحدة واحدة</h2>
+<div class="sym head" id="f-resolve_internet_checks"><span class="tag fn">دالة</span> <b>resolve_internet_checks(custom)</b>
+ <span class="muted">→ tuple</span>
+ <a class="tag api" href="../src/verify.html#L19">سطر 19–34</a>
+<div>تعريف الدالة resolve_internet_checks(custom) ترجع tuple <span class="muted">(نص المؤلف الأصلي في docstring: Build the check list from an optional custom URL string or env default.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>4 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>parsed, raw</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/config.html#f-_parse_internet_checks"><code>_parse_internet_checks</code></a><span class="muted">×1 سطر 33</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/server.html#f-Handler._internet_checks"><code>Handler._internet_checks</code></a> <span class="muted">(server.py:508)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-probe_internet"><span class="tag fn">دالة</span> <b>probe_internet(session, checks, timeout)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/verify.html#L40">سطر 40–82</a>
+<div>السؤال الوحيد المهم: هل هذا الجهاز متصل فعلاً الآن؟ allow_redirects=False مقصود: التحويل إلى صفحة الدخول هو دليل WALLED. ترجع (state, detail) حيث state ∈ {ONLINE, WALLED, OFFLINE}. <span class="muted">(نص المؤلف الأصلي في docstring: -&gt; {state, label, detail, status, location})</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>5 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>body, kind, last_error, resp</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-Engine._start_watchdog"><code>Engine._start_watchdog</code></a> <span class="muted">(engine.py:2155)</span> <a href="../files/engine.html#f-Engine._start_watchdog.watch"><code>Engine._start_watchdog.watch</code></a> <span class="muted">(engine.py:2155)</span> <a href="../files/engine.html#f-_known_card_preflight"><code>_known_card_preflight</code></a> <span class="muted">(engine.py:959)</span> <a href="../files/engine.html#f-_tune_with_known_card"><code>_tune_with_known_card</code></a> <span class="muted">(engine.py:846)</span> <a href="../files/engine.html#f-calibrate"><code>calibrate</code></a> <span class="muted">(engine.py:534)</span> <a href="../files/engine.html#f-diagnose"><code>diagnose</code></a> <span class="muted">(engine.py:1044)</span> <a href="../files/verify.html#f-verify_online"><code>verify_online</code></a> <span class="muted">(verify.py:87)</span> <a href="../files/server.html#f-Handler._scan"><code>Handler._scan</code></a> <span class="muted">(server.py:564)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-verify_online"><span class="tag fn">دالة</span> <b>verify_online(session, checks, timeout)</b>
+ <span class="muted">→ tuple</span>
+ <a class="tag api" href="../src/verify.html#L85">سطر 85–89</a>
+<div>تعريف الدالة verify_online(session, checks, timeout) ترجع tuple <span class="muted">(نص المؤلف الأصلي في docstring: After a card is accepted: -&gt; (True/False, dict with the reason).)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>info, ok</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/verify.html#f-probe_internet"><code>probe_internet</code></a><span class="muted">×1 سطر 87 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-Engine._verify_hit"><code>Engine._verify_hit</code></a> <span class="muted">(engine.py:1917)</span> <a href="../files/engine.html#f-_known_card_preflight"><code>_known_card_preflight</code></a> <span class="muted">(engine.py:935)</span> <a href="../files/engine.html#f-_tune_with_known_card"><code>_tune_with_known_card</code></a> <span class="muted">(engine.py:832)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-portal_status_page"><span class="tag fn">دالة</span> <b>portal_status_page(session, portal_url, timeout)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/verify.html#L92">سطر 92–117</a>
+<div>تعريف الدالة portal_status_page(session, portal_url, timeout) ترجع dict <span class="muted">(نص المؤلف الأصلي في docstring: Look for the router&#x27;s own status/logout page as a second opinion.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>4 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>base, body, logged_in, login_form, parts, resp, url</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-Engine._verify_hit"><code>Engine._verify_hit</code></a> <span class="muted">(engine.py:1905)</span> <a href="../files/engine.html#f-Engine._verify_hit"><code>Engine._verify_hit</code></a> <span class="muted">(engine.py:1923)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-logout"><span class="tag fn">دالة</span> <b>logout(session, portal_url, timeout)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/verify.html#L122">سطر 122–135</a>
+<div>يعيد الشبكة إلى حالة WALLED حتى لا نترك بطاقة المستخدم مستهلكة. تأكيد الخروج شرط لكل دليل نجاح في المعايرة. <span class="muted">(نص المؤلف الأصلي في docstring: Log the test card out again so a paid card is not left consumed.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>base, parts, resp, url</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-_known_card_preflight"><code>_known_card_preflight</code></a> <span class="muted">(engine.py:958)</span> <a href="../files/engine.html#f-_tune_with_known_card"><code>_tune_with_known_card</code></a> <span class="muted">(engine.py:845)</span></td></tr>
+</table></div>
+<footer class="docfoot">صفحة مولّدة آلياً من مصدر الكود · KiraPass —
+<code>files</code> · 2026-10-01 02:26</footer>
+</main>
+</div>
+<script src="../assets/docs.js"></script>
+<script>KPInit("files");</script>
+</body>
+</html>

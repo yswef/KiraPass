@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>مصدر web/ui.css · KiraPass</title>
+<link rel="stylesheet" href="../assets/docs.css">
+
+</head>
+<body>
+<div id="kp-layout">
+<main class="doc">
+<h1>مصدر <code>web/ui.css</code></h1>
+<p class="lead">التنسيقات: كل الأصناف والمتغيرات — 481 سطراً. كل سطر يحمل تعليقه العربي.</p>
+<div class="card info"><b>هذه الصفحة مولّدة آلياً</b> من مصدر الكود مباشرة (<code>tools/docs/build_docs.py</code>). إن غيّرت الكود فأعد توليدها: <code>python3 tools/docs/build_docs.py</code>. الشرح اليدوي الأوسع في <a href="../architecture.html">المعمارية</a> و<a href="../editing.html">دليل التعديل</a> و<a href="../danger.html">أماكن الخطر</a>.</div>
+<p><a class="btn" href="../files/ui-css.html">← صفحة الشرح</a> <label class="muted"> قفز إلى سطر: <input id="kp-jump" style="width:6rem" placeholder="123"></label></p>
+<details class="src" open><summary>المصدر كاملاً</summary><pre data-lines="481"><code>
+<span class="ln" id="L1">1</span>:root { /* جذر المستند: متغيرات CSS العامة */
+<span class="ln" id="L2">2</span>  color-scheme: dark; /* color-scheme: dark */
+<span class="ln" id="L3">3</span>  --bg: #080d17; /* --bg: #080d17 */
+<span class="ln" id="L4">4</span>  --bg-soft: #0c1422; /* --bg-soft: #0c1422 */
+<span class="ln" id="L5">5</span>  --surface: rgba(17, 27, 44, .86); /* --surface: rgba(17, 27, 44, .86) */
+<span class="ln" id="L6">6</span>  --surface-solid: #111b2c; /* --surface-solid: #111b2c */
+<span class="ln" id="L7">7</span>  --surface-raised: #16243a; /* --surface-raised: #16243a */
+<span class="ln" id="L8">8</span>  --line: rgba(157, 182, 220, .14); /* --line: rgba(157, 182, 220, .14) */
+<span class="ln" id="L9">9</span>  --line-strong: rgba(157, 182, 220, .24); /* --line-strong: rgba(157, 182, 220, .24) */
+<span class="ln" id="L10">10</span>  --fg: #edf4ff; /* --fg: #edf4ff */
+<span class="ln" id="L11">11</span>  --dim: #97a8c3; /* --dim: #97a8c3 */
+<span class="ln" id="L12">12</span>  --muted: #71829d; /* --muted: #71829d */
+<span class="ln" id="L13">13</span>  --acc: #69d8d0; /* --acc: #69d8d0 */
+<span class="ln" id="L14">14</span>  --acc-strong: #24b9b1; /* --acc-strong: #24b9b1 */
+<span class="ln" id="L15">15</span>  --acc-blue: #60a9ff; /* --acc-blue: #60a9ff */
+<span class="ln" id="L16">16</span>  --ok: #61dda0; /* --ok: #61dda0 */
+<span class="ln" id="L17">17</span>  --ok-soft: rgba(44, 175, 112, .16); /* --ok-soft: rgba(44, 175, 112, .16) */
+<span class="ln" id="L18">18</span>  --warn: #f4c66f; /* --warn: #f4c66f */
+<span class="ln" id="L19">19</span>  --warn-soft: rgba(242, 177, 56, .13); /* --warn-soft: rgba(242, 177, 56, .13) */
+<span class="ln" id="L20">20</span>  --bad: #ff818a; /* --bad: #ff818a */
+<span class="ln" id="L21">21</span>  --bad-soft: rgba(239, 91, 91, .15); /* --bad-soft: rgba(239, 91, 91, .15) */
+<span class="ln" id="L22">22</span>  --purple: #c4a0ff; /* --purple: #c4a0ff */
+<span class="ln" id="L23">23</span>  --radius: 18px; /* --radius: 18px */
+<span class="ln" id="L24">24</span>  --radius-sm: 12px; /* --radius-sm: 12px */
+<span class="ln" id="L25">25</span>  --shadow: 0 24px 70px rgba(0, 0, 0, .28); /* --shadow: 0 24px 70px rgba(0, 0, 0, .28) */
+<span class="ln" id="L26">26</span>  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; /* --mono: ui-monospace, SFMono-Regular, Menlo, Con */
+<span class="ln" id="L27">27</span>} /* إغلاق الكتلة السابقة */
+<span class="ln" id="L28">28</span> 
+<span class="ln" id="L29">29</span>* { box-sizing: border-box; } /* قاعدة كاملة في سطر واحد على المحدِّد * */
+<span class="ln" id="L30">30</span>html { min-width: 320px; scroll-behavior: smooth; } /* قاعدة كاملة في سطر واحد على المحدِّد html */
+<span class="ln" id="L31">31</span>body { /* محدِّد (selector) body: القواعد التالية تُطبَّق عليه */
+<span class="ln" id="L32">32</span>  min-height: 100vh; /* أدنى ارتفاع: 100vh */
+<span class="ln" id="L33">33</span>  margin: 0; /* الهامش الخارجي: 0 */
+<span class="ln" id="L34">34</span>  padding-bottom: 36px; /* padding-bottom: 36px */
+<span class="ln" id="L35">35</span>  color: var(--fg); /* لون النص: var(--fg) */
+<span class="ln" id="L36">36</span>  background: /* تكملة القاعدة السابقة */
+<span class="ln" id="L37">37</span>    radial-gradient(ellipse at 12% -10%, rgba(32, 119, 158, .22), transparent 42rem), /* محدِّد إضافي لنفس الكتلة */
+<span class="ln" id="L38">38</span>    radial-gradient(ellipse at 96% 18%, rgba(91, 74, 164, .13), transparent 36rem), /* محدِّد إضافي لنفس الكتلة */
+<span class="ln" id="L39">39</span>    var(--bg); /* تكملة القاعدة السابقة */
+<span class="ln" id="L40">40</span>  font: 15px/1.65 system-ui, -apple-system, &quot;Segoe UI&quot;, Roboto, /* font: 15px/1.65 system-ui, -apple-system, &quot;Seg */
+<span class="ln" id="L41">41</span>        &quot;Noto Kufi Arabic&quot;, Tahoma, sans-serif; /* تكملة القاعدة السابقة */
+<span class="ln" id="L42">42</span>  -webkit-text-size-adjust: 100%; /* -webkit-text-size-adjust: 100% */
+<span class="ln" id="L43">43</span>} /* إغلاق الكتلة السابقة */
+<span class="ln" id="L44">44</span>button, input, select { font: inherit; } /* قاعدة كاملة في سطر واحد على المحدِّد button, input, select */
+<span class="ln" id="L45">45</span>button { -webkit-tap-highlight-color: transparent; } /* قاعدة كاملة في سطر واحد على المحدِّد button */
+<span class="ln" id="L46">46</span>::selection { color: #051118; background: var(--acc); } /* قاعدة كاملة في سطر واحد على المحدِّد ::selection */
+<span class="ln" id="L47">47</span> 
+<span class="ln" id="L48">48</span>.sr-only { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0,0,0,0) !important; white-space: nowrap !important; border: 0 !important; } /* قاعدة كاملة في سطر واحد على المحدِّد .sr-only */
+<span class="ln" id="L49">49</span>.skip-link { /* محدِّد (selector) .skip-link: القواعد التالية تُطبَّق عليه */
+<span class="ln" id="L50">50</span>  position: fixed; /* نوع التموضع: fixed */
+<span class="ln" id="L51">51</span>  z-index: 100; /* طبقة الترتيب: 100 */
+<span class="ln" id="L52">52</span>  inset-block-start: 8px; /* inset-block-start: 8px */
+<span class="ln" id="L53">53</span>  inset-inline-start: 8px; /* inset-inline-start: 8px */
+<span class="ln" id="L54">54</span>  transform: translateY(-160%); /* التحويل: translateY(-160%) */
+<span class="ln" id="L55">55</span>  padding: 9px 14px; /* الحشوة الداخلية: 9px 14px */
+<span class="ln" id="L56">56</span>  border-radius: 10px; /* استدارة الزوايا: 10px */
+<span class="ln" id="L57">57</span>  color: #06111b; /* لون النص: #06111b */
+<span class="ln" id="L58">58</span>  background: var(--acc); /* الخلفية: var(--acc) */
+<span class="ln" id="L59">59</span>  font-weight: 700; /* سماكة الخط: 700 */
+<span class="ln" id="L60">60</span>} /* إغلاق الكتلة السابقة */
+<span class="ln" id="L61">61</span>.skip-link:focus { transform: translateY(0); } /* قاعدة كاملة في سطر واحد على المحدِّد .skip-link:focus */
+<span class="ln" id="L62">62</span> 
+<span class="ln" id="L63">63</span>/* App bar */
+<span class="ln" id="L64">64</span>.top { /* محدِّد (selector) .top: القواعد التالية تُطبَّق عليه */
+<span class="ln" id="L65">65</span>  position: sticky; /* نوع التموضع: sticky */
+<span class="ln" id="L66">66</span>  z-index: 30; /* طبقة الترتيب: 30 */
+<span class="ln" id="L67">67</span>  top: 0; /* المسافة من الأعلى: 0 */
+<span class="ln" id="L68">68</span>  display: flex; /* طريقة العرض: flex */
+<span class="ln" id="L69">69</span>  min-height: 72px; /* أدنى ارتفاع: 72px */
+<span class="ln" id="L70">70</span>  align-items: center; /* محاذاة العناصر: center */
+<span class="ln" id="L71">71</span>  justify-content: space-between; /* توزيع المحتوى: space-between */
+<span class="ln" id="L72">72</span>  gap: 18px; /* المسافة بين العناصر: 18px */
+<span class="ln" id="L73">73</span>  padding: 10px max(20px, calc((100vw - 1180px) / 2)); /* الحشوة الداخلية: 10px max(20px, calc((100vw - 1180px) / 2 */
+<span class="ln" id="L74">74</span>  border-bottom: 1px solid var(--line); /* border-bottom: 1px solid var(--line) */
+<span class="ln" id="L75">75</span>  background: rgba(8, 13, 23, .84); /* الخلفية: rgba(8, 13, 23, .84) */
+<span class="ln" id="L76">76</span>  backdrop-filter: blur(18px) saturate(140%); /* backdrop-filter: blur(18px) saturate(140%) */
+<span class="ln" id="L77">77</span>  -webkit-backdrop-filter: blur(18px) saturate(140%); /* -webkit-backdrop-filter: blur(18px) saturate(140%) */
+<span class="ln" id="L78">78</span>} /* إغلاق الكتلة السابقة */
+<span class="ln" id="L79">79</span>.brand { display: flex; min-width: 0; align-items: center; gap: 12px; } /* قاعدة كاملة في سطر واحد على المحدِّد .brand */
+<span class="ln" id="L80">80</span>.logo { /* محدِّد (selector) .logo: القواعد التالية تُطبَّق عليه */
+<span class="ln" id="L81">81</span>  display: grid; /* طريقة العرض: grid */
+<span class="ln" id="L82">82</span>  width: 42px; /* العرض: 42px */
+<span class="ln" id="L83">83</span>  height: 42px; /* الارتفاع: 42px */
+<span class="ln" id="L84">84</span>  flex: 0 0 auto; /* المرونة: 0 0 auto */
+<span class="ln" id="L85">85</span>  place-items: center; /* place-items: center */
+<span class="ln" id="L86">86</span>  border: 1px solid rgba(255,255,255,.24); /* الحدود: 1px solid rgba(255,255,255,.24) */
+<span class="ln" id="L87">87</span>  border-radius: 14px; /* استدارة الزوايا: 14px */
+<span class="ln" id="L88">88</span>  color: #061a20; /* لون النص: #061a20 */
+<span class="ln" id="L89">89</span>  background: linear-gradient(145deg, #8af2df, #4eb6e8 58%, #779cff); /* الخلفية: linear-gradient(145deg, #8af2df, #4eb6e8 */
+<span class="ln" id="L90">90</span>  box-shadow: 0 8px 24px rgba(46, 180, 198, .28), inset 0 1px 1px rgba(255,255,255,.65); /* ظل الصندوق: 0 8px 24px rgba(46, 180, 198, .28), inse */
+<span class="ln" id="L91">91</span>  font-size: 1.2rem; /* حجم الخط: 1.2rem */
+<span class="ln" id="L92">92</span>  font-weight: 900; /* سماكة الخط: 900 */
+<span class="ln" id="L93">93</span>  letter-spacing: -.08em; /* تباعد الحروف: -.08em */
+<span class="ln" id="L94">94</span>} /* إغلاق الكتلة السابقة */
+<span class="ln" id="L95">95</span>.brand-copy { display: grid; gap: 0; line-height: 1.25; } /* قاعدة كاملة في سطر واحد على المحدِّد .brand-copy */
+<span class="ln" id="L96">96</span>.name { color: var(--fg); font-size: 1.02rem; font-weight: 800; letter-spacing: .01em; } /* قاعدة كاملة في سطر واحد على المحدِّد .name */
+<span class="ln" id="L97">97</span>.tagline { color: var(--dim); font-size: .69rem; } /* قاعدة كاملة في سطر واحد على المحدِّد .tagline */
+<span class="ln" id="L98">98</span>.ver { /* محدِّد (selector) .ver: القواعد التالية تُطبَّق عليه */
+<span class="ln" id="L99">99</span>  align-self: flex-start; /* align-self: flex-start */
+<span class="ln" id="L100">100</span>  margin-block-start: 2px; /* margin-block-start: 2px */
+<span class="ln" id="L101">101</span>  padding: 2px 8px; /* الحشوة الداخلية: 2px 8px */
+<span class="ln" id="L102">102</span>  border: 1px solid var(--line-strong); /* الحدود: 1px solid var(--line-strong) */
+<span class="ln" id="L103">103</span>  border-radius: 99px; /* استدارة الزوايا: 99px */
+<span class="ln" id="L104">104</span>  color: #a8bbd5; /* لون النص: #a8bbd5 */
+<span class="ln" id="L105">105</span>  background: rgba(255,255,255,.035); /* الخلفية: rgba(255,255,255,.035) */
+<span class="ln" id="L106">106</span>  font: 600 .65rem/1.5 var(--mono); /* font: 600 .65rem/1.5 var(--mono) */
+<span class="ln" id="L107">107</span>} /* إغلاق الكتلة السابقة */
+<span class="ln" id="L108">108</span>.top-actions { display: flex; align-items: center; gap: 8px; } /* قاعدة كاملة في سطر واحد على المحدِّد .top-actions */
+<span class="ln" id="L109">109</span>.pill { /* محدِّد (selector) .pill: القواعد التالية تُطبَّق عليه */
+<span class="ln" id="L110">110</span>  display: inline-flex; /* طريقة العرض: inline-flex */
+<span class="ln" id="L111">111</span>  min-height: 34px; /* أدنى ارتفاع: 34px */
+<span class="ln" id="L112">112</span>  align-items: center; /* محاذاة العناصر: center */
+<span class="ln" id="L113">113</span>  gap: 7px; /* المسافة بين العناصر: 7px */
+<span class="ln" id="L114">114</span>  padding: 4px 12px; /* الحشوة الداخلية: 4px 12px */
+<span class="ln" id="L115">115</span>  border: 1px solid var(--line); /* الحدود: 1px solid var(--line) */
+<span class="ln" id="L116">116</span>  border-radius: 999px; /* استدارة الزوايا: 999px */
+<span class="ln" id="L117">117</span>  color: var(--dim); /* لون النص: var(--dim) */
+<span class="ln" id="L118">118</span>  background: rgba(255,255,255,.04); /* الخلفية: rgba(255,255,255,.04) */
+<span class="ln" id="L119">119</span>  font-size: .77rem; /* حجم الخط: .77rem */
+<span class="ln" id="L120">120</span>  white-space: nowrap; /* التعامل مع المسافات: nowrap */
+<span class="ln" id="L121">121</span>} /* إغلاق الكتلة السابقة */
+<span class="ln" id="L122">122</span>.pill::before { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); content: &quot;&quot;; } /* قاعدة كاملة في سطر واحد على المحدِّد .pill::before */
+<span class="ln" id="L123">123</span>.pill.run { border-color: rgba(96,169,255,.36); color: #c7e1ff; background: rgba(42,105,173,.16); } /* قاعدة كاملة في سطر واحد على المحدِّد .pill.run */
+<span class="ln" id="L124">124</span>.pill.run::before { background: var(--acc-blue); box-shadow: 0 0 0 4px rgba(96,169,255,.12); animation: breathe 1.5s ease-in-out infinite; } /* قاعدة كاملة في سطر واحد على المحدِّد .pill.run::before */
+<span class="ln" id="L125">125</span>.pill.done { border-color: rgba(97,221,160,.32); color: #c7ffe0; background: var(--ok-soft); } /* قاعدة كاملة في سطر واحد على المحدِّد .pill.done */
+<span class="ln" id="L126">126</span>.pill.done::before { background: var(--ok); } /* قاعدة كاملة في سطر واحد على المحدِّد .pill.done::before */
+<span class="ln" id="L127">127</span>.pill.err { border-color: rgba(255,129,138,.34); color: #ffd7da; background: var(--bad-soft); } /* قاعدة كاملة في سطر واحد على المحدِّد .pill.err */
+<span class="ln" id="L128">128</span>.pill.err::before { background: var(--bad); } /* قاعدة كاملة في سطر واحد على المحدِّد .pill.err::before */
+<span class="ln" id="L129">129</span>@keyframes breathe { 50% { box-shadow: 0 0 0 7px rgba(96,169,255,.035); } } /* تعريف حركة (keyframes) */
+<span class="ln" id="L130">130</span> 
+<span class="ln" id="L131">131</span>/* Authorization notice */
+<span class="ln" id="L132">132</span>.banner { /* محدِّد (selector) .banner: القواعد التالية تُطبَّق عليه */
+<span class="ln" id="L133">133</span>  display: flex; /* طريقة العرض: flex */
+<span class="ln" id="L134">134</span>  max-width: 1180px; /* أقصى عرض: 1180px */
+<span class="ln" id="L135">135</span>  align-items: center; /* محاذاة العناصر: center */
+<span class="ln" id="L136">136</span>  gap: 11px; /* المسافة بين العناصر: 11px */
+<span class="ln" id="L137">137</span>  margin: 18px auto 14px; /* الهامش الخارجي: 18px auto 14px */
+<span class="ln" id="L138">138</span>  padding: 12px 16px; /* الحشوة الداخلية: 12px 16px */
+<span class="ln" id="L139">139</span>  border: 1px solid rgba(242, 194, 101, .22); /* الحدود: 1px solid rgba(242, 194, 101, .22) */
+<span class="ln" id="L140">140</span>  border-radius: var(--radius-sm); /* استدارة الزوايا: var(--radius-sm) */
+<span class="ln" id="L141">141</span>  color: #e5d3ac; /* لون النص: #e5d3ac */
+<span class="ln" id="L142">142</span>  background: linear-gradient(100deg, rgba(113, 79, 23, .24), rgba(56, 43, 22, .24)); /* الخلفية: linear-gradient(100deg, rgba(113, 79, 23 */
+<span class="ln" id="L143">143</span>  font-size: .79rem; /* حجم الخط: .79rem */
+<span class="ln" id="L144">144</span>} /* إغلاق الكتلة السابقة */
+<span class="ln" id="L145">145</span>.banner-icon { /* محدِّد (selector) .banner-icon: القواعد التالية تُطبَّق عليه */
+<span class="ln" id="L146">146</span>  display: grid; /* طريقة العرض: grid */
+<span class="ln" id="L147">147</span>  width: 25px; /* العرض: 25px */
+<span class="ln" id="L148">148</span>  height: 25px; /* الارتفاع: 25px */
+<span class="ln" id="L149">149</span>  flex: 0 0 auto; /* المرونة: 0 0 auto */
+<span class="ln" id="L150">150</span>  place-items: center; /* place-items: center */
+<span class="ln" id="L151">151</span>  border-radius: 50%; /* استدارة الزوايا: 50% */
+<span class="ln" id="L152">152</span>  color: #201603; /* لون النص: #201603 */
+<span class="ln" id="L153">153</span>  background: var(--warn); /* الخلفية: var(--warn) */
+<span class="ln" id="L154">154</span>  font-weight: 900; /* سماكة الخط: 900 */
+<span class="ln" id="L155">155</span>} /* إغلاق الكتلة السابقة */
+<span class="ln" id="L156">156</span>.banner strong { flex: 0 0 auto; color: #ffdc93; } /* قاعدة كاملة في سطر واحد على المحدِّد .banner strong */
+<span class="ln" id="L157">157</span>.banner &gt; span:not(.banner-icon) { flex: 1 1 auto; } /* قاعدة كاملة في سطر واحد على المحدِّد .banner &gt; span:not(.banner-icon) */
+<span class="ln" id="L158">158</span> 
+<span class="ln" id="L159">159</span>/* Wizard navigation */
+<span class="ln" id="L160">160</span>.steps { /* محدِّد (selector) .steps: القواعد التالية تُطبَّق عليه */
+<span class="ln" id="L161">161</span>  position: sticky; /* نوع التموضع: sticky */
+<span class="ln" id="L162">162</span>  z-index: 20; /* طبقة الترتيب: 20 */
+<span class="ln" id="L163">163</span>  top: 72px; /* المسافة من الأعلى: 72px */
+<span class="ln" id="L164">164</span>  display: flex; /* طريقة العرض: flex */
+<span class="ln" id="L165">165</span>  max-width: 1180px; /* أقصى عرض: 1180px */
+<span class="ln" id="L166">166</span>  gap: 8px; /* المسافة بين العناصر: 8px */
+<span class="ln" id="L167">167</span>  margin: 0 auto; /* الهامش الخارجي: 0 auto */
+<span class="ln" id="L168">168</span>  padding: 8px 0 14px; /* الحشوة الداخلية: 8px 0 14px */
+<span class="ln" id="L169">169</span>  overflow-x: auto; /* الفائض الأفقي: auto */
+<span class="ln" id="L170">170</span>  scrollbar-width: thin; /* scrollbar-width: thin */
+<span class="ln" id="L171">171</span>  background: linear-gradient(var(--bg), rgba(8,13,23,.94)); /* الخلفية: linear-gradient(var(--bg), rgba(8,13,23, */
+<span class="ln" id="L172">172</span>} /* إغلاق الكتلة السابقة */
+<span class="ln" id="L173">173</span>.steps.steps-hidden, /* محدِّد إضافي لنفس الكتلة */
+<span class="ln" id="L174">174</span>.steps[hidden] { /* محدِّد (selector) .steps[hidden]: القواعد التالية تُطبَّق عليه */
+<span class="ln" id="L175">175</span>  display: none !important; /* طريقة العرض: none !important */
+<span class="ln" id="L176">176</span>} /* إغلاق الكتلة السابقة */
+<span class="ln" id="L177">177</span>.step { /* محدِّد (selector) .step: القواعد التالية تُطبَّق عليه */
+<span class="ln" id="L178">178</span>  position: relative; /* نوع التموضع: relative */
+<span class="ln" id="L179">179</span>  display: flex; /* طريقة العرض: flex */
+<span class="ln" id="L180">180</span>  min-width: 0; /* أدنى عرض: 0 */
+<span class="ln" id="L181">181</span>  flex: 1 1 0; /* المرونة: 1 1 0 */
+<span class="ln" id="L182">182</span>  align-items: center; /* محاذاة العناصر: center */
+<span class="ln" id="L183">183</span>  justify-content: center; /* توزيع المحتوى: center */
+<span class="ln" id="L184">184</span>  gap: 10px; /* المسافة بين العناصر: 10px */
+<span class="ln" id="L185">185</span>  padding: 9px 12px; /* الحشوة الداخلية: 9px 12px */
+<span class="ln" id="L186">186</span>  border: 1px solid var(--line); /* الحدود: 1px solid var(--line) */
+<span class="ln" id="L187">187</span>  border-radius: 13px; /* استدارة الزوايا: 13px */
+<span class="ln" id="L188">188</span>  color: var(--dim); /* لون النص: var(--dim) */
+<span class="ln" id="L189">189</span>  background: rgba(17,27,44,.63); /* الخلفية: rgba(17,27,44,.63) */
+<span class="ln" id="L190">190</span>  cursor: pointer; /* شكل المؤشر: pointer */
+<span class="ln" id="L191">191</span>  transition: border-color .18s, background .18s, color .18s, transform .18s; /* الانتقال الحركي: border-color .18s, background .18s, colo */
+<span class="ln" id="L192">192</span>  white-space: nowrap; /* التعامل مع المسافات: nowrap */
+<span class="ln" id="L193">193</span>} /* إغلاق الكتلة السابقة */
+<span class="ln" id="L194">194</span>.step:hover { border-color: var(--line-strong); color: var(--fg); transform: translateY(-1px); } /* قاعدة كاملة في سطر واحد على المحدِّد .step:hover */
+<span class="ln" id="L195">195</span>.step b { /* محدِّد (selector) .step b: القواعد التالية تُطبَّق عليه */
+<span class="ln" id="L196">196</span>  display: grid; /* طريقة العرض: grid */
+<span class="ln" id="L197">197</span>  width: 25px; /* العرض: 25px */
+<span class="ln" id="L198">198</span>  height: 25px; /* الارتفاع: 25px */
+<span class="ln" id="L199">199</span>  flex: 0 0 auto; /* المرونة: 0 0 auto */
+<span class="ln" id="L200">200</span>  place-items: center; /* place-items: center */
+<span class="ln" id="L201">201</span>  border: 1px solid var(--line-strong); /* الحدود: 1px solid var(--line-strong) */
+<span class="ln" id="L202">202</span>  border-radius: 50%; /* استدارة الزوايا: 50% */
+<span class="ln" id="L203">203</span>  color: #b5c6df; /* لون النص: #b5c6df */
+<span class="ln" id="L204">204</span>  background: rgba(255,255,255,.04); /* الخلفية: rgba(255,255,255,.04) */
+<span class="ln" id="L205">205</span>  font: 700 .73rem var(--mono); /* font: 700 .73rem var(--mono) */
+<span class="ln" id="L206">206</span>} /* إغلاق الكتلة السابقة */
+<span class="ln" id="L207">207</span>.step.active { /* محدِّد (selector) .step.active: القواعد التالية تُطبَّق عليه */
+<span class="ln" id="L208">208</span>  border-color: rgba(105,216,208,.42); /* border-color: rgba(105,216,208,.42) */
+<span class="ln" id="L209">209</span>  color: #edffff; /* لون النص: #edffff */
+<span class="ln" id="L210">210</span>  background: linear-gradient(130deg, rgba(36,185,177,.16), rgba(51,120,188,.13)); /* الخلفية: linear-gradient(130deg, rgba(36,185,177, */
+<span class="ln" id="L211">211</span>  box-shadow: 0 8px 28px rgba(21,153,164,.07), inset 0 1px rgba(255,255,255,.04); /* ظل الصندوق: 0 8px 28px rgba(21,153,164,.07), inset 0 */
+<span class="ln" id="L212">212</span>} /* إغلاق الكتلة السابقة */
+<span class="ln" id="L213">213</span>.step.active b { border-color: transparent; color: #062022; background: linear-gradient(135deg, #84e8dc, #64bdf0); } /* قاعدة كاملة في سطر واحد على المحدِّد .step.active b */
+<span class="ln" id="L214">214</span> 
+<span class="ln" id="L215">215</span>main { width: min(100% - 40px, 1180px); min-height: 55vh; margin: 0 auto; padding: 8px 0 26px; } /* قاعدة كاملة في سطر واحد على المحدِّد main */
+<span class="ln" id="L216">216</span>.panel { /* محدِّد (selector) .panel: القواعد التالية تُطبَّق عليه */
+<span class="ln" id="L217">217</span>  display: none; /* طريقة العرض: none */
+<span class="ln" id="L218">218</span>  padding: clamp(22px, 4vw, 38px); /* الحشوة الداخلية: clamp(22px, 4vw, 38px) */
+<span class="ln" id="L219">219</span>  border: 1px solid var(--line); /* الحدود: 1px solid var(--line) */
+<span class="ln" id="L220">220</span>  border-radius: 24px; /* استدارة الزوايا: 24px */
+<span class="ln" id="L221">221</span>  background: linear-gradient(145deg, rgba(18,29,47,.96), rgba(12,20,34,.94)); /* الخلفية: linear-gradient(145deg, rgba(18,29,47,.9 */
+<span class="ln" id="L222">222</span>  box-shadow: var(--shadow), inset 0 1px rgba(255,255,255,.035); /* ظل الصندوق: var(--shadow), inset 0 1px rgba(255,255, */
+<span class="ln" id="L223">223</span>  animation: panel-in .24s ease both; /* animation: panel-in .24s ease both */
+<span class="ln" id="L224">224</span>} /* إغلاق الكتلة السابقة */
+<span class="ln" id="L225">225</span>.panel.active { display: block; } /* قاعدة كاملة في سطر واحد على المحدِّد .panel.active */
+<span class="ln" id="L226">226</span>@keyframes panel-in { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: none; } } /* تعريف حركة (keyframes) */
+<span class="ln" id="L227">227</span>.panel h2 { /* محدِّد (selector) .panel h2: القواعد التالية تُطبَّق عليه */
+<span class="ln" id="L228">228</span>  display: flex; /* طريقة العرض: flex */
+<span class="ln" id="L229">229</span>  align-items: center; /* محاذاة العناصر: center */
+<span class="ln" id="L230">230</span>  gap: 12px; /* المسافة بين العناصر: 12px */
+<span class="ln" id="L231">231</span>  margin: 0 0 7px; /* الهامش الخارجي: 0 0 7px */
+<span class="ln" id="L232">232</span>  color: #f3f7ff; /* لون النص: #f3f7ff */
+<span class="ln" id="L233">233</span>  font-size: clamp(1.2rem, 2vw, 1.55rem); /* حجم الخط: clamp(1.2rem, 2vw, 1.55rem) */
+<span class="ln" id="L234">234</span>  font-weight: 760; /* سماكة الخط: 760 */
+<span class="ln" id="L235">235</span>  letter-spacing: -.02em; /* تباعد الحروف: -.02em */
+<span class="ln" id="L236">236</span>} /* إغلاق الكتلة السابقة */
+<span class="ln" id="L237">237</span>.panel h2::before { /* محدِّد (selector) .panel h2::before: القواعد التالية تُطبَّق عليه */
+<span class="ln" id="L238">238</span>  width: 4px; /* العرض: 4px */
+<span class="ln" id="L239">239</span>  height: 1.25em; /* الارتفاع: 1.25em */
+<span class="ln" id="L240">240</span>  border-radius: 99px; /* استدارة الزوايا: 99px */
+<span class="ln" id="L241">241</span>  background: linear-gradient(var(--acc), var(--acc-blue)); /* الخلفية: linear-gradient(var(--acc), var(--acc-bl */
+<span class="ln" id="L242">242</span>  content: &quot;&quot;; /* المحتوى المولَّد: &quot;&quot; */
+<span class="ln" id="L243">243</span>} /* إغلاق الكتلة السابقة */
+<span class="ln" id="L244">244</span>.panel h3 { margin: 25px 0 10px; color: #c7e9ec; font-size: 1rem; } /* قاعدة كاملة في سطر واحد على المحدِّد .panel h3 */
+<span class="ln" id="L245">245</span>.hint { margin: 0 0 20px; color: var(--dim); font-size: .86rem; line-height: 1.8; } /* قاعدة كاملة في سطر واحد على المحدِّد .hint */
+<span class="ln" id="L246">246</span>a { color: #88dce1; text-decoration-color: rgba(136,220,225,.4); text-underline-offset: 3px; } /* قاعدة كاملة في سطر واحد على المحدِّد a */
+<span class="ln" id="L247">247</span>a:hover { color: #c1ffff; } /* قاعدة كاملة في سطر واحد على المحدِّد a:hover */
+<span class="ln" id="L248">248</span>.mono { font-family: var(--mono); font-size: .84rem; word-break: break-all; } /* قاعدة كاملة في سطر واحد على المحدِّد .mono */
+<span class="ln" id="L249">249</span> 
+<span class="ln" id="L250">250</span>/* Inputs, buttons and layout */
+<span class="ln" id="L251">251</span>.row { display: flex; align-items: center; gap: 10px; margin: 14px 0; } /* قاعدة كاملة في سطر واحد على المحدِّد .row */
+<span class="ln" id="L252">252</span>.row.wrap { flex-wrap: wrap; } /* قاعدة كاملة في سطر واحد على المحدِّد .row.wrap */
+<span class="ln" id="L253">253</span>.row.end { justify-content: flex-end; flex-wrap: wrap; } /* قاعدة كاملة في سطر واحد على المحدِّد .row.end */
+<span class="ln" id="L254">254</span>.row.small { gap: 7px; } /* قاعدة كاملة في سطر واحد على المحدِّد .row.small */
+<span class="ln" id="L255">255</span>.grow { min-width: 0; flex: 1 1 auto; } /* قاعدة كاملة في سطر واحد على المحدِّد .grow */
+<span class="ln" id="L256">256</span>.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15px; } /* قاعدة كاملة في سطر واحد على المحدِّد .grid */
+<span class="ln" id="L257">257</span>label { display: flex; min-width: 0; flex-direction: column; gap: 6px; color: #afbdd2; font-size: .79rem; font-weight: 580; } /* قاعدة كاملة في سطر واحد على المحدِّد label */
+<span class="ln" id="L258">258</span>label.check { flex-direction: row; align-items: center; gap: 10px; color: #dfe9f7; font-size: .84rem; } /* قاعدة كاملة في سطر واحد على المحدِّد label.check */
+<span class="ln" id="L259">259</span>.input-action { display: flex; align-items: stretch; gap: 7px; } /* قاعدة كاملة في سطر واحد على المحدِّد .input-action */
+<span class="ln" id="L260">260</span>.input-action .btn { flex: 0 0 auto; } /* قاعدة كاملة في سطر واحد على المحدِّد .input-action .btn */
+<span class="ln" id="L261">261</span>label &gt; small.hint { margin: 1px 0 0; font-size: .72rem; font-weight: 400; } /* قاعدة كاملة في سطر واحد على المحدِّد label &gt; small.hint */
+<span class="ln" id="L262">262</span>input, select { /* محدِّد (selector) input, select: القواعد التالية تُطبَّق عليه */
+<span class="ln" id="L263">263</span>  width: 100%; /* العرض: 100% */
+<span class="ln" id="L264">264</span>  min-height: 45px; /* أدنى ارتفاع: 45px */
+<span class="ln" id="L265">265</span>  padding: 10px 13px; /* الحشوة الداخلية: 10px 13px */
+<span class="ln" id="L266">266</span>  border: 1px solid var(--line-strong); /* الحدود: 1px solid var(--line-strong) */
+<span class="ln" id="L267">267</span>  border-radius: 11px; /* استدارة الزوايا: 11px */
+<span class="ln" id="L268">268</span>  outline: none; /* الحد الخارجي: none */
+<span class="ln" id="L269">269</span>  color: var(--fg); /* لون النص: var(--fg) */
+<span class="ln" id="L270">270</span>  background: rgba(5, 11, 20, .62); /* الخلفية: rgba(5, 11, 20, .62) */
+<span class="ln" id="L271">271</span>  transition: border-color .16s, box-shadow .16s, background .16s; /* الانتقال الحركي: border-color .16s, box-shadow .16s, back */
+<span class="ln" id="L272">272</span>} /* إغلاق الكتلة السابقة */
+<span class="ln" id="L273">273</span>input::placeholder { color: #62738d; opacity: 1; } /* قاعدة كاملة في سطر واحد على المحدِّد input::placeholder */
+<span class="ln" id="L274">274</span>input:hover, select:hover { border-color: rgba(157,182,220,.38); } /* قاعدة كاملة في سطر واحد على المحدِّد input:hover, select:hover */
+<span class="ln" id="L275">275</span>input:focus, select:focus { /* محدِّد (selector) input:focus, select:focus: القواعد التالية تُطبَّق عليه */
+<span class="ln" id="L276">276</span>  border-color: rgba(105,216,208,.78); /* border-color: rgba(105,216,208,.78) */
+<span class="ln" id="L277">277</span>  background: rgba(7,15,25,.94); /* الخلفية: rgba(7,15,25,.94) */
+<span class="ln" id="L278">278</span>  box-shadow: 0 0 0 3px rgba(105,216,208,.12); /* ظل الصندوق: 0 0 0 3px rgba(105,216,208,.12) */
+<span class="ln" id="L279">279</span>} /* إغلاق الكتلة السابقة */
+<span class="ln" id="L280">280</span>input[type=checkbox] { width: 19px; height: 19px; min-height: 19px; flex: 0 0 auto; accent-color: var(--acc-strong); } /* قاعدة كاملة في سطر واحد على المحدِّد input[type=checkbox] */
+<span class="ln" id="L281">281</span>input[type=number] { font-variant-numeric: tabular-nums; } /* قاعدة كاملة في سطر واحد على المحدِّد input[type=number] */
+<span class="ln" id="L282">282</span>.btn { /* محدِّد (selector) .btn: القواعد التالية تُطبَّق عليه */
+<span class="ln" id="L283">283</span>  display: inline-flex; /* طريقة العرض: inline-flex */
+<span class="ln" id="L284">284</span>  min-height: 44px; /* أدنى ارتفاع: 44px */
+<span class="ln" id="L285">285</span>  align-items: center; /* محاذاة العناصر: center */
+<span class="ln" id="L286">286</span>  justify-content: center; /* توزيع المحتوى: center */
+<span class="ln" id="L287">287</span>  gap: 8px; /* المسافة بين العناصر: 8px */
+<span class="ln" id="L288">288</span>  padding: 9px 16px; /* الحشوة الداخلية: 9px 16px */
+<span class="ln" id="L289">289</span>  border: 1px solid var(--line-strong); /* الحدود: 1px solid var(--line-strong) */
+<span class="ln" id="L290">290</span>  border-radius: 11px; /* استدارة الزوايا: 11px */
+<span class="ln" id="L291">291</span>  color: #dce7f7; /* لون النص: #dce7f7 */
+<span class="ln" id="L292">292</span>  background: linear-gradient(180deg, rgba(31,46,68,.93), rgba(20,32,50,.93)); /* الخلفية: linear-gradient(180deg, rgba(31,46,68,.9 */
+<span class="ln" id="L293">293</span>  box-shadow: 0 2px 5px rgba(0,0,0,.12), inset 0 1px rgba(255,255,255,.035); /* ظل الصندوق: 0 2px 5px rgba(0,0,0,.12), inset 0 1px r */
+<span class="ln" id="L294">294</span>  cursor: pointer; /* شكل المؤشر: pointer */
+<span class="ln" id="L295">295</span>  font-size: .84rem; /* حجم الخط: .84rem */
+<span class="ln" id="L296">296</span>  font-weight: 650; /* سماكة الخط: 650 */
+<span class="ln" id="L297">297</span>  transition: transform .16s, border-color .16s, background .16s, box-shadow .16s; /* الانتقال الحركي: transform .16s, border-color .16s, backg */
+<span class="ln" id="L298">298</span>} /* إغلاق الكتلة السابقة */
+<span class="ln" id="L299">299</span>.btn:hover:not(:disabled) { border-color: rgba(105,216,208,.48); color: #fff; transform: translateY(-1px); } /* قاعدة كاملة في سطر واحد على المحدِّد .btn:hover:not(:disabled) */
+<span class="ln" id="L300">300</span>.btn:active:not(:disabled) { transform: translateY(0); } /* قاعدة كاملة في سطر واحد على المحدِّد .btn:active:not(:disabled) */
+<span class="ln" id="L301">301</span>.btn:focus-visible, .chip:focus-visible, .step:focus-visible, a:focus-visible { outline: 3px solid rgba(105,216,208,.55); outline-offset: 2px; } /* قاعدة كاملة في سطر واحد على المحدِّد .btn:focus-visible, .chip:focus-visible, */
+<span class="ln" id="L302">302</span>.btn:disabled { cursor: not-allowed; opacity: .48; filter: saturate(.5); } /* قاعدة كاملة في سطر واحد على المحدِّد .btn:disabled */
+<span class="ln" id="L303">303</span>.btn.primary { /* محدِّد (selector) .btn.primary: القواعد التالية تُطبَّق عليه */
+<span class="ln" id="L304">304</span>  border-color: rgba(105,216,208,.48); /* border-color: rgba(105,216,208,.48) */
+<span class="ln" id="L305">305</span>  color: #052020; /* لون النص: #052020 */
+<span class="ln" id="L306">306</span>  background: linear-gradient(135deg, #8ceade, #62c6d4 54%, #82b8ff); /* الخلفية: linear-gradient(135deg, #8ceade, #62c6d4 */
+<span class="ln" id="L307">307</span>  box-shadow: 0 9px 24px rgba(35,167,174,.17), inset 0 1px rgba(255,255,255,.55); /* ظل الصندوق: 0 9px 24px rgba(35,167,174,.17), inset 0 */
+<span class="ln" id="L308">308</span>  font-weight: 800; /* سماكة الخط: 800 */
+<span class="ln" id="L309">309</span>} /* إغلاق الكتلة السابقة */
+<span class="ln" id="L310">310</span>.btn.primary:hover:not(:disabled) { box-shadow: 0 12px 30px rgba(35,167,174,.24), inset 0 1px rgba(255,255,255,.55); } /* قاعدة كاملة في سطر واحد على المحدِّد .btn.primary:hover:not(:disabled) */
+<span class="ln" id="L311">311</span>.btn.danger { border-color: rgba(255,129,138,.3); color: #ffdce0; background: linear-gradient(180deg, rgba(113,37,49,.55), rgba(74,25,35,.65)); } /* قاعدة كاملة في سطر واحد على المحدِّد .btn.danger */
+<span class="ln" id="L312">312</span>.btn.ghost { background: rgba(255,255,255,.025); box-shadow: none; } /* قاعدة كاملة في سطر واحد على المحدِّد .btn.ghost */
+<span class="ln" id="L313">313</span>.btn.tiny { min-height: 32px; padding: 5px 10px; font-size: .73rem; } /* قاعدة كاملة في سطر واحد على المحدِّد .btn.tiny */
+<span class="ln" id="L314">314</span>.btn.big { min-height: 52px; padding: 12px 25px; font-size: .95rem; } /* قاعدة كاملة في سطر واحد على المحدِّد .btn.big */
+<span class="ln" id="L315">315</span>.icon-btn { width: 42px; min-width: 42px; padding: 7px; font-size: 1rem; } /* قاعدة كاملة في سطر واحد على المحدِّد .icon-btn */
+<span class="ln" id="L316">316</span>.chip { /* محدِّد (selector) .chip: القواعد التالية تُطبَّق عليه */
+<span class="ln" id="L317">317</span>  display: inline-flex; /* طريقة العرض: inline-flex */
+<span class="ln" id="L318">318</span>  min-height: 36px; /* أدنى ارتفاع: 36px */
+<span class="ln" id="L319">319</span>  align-items: center; /* محاذاة العناصر: center */
+<span class="ln" id="L320">320</span>  padding: 6px 12px; /* الحشوة الداخلية: 6px 12px */
+<span class="ln" id="L321">321</span>  border: 1px solid var(--line); /* الحدود: 1px solid var(--line) */
+<span class="ln" id="L322">322</span>  border-radius: 999px; /* استدارة الزوايا: 999px */
+<span class="ln" id="L323">323</span>  color: #abc0da; /* لون النص: #abc0da */
+<span class="ln" id="L324">324</span>  background: rgba(255,255,255,.035); /* الخلفية: rgba(255,255,255,.035) */
+<span class="ln" id="L325">325</span>  cursor: pointer; /* شكل المؤشر: pointer */
+<span class="ln" id="L326">326</span>  font-size: .73rem; /* حجم الخط: .73rem */
+<span class="ln" id="L327">327</span>  transition: border-color .16s, color .16s, background .16s; /* الانتقال الحركي: border-color .16s, color .16s, backgroun */
+<span class="ln" id="L328">328</span>} /* إغلاق الكتلة السابقة */
+<span class="ln" id="L329">329</span>.chip:hover, .chip:focus-visible { border-color: rgba(105,216,208,.45); color: #edffff; background: rgba(105,216,208,.08); } /* قاعدة كاملة في سطر واحد على المحدِّد .chip:hover, .chip:focus-visible */
+<span class="ln" id="L330">330</span> 
+<span class="ln" id="L331">331</span>/* Cards and advanced settings */
+<span class="ln" id="L332">332</span>.card { /* محدِّد (selector) .card: القواعد التالية تُطبَّق عليه */
+<span class="ln" id="L333">333</span>  margin: 14px 0; /* الهامش الخارجي: 14px 0 */
+<span class="ln" id="L334">334</span>  padding: 16px 18px; /* الحشوة الداخلية: 16px 18px */
+<span class="ln" id="L335">335</span>  border: 1px solid var(--line); /* الحدود: 1px solid var(--line) */
+<span class="ln" id="L336">336</span>  border-radius: var(--radius-sm); /* استدارة الزوايا: var(--radius-sm) */
+<span class="ln" id="L337">337</span>  color: #d8e4f4; /* لون النص: #d8e4f4 */
+<span class="ln" id="L338">338</span>  background: linear-gradient(145deg, rgba(25,39,60,.84), rgba(17,29,47,.8)); /* الخلفية: linear-gradient(145deg, rgba(25,39,60,.8 */
+<span class="ln" id="L339">339</span>  box-shadow: 0 10px 30px rgba(0,0,0,.08), inset 0 1px rgba(255,255,255,.025); /* ظل الصندوق: 0 10px 30px rgba(0,0,0,.08), inset 0 1px */
+<span class="ln" id="L340">340</span>  font-size: .86rem; /* حجم الخط: .86rem */
+<span class="ln" id="L341">341</span>} /* إغلاق الكتلة السابقة */
+<span class="ln" id="L342">342</span>.card.muted { color: var(--dim); } /* قاعدة كاملة في سطر واحد على المحدِّد .card.muted */
+<span class="ln" id="L343">343</span>.card.hidden, .hidden { display: none !important; } /* قاعدة كاملة في سطر واحد على المحدِّد .card.hidden, .hidden */
+<span class="ln" id="L344">344</span>.card h4 { margin: 0 0 10px; color: #b7e9e6; font-size: .91rem; } /* قاعدة كاملة في سطر واحد على المحدِّد .card h4 */
+<span class="ln" id="L345">345</span>.kv { display: grid; grid-template-columns: minmax(110px, .35fr) 1fr; gap: 5px 14px; font-size: .8rem; } /* قاعدة كاملة في سطر واحد على المحدِّد .kv */
+<span class="ln" id="L346">346</span>.kv dt { color: var(--dim); } /* قاعدة كاملة في سطر واحد على المحدِّد .kv dt */
+<span class="ln" id="L347">347</span>.kv dd { min-width: 0; margin: 0; color: #d9e8f8; font: .77rem/1.7 var(--mono); overflow-wrap: anywhere; } /* قاعدة كاملة في سطر واحد على المحدِّد .kv dd */
+<span class="ln" id="L348">348</span>.warn { color: var(--warn); } /* قاعدة كاملة في سطر واحد على المحدِّد .warn */
+<span class="ln" id="L349">349</span>.bad { color: var(--bad); } /* قاعدة كاملة في سطر واحد على المحدِّد .bad */
+<span class="ln" id="L350">350</span>.ok { color: var(--ok); } /* قاعدة كاملة في سطر واحد على المحدِّد .ok */
+<span class="ln" id="L351">351</span>.adv { /* محدِّد (selector) .adv: القواعد التالية تُطبَّق عليه */
+<span class="ln" id="L352">352</span>  margin: 18px 0; /* الهامش الخارجي: 18px 0 */
+<span class="ln" id="L353">353</span>  padding: 0 16px 16px; /* الحشوة الداخلية: 0 16px 16px */
+<span class="ln" id="L354">354</span>  border: 1px solid var(--line); /* الحدود: 1px solid var(--line) */
+<span class="ln" id="L355">355</span>  border-radius: 15px; /* استدارة الزوايا: 15px */
+<span class="ln" id="L356">356</span>  background: rgba(6,13,23,.38); /* الخلفية: rgba(6,13,23,.38) */
+<span class="ln" id="L357">357</span>} /* إغلاق الكتلة السابقة */
+<span class="ln" id="L358">358</span>.adv summary { position: relative; padding: 14px 2px; color: #b8c8df; cursor: pointer; font-size: .84rem; font-weight: 700; list-style: none; } /* قاعدة كاملة في سطر واحد على المحدِّد .adv summary */
+<span class="ln" id="L359">359</span>.adv summary::-webkit-details-marker { display: none; } /* قاعدة كاملة في سطر واحد على المحدِّد .adv summary::-webkit-details-marker */
+<span class="ln" id="L360">360</span>.adv summary::after { float: inline-end; color: var(--acc); content: &quot;+&quot;; font: 1.15rem var(--mono); } /* قاعدة كاملة في سطر واحد على المحدِّد .adv summary::after */
+<span class="ln" id="L361">361</span>.adv[open] summary::after { content: &quot;−&quot;; } /* قاعدة كاملة في سطر واحد على المحدِّد .adv[open] summary::after */
+<span class="ln" id="L362">362</span>.adv .grid { margin: 5px 0 14px; } /* قاعدة كاملة في سطر واحد على المحدِّد .adv .grid */
+<span class="ln" id="L363">363</span>.adv .btn { margin: 4px 5px 4px 0; } /* قاعدة كاملة في سطر واحد على المحدِّد .adv .btn */
+<span class="ln" id="L364">364</span>.profrow { align-items: flex-end; margin-bottom: 18px; } /* قاعدة كاملة في سطر واحد على المحدِّد .profrow */
+<span class="ln" id="L365">365</span>.profrow label.grow { flex: 1; } /* قاعدة كاملة في سطر واحد على المحدِّد .profrow label.grow */
+<span class="ln" id="L366">366</span>.profrow select { width: 100%; direction: ltr; text-align: start; } /* قاعدة كاملة في سطر واحد على المحدِّد .profrow select */
+<span class="ln" id="L367">367</span>.preview { margin: 5px 0; color: #c6d6eb; font-size: .83rem; } /* قاعدة كاملة في سطر واحد على المحدِّد .preview */
+<span class="ln" id="L368">368</span>.preview b { color: #f0f7ff; font: 700 .9rem var(--mono); } /* قاعدة كاملة في سطر واحد على المحدِّد .preview b */
+<span class="ln" id="L369">369</span>#pvSamples { display: inline-flex; flex-wrap: wrap; gap: 6px; } /* قاعدة كاملة في سطر واحد على المحدِّد #pvSamples */
+<span class="ln" id="L370">370</span>.sample { padding: 3px 9px; border: 1px solid rgba(96,169,255,.22); border-radius: 8px; color: #cae4ff; background: rgba(52,116,184,.12); font: .78rem var(--mono); } /* قاعدة كاملة في سطر واحد على المحدِّد .sample */
+<span class="ln" id="L371">371</span>#previewCard { border-color: rgba(105,216,208,.18); background: linear-gradient(120deg, rgba(19,58,66,.25), rgba(21,34,53,.78)); } /* قاعدة كاملة في سطر واحد على المحدِّد #previewCard */
+<span class="ln" id="L372">372</span>.license { display: flex; flex-direction: row; align-items: flex-start; gap: 10px; margin: 18px 0; padding: 14px 16px; border: 1px solid rgba(242,194,101,.2); border-radius: 13px; color: #eee2c8; background: rgba(113,79,23,.13); font-size: .81rem; } /* قاعدة كاملة في سطر واحد على المحدِّد .license */
+<span class="ln" id="L373">373</span> 
+<span class="ln" id="L374">374</span>/* Run dashboard */
+<span class="ln" id="L375">375</span>.statline { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 16px 0; } /* قاعدة كاملة في سطر واحد على المحدِّد .statline */
+<span class="ln" id="L376">376</span>.stat { /* محدِّد (selector) .stat: القواعد التالية تُطبَّق عليه */
+<span class="ln" id="L377">377</span>  position: relative; /* نوع التموضع: relative */
+<span class="ln" id="L378">378</span>  display: flex; /* طريقة العرض: flex */
+<span class="ln" id="L379">379</span>  min-height: 88px; /* أدنى ارتفاع: 88px */
+<span class="ln" id="L380">380</span>  flex-direction: column; /* اتجاه المحور: column */
+<span class="ln" id="L381">381</span>  justify-content: space-between; /* توزيع المحتوى: space-between */
+<span class="ln" id="L382">382</span>  gap: 8px; /* المسافة بين العناصر: 8px */
+<span class="ln" id="L383">383</span>  padding: 13px 15px; /* الحشوة الداخلية: 13px 15px */
+<span class="ln" id="L384">384</span>  overflow: hidden; /* التعامل مع الفائض: hidden */
+<span class="ln" id="L385">385</span>  border: 1px solid var(--line); /* الحدود: 1px solid var(--line) */
+<span class="ln" id="L386">386</span>  border-radius: 14px; /* استدارة الزوايا: 14px */
+<span class="ln" id="L387">387</span>  background: linear-gradient(150deg, rgba(23,37,58,.94), rgba(13,23,39,.9)); /* الخلفية: linear-gradient(150deg, rgba(23,37,58,.9 */
+<span class="ln" id="L388">388</span>} /* إغلاق الكتلة السابقة */
+<span class="ln" id="L389">389</span>.stat::after { position: absolute; inset-inline-end: -17px; inset-block-end: -30px; width: 70px; height: 70px; border-radius: 50%; background: rgba(96,169,255,.06); content: &quot;&quot;; } /* قاعدة كاملة في سطر واحد على المحدِّد .stat::after */
+<span class="ln" id="L390">390</span>.stat span { color: var(--dim); font-size: .7rem; } /* قاعدة كاملة في سطر واحد على المحدِّد .stat span */
+<span class="ln" id="L391">391</span>.stat b { color: #eaf5ff; font: 700 1.1rem var(--mono); font-variant-numeric: tabular-nums; } /* قاعدة كاملة في سطر واحد على المحدِّد .stat b */
+<span class="ln" id="L392">392</span>.progress { height: 11px; margin: 15px 0; overflow: hidden; border: 1px solid var(--line); border-radius: 999px; background: #080e19; } /* قاعدة كاملة في سطر واحد على المحدِّد .progress */
+<span class="ln" id="L393">393</span>#bar { width: 0; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #2aaea9, #69d8d0 45%, #71b4ff); box-shadow: 0 0 16px rgba(105,216,208,.36); transition: width .35s ease; } /* قاعدة كاملة في سطر واحد على المحدِّد #bar */
+<span class="ln" id="L394">394</span>.chips { display: flex; flex-wrap: wrap; gap: 7px; margin: 12px 0; } /* قاعدة كاملة في سطر واحد على المحدِّد .chips */
+<span class="ln" id="L395">395</span>.cchip { display: inline-flex; align-items: center; gap: 7px; padding: 6px 11px; border: 1px solid var(--line); border-radius: 999px; color: #c2d1e4; background: rgba(255,255,255,.035); font-size: .75rem; } /* قاعدة كاملة في سطر واحد على المحدِّد .cchip */
+<span class="ln" id="L396">396</span>.cchip b { color: #f1f7ff; font: 700 .76rem var(--mono); } /* قاعدة كاملة في سطر واحد على المحدِّد .cchip b */
+<span class="ln" id="L397">397</span> 
+<span class="ln" id="L398">398</span>/* Attempt table */
+<span class="ln" id="L399">399</span>.logwrap { max-height: 55vh; overflow: auto; border: 1px solid var(--line); border-radius: 14px; background: rgba(6,12,21,.62); scrollbar-color: #354963 transparent; } /* قاعدة كاملة في سطر واحد على المحدِّد .logwrap */
+<span class="ln" id="L400">400</span>table.log { width: 100%; border-collapse: separate; border-spacing: 0; font-size: .76rem; } /* قاعدة كاملة في سطر واحد على المحدِّد table.log */
+<span class="ln" id="L401">401</span>table.log th { position: sticky; z-index: 2; top: 0; padding: 10px 9px; border-bottom: 1px solid var(--line-strong); color: #9eb2cd; background: #111c2d; text-align: start; font-size: .71rem; font-weight: 700; white-space: nowrap; } /* قاعدة كاملة في سطر واحد على المحدِّد table.log th */
+<span class="ln" id="L402">402</span>table.log td { padding: 8px 9px; border-bottom: 1px solid rgba(157,182,220,.08); color: #c5d4e8; font: .72rem var(--mono); white-space: nowrap; } /* قاعدة كاملة في سطر واحد على المحدِّد table.log td */
+<span class="ln" id="L403">403</span>table.log tr:hover td { background-color: rgba(255,255,255,.025); } /* قاعدة كاملة في سطر واحد على المحدِّد table.log tr:hover td */
+<span class="ln" id="L404">404</span>table.log td.why { max-width: 300px; color: #9caec7; font: .75rem/1.45 system-ui, sans-serif; white-space: normal; } /* قاعدة كاملة في سطر واحد على المحدِّد table.log td.why */
+<span class="ln" id="L405">405</span>table.log tr.ACCEPTED_VERIFIED td, table.log tr.ACCEPTED td { background-color: rgba(44,175,112,.095); } /* قاعدة كاملة في سطر واحد على المحدِّد table.log tr.ACCEPTED_VERIFIED td, table */
+<span class="ln" id="L406">406</span>table.log tr.UNKNOWN td { background-color: rgba(242,177,56,.06); } /* قاعدة كاملة في سطر واحد على المحدِّد table.log tr.UNKNOWN td */
+<span class="ln" id="L407">407</span>table.log tr.BANNED td, table.log tr.RATE_LIMITED td { background-color: rgba(239,91,91,.08); } /* قاعدة كاملة في سطر واحد على المحدِّد table.log tr.BANNED td, table.log tr.RAT */
+<span class="ln" id="L408">408</span>table.log tr.NET_ERROR td { color: #9aabc2; } /* قاعدة كاملة في سطر واحد على المحدِّد table.log tr.NET_ERROR td */
+<span class="ln" id="L409">409</span>.vcode { display: inline-block; padding: 2px 7px; border-radius: 6px; font: 700 .65rem/1.45 system-ui,sans-serif; white-space: nowrap; } /* قاعدة كاملة في سطر واحد على المحدِّد .vcode */
+<span class="ln" id="L410">410</span>.v-ACCEPTED_VERIFIED { color: #d8ffeb; background: #155c3d; } /* قاعدة كاملة في سطر واحد على المحدِّد .v-ACCEPTED_VERIFIED */
+<span class="ln" id="L411">411</span>.v-ACCEPTED { color: #dcffec; background: #1d6947; } /* قاعدة كاملة في سطر واحد على المحدِّد .v-ACCEPTED */
+<span class="ln" id="L412">412</span>.v-ACCEPTED_UNVERIFIED { color: #ddf0ff; background: #285a7b; } /* قاعدة كاملة في سطر واحد على المحدِّد .v-ACCEPTED_UNVERIFIED */
+<span class="ln" id="L413">413</span>.v-REJECTED { color: #a9b7cb; background: #27364b; } /* قاعدة كاملة في سطر واحد على المحدِّد .v-REJECTED */
+<span class="ln" id="L414">414</span>.v-UNKNOWN { color: #ffe9ba; background: #674c1a; } /* قاعدة كاملة في سطر واحد على المحدِّد .v-UNKNOWN */
+<span class="ln" id="L415">415</span>.v-BANNED { color: #ffdadd; background: #672932; } /* قاعدة كاملة في سطر واحد على المحدِّد .v-BANNED */
+<span class="ln" id="L416">416</span>.v-RATE_LIMITED { color: #ffe1bb; background: #69411b; } /* قاعدة كاملة في سطر واحد على المحدِّد .v-RATE_LIMITED */
+<span class="ln" id="L417">417</span>.v-CHALLENGE { color: #eadfff; background: #493574; } /* قاعدة كاملة في سطر واحد على المحدِّد .v-CHALLENGE */
+<span class="ln" id="L418">418</span>.v-NET_ERROR { color: #d5e5ff; background: #243b61; } /* قاعدة كاملة في سطر واحد على المحدِّد .v-NET_ERROR */
+<span class="ln" id="L419">419</span>table.why { width: 100%; border-collapse: collapse; font-size: .8rem; } /* قاعدة كاملة في سطر واحد على المحدِّد table.why */
+<span class="ln" id="L420">420</span>table.why td { padding: 7px 8px; border-bottom: 1px solid var(--line); } /* قاعدة كاملة في سطر واحد على المحدِّد table.why td */
+<span class="ln" id="L421">421</span>table.why td:last-child { color: var(--fg); text-align: end; white-space: nowrap; } /* قاعدة كاملة في سطر واحد على المحدِّد table.why td:last-child */
+<span class="ln" id="L422">422</span> 
+<span class="ln" id="L423">423</span>/* Dialogs */
+<span class="ln" id="L424">424</span>.modal { position: fixed; z-index: 70; inset: 0; display: grid; place-items: center; padding: 16px; background: rgba(2,6,12,.76); backdrop-filter: blur(8px); } /* قاعدة كاملة في سطر واحد على المحدِّد .modal */
+<span class="ln" id="L425">425</span>.modal-box { display: flex; width: min(800px, 100%); max-height: min(88vh, 900px); flex-direction: column; overflow: hidden; border: 1px solid var(--line-strong); border-radius: 18px; background: #111c2d; box-shadow: 0 28px 100px rgba(0,0,0,.55); } /* قاعدة كاملة في سطر واحد على المحدِّد .modal-box */
+<span class="ln" id="L426">426</span>.modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--line); background: rgba(255,255,255,.025); } /* قاعدة كاملة في سطر واحد على المحدِّد .modal-head */
+<span class="ln" id="L427">427</span>.modal-body { padding: 17px; overflow: auto; color: #d7e3f2; font-size: .85rem; } /* قاعدة كاملة في سطر واحد على المحدِّد .modal-body */
+<span class="ln" id="L428">428</span>.modal-body pre { overflow-wrap: anywhere; white-space: pre-wrap; font-size: .77rem; } /* قاعدة كاملة في سطر واحد على المحدِّد .modal-body pre */
+<span class="ln" id="L429">429</span>iframe.pagereview { width: 100%; height: min(60vh, 600px); border: 1px solid var(--line); border-radius: 10px; background: #fff; } /* قاعدة كاملة في سطر واحد على المحدِّد iframe.pagereview */
+<span class="ln" id="L430">430</span> 
+<span class="ln" id="L431">431</span>footer.foot { display: flex; width: min(100% - 40px, 1180px); align-items: center; gap: 9px; flex-wrap: wrap; margin: 8px auto 0; padding: 18px 3px; border-top: 1px solid var(--line); color: var(--muted); font-size: .73rem; } /* قاعدة كاملة في سطر واحد على المحدِّد footer.foot */
+<span class="ln" id="L432">432</span>.foot #footText { flex: 1 1 360px; } /* قاعدة كاملة في سطر واحد على المحدِّد .foot #footText */
+<span class="ln" id="L433">433</span>.dot { color: #52647e; } /* قاعدة كاملة في سطر واحد على المحدِّد .dot */
+<span class="ln" id="L434">434</span> 
+<span class="ln" id="L435">435</span>@media (min-width: 900px) { /* استعلام وسائط: قواعد تُطبَّق في هذا العرض/الحالة فقط */
+<span class="ln" id="L436">436</span>  #panel-scan &gt; .row:first-of-type { max-width: 850px; } /* قاعدة كاملة في سطر واحد على المحدِّد #panel-scan &gt; .row:first-of-type */
+<span class="ln" id="L437">437</span>  #scanUrl { min-height: 54px; font-size: .95rem; } /* قاعدة كاملة في سطر واحد على المحدِّد #scanUrl */
+<span class="ln" id="L438">438</span>} /* إغلاق الكتلة السابقة */
+<span class="ln" id="L439">439</span>@media (max-width: 760px) { /* استعلام وسائط: قواعد تُطبَّق في هذا العرض/الحالة فقط */
+<span class="ln" id="L440">440</span>  .banner { width: calc(100% - 28px); margin: 12px auto 10px; align-items: flex-start; flex-wrap: wrap; gap: 7px 9px; } /* قاعدة كاملة في سطر واحد على المحدِّد .banner */
+<span class="ln" id="L441">441</span>  .banner &gt; span:not(.banner-icon) { flex-basis: calc(100% - 38px); } /* قاعدة كاملة في سطر واحد على المحدِّد .banner &gt; span:not(.banner-icon) */
+<span class="ln" id="L442">442</span>  .banner .btn { margin-inline-start: 34px; } /* قاعدة كاملة في سطر واحد على المحدِّد .banner .btn */
+<span class="ln" id="L443">443</span>  .steps { width: 100%; top: 64px; padding: 8px 14px 12px; } /* قاعدة كاملة في سطر واحد على المحدِّد .steps */
+<span class="ln" id="L444">444</span>  .step { flex: 0 0 auto; justify-content: flex-start; padding: 7px 11px; font-size: .75rem; } /* قاعدة كاملة في سطر واحد على المحدِّد .step */
+<span class="ln" id="L445">445</span>  main { width: calc(100% - 28px); padding-top: 3px; } /* قاعدة كاملة في سطر واحد على المحدِّد main */
+<span class="ln" id="L446">446</span>  .panel { padding: 22px 19px; border-radius: 19px; } /* قاعدة كاملة في سطر واحد على المحدِّد .panel */
+<span class="ln" id="L447">447</span>  .statline { grid-template-columns: repeat(2, minmax(0,1fr)); } /* قاعدة كاملة في سطر واحد على المحدِّد .statline */
+<span class="ln" id="L448">448</span>} /* إغلاق الكتلة السابقة */
+<span class="ln" id="L449">449</span>@media (max-width: 520px) { /* استعلام وسائط: قواعد تُطبَّق في هذا العرض/الحالة فقط */
+<span class="ln" id="L450">450</span>  .top { min-height: 64px; padding: 8px 14px; } /* قاعدة كاملة في سطر واحد على المحدِّد .top */
+<span class="ln" id="L451">451</span>  .logo { width: 38px; height: 38px; border-radius: 12px; } /* قاعدة كاملة في سطر واحد على المحدِّد .logo */
+<span class="ln" id="L452">452</span>  .tagline { font-size: .62rem; } /* قاعدة كاملة في سطر واحد على المحدِّد .tagline */
+<span class="ln" id="L453">453</span>  .top-actions { gap: 5px; } /* قاعدة كاملة في سطر واحد على المحدِّد .top-actions */
+<span class="ln" id="L454">454</span>  .top-actions .btn { min-height: 38px; padding: 5px 9px; } /* قاعدة كاملة في سطر واحد على المحدِّد .top-actions .btn */
+<span class="ln" id="L455">455</span>  .top-actions .icon-btn { width: 38px; min-width: 38px; } /* قاعدة كاملة في سطر واحد على المحدِّد .top-actions .icon-btn */
+<span class="ln" id="L456">456</span>  .pill { min-height: 30px; padding: 3px 9px; font-size: .69rem; } /* قاعدة كاملة في سطر واحد على المحدِّد .pill */
+<span class="ln" id="L457">457</span>  .steps { top: 64px; } /* قاعدة كاملة في سطر واحد على المحدِّد .steps */
+<span class="ln" id="L458">458</span>  main { width: calc(100% - 20px); } /* قاعدة كاملة في سطر واحد على المحدِّد main */
+<span class="ln" id="L459">459</span>  .panel { padding: 19px 14px; border-radius: 16px; } /* قاعدة كاملة في سطر واحد على المحدِّد .panel */
+<span class="ln" id="L460">460</span>  .panel h2 { font-size: 1.16rem; } /* قاعدة كاملة في سطر واحد على المحدِّد .panel h2 */
+<span class="ln" id="L461">461</span>  .hint { font-size: .8rem; } /* قاعدة كاملة في سطر واحد على المحدِّد .hint */
+<span class="ln" id="L462">462</span>  .row { align-items: stretch; flex-wrap: wrap; } /* قاعدة كاملة في سطر واحد على المحدِّد .row */
+<span class="ln" id="L463">463</span>  .row &gt; .btn { flex: 1 1 auto; } /* قاعدة كاملة في سطر واحد على المحدِّد .row &gt; .btn */
+<span class="ln" id="L464">464</span>  #panel-scan &gt; .row:first-of-type { align-items: stretch; } /* قاعدة كاملة في سطر واحد على المحدِّد #panel-scan &gt; .row:first-of-type */
+<span class="ln" id="L465">465</span>  #scanUrl { flex-basis: 100%; } /* قاعدة كاملة في سطر واحد على المحدِّد #scanUrl */
+<span class="ln" id="L466">466</span>  .grid { grid-template-columns: minmax(0,1fr); gap: 12px; } /* قاعدة كاملة في سطر واحد على المحدِّد .grid */
+<span class="ln" id="L467">467</span>  .profrow { align-items: stretch; } /* قاعدة كاملة في سطر واحد على المحدِّد .profrow */
+<span class="ln" id="L468">468</span>  .profrow .btn { flex: 0 0 auto; } /* قاعدة كاملة في سطر واحد على المحدِّد .profrow .btn */
+<span class="ln" id="L469">469</span>  .kv { grid-template-columns: minmax(80px,.38fr) 1fr; gap: 4px 8px; } /* قاعدة كاملة في سطر واحد على المحدِّد .kv */
+<span class="ln" id="L470">470</span>  .stat { min-height: 78px; padding: 10px 11px; } /* قاعدة كاملة في سطر واحد على المحدِّد .stat */
+<span class="ln" id="L471">471</span>  .stat b { font-size: .97rem; } /* قاعدة كاملة في سطر واحد على المحدِّد .stat b */
+<span class="ln" id="L472">472</span>  .logwrap { max-height: 48vh; } /* قاعدة كاملة في سطر واحد على المحدِّد .logwrap */
+<span class="ln" id="L473">473</span>  table.log th, table.log td { padding: 7px 8px; } /* قاعدة كاملة في سطر واحد على المحدِّد table.log th, table.log td */
+<span class="ln" id="L474">474</span>  .license { font-size: .76rem; } /* قاعدة كاملة في سطر واحد على المحدِّد .license */
+<span class="ln" id="L475">475</span>  .btn.big { width: 100%; } /* قاعدة كاملة في سطر واحد على المحدِّد .btn.big */
+<span class="ln" id="L476">476</span>  footer.foot { width: calc(100% - 24px); gap: 7px; } /* قاعدة كاملة في سطر واحد على المحدِّد footer.foot */
+<span class="ln" id="L477">477</span>} /* إغلاق الكتلة السابقة */
+<span class="ln" id="L478">478</span>@media (prefers-reduced-motion: reduce) { /* استعلام وسائط: قواعد تُطبَّق في هذا العرض/الحالة فقط */
+<span class="ln" id="L479">479</span>  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } /* قاعدة كاملة في سطر واحد على المحدِّد *, *::before, *::after */
+<span class="ln" id="L480">480</span>} /* إغلاق الكتلة السابقة */
+<span class="ln" id="L481">481</span> 
+</code></pre></details>
+<script>
+document.getElementById("kp-jump").addEventListener("change", function (e) {
+  var n = parseInt(e.target.value, 10);
+  if (n > 0) { var el = document.getElementById("L" + n);
+    if (el) el.scrollIntoView({block: "center"}); }
+});
+if (location.hash) { var el = document.querySelector(location.hash);
+  if (el) setTimeout(function () { el.scrollIntoView({block: "center"}); }, 60); }
+</script>
+<footer class="docfoot">صفحة مولّدة آلياً من مصدر الكود · KiraPass —
+<code>files</code> · 2026-10-01 02:26</footer>
+</main>
+</div>
+<script src="../assets/docs.js"></script>
+<script>KPInit("files");</script>
+</body>
+</html>

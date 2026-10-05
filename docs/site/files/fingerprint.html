@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ملف fingerprint.py · KiraPass</title>
+<link rel="stylesheet" href="../assets/docs.css">
+
+</head>
+<body>
+<div id="kp-layout">
+<main class="doc">
+<h1>ملف <code>fingerprint.py</code></h1>
+<p class="lead">البصمة والحَكَم: من الردّ إلى الحكم — <code>kirapass/fingerprint.py</code></p>
+<div class="card info"><b>هذه الصفحة مولّدة آلياً</b> من مصدر الكود مباشرة (<code>tools/docs/build_docs.py</code>). إن غيّرت الكود فأعد توليدها: <code>python3 tools/docs/build_docs.py</code>. الشرح اليدوي الأوسع في <a href="../architecture.html">المعمارية</a> و<a href="../editing.html">دليل التعديل</a> و<a href="../danger.html">أماكن الخطر</a>.</div>
+<div class="grid3"><div class="card"><b>598</b><br>سطراً</div><div class="card"><b>27</b><br>دالة</div><div class="card"><b>3</b><br>صنف</div></div>
+<div class="note"><b>ملخّص المؤلف للملف (نصه الأصلي بالإنجليزية):</b> <span class="muted">Decide what a router&#x27;s answer means - without guessing.</span></div>
+<p><a class="btn primary" href="../src/fingerprint.html">افتح المصدر كاملاً مرقّماً</a></p>
+<h2 id="imports">الاستيرادات</h2><table class="t compact"><thead><tr><th>السطر</th><th>الاستيراد</th><th>لماذا</th></tr></thead><tbody>
+<tr><td class="mono">25</td><td class="mono">from __future__ import annotations</td><td>استيراد annotations من الوحدة __future__</td></tr>
+<tr><td class="mono">27</td><td class="mono">import difflib</td><td>استيراد الوحدة difflib من المكتبة</td></tr>
+<tr><td class="mono">28</td><td class="mono">import hashlib</td><td>استيراد الوحدة hashlib من المكتبة</td></tr>
+<tr><td class="mono">29</td><td class="mono">import html</td><td>استيراد الوحدة html من المكتبة</td></tr>
+<tr><td class="mono">30</td><td class="mono">import re</td><td>استيراد الوحدة re من المكتبة</td></tr>
+<tr><td class="mono">32</td><td class="mono">from . import config</td><td>استيراد config من الوحدة .</td></tr>
+</tbody></table>
+<h2 id="vars">متغيرات وثوابت على مستوى الوحدة</h2><div class="scroll-x"><table class="t compact"><thead><tr><th>الاسم</th><th>السطر</th><th>القيمة</th><th>الشرح</th></tr></thead><tbody>
+<tr><td class="mono"><span class="tag var">TOKEN_RE</span></td><td class="mono"><a href="../src/fingerprint.html#L34">34</a></td><td class="mono">re.compile(&#x27;[A-Za-z0-9_@.\\-]+|[^\\sA-Za-z0-9_]&#x27;)</td><td>إسناد نتيجة استدعاء re.compile (معامل واحد) إلى TOKEN_RE</td></tr>
+<tr><td class="mono"><span class="tag var">SCRIPT_RE</span></td><td class="mono"><a href="../src/fingerprint.html#L35">35</a></td><td class="mono">re.compile(&#x27;&lt;(script|style)\\b.*?&lt;/\\1&gt;&#x27;, re.S | re.I)</td><td>إسناد نتيجة استدعاء re.compile (2 معاملات) إلى SCRIPT_RE</td></tr>
+<tr><td class="mono"><span class="tag var">TAG_RE</span></td><td class="mono"><a href="../src/fingerprint.html#L36">36</a></td><td class="mono">re.compile(&#x27;&lt;[^&gt;]+&gt;&#x27;)</td><td>إسناد نتيجة استدعاء re.compile (معامل واحد) إلى TAG_RE</td></tr>
+<tr><td class="mono"><span class="tag var">WS_RE</span></td><td class="mono"><a href="../src/fingerprint.html#L37">37</a></td><td class="mono">re.compile(&#x27;[ \\t\\r\\n]+&#x27;)</td><td>إسناد نتيجة استدعاء re.compile (معامل واحد) إلى WS_RE</td></tr>
+<tr><td class="mono"><span class="tag var">UUID_RE</span></td><td class="mono"><a href="../src/fingerprint.html#L39">39</a></td><td class="mono">re.compile(&#x27;\\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F</td><td>إسناد نتيجة استدعاء re.compile (معامل واحد) إلى UUID_RE</td></tr>
+<tr><td class="mono"><span class="tag var">LONGHEX_RE</span></td><td class="mono"><a href="../src/fingerprint.html#L41">41</a></td><td class="mono">re.compile(&#x27;\\b[0-9a-fA-F]{12,}\\b&#x27;)</td><td>إسناد نتيجة استدعاء re.compile (معامل واحد) إلى LONGHEX_RE</td></tr>
+<tr><td class="mono"><span class="tag var">LONGNUM_RE</span></td><td class="mono"><a href="../src/fingerprint.html#L42">42</a></td><td class="mono">re.compile(&#x27;\\b\\d{4,}\\b&#x27;)</td><td>إسناد نتيجة استدعاء re.compile (معامل واحد) إلى LONGNUM_RE</td></tr>
+<tr><td class="mono"><span class="tag var">MAC_RE</span></td><td class="mono"><a href="../src/fingerprint.html#L43">43</a></td><td class="mono">re.compile(&#x27;\\b(?:[0-9a-fA-F]{2}[:-]){5}[0-9a-fA-F]{2}\\b&#x27;)</td><td>إسناد نتيجة استدعاء re.compile (معامل واحد) إلى MAC_RE</td></tr>
+<tr><td class="mono"><span class="tag var">TOKENLIKE_RE</span></td><td class="mono"><a href="../src/fingerprint.html#L46">46</a></td><td class="mono">re.compile(&#x27;[0-9A-Za-z]{6,}&#x27;)</td><td>إسناد نتيجة استدعاء re.compile (معامل واحد) إلى TOKENLIKE_RE</td></tr>
+<tr><td class="mono"><span class="tag var">HEXLIKE_RE</span></td><td class="mono"><a href="../src/fingerprint.html#L47">47</a></td><td class="mono">re.compile(&#x27;^[0-9a-fA-F]+$&#x27;)</td><td>إسناد نتيجة استدعاء re.compile (معامل واحد) إلى HEXLIKE_RE</td></tr>
+<tr><td class="mono"><span class="tag var">IP_RE</span></td><td class="mono"><a href="../src/fingerprint.html#L48">48</a></td><td class="mono">re.compile(&#x27;\\b\\d{1,3}(?:\\.\\d{1,3}){3}\\b&#x27;)</td><td>إسناد نتيجة استدعاء re.compile (معامل واحد) إلى IP_RE</td></tr>
+<tr><td class="mono"><span class="tag var">_PHRASE_CACHE</span></td><td class="mono"><a href="../src/fingerprint.html#L141">141</a></td><td class="mono">{}</td><td>إسناد قاموس إلى _PHRASE_CACHE</td></tr>
+</tbody></table></div>
+<h2 id="classes">الأصناف</h2>
+<div class="sym head" id="c-Verdict"><span class="tag mod">صنف</span> <b>Verdict</b> <a class="tag api" href="../src/fingerprint.html#L268">سطر 268</a><div>حكم واحد: code + reason + confidence + data + evidence. is_hit: أي كود يبدأ بـACCEPTED. is_final: مؤكد أو ثقة ≥0.85.</div></div>
+<div class="sym body">دواله: <a href="#f-Verdict.__init__"><code>__init__</code></a> · <a href="#f-Verdict.is_hit"><code>is_hit</code></a> · <a href="#f-Verdict.is_final"><code>is_final</code></a> · <a href="#f-Verdict.as_dict"><code>as_dict</code></a></div>
+<div class="sym head" id="c-Fingerprinter"><span class="tag mod">صنف</span> <b>Fingerprinter</b> <a class="tag api" href="../src/fingerprint.html#L296">سطر 296</a><div>تعريف الصنف Fingerprinter</div></div>
+<div class="sym body">دواله: <a href="#f-Fingerprinter.__init__"><code>__init__</code></a> · <a href="#f-Fingerprinter.learn"><code>learn</code></a> · <a href="#f-Fingerprinter.same_as_reject"><code>same_as_reject</code></a></div>
+<div class="sym head" id="c-Judge"><span class="tag mod">صنف</span> <b>Judge</b> <a class="tag api" href="../src/fingerprint.html#L405">سطر 405</a><div>تعريف الصنف Judge</div></div>
+<div class="sym body">دواله: <a href="#f-Judge.__init__"><code>__init__</code></a> · <a href="#f-Judge._has_any"><code>_has_any</code></a> · <a href="#f-Judge._has_phrase"><code>_has_phrase</code></a> · <a href="#f-Judge.classify"><code>classify</code></a></div>
+<h2 id="funcs">الدوال — واحدة واحدة</h2>
+<div class="sym head" id="f-visible_text"><span class="tag fn">دالة</span> <b>visible_text(body)</b>
+ <span class="muted">→ str</span>
+ <a class="tag api" href="../src/fingerprint.html#L54">سطر 54–61</a>
+<div>تعريف الدالة visible_text(body) ترجع str <span class="muted">(نص المؤلف الأصلي في docstring: What the guest actually sees: no &lt;script&gt;/&lt;style&gt;, no tags.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>text</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/fingerprint.html#f-Judge.classify"><code>Judge.classify</code></a> <span class="muted">(fingerprint.py:452)</span> <a href="../files/fingerprint.html#f-diff_words"><code>diff_words</code></a> <span class="muted">(fingerprint.py:121)</span> <a href="../files/fingerprint.html#f-diff_words.words"><code>diff_words.words</code></a> <span class="muted">(fingerprint.py:121)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-tokens"><span class="tag fn">دالة</span> <b>tokens(text)</b>
+ <span class="muted">→ list</span>
+ <a class="tag api" href="../src/fingerprint.html#L64">سطر 64–65</a>
+<div>تعريف الدالة tokens(text) ترجع list</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/fingerprint.html#f-differing_tokens"><code>differing_tokens</code></a> <span class="muted">(fingerprint.py:181)</span> <a href="../files/fingerprint.html#f-learn_dynamic"><code>learn_dynamic</code></a> <span class="muted">(fingerprint.py:251)</span> <a href="../files/fingerprint.html#f-learn_patterns"><code>learn_patterns</code></a> <span class="muted">(fingerprint.py:210)</span> <a href="../files/fingerprint.html#f-struct_tokens"><code>struct_tokens</code></a> <span class="muted">(fingerprint.py:104)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-_nonce_like"><span class="tag fn">دالة</span> <b>_nonce_like(tok)</b>
+ <span class="muted">→ bool</span>
+ <a class="tag api" href="../src/fingerprint.html#L68">سطر 68–73</a>
+<div>تعريف الدالة _nonce_like(tok) ترجع bool</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>has_alpha, has_digit</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/fingerprint.html#f-learn_patterns"><code>learn_patterns</code></a> <span class="muted">(fingerprint.py:211)</span> <a href="../files/fingerprint.html#f-mask_text"><code>mask_text</code></a> <span class="muted">(fingerprint.py:89)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-mask_text"><span class="tag fn">دالة</span> <b>mask_text(text, literals, generic, patterns)</b>
+ <span class="muted">→ str</span>
+ <a class="tag api" href="../src/fingerprint.html#L77">سطر 77–96</a>
+<div>يستبدل القيم المتغيّرة والأنماط المتعلَّمة بـ# حتى تصير المقارنة عادلة. <span class="muted">(نص المؤلف الأصلي في docstring: Replace values that legitimately change between two identical requests.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>out</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/fingerprint.html#f-_nonce_like"><code>_nonce_like</code></a><span class="muted">×1 سطر 89 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/fingerprint.html#f-Fingerprinter.learn"><code>Fingerprinter.learn</code></a> <span class="muted">(fingerprint.py:349)</span> <a href="../files/fingerprint.html#f-Fingerprinter.same_as_reject"><code>Fingerprinter.same_as_reject</code></a> <span class="muted">(fingerprint.py:385)</span> <a href="../files/fingerprint.html#f-learn_dynamic"><code>learn_dynamic</code></a> <span class="muted">(fingerprint.py:240)</span> <a href="../files/fingerprint.html#f-struct_tokens"><code>struct_tokens</code></a> <span class="muted">(fingerprint.py:102)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-struct_tokens"><span class="tag fn">دالة</span> <b>struct_tokens(text, literals, generic, patterns)</b>
+ <span class="muted">→ list</span>
+ <a class="tag api" href="../src/fingerprint.html#L100">سطر 100–109</a>
+<div>«شكل» الصفحة: تسلسل الرموز بعد تحويل كل رقم إلى # — للمقارنة التقريبية. <span class="muted">(نص المؤلف الأصلي في docstring: A shape-only view of the page, used when exact compare is impossible.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>masked, out</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/fingerprint.html#f-mask_text"><code>mask_text</code></a><span class="muted">×1 سطر 102 (نفس الملف)</span> · <a href="../files/fingerprint.html#f-tokens"><code>tokens</code></a><span class="muted">×1 سطر 104 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/fingerprint.html#f-Fingerprinter.learn"><code>Fingerprinter.learn</code></a> <span class="muted">(fingerprint.py:356)</span> <a href="../files/fingerprint.html#f-Fingerprinter.same_as_reject"><code>Fingerprinter.same_as_reject</code></a> <span class="muted">(fingerprint.py:390)</span> <a href="../files/fingerprint.html#f-Fingerprinter.same_as_reject"><code>Fingerprinter.same_as_reject</code></a> <span class="muted">(fingerprint.py:397)</span> <a href="../files/fingerprint.html#f-Fingerprinter.same_as_reject"><code>Fingerprinter.same_as_reject</code></a> <span class="muted">(fingerprint.py:398)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-ratio"><span class="tag fn">دالة</span> <b>ratio(a, b)</b>
+ <span class="muted">→ float</span>
+ <a class="tag api" href="../src/fingerprint.html#L112">سطر 112–115</a>
+<div>تعريف الدالة ratio(a, b) ترجع float</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/fingerprint.html#f-Fingerprinter.same_as_reject"><code>Fingerprinter.same_as_reject</code></a> <span class="muted">(fingerprint.py:390)</span> <a href="../files/fingerprint.html#f-Fingerprinter.same_as_reject"><code>Fingerprinter.same_as_reject</code></a> <span class="muted">(fingerprint.py:397)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-diff_words"><span class="tag fn">دالة</span> <b>diff_words(page, reference, limit)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/fingerprint.html#L118">سطر 118–127</a>
+<div>تعريف الدالة diff_words(page, reference, limit) ترجع dict <span class="muted">(نص المؤلف الأصلي في docstring: Words that appear in `page` but not in `reference`, and vice-versa.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/fingerprint.html#f-diff_words.words"><code>diff_words.words</code></a><span class="muted">×2 سطر 123 (نفس الملف)</span> · <a href="../files/fingerprint.html#f-visible_text"><code>visible_text</code></a><span class="muted">×1 سطر 121 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-_new_words"><code>_new_words</code></a> <span class="muted">(engine.py:981)</span> <a href="../files/fingerprint.html#f-Judge.classify"><code>Judge.classify</code></a> <span class="muted">(fingerprint.py:562)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-diff_words.words"><span class="tag fn">دالة</span> <b>diff_words.words(t)</b>
+ <a class="tag api" href="../src/fingerprint.html#L120">سطر 120–121</a>
+<div>تعريف الدالة words(t)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/fingerprint.html#f-visible_text"><code>visible_text</code></a><span class="muted">×1 سطر 121 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/fingerprint.html#f-diff_words"><code>diff_words</code></a> <span class="muted">(fingerprint.py:123)</span> <a href="../files/fingerprint.html#f-diff_words"><code>diff_words</code></a> <span class="muted">(fingerprint.py:123)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-sha"><span class="tag fn">دالة</span> <b>sha(text)</b>
+ <span class="muted">→ str</span>
+ <a class="tag api" href="../src/fingerprint.html#L130">سطر 130–131</a>
+<div>تعريف الدالة sha(text) ترجع str</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/fingerprint.html#f-Fingerprinter.learn"><code>Fingerprinter.learn</code></a> <span class="muted">(fingerprint.py:353)</span> <a href="../files/fingerprint.html#f-Fingerprinter.same_as_reject"><code>Fingerprinter.same_as_reject</code></a> <span class="muted">(fingerprint.py:387)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-_phrase_re"><span class="tag fn">دالة</span> <b>_phrase_re(phrase)</b>
+ <a class="tag api" href="../src/fingerprint.html#L144">سطر 144–150</a>
+<div>تعريف الدالة _phrase_re(phrase)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>pat</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/fingerprint.html#f-find_phrase"><code>find_phrase</code></a> <span class="muted">(fingerprint.py:158)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-find_phrase"><span class="tag fn">دالة</span> <b>find_phrase(haystack, phrases)</b>
+ <span class="muted">→ str</span>
+ <a class="tag api" href="../src/fingerprint.html#L153">سطر 153–160</a>
+<div>تعريف الدالة find_phrase(haystack, phrases) ترجع str <span class="muted">(نص المؤلف الأصلي في docstring: -&gt; the first whole-word phrase found in `haystack`, else &#x27;&#x27;.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/fingerprint.html#f-_phrase_re"><code>_phrase_re</code></a><span class="muted">×1 سطر 158 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-_is_protective_reply"><code>_is_protective_reply</code></a> <span class="muted">(engine.py:367)</span> <a href="../files/engine.html#f-_tune_with_known_card"><code>_tune_with_known_card</code></a> <span class="muted">(engine.py:863)</span> <a href="../files/engine.html#f-_tune_with_known_card"><code>_tune_with_known_card</code></a> <span class="muted">(engine.py:864)</span> <a href="../files/engine.html#f-calibrate"><code>calibrate</code></a> <span class="muted">(engine.py:524)</span> <a href="../files/fingerprint.html#f-Judge._has_phrase"><code>Judge._has_phrase</code></a> <span class="muted">(fingerprint.py:443)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-differing_tokens"><span class="tag fn">دالة</span> <b>differing_tokens(a, b, limit)</b>
+ <span class="muted">→ list</span>
+ <a class="tag api" href="../src/fingerprint.html#L166">سطر 166–187</a>
+<div>تعريف الدالة differing_tokens(a, b, limit) ترجع list <span class="muted">(نص المؤلف الأصلي في docstring: Raw list of the values that change between two same-shape replies.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>3 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>sm</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/fingerprint.html#f-tokens"><code>tokens</code></a><span class="muted">×1 سطر 181 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/fingerprint.html#f-Fingerprinter.learn"><code>Fingerprinter.learn</code></a> <span class="muted">(fingerprint.py:346)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-learn_patterns"><span class="tag fn">دالة</span> <b>learn_patterns(samples, max_patterns)</b>
+ <span class="muted">→ list</span>
+ <a class="tag api" href="../src/fingerprint.html#L191">سطر 191–222</a>
+<div>يحوّل القيم المتغيّرة إلى أنماط عامة بدل حفظ كل قيمة على حدة. <span class="muted">(نص المؤلف الأصلي في docstring: Turn &quot;this span changes&quot; into &quot;a token like this changes&quot;.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>3 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>base, pattern, samples, sm</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/fingerprint.html#f-tokens"><code>tokens</code></a><span class="muted">×1 سطر 210 (نفس الملف)</span> · <a href="../files/fingerprint.html#f-_nonce_like"><code>_nonce_like</code></a><span class="muted">×1 سطر 211 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/fingerprint.html#f-Fingerprinter.learn"><code>Fingerprinter.learn</code></a> <span class="muted">(fingerprint.py:344)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-learn_dynamic"><span class="tag fn">دالة</span> <b>learn_dynamic(samples, rounds)</b>
+ <span class="muted">→ set</span>
+ <a class="tag api" href="../src/fingerprint.html#L226">سطر 226–260</a>
+<div>يكتشف القيم التي تتغير وحدها بين ردّين متطابقين (رمز جلسة، وقت، صدى البطاقة). <span class="muted">(نص المؤلف الأصلي في docstring: Return the literal values that differ between two same-shape replies.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>base, gained, literals, masked, samples, sm</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/store.html#f-Store.all"><code>Store.all</code></a><span class="muted">×1 سطر 241</span> · <a href="../files/fingerprint.html#f-mask_text"><code>mask_text</code></a><span class="muted">×1 سطر 240 (نفس الملف)</span> · <a href="../files/fingerprint.html#f-tokens"><code>tokens</code></a><span class="muted">×1 سطر 251 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/fingerprint.html#f-Fingerprinter.learn"><code>Fingerprinter.learn</code></a> <span class="muted">(fingerprint.py:343)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Verdict.__init__"><span class="tag fn">دالة</span> <b>Verdict.__init__(self, code, reason, confidence, data, evidence)</b>
+ <a class="tag api" href="../src/fingerprint.html#L273">سطر 273–278</a>
+<div>تعريف الدالة __init__(self, code, reason, confidence, data, evidence)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>يُسند إلى</th><td><code>self.code, self.confidence, self.data, self.evidence, self.reason</code></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Verdict.is_hit"><span class="tag fn">دالة</span> <b>Verdict.is_hit(self)</b>
+ <span class="muted">→ bool</span>
+ <span class="tag var">@property</span>
+ <a class="tag api" href="../src/fingerprint.html#L281">سطر 281–282</a>
+<div>تعريف الدالة is_hit(self) ترجع bool</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Verdict.is_final"><span class="tag fn">دالة</span> <b>Verdict.is_final(self)</b>
+ <span class="muted">→ bool</span>
+ <span class="tag var">@property</span>
+ <a class="tag api" href="../src/fingerprint.html#L285">سطر 285–288</a>
+<div>تعريف الدالة is_final(self) ترجع bool <span class="muted">(نص المؤلف الأصلي في docstring: High-confidence hits stop the run; UNKNOWN never does.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Verdict.as_dict"><span class="tag fn">دالة</span> <b>Verdict.as_dict(self)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/fingerprint.html#L290">سطر 290–293</a>
+<div>تعريف الدالة as_dict(self) ترجع dict</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Fingerprinter.__init__"><span class="tag fn">دالة</span> <b>Fingerprinter.__init__(self)</b>
+ <a class="tag api" href="../src/fingerprint.html#L299">سطر 299–314</a>
+<div>تعريف الدالة __init__(self)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>يُسند إلى</th><td><code>self.dynamic_count, self.exact, self.literals, self.login_text, self.note, self.patterns, self.reject_len, self.reject_location_key, self.reject_masked_sha, self.reject_status, self.reject_text, self.reject_tokens, self.samples</code></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Fingerprinter.learn"><span class="tag fn">دالة</span> <b>Fingerprinter.learn(cls, reject_replies, login_reply)</b>
+ <span class="muted">→ &#x27;Fingerprinter&#x27;</span>
+ <span class="tag var">@classmethod</span>
+ <a class="tag api" href="../src/fingerprint.html#L320">سطر 320–359</a>
+<div>يبني «شكل صفحة الرفض» من ردود بطاقات خاطئة جيدة الصيغة. عيّنة فاشلة شبكياً تصل None فتُستبعد ولا تكسر التعلّم. <span class="muted">(نص المؤلف الأصلي في docstring: `reject_replies` = list of Replies to wrong-but-well-formed cards.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>bodies, dynamic_count, exact, fp, literals, locs, login_text, masked, note, patterns, reject_len, reject_location_key, reject_masked_sha, reject_status, reject_text, reject_tokens…</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/store.html#f-Store.all"><code>Store.all</code></a><span class="muted">×2 سطر 351</span> · <a href="../files/fingerprint.html#f-learn_dynamic"><code>learn_dynamic</code></a><span class="muted">×1 سطر 343 (نفس الملف)</span> · <a href="../files/fingerprint.html#f-learn_patterns"><code>learn_patterns</code></a><span class="muted">×1 سطر 344 (نفس الملف)</span> · <a href="../files/fingerprint.html#f-mask_text"><code>mask_text</code></a><span class="muted">×1 سطر 349 (نفس الملف)</span> · <a href="../files/fingerprint.html#f-sha"><code>sha</code></a><span class="muted">×1 سطر 353 (نفس الملف)</span> · <a href="../files/fingerprint.html#f-struct_tokens"><code>struct_tokens</code></a><span class="muted">×1 سطر 356 (نفس الملف)</span> · <a href="../files/fingerprint.html#f-_loc_key"><code>_loc_key</code></a><span class="muted">×1 سطر 341 (نفس الملف)</span> · <a href="../files/fingerprint.html#f-differing_tokens"><code>differing_tokens</code></a><span class="muted">×1 سطر 346 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Fingerprinter.same_as_reject"><span class="tag fn">دالة</span> <b>Fingerprinter.same_as_reject(self, resp, extra_literals)</b>
+ <span class="muted">→ tuple</span>
+ <a class="tag api" href="../src/fingerprint.html#L364">سطر 364–402</a>
+<div>-- المقارنة ------------------------------------------------------- المقارنة بثلاث درجات: exact (SHA بعد الإخفاء) ← shape ← similar. الردّان الفارغان لا يعنيان تطابقاً: يُقارن مفتاح التحويل ثم الحالة. <span class="muted">(نص المؤلف الأصلي في docstring: -&gt; (is_rejected, how, similarity))</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>8 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>body, literals, masked, same, sim</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/fingerprint.html#f-struct_tokens"><code>struct_tokens</code></a><span class="muted">×3 سطر 397 (نفس الملف)</span> · <a href="../files/fingerprint.html#f-ratio"><code>ratio</code></a><span class="muted">×2 سطر 397 (نفس الملف)</span> · <a href="../files/fingerprint.html#f-mask_text"><code>mask_text</code></a><span class="muted">×1 سطر 385 (نفس الملف)</span> · <a href="../files/fingerprint.html#f-sha"><code>sha</code></a><span class="muted">×1 سطر 387 (نفس الملف)</span> · <a href="../files/fingerprint.html#f-_loc_key"><code>_loc_key</code></a><span class="muted">×1 سطر 379 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/fingerprint.html#f-Judge.classify"><code>Judge.classify</code></a> <span class="muted">(fingerprint.py:482)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Judge.__init__"><span class="tag fn">دالة</span> <b>Judge.__init__(self, fingerprint, login_url, success_words, success_url_contains, exit_host_markers)</b>
+ <a class="tag api" href="../src/fingerprint.html#L408">سطر 408–429</a>
+<div>تعريف الدالة __init__(self, fingerprint, login_url, success_words, success_url_contains, exit_host_markers)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>يُسند إلى</th><td><code>login_text, reject_text, self.accept_phrases, self.exit_markers, self.fp, self.login_url, self.portal_host, self.reject_phrases, self.success_url_contains, self.success_words</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/fingerprint.html#f-_host"><code>_host</code></a><span class="muted">×1 سطر 416 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Judge._has_any"><span class="tag fn">دالة</span> <b>Judge._has_any(haystack, needles)</b>
+ <span class="muted">→ str</span>
+ <span class="tag var">@staticmethod</span>
+ <a class="tag api" href="../src/fingerprint.html#L433">سطر 433–438</a>
+<div>تعريف الدالة _has_any(haystack, needles) ترجع str <span class="muted">(نص المؤلف الأصلي في docstring: Loose (substring) match - for words the user gave us himself.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/fingerprint.html#f-Judge.classify"><code>Judge.classify</code></a> <span class="muted">(fingerprint.py:518)</span> <a href="../files/fingerprint.html#f-Judge.classify"><code>Judge.classify</code></a> <span class="muted">(fingerprint.py:519)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Judge._has_phrase"><span class="tag fn">دالة</span> <b>Judge._has_phrase(haystack, needles)</b>
+ <span class="muted">→ str</span>
+ <span class="tag var">@staticmethod</span>
+ <a class="tag api" href="../src/fingerprint.html#L441">سطر 441–443</a>
+<div>تعريف الدالة _has_phrase(haystack, needles) ترجع str <span class="muted">(نص المؤلف الأصلي في docstring: Whole-word match - for the built-in reject/accept/ban phrases.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/fingerprint.html#f-find_phrase"><code>find_phrase</code></a><span class="muted">×1 سطر 443 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/fingerprint.html#f-Judge.classify"><code>Judge.classify</code></a> <span class="muted">(fingerprint.py:462)</span> <a href="../files/fingerprint.html#f-Judge.classify"><code>Judge.classify</code></a> <span class="muted">(fingerprint.py:463)</span> <a href="../files/fingerprint.html#f-Judge.classify"><code>Judge.classify</code></a> <span class="muted">(fingerprint.py:545)</span> <a href="../files/fingerprint.html#f-Judge.classify"><code>Judge.classify</code></a> <span class="muted">(fingerprint.py:555)</span> <a href="../files/fingerprint.html#f-Judge.classify"><code>Judge.classify</code></a> <span class="muted">(fingerprint.py:556)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Judge.classify"><span class="tag fn">دالة</span> <b>Judge.classify(self, resp, submitted)</b>
+ <span class="muted">→ Verdict</span>
+ <a class="tag api" href="../src/fingerprint.html#L450">سطر 450–571</a>
+<div>-- القرار ---------------------------------------------------- قلب الأداة: ردّ واحد ⇒ حكم واحد. الترتيب هو القرار: (1) الحجب/الكابتشا (2) مطابقة صفحة الرفض (3) الأدلة الإيجابية: تحويل خارج البوابة، كلمات نجاح، رابط نجاح (4) UNKNOWN لكل ما لا يُثبت. لا يُسمّى شيء نجاحاً بلا دليل.</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>16 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>accept_hit, ban, body, confident, diff, host, loc, low, marker, raw_low, reject_hit, seen, seen_ok, sub, text</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/fingerprint.html#f-Verdict"><code>Verdict</code></a><span class="muted">×16 سطر 568 (نفس الملف)</span> · <a href="../files/fingerprint.html#f-Judge._has_phrase"><code>Judge._has_phrase</code></a><span class="muted">×5 سطر 555 (نفس الملف)</span> · <a href="../files/fingerprint.html#f-_host"><code>_host</code></a><span class="muted">×2 سطر 489 (نفس الملف)</span> · <a href="../files/fingerprint.html#f-Judge._has_any"><code>Judge._has_any</code></a><span class="muted">×2 سطر 518 (نفس الملف)</span> · <a href="../files/fingerprint.html#f-visible_text"><code>visible_text</code></a><span class="muted">×1 سطر 452 (نفس الملف)</span> · <a href="../files/fingerprint.html#f-Fingerprinter.same_as_reject"><code>Fingerprinter.same_as_reject</code></a><span class="muted">×1 سطر 482 (نفس الملف)</span> · <a href="../files/fingerprint.html#f-diff_words"><code>diff_words</code></a><span class="muted">×1 سطر 562 (نفس الملف)</span> · <a href="../files/fingerprint.html#f-_loc_key"><code>_loc_key</code></a><span class="muted">×1 سطر 534 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-_loc_key"><span class="tag fn">دالة</span> <b>_loc_key(url)</b>
+ <span class="muted">→ tuple</span>
+ <a class="tag api" href="../src/fingerprint.html#L574">سطر 574–589</a>
+<div>تعريف الدالة _loc_key(url) ترجع tuple <span class="muted">(نص المؤلف الأصلي في docstring: The stable part of a redirect target: scheme + host + path.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>3 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>parts</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/fingerprint.html#f-Fingerprinter.learn"><code>Fingerprinter.learn</code></a> <span class="muted">(fingerprint.py:341)</span> <a href="../files/fingerprint.html#f-Fingerprinter.same_as_reject"><code>Fingerprinter.same_as_reject</code></a> <span class="muted">(fingerprint.py:379)</span> <a href="../files/fingerprint.html#f-Judge.classify"><code>Judge.classify</code></a> <span class="muted">(fingerprint.py:534)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-_host"><span class="tag fn">دالة</span> <b>_host(url)</b>
+ <span class="muted">→ str</span>
+ <a class="tag api" href="../src/fingerprint.html#L592">سطر 592–597</a>
+<div>تعريف الدالة _host(url) ترجع str</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/fingerprint.html#f-Judge.__init__"><code>Judge.__init__</code></a> <span class="muted">(fingerprint.py:416)</span> <a href="../files/fingerprint.html#f-Judge.classify"><code>Judge.classify</code></a> <span class="muted">(fingerprint.py:489)</span> <a href="../files/fingerprint.html#f-Judge.classify"><code>Judge.classify</code></a> <span class="muted">(fingerprint.py:516)</span></td></tr>
+</table></div>
+<footer class="docfoot">صفحة مولّدة آلياً من مصدر الكود · KiraPass —
+<code>files</code> · 2026-10-01 02:26</footer>
+</main>
+</div>
+<script src="../assets/docs.js"></script>
+<script>KPInit("files");</script>
+</body>
+</html>

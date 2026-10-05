@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ملف cli.py · KiraPass</title>
+<link rel="stylesheet" href="../assets/docs.css">
+
+</head>
+<body>
+<div id="kp-layout">
+<main class="doc">
+<h1>ملف <code>cli.py</code></h1>
+<p class="lead">سطر الأوامر: الخيارات، الطباعة، تشغيل السيرفر — <code>kirapass/cli.py</code></p>
+<div class="card info"><b>هذه الصفحة مولّدة آلياً</b> من مصدر الكود مباشرة (<code>tools/docs/build_docs.py</code>). إن غيّرت الكود فأعد توليدها: <code>python3 tools/docs/build_docs.py</code>. الشرح اليدوي الأوسع في <a href="../architecture.html">المعمارية</a> و<a href="../editing.html">دليل التعديل</a> و<a href="../danger.html">أماكن الخطر</a>.</div>
+<div class="grid3"><div class="card"><b>196</b><br>سطراً</div><div class="card"><b>8</b><br>دالة</div><div class="card"><b>0</b><br>صنف</div></div>
+<div class="note"><b>ملخّص المؤلف للملف (نصه الأصلي بالإنجليزية):</b> <span class="muted">Command line entry point.</span></div>
+<p><a class="btn primary" href="../src/cli.html">افتح المصدر كاملاً مرقّماً</a></p>
+<h2 id="imports">الاستيرادات</h2><table class="t compact"><thead><tr><th>السطر</th><th>الاستيراد</th><th>لماذا</th></tr></thead><tbody>
+<tr><td class="mono">9</td><td class="mono">from __future__ import annotations</td><td>استيراد annotations من الوحدة __future__</td></tr>
+<tr><td class="mono">11</td><td class="mono">import argparse</td><td>استيراد الوحدة argparse من المكتبة</td></tr>
+<tr><td class="mono">12</td><td class="mono">import os</td><td>استيراد الوحدة os من المكتبة</td></tr>
+<tr><td class="mono">13</td><td class="mono">import secrets</td><td>استيراد الوحدة secrets من المكتبة</td></tr>
+<tr><td class="mono">14</td><td class="mono">import socket</td><td>استيراد الوحدة socket من المكتبة</td></tr>
+<tr><td class="mono">15</td><td class="mono">import sys</td><td>استيراد الوحدة sys من المكتبة</td></tr>
+<tr><td class="mono">16</td><td class="mono">import webbrowser</td><td>استيراد الوحدة webbrowser من المكتبة</td></tr>
+<tr><td class="mono">18</td><td class="mono">from . import config, store</td><td>استيراد config, store من الوحدة .</td></tr>
+<tr><td class="mono">19</td><td class="mono">from .httpclient import local_ip</td><td>استيراد local_ip من الوحدة httpclient</td></tr>
+</tbody></table>
+<h2 id="funcs">الدوال — واحدة واحدة</h2>
+<div class="sym head" id="f-build_parser"><span class="tag fn">دالة</span> <b>build_parser()</b>
+ <span class="muted">→ argparse.ArgumentParser</span>
+ <a class="tag api" href="../src/cli.html#L22">سطر 22–49</a>
+<div>تعريف الدالة build_parser() ترجع argparse.ArgumentParser</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>p</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/cli.html#f-main"><code>main</code></a> <span class="muted">(cli.py:134)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-banner"><span class="tag fn">دالة</span> <b>banner(url, lan, token)</b>
+ <span class="muted">→ str</span>
+ <a class="tag api" href="../src/cli.html#L52">سطر 52–72</a>
+<div>تعريف الدالة banner(url, lan, token) ترجع str</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>bar, lines</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/cli.html#f-main"><code>main</code></a> <span class="muted">(cli.py:180)</span> <a href="../files/cli.html#f-main.on_ready"><code>main.on_ready</code></a> <span class="muted">(cli.py:180)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-free_port"><span class="tag fn">دالة</span> <b>free_port(host, wanted, tries)</b>
+ <span class="muted">→ int</span>
+ <a class="tag api" href="../src/cli.html#L75">سطر 75–84</a>
+<div>تعريف الدالة free_port(host, wanted, tries) ترجع int</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/cli.html#f-main"><code>main</code></a> <span class="muted">(cli.py:151)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-cmd_clear_cache"><span class="tag fn">دالة</span> <b>cmd_clear_cache(scope)</b>
+ <span class="muted">→ int</span>
+ <a class="tag api" href="../src/cli.html#L87">سطر 87–96</a>
+<div>تعريف الدالة cmd_clear_cache(scope) ترجع int</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>info, result, st</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/store.html#f-Store"><code>Store</code></a><span class="muted">×1 سطر 88</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/cli.html#f-main"><code>main</code></a> <span class="muted">(cli.py:142)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-cmd_check"><span class="tag fn">دالة</span> <b>cmd_check()</b>
+ <span class="muted">→ int</span>
+ <a class="tag api" href="../src/cli.html#L99">سطر 99–121</a>
+<div>تعريف الدالة cmd_check() ترجع int</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>3 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>probe</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/store.html#f-ensure_dirs"><code>ensure_dirs</code></a><span class="muted">×1 سطر 103</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/cli.html#f-main"><code>main</code></a> <span class="muted">(cli.py:140)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-cmd_selftest"><span class="tag fn">دالة</span> <b>cmd_selftest()</b>
+ <span class="muted">→ int</span>
+ <a class="tag api" href="../src/cli.html#L124">سطر 124–128</a>
+<div>تعريف الدالة cmd_selftest() ترجع int</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>summary</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/selftest.html#f-run_all"><code>run_all</code></a><span class="muted">×1 سطر 127</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/cli.html#f-main"><code>main</code></a> <span class="muted">(cli.py:144)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-main"><span class="tag fn">دالة</span> <b>main(argv)</b>
+ <span class="muted">→ int</span>
+ <a class="tag api" href="../src/cli.html#L133">سطر 133–195</a>
+<div>يحلّل سطر الأوامر ثم يشغّل السيرفر ويطبع الرابط والرمز. --host 0.0.0.0 يطبع تحذيراً: الرمز يُرسل بلا TLS على شبكة محلية.</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>6 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>args, base_local, host, port, query, shown, st, token</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/store.html#f-Store"><code>Store</code></a><span class="muted">×1 سطر 146</span> · <a href="../files/cli.html#f-free_port"><code>free_port</code></a><span class="muted">×1 سطر 151 (نفس الملف)</span> · <a href="../files/cli.html#f-cmd_check"><code>cmd_check</code></a><span class="muted">×1 سطر 140 (نفس الملف)</span> · <a href="../files/cli.html#f-cmd_clear_cache"><code>cmd_clear_cache</code></a><span class="muted">×1 سطر 142 (نفس الملف)</span> · <a href="../files/cli.html#f-cmd_selftest"><code>cmd_selftest</code></a><span class="muted">×1 سطر 144 (نفس الملف)</span> · <a href="../files/server.html#f-serve"><code>serve</code></a><span class="muted">×1 سطر 188</span> · <a href="../files/cli.html#f-build_parser"><code>build_parser</code></a><span class="muted">×1 سطر 134 (نفس الملف)</span> · <a href="../files/cli.html#f-banner"><code>banner</code></a><span class="muted">×1 سطر 180 (نفس الملف)</span> · <a href="../files/httpclient.html#f-local_ip"><code>local_ip</code></a><span class="muted">×1 سطر 179</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-main.on_ready"><span class="tag fn">دالة</span> <b>main.on_ready(real_port, real_token)</b>
+ <a class="tag api" href="../src/cli.html#L173">سطر 173–185</a>
+<div>تعريف الدالة on_ready(real_port, real_token)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>يُسند إلى</th><td><code>base_local, query</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/cli.html#f-banner"><code>banner</code></a><span class="muted">×1 سطر 180 (نفس الملف)</span> · <a href="../files/httpclient.html#f-local_ip"><code>local_ip</code></a><span class="muted">×1 سطر 179</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/server.html#f-serve"><code>serve</code></a> <span class="muted">(server.py:688)</span></td></tr>
+</table></div>
+<footer class="docfoot">صفحة مولّدة آلياً من مصدر الكود · KiraPass —
+<code>files</code> · 2026-10-01 02:26</footer>
+</main>
+</div>
+<script src="../assets/docs.js"></script>
+<script>KPInit("files");</script>
+</body>
+</html>

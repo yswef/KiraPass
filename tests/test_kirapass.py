@@ -9,16 +9,21 @@ local mock routers, so no real network is touched.
 
 from __future__ import annotations
 
+import json
 import os
+import re
+from pathlib import Path
 import shutil
 import sys
 import tempfile
 import time
 import unittest
+from html.parser import HTMLParser
+from urllib.parse import parse_qsl, urlsplit
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from kirapass import (config, engine, fingerprint, httpclient,  # noqa: E402
+from kirapass import (capture, config, engine, fingerprint, httpclient,  # noqa: E402
                      portals, selftest, store)
 from kirapass.mockportal import MockPortal                                     # noqa: E402
 
@@ -54,6 +59,41 @@ for _fn in selftest.SCENARIOS:
 # ---------------------------------------------------------------------------
 # units
 # ---------------------------------------------------------------------------
+class UIIntegrityTests(unittest.TestCase):
+    def test_ui_ids_are_unique_and_static_translations_exist(self):
+        root = Path(__file__).resolve().parents[1]
+        html = (root / "kirapass" / "web" / "ui.html").read_text(encoding="utf-8")
+        js = (root / "kirapass" / "web" / "ui.js").read_text(encoding="utf-8")
+
+        class Markup(HTMLParser):
+            def __init__(self):
+                super().__init__()
+                self.ids, self.keys = [], []
+
+            def handle_starttag(self, tag, attrs):
+                attrs = dict(attrs)
+                if attrs.get("id"):
+                    self.ids.append(attrs["id"])
+                if attrs.get("data-i18n"):
+                    self.keys.append(attrs["data-i18n"])
+
+        markup = Markup()
+        markup.feed(html)
+        duplicates = sorted({item for item in markup.ids
+                             if markup.ids.count(item) > 1})
+        self.assertEqual(duplicates, [], "duplicate DOM ids break UI wiring")
+        missing = [key for key in set(markup.keys)
+                   if len(re.findall(r"\b" + re.escape(key) + r"\s*:", js)) < 2]
+        self.assertEqual(sorted(missing), [],
+                         "every static label needs Arabic and English text")
+        scan_panel = html.index('id="panel-scan"')
+        format_panel = html.index('id="panel-format"')
+        self.assertLess(html.index('id="calibrateBtn"'), format_panel)
+        self.assertGreater(html.index('id="calibrateBtn"'), scan_panel)
+        self.assertIn("S.calibrationReady", js)
+        self.assertIn("preflight_only: true", js)
+
+
 class MaskingTests(unittest.TestCase):
     def test_dynamic_tokens_are_detected_and_masked(self):
         a = "<html>session abc123def456 card 0201242548</html>"
@@ -80,6 +120,14 @@ class MaskingTests(unittest.TestCase):
         judge = fingerprint.Judge(fp, "http://portal/login")
         v = judge.classify(_FakeReply(ban, status=403))
         self.assertIn(v.code, ("BANNED", "RATE_LIMITED"), v.as_dict())
+
+    def test_arabic_ban_phrase_is_detected(self):
+        from kirapass import config
+        page = "<html><body><h1>تم حظرك</h1><p>جهازك محظور مؤقتا</p></body></html>"
+        self.assertTrue(fingerprint.find_phrase(page.lower(), config.BAN_WORDS))
+        # French phrase too
+        fr = "<html><body>trop de tentatives de connexion</body></html>"
+        self.assertTrue(fingerprint.find_phrase(fr.lower(), config.BAN_WORDS))
 
     def test_a_redirect_inside_the_portal_is_not_a_hit(self):
         """Some routers bounce you between their own pages - every bounce
@@ -151,6 +199,15 @@ class PortalFormTests(unittest.TestCase):
         # a named submit button is not data we should replay
         self.assertNotIn("connect", form.extra_fields)
         self.assertNotIn("go", form.extra_fields)
+
+    def test_a_copied_get_submission_is_recognised_without_a_form(self):
+        url = "http://a.com/login?username=2934664754&password=&dst=%2F"
+        form = portals.parse_form("<html>please wait</html>", url)
+        self.assertEqual(form.method, "get")
+        self.assertEqual(form.user_field, "username")
+        self.assertEqual(form.pass_field, "password")
+        self.assertEqual(form.dst_field, "dst")
+        self.assertEqual(form.dst_value, "/")
 
     def test_buttons_are_never_sent_as_fixed_fields(self):
         html = """<html><form action="/login" method="post">
@@ -244,51 +301,32 @@ class RedirectPortalTests(unittest.TestCase):
 
 
 class BlockRecoveryTests(unittest.TestCase):
-    """A router that locks a device after N failed logins.
+    """Explicit router lockouts stop calibration and runs without retries."""
 
-    The learning cards are failed logins too, so three of them can fill the
-    counter on their own - the tool must notice that it caused the lockout,
-    wait for it to clear, and try again with fewer cards.
-    """
-
-    def test_the_lockout_is_waited_out_and_the_run_starts(self):
-        from unittest import mock
-        # two failures are enough for this router, and three learning cards
-        # are three failures - the third one gets the block page
+    def test_calibration_lockout_stops_without_waiting_or_retrying(self):
         with MockPortal(valid_cards={"020124042"}, pass_mode="empty",
                         ban_after=2, ban_seconds=2) as portal:
             info = selftest.scan(portal.url)
             p = selftest.make_profile(portal.url, prefix="020", length=9,
                                       portal_info=info)
-            # three learning cards -> the router's counter is full before any
-            # real attempt was made
-            cal = engine.calibrate(p, checks=selftest.mock_checks(portal))
-            self.assertFalse(cal.ok, cal.as_dict())
-            self.assertEqual(cal.error, "blocked_already")
-            self.assertTrue(
-                any(s["reason"] == "blocked_by_our_probes" for s in cal.steps),
-                cal.steps)
-            self.assertTrue(engine.block_caused_by_probes(cal))
+            eng = engine.Engine(store.Store(), persist=False,
+                               checks=selftest.mock_checks(portal))
+            eng.start(p, attempts=20, threads=2, delay_ms=0)
+            deadline = time.time() + 10
+            while time.time() < deadline and eng.state != "done":
+                time.sleep(0.05)
 
-            # and the engine waits the lockout out, then relearns with two
-            with mock.patch.object(config, "BLOCK_WAIT_SECONDS", 3), \
-                    mock.patch.object(config, "CALIBRATION_PROBES_RETRY", 2):
-                eng = engine.Engine(store.Store(), persist=False,
-                                  checks=selftest.mock_checks(portal))
-                eng.start(p, attempts=20, threads=2, delay_ms=0)
-                deadline = time.time() + 60
-                while time.time() < deadline and eng.state not in ("running", "done"):
-                    time.sleep(0.1)
-                eng.stop("test_done")
-                while time.time() < deadline and eng.state != "done":
-                    time.sleep(0.1)
-            self.assertNotEqual(eng.stop_reason, "calibration_failed",
-                                eng.calibration)
-            self.assertEqual(eng.calibration.get("ok"), True)
-            baseline = [s for s in eng.calibration.get("steps", [])
-                        if s["id"] == "rejection_baseline"]
-            self.assertTrue(baseline, eng.calibration)
-            self.assertLessEqual(baseline[0]["detail"]["samples"], 2)
+            self.assertEqual(eng.state, "done")
+            self.assertEqual(eng.stop_reason, "calibration_failed")
+            self.assertEqual(eng.calibration.get("error"), "blocked_already",
+                             eng.calibration)
+            self.assertEqual(eng.calibration.get("ok"), False)
+            self.assertTrue(any(step.get("reason") == "blocked_by_our_probes"
+                                for step in eng.calibration.get("steps", [])))
+            self.assertEqual(eng.progress.get("attempts", 0), 0)
+            # It stops on the second request that returns the block page;
+            # there is no third probe and no second calibration cycle.
+            self.assertEqual(portal.state.logins, 2)
 
     def test_a_block_that_was_already_there_is_not_our_fault(self):
         with MockPortal(valid_cards={"020124042"}, pass_mode="empty",
@@ -377,6 +415,23 @@ class BlockFalsePositiveTests(unittest.TestCase):
         self.assertEqual(sess.request.call_count, 0)
 
 
+class NetworkFailureGuardTests(unittest.TestCase):
+    def test_transport_error_burst_stops_promptly_without_reconnect(self):
+        eng = engine.Engine(store.Store(), persist=False)
+        for _ in range(config.CONSECUTIVE_TRANSPORT_FAILURE_LIMIT - 1):
+            eng._record_transport_health("connect_timeout")
+        self.assertFalse(eng.stop_event.is_set())
+
+        # A real HTTP response proves the route is reachable and breaks the
+        # consecutive-failure streak; the tool must not infer a MAC/IP ban.
+        eng._record_transport_health()
+        self.assertFalse(eng.stop_event.is_set())
+        for _ in range(config.CONSECUTIVE_TRANSPORT_FAILURE_LIMIT):
+            eng._record_transport_health("connect_timeout")
+        self.assertTrue(eng.stop_event.is_set())
+        self.assertEqual(eng.stop_reason, "target_unreachable")
+
+
 class InternetWatchdogTests(unittest.TestCase):
     """The nastiest real case: the router logs the guest in and still answers
     with the rejection page, so no verdict ever looks like a hit.  The only
@@ -412,7 +467,6 @@ class InternetWatchdogTests(unittest.TestCase):
 
     def test_cards_the_router_refused_to_judge_are_not_counted_as_covered(self):
         """A block page is not an answer: that card is still untested."""
-        from unittest import mock
         # bans start after five failures, so the learning is clean and the
         # lockout hits in the middle of the run
         with MockPortal(valid_cards={"020124999"}, pass_mode="empty",
@@ -420,14 +474,13 @@ class InternetWatchdogTests(unittest.TestCase):
             info = selftest.scan(portal.url)
             p = selftest.make_profile(portal.url, prefix="030124", length=9,
                                       portal_info=info)
-            with mock.patch.object(config, "BLOCK_WAIT_SECONDS", 0):
-                eng = engine.Engine(store.Store(), persist=False,
-                                    checks=selftest.mock_checks(portal))
-                eng.start(p, attempts=20, threads=2, delay_ms=0,
-                          verify_after=False)
-                deadline = time.time() + 60
-                while time.time() < deadline and eng.state != "done":
-                    time.sleep(0.1)
+            eng = engine.Engine(store.Store(), persist=False,
+                                checks=selftest.mock_checks(portal))
+            eng.start(p, attempts=20, threads=2, delay_ms=0,
+                      verify_after=False)
+            deadline = time.time() + 60
+            while time.time() < deadline and eng.state != "done":
+                time.sleep(0.1)
             st = eng.status()
             banned = st["counters"].get("BANNED", 0)
             tried = sum(st["counters"].values())
@@ -439,40 +492,47 @@ class InternetWatchdogTests(unittest.TestCase):
 
 
 class LockoutProbeTests(unittest.TestCase):
-    """Measure the protection instead of fighting it: how many failures does
-    this router forgive, and how long does the lockout last?
-    """
+    """The opt-in check is bounded and stops at the first explicit block."""
 
-    def test_it_measures_the_limit_and_the_recovery(self):
-        # blocks after 3 failures, clears after 2 seconds
+    def test_it_stops_at_the_first_block_without_waiting_or_reprobing(self):
+        # Three rejected requests increment the counter; the fourth is blocked.
         with MockPortal(valid_cards={"020124999"}, pass_mode="empty",
                         ban_after=3, ban_seconds=2) as portal:
             info = selftest.scan(portal.url)
             p = selftest.make_profile(portal.url, prefix="030124", length=9,
                                       portal_info=info)
             got = engine.probe_lockout(p, checks=selftest.mock_checks(portal),
-                                       max_failures=10, wait_limit=30,
+                                       max_failures=30, wait_limit=30,
                                        step=1.0, pace=0.0)
+            login_count = portal.state.logins
         self.assertTrue(got["ok"], got)
+        self.assertEqual(got["max_failures"], config.LOCKOUT_PROBE_MAX_FAILURES)
         self.assertEqual(got["ban_after"], 3, got)
-        self.assertIsNotNone(got["clears_after"], got)
-        self.assertLessEqual(got["clears_after"], 10, got)
-        # 3 failures forgiven every couple of seconds -> about a second each
-        self.assertGreaterEqual(got["safe_delay_ms"], 1000, got)
+        self.assertEqual(got["tried"], 4, got)
+        self.assertEqual(login_count, 3)
+        self.assertEqual(portal.state.bans, 1,
+                         "a second request after the lockout would add another ban")
+        self.assertIsNone(got["clears_after"], got)
+        self.assertIsNone(got["safe_delay_ms"], got)
+        recovery = next(s for s in got["steps"] if s["id"] == "recovery")
+        self.assertEqual(recovery["reason"], "not_probed_after_lockout")
 
-    def test_a_router_that_never_forgives_says_so(self):
+    def test_a_router_that_blocks_is_not_polled_for_expiry(self):
         with MockPortal(valid_cards={"020124999"}, pass_mode="empty",
-                        ban_after=2) as portal:
+                        ban_after=2, ban_seconds=15) as portal:
             info = selftest.scan(portal.url)
             p = selftest.make_profile(portal.url, prefix="030124", length=9,
                                       portal_info=info)
             got = engine.probe_lockout(p, checks=selftest.mock_checks(portal),
-                                       max_failures=6, wait_limit=4,
-                                       step=1.0, pace=0.0)
-        self.assertTrue(got["ok"], got)
+                                       max_failures=6, wait_limit=20,
+                                       step=10.0, pace=0.0)
+            login_count = portal.state.logins
         self.assertEqual(got["ban_after"], 2, got)
-        self.assertIsNone(got["clears_after"], got)   # never cleared
-        self.assertIsNone(got["safe_delay_ms"], got)  # so: no safe pace
+        self.assertEqual(login_count, 2)
+        self.assertEqual(portal.state.bans, 1)
+        self.assertEqual(got["waited"], 0.0)
+        self.assertIsNone(got["clears_after"], got)
+        self.assertIsNone(got["safe_delay_ms"], got)
 
     def test_a_router_that_never_blocks_is_reported_as_such(self):
         with MockPortal(valid_cards={"020124999"}, pass_mode="empty") as portal:
@@ -480,11 +540,30 @@ class LockoutProbeTests(unittest.TestCase):
             p = selftest.make_profile(portal.url, prefix="030124", length=9,
                                       portal_info=info)
             got = engine.probe_lockout(p, checks=selftest.mock_checks(portal),
-                                       max_failures=6, wait_limit=2,
+                                       max_failures=30, wait_limit=2,
                                        step=1.0, pace=0.0)
+            login_count = portal.state.logins
         self.assertTrue(got["ok"], got)
         self.assertIsNone(got["ban_after"], got)
-        self.assertEqual(got["tried"], 6, got)
+        self.assertEqual(got["tried"], config.LOCKOUT_PROBE_MAX_FAILURES, got)
+        self.assertEqual(login_count, config.LOCKOUT_PROBE_MAX_FAILURES)
+
+    def test_network_diagnosis_stops_sampling_after_a_block(self):
+        with MockPortal(valid_cards={"020124999"}, pass_mode="empty",
+                        ban_after=3) as portal:
+            info = selftest.scan(portal.url)
+            p = selftest.make_profile(portal.url, prefix="030124", length=9,
+                                      portal_info=info)
+            result = engine.diagnose(p, threads=4,
+                                     checks=selftest.mock_checks(portal))
+            login_count = portal.state.logins
+        seq = result["latency"]["sequential"]
+        parallel = result["latency"]["parallel"]
+        self.assertGreaterEqual(seq["banned"], 1, result)
+        self.assertTrue(parallel["skipped_after_block"], result)
+        self.assertEqual(login_count, 3)
+        self.assertEqual(portal.state.bans, 1,
+                         "diagnosis must not send another request after the block")
 
 
 class KnownCardTests(unittest.TestCase):
@@ -499,6 +578,46 @@ class KnownCardTests(unittest.TestCase):
                 return s
         return None
 
+    def test_run_preflight_only_verifies_exact_request_once_before_baseline(self):
+        with MockPortal(valid_cards={"020124042"}, pass_mode="empty",
+                        unknown_success_page=True) as portal:
+            info = selftest.scan(portal.url)
+            p = selftest.make_profile(portal.url, prefix="020124", length=9,
+                                      portal_info=info, pass_mode="empty")
+            cal = engine.calibrate(p, known_card="020124042", preflight_only=True,
+                                   checks=selftest.mock_checks(portal))
+            self.assertTrue(cal.ok and cal.tuned and cal.tuned.get("verified"),
+                            cal.as_dict())
+            self.assertEqual(portal.state.asked_cards.count("020124042"), 1)
+            self.assertEqual(cal.tuned["logout"]["internet_after"], "WALLED")
+
+    def test_run_preflight_only_stops_before_probes_when_known_card_fails(self):
+        with MockPortal(valid_cards={"020124042"}, pass_mode="empty") as portal:
+            info = selftest.scan(portal.url)
+            p = selftest.make_profile(portal.url, prefix="020124", length=9,
+                                      portal_info=info, pass_mode="empty")
+            cal = engine.calibrate(p, known_card="020124000", preflight_only=True,
+                                   checks=selftest.mock_checks(portal))
+            self.assertFalse(cal.ok, cal.as_dict())
+            self.assertEqual(cal.error, "known_card_not_proven")
+            self.assertEqual(portal.state.asked_cards, ["020124000"])
+
+    def test_pretested_known_card_is_excluded_without_being_resubmitted(self):
+        with MockPortal(valid_cards={"020124042"}, pass_mode="empty") as portal:
+            info = selftest.scan(portal.url)
+            p = selftest.make_profile(portal.url, prefix="020124", length=9,
+                                      portal_info=info, pass_mode="empty")
+            cal = engine.calibrate(p, known_card="020124042", learn_known=False,
+                                   checks=selftest.mock_checks(portal))
+            self.assertTrue(cal.ok, cal.as_dict())
+            self.assertNotIn("020124042", portal.state.asked_cards)
+
+    def test_rejection_baseline_never_uses_the_known_card(self):
+        p = store.new_profile(prefix="02", length=4, charset="0123456789")
+        cards = engine.bench_cards(p, count=4, seed=3, exclude=("0200",))
+        self.assertEqual(len(cards), 4)
+        self.assertNotIn("0200", cards)
+
     def test_a_card_that_does_not_fit_the_format_is_named(self):
         p = {"prefix": "0201", "length": 9, "suffix": "", "charset": "0123456789"}
         self.assertEqual(engine.known_card_problem(p, "020124042"), {})
@@ -512,6 +631,29 @@ class KnownCardTests(unittest.TestCase):
             {"prefix": "", "length": 10, "suffix": "", "charset": "abc"},
             "2934664754")
         self.assertEqual(got["reason"], "charset_mismatch")
+
+    def test_http_200_unknown_page_is_verified_against_internet_state(self):
+        """A valid card may open the network without a clear success page."""
+        with MockPortal(valid_cards={"020124042"}, pass_mode="empty",
+                        unknown_success_page=True) as portal:
+            info = selftest.scan(portal.url)
+            p = selftest.make_profile(portal.url, prefix="020124", length=9,
+                                      portal_info=info, pass_mode="empty")
+            cal = engine.calibrate(p, known_card="020124042",
+                                   checks=selftest.mock_checks(portal))
+        step = self._shape_step(cal)
+        self.assertTrue(step and step["ok"], cal.as_dict())
+        self.assertEqual(step["reason"], "known_card_works")
+        self.assertTrue(cal.tuned and cal.tuned.get("verified"), cal.tuned)
+        self.assertEqual(cal.tuned.get("internet"), "expected_answer")
+        applied = cal.as_dict().get("applied_settings")
+        self.assertTrue(applied and applied.get("method") == "post", applied)
+        self.assertEqual(applied.get("pass_mode"), "empty")
+        self.assertNotIn("020124042", json.dumps(cal.as_dict()))
+        trial = cal.tuned.get("trial") or {}
+        self.assertEqual(trial.get("status"), 200)
+        self.assertEqual(trial.get("code"), "UNKNOWN")
+        self.assertTrue(trial.get("online_transition"), trial)
 
     def test_it_finds_the_right_request_shape_and_says_so(self):
         with MockPortal(valid_cards={"020124042"}, pass_mode="same") as portal:
@@ -528,23 +670,315 @@ class KnownCardTests(unittest.TestCase):
         self.assertEqual(step["reason"], "known_card_works")
         self.assertEqual(cal.profile["pass_mode"], "same")
 
-    def test_a_card_the_router_refuses_reports_what_came_back(self):
+    def test_unproven_known_card_stops_and_limits_tuning_requests(self):
         with MockPortal(valid_cards={"020124042"}, pass_mode="empty") as portal:
             info = selftest.scan(portal.url)
             p = selftest.make_profile(portal.url, prefix="020124", length=9,
                                       portal_info=info, pass_mode="empty")
-            cal = engine.calibrate(p, known_card="020124999",
+            eng = engine.Engine(store.Store(), persist=False,
+                               checks=selftest.mock_checks(portal))
+            eng.start(p, attempts=50, threads=1, known_card="020124999")
+            deadline = time.time() + 10
+            while time.time() < deadline and eng.state != "done":
+                time.sleep(0.05)
+
+            self.assertEqual(eng.state, "done")
+            self.assertEqual(eng.stop_reason, "calibration_failed")
+            self.assertEqual(eng.calibration.get("error"), "known_card_not_proven")
+            self.assertEqual(eng.progress.get("attempts", 0), 0)
+            step = next(s for s in eng.calibration["steps"]
+                        if s["id"] == "shape_tuned")
+            self.assertFalse(step["ok"], step)
+            self.assertEqual(step["reason"], "known_card_not_proven")
+            trials = step["detail"]["trials"]
+            self.assertTrue(trials, step["detail"])
+            self.assertLessEqual(len(trials), config.KNOWN_CARD_TRIAL_LIMIT)
+            self.assertTrue(all(t["code"] == "REJECTED" for t in trials), trials)
+            # The router's answer is recorded, not just "it failed".
+            self.assertTrue(any(t.get("word") for t in trials), trials)
+
+
+class BrowserParityTests(unittest.TestCase):
+    """A real portal hands out a cookie and a token on the login page, and
+    refuses the post without them: "bad request" instead of a judgement.
+    That is the difference between a browser - which asks for the page first
+    - and a script that only posts.
+    """
+
+    def test_a_bare_post_is_refused_but_the_run_gets_judged(self):
+        with MockPortal(valid_cards={"020124042"}, pass_mode="empty",
+                        require_session=True) as portal:
+            info = selftest.scan(portal.url)
+            p = selftest.make_profile(portal.url, prefix="020124", length=9,
+                                      portal_info=info)
+            # no page was ever asked for: the router refuses the request
+            sess = engine.new_session()
+            self.addCleanup(sess.close)
+            r = engine.send_login(sess, p, "020124000")
+            self.assertEqual(r.status, 400, r.text[:120])
+
+            # asking for the page first hands us what the portal wants
+            warmed = engine.warm_up(sess, p)
+            self.assertTrue((warmed.get("extra_fields") or {}).get("tok"),
+                            warmed.get("extra_fields"))
+            r = engine.send_login(sess, warmed, "020124000")
+            self.assertEqual(r.status, 200, r.text[:120])
+
+            # and a whole run gets its cards judged, not refused
+            eng = engine.Engine(store.Store(), persist=False,
+                                checks=selftest.mock_checks(portal))
+            eng.start(p, attempts=20, threads=2, delay_ms=0, verify_after=False)
+            deadline = time.time() + 60
+            while time.time() < deadline and eng.state != "done":
+                time.sleep(0.1)
+            st = eng.status()
+            self.assertGreater(st["counters"].get("REJECTED", 0), 5,
+                               st["counters"])
+            self.assertEqual(st["counters"].get("NET_ERROR", 0), 0,
+                             st["counters"])
+            self.assertEqual(portal.state.bad_requests, 1)   # only the bare one
+
+    def test_the_request_looks_like_the_browser_that_scanned_it(self):
+        p = selftest.make_profile("http://10.5.50.1/login",
+                                  prefix="020124", length=9)
+        h = engine.browser_headers(p, p["login_url"])
+        self.assertEqual(h["Referer"], p["login_url"])
+        self.assertEqual(h["Origin"], "http://10.5.50.1")
+        self.assertIn("x-www-form-urlencoded", h["Content-Type"])
+        # the operator can send another identity - some portals refuse others
+        p2 = dict(p, user_agent="Mozilla/5.0 (iPhone)", send_referer=False)
+        h2 = engine.browser_headers(p2, p2["login_url"])
+        self.assertEqual(h2["User-Agent"], "Mozilla/5.0 (iPhone)")
+        self.assertNotIn("Referer", h2)
+
+        # A browser GET form has a Referer but no POST-only Origin/content type.
+        get_profile = dict(p, method="get")
+        h3 = engine.browser_headers(get_profile, get_profile["login_url"])
+        self.assertIn("Referer", h3)
+        self.assertNotIn("Origin", h3)
+        self.assertNotIn("Content-Type", h3)
+
+    def test_known_card_tuning_keeps_rotating_session_tokens(self):
+        """Calibration tries many shapes; every one needs the token just returned."""
+        with MockPortal(valid_cards={"0242"}, pass_mode="same",
+                        require_session=True) as portal:
+            info = selftest.scan(portal.url)
+            p = selftest.make_profile(portal.url, prefix="02", length=4,
+                                      portal_info=info, pass_mode="empty")
+            cal = engine.calibrate(p, known_card="0242",
                                    checks=selftest.mock_checks(portal))
-        self.assertTrue(cal.ok, cal.as_dict())     # the run can still go on
-        step = self._shape_step(cal)
-        self.assertIsNotNone(step, cal.steps)
-        self.assertFalse(step["ok"], step)
-        self.assertEqual(step["reason"], "known_card_not_proven")
-        trials = step["detail"]["trials"]
-        self.assertTrue(trials, step["detail"])
-        self.assertTrue(all(t["code"] == "REJECTED" for t in trials), trials)
-        # and the router's own answer is in there, not just "it failed"
-        self.assertTrue(any(t.get("word") for t in trials), trials)
+            self.assertTrue(cal.ok, cal.as_dict())
+            self.assertEqual(cal.profile["pass_mode"], "same")
+            self.assertEqual((cal.tuned or {}).get("mode"), "same", cal.tuned)
+            self.assertEqual(portal.state.bad_requests, 0,
+                             "a one-use token was reused during calibration")
+
+    def test_diagnosis_uses_a_browser_session_in_every_thread(self):
+        with MockPortal(valid_cards={"0299"}, pass_mode="empty",
+                        require_session=True) as portal:
+            info = selftest.scan(portal.url)
+            p = selftest.make_profile(portal.url, prefix="03", length=4,
+                                      portal_info=info)
+            result = engine.diagnose(p, threads=4,
+                                     checks=selftest.mock_checks(portal))
+            self.assertTrue(result["ok"], result)
+            self.assertEqual(result["latency"]["sequential"]["errors"], 0,
+                             result["latency"])
+            self.assertEqual(result["latency"]["parallel"]["errors"], 0,
+                             result["latency"])
+            self.assertEqual(portal.state.bad_requests, 0,
+                             "parallel diagnosis posted without a page session")
+            self.assertLessEqual(portal.state.logins,
+                                 config.DIAGNOSTIC_SAMPLE_LIMIT)
+
+    def test_get_submission_preserves_query_order_and_omits_absent_fields(self):
+        from unittest import mock
+        url = "http://example.invalid/login?username=&password="
+        p = store.new_profile(login_url=url, method="get",
+                              user_field="username", pass_field="password",
+                              pass_mode="empty", send_dst=False,
+                              send_popup=False,
+                              extra_fields={"dst": "stale", "popup": "stale"})
+        page = ("<form method='get' action='/login?username=&password='>"
+                "<input name='username'><input name='password' type='password'>"
+                "</form>")
+        p = engine.absorb_form(p, page, url)
+        self.assertFalse(p.get("send_dst"))
+        self.assertFalse(p.get("send_popup"))
+        self.assertNotIn("dst", engine.build_fields(p, "CARD"))
+        self.assertNotIn("popup", engine.build_fields(p, "CARD"))
+
+        sess = mock.MagicMock()
+        engine.send_login(sess, p, "CARD")
+        method, request_url = sess.request.call_args.args[:2]
+        self.assertEqual(method, "GET")
+        pairs = parse_qsl(urlsplit(request_url).query, keep_blank_values=True)
+        self.assertEqual([key for key, _ in pairs], ["username", "password"])
+        self.assertEqual(pairs[0][1], "CARD")
+        self.assertEqual(pairs[1][1], "")
+        self.assertNotIn("dst=", request_url)
+        self.assertNotIn("popup=", request_url)
+
+    def test_safe_request_shape_preserves_order_and_redacts_values(self):
+        p = store.new_profile(
+            login_url="https://url-user:url-pass@portal.invalid/login?token=secret-token&username=OLD&password=",
+            method="get", user_field="username", pass_field="password",
+            pass_mode="same", send_dst=False, send_popup=False)
+        shape = engine.safe_request_shape(p, "CARD-123")
+        self.assertEqual(shape["method"], "GET")
+        self.assertEqual(shape["field_names"], ["password", "username"])
+        self.assertNotIn("secret-token", shape["url"])
+        self.assertNotIn("OLD", shape["url"])
+        self.assertNotIn("CARD-123", shape["url"])
+        self.assertNotIn("secret-token", repr(shape))
+        self.assertNotIn("url-user", repr(shape))
+        self.assertNotIn("url-pass", repr(shape))
+        self.assertEqual(shape["body_field_names"], [])
+
+    def test_scanning_a_copied_success_url_does_not_spend_its_card(self):
+        with MockPortal(valid_cards={"0242"}, method="get",
+                        pass_mode="empty") as portal:
+            copied = portal.url + "?username=0242&password=&dst=%2F"
+            sess = engine.new_session()
+            self.addCleanup(sess.close)
+            found = portals.discover(sess, copied)
+            self.assertEqual(portal.state.logins, 0,
+                             "the scan submitted and consumed the real card")
+            self.assertEqual(found.form.method, "get")
+            self.assertNotIn("username=0242", found.form.action)
+
+    def test_a_copied_success_url_replaces_old_credentials(self):
+        """Never append USER2 after ?username=USER1&password=.
+
+        The user's exact report was that changing the username in this URL in
+        a browser works. Many routers read the first duplicate query value, so
+        appending fields would silently test USER1 for the entire run.
+        """
+        with MockPortal(valid_cards={"0242"}, method="get",
+                        pass_mode="empty") as portal:
+            p = selftest.make_profile(
+                portal.url + "?username=OLD&amp;password=", prefix="02", length=4,
+                method="get", pass_mode="empty")
+            sess = engine.new_session()
+            self.addCleanup(sess.close)
+            r = engine.send_login(sess, p, "0242")
+            self.assertEqual(r.status, 302, r.text[:120])
+            self.assertEqual(portal.state.asked_cards[-1], "0242")
+            self.assertNotIn("OLD", portal.state.asked_cards)
+
+    def test_http_400_is_not_learned_as_a_wrong_card(self):
+        """A bad request is the router rejecting the shape, not the card."""
+        with MockPortal(valid_cards={"0242"}, pass_mode="empty",
+                        reject_shape=True) as portal:
+            info = selftest.scan(portal.url)
+            p = selftest.make_profile(portal.url, prefix="02", length=4,
+                                      portal_info=info)
+            cal = engine.calibrate(p)
+            self.assertFalse(cal.ok, cal.as_dict())
+            self.assertEqual(cal.error, "request_shape_rejected")
+            step = next(s for s in cal.steps
+                        if s["reason"] == "request_shape_rejected")
+            self.assertEqual(step["detail"]["status"], [400, 400, 400])
+
+
+class ResumeProgressTests(unittest.TestCase):
+    def test_resumed_run_only_queues_the_remaining_unique_cards(self):
+        with MockPortal(valid_cards={"9999"}, pass_mode="empty") as portal:
+            info = selftest.scan(portal.url)
+            prof = selftest.make_profile(portal.url, prefix="02", length=4,
+                                         portal_info=info, pass_mode="empty")
+            prof.update(space_pos=92, walk_a=1, walk_b=0)
+            eng = engine.Engine(store.Store(), persist=False,
+                                checks=selftest.mock_checks(portal))
+            self.assertTrue(eng.start(prof, attempts=2000, threads=1,
+                                      verify_after=False)["ok"])
+            deadline = time.time() + 30
+            while time.time() < deadline and eng.state != "done":
+                time.sleep(0.05)
+            self.assertEqual(eng.state, "done", eng.status())
+            progress = eng.status()["progress"]
+            self.assertEqual(progress["space"], 100)
+            self.assertEqual(progress["total"], 8)
+            self.assertEqual(progress["queued"], 8)
+            self.assertLessEqual(progress["percent"], 100)
+            self.assertLessEqual(progress["covered"], 100)
+            self.assertEqual(len(portal.state.asked_cards[-8:]), 8)
+            self.assertEqual(len(set(portal.state.asked_cards[-8:])), 8)
+
+
+class LostAnswerTests(unittest.TestCase):
+    """A request can die on the way while the router did take it.
+
+    Such a card has no answer, so it is not tested: the tool has to ask about
+    it again instead of moving on - otherwise a run over a whole card space
+    can finish without ever really asking about the card that works.
+    """
+
+    def test_status_is_safe_before_the_first_run(self):
+        eng = engine.Engine(store.Store(), persist=False)
+        st = eng.status()
+        self.assertEqual(st["state"], "idle")
+        self.assertEqual(st["progress"]["threads"], 0)
+
+    def test_a_card_that_got_no_answer_is_asked_again(self):
+        from kirapass import httpclient, selftest as _st
+
+        with MockPortal(valid_cards={"0242"}, pass_mode="empty") as portal:
+            info = _st.scan(portal.url)
+            p = _st.make_profile(portal.url, prefix="02", length=4,
+                                 portal_info=info, pass_mode="empty")
+            real = engine.send_login
+            real_bench = engine.bench_cards
+            lost = {"left": 2}
+
+            def deterministic_bench(profile, count=3, seed=0, exclude=()):
+                return [card for card in ("0200", "0201", "0202")
+                        if card not in set(exclude)][:count]
+
+            def silent_twice(session, prof, card, *a, **k):
+                # "refused" is not retryable on the spot, so without the
+                # re-queue the card would simply be dropped
+                if card == "0242" and lost["left"] > 0:
+                    lost["left"] -= 1
+                    raise httpclient.NetError("refused", "simulated silence",
+                                              prof.get("login_url", ""))
+                return real(session, prof, card, *a, **k)
+
+            engine.send_login = silent_twice
+            engine.bench_cards = deterministic_bench
+            try:
+                st, _eng = _st.run_engine(p, attempts=200, threads=2,
+                                          checks=_st.mock_checks(portal))
+            finally:
+                engine.send_login = real
+                engine.bench_cards = real_bench
+            counters = st.get("counters", {})
+            self.assertTrue(st.get("hits"), f"hits={st.get('hits')} "
+                                            f"counters={counters}")
+            self.assertGreaterEqual(counters.get("NET_ERROR", 0), 1, counters)
+            self.assertEqual(lost["left"], 0, "the card was never asked again")
+
+    def test_a_redirect_out_of_the_portal_is_never_called_rejected(self):
+        # A router that answers with an empty body and a redirect for wrong
+        # cards (and never the same target twice) leaves the judge with
+        # nothing but the status to compare.  A card that goes somewhere else
+        # entirely must not then be reported as a normal rejection.
+        # ... two different targets, so there is no single "wrong card" target
+        # to compare with and only the status is left
+        fp = fingerprint.Fingerprinter.learn([
+            _FakeReply("", status=302,
+                       headers={"Location": "http://portal/login?e=1"}),
+            _FakeReply("", status=302,
+                       headers={"Location": "http://portal/status?e=2"})])
+        judge = fingerprint.Judge(fp, "http://portal/login")
+        v = judge.classify(_FakeReply(
+            "", status=302,
+            headers={"Location":
+                     "http://connectivitycheck.gstatic.com/generate_204"}),
+            submitted=["0242"])
+        self.assertNotEqual(v.code, "REJECTED", v.as_dict())
+        self.assertEqual(
+            v.reason, "redirect_out_of_portal_but_page_matches", v.as_dict())
 
 
 class _FakeReply:
@@ -579,6 +1013,66 @@ class _FakeReply:
 
 
 class StoreTests(unittest.TestCase):
+    def test_calibration_report_redacts_hints_and_url_secrets(self):
+        from kirapass.web.server import _safe_calibration_report
+        profile = {"user_field": "username", "pass_field": "password"}
+        safe = _safe_calibration_report({
+            "steps": [{"detail": {"card_hint": "020124...",
+                                    "sample_cards": ["020124001"],
+                                    "extra_fields": {"tok": "private-token"},
+                                    "url": "https://u:p@portal.invalid/login?token=private"}}],
+        }, profile)
+        blob = json.dumps(safe)
+        for secret in ("020124", "private", "https://u:p@"):
+            self.assertNotIn(secret, blob)
+        self.assertIn("[REDACTED]", blob)
+
+    def test_report_snapshot_redacts_query_and_live_profile_secrets(self):
+        card, digest, challenge, csrf = (
+            "2972801416", "4529b5cb476335e9a70a5f7acd29b663",
+            "private-challenge", "live-csrf-token")
+        snapshot = engine.safe_profile_snapshot({
+            "name": "safe-report",
+            "login_url": ("http://a.com/login?username=" + card +
+                          "&amp;password=" + digest),
+            "user_field": "username", "pass_field": "password",
+            "pass_fixed": "fixed-secret",
+            "chap": {"id": "private-id", "challenge": challenge,
+                     "field": "password"},
+            "extra_fields": {"csrf_token": csrf, "remember": "ON"},
+        })
+        blob = json.dumps(snapshot)
+        for secret in (card, digest, challenge, "private-id", "fixed-secret", csrf):
+            self.assertNotIn(secret, blob)
+        self.assertEqual(snapshot["extra_fields"]["remember"], "ON")
+        self.assertTrue(snapshot["chap"]["challenge_present"])
+        self.assertIn("username=&password=", snapshot["login_url"])
+
+    def test_migration_redacts_credentials_from_copied_get_url(self):
+        card, digest = "2972801416", "4529b5cb476335e9a70a5f7acd29b663"
+        prof = store.migrate({
+            "name": "old-get",
+            "login_url": ("http://a.com/login?password=" + digest +
+                          "&amp;username=" + card + "&amp;dst=%2F"),
+            "method": "get", "user_field": "username",
+            "pass_field": "password", "length": 10, "prefix": "29",
+        })
+        self.assertEqual(prof["login_url"],
+                         "http://a.com/login?password=&username=&dst=%2F")
+        self.assertNotIn(card, json.dumps(prof))
+        self.assertNotIn(digest, json.dumps(prof))
+        self.assertNotIn("&amp;", prof["login_url"])
+
+    def test_migration_preserves_explicit_dst_popup_flags(self):
+        current = store.migrate({"schema": store.SCHEMA,
+                                 "send_dst": False, "send_popup": False,
+                                 "extras": True})
+        self.assertFalse(current["send_dst"])
+        self.assertFalse(current["send_popup"])
+        legacy = store.migrate({"network_type": "1", "extras": False})
+        self.assertFalse(legacy["send_dst"])
+        self.assertFalse(legacy["send_popup"])
+
     def test_migrates_all_old_shapes(self):
         samples = [
             {"name": "a", "login_url": "http://x/login", "method": "2",
@@ -624,6 +1118,62 @@ class StoreTests(unittest.TestCase):
         self.assertTrue(saved.get("file"))
         self.assertIn("hello", st.read_review(saved["file"]))
         st.clear_cache("temp")
+
+    def test_review_body_redacts_mac_and_ip(self):
+        body = ("<html><body>client AA:BB:CC:DD:EE:FF at 10.5.50.42 "
+                "and also aa-bb-cc-dd-ee-ff</body></html>")
+        red = store.redact_review_body(body)
+        self.assertNotIn("AA:BB:CC:DD:EE:FF", red)
+        self.assertNotIn("10.5.50.42", red)
+        self.assertIn("[mac-redacted]", red)
+        self.assertIn("[ip-redacted]", red)
+        st = store.Store()
+        saved = st.save_review(2, "card1",
+                               {"code": "UNKNOWN", "reason": "x", "data": {}},
+                               body)
+        content = st.read_review(saved["file"])
+        self.assertNotIn("AA:BB:CC", content)
+        self.assertNotIn("10.5.50.42", content)
+        st.clear_cache("temp")
+
+    def test_sha_password_modes_are_replayable(self):
+        from kirapass import engine
+        p = store.new_profile(pass_mode="sha1user")
+        self.assertEqual(engine.password_value(p, "0201"),
+                         capture._sha1("0201"))
+        p["pass_mode"] = "sha256user"
+        self.assertEqual(engine.password_value(p, "0201"),
+                         capture._sha256("0201"))
+        self.assertIn("sha1user", store.PASS_MODES)
+        self.assertIn("sha256user", store.PASS_MODES)
+
+    def test_ban_evidence_structure(self):
+        from kirapass import engine
+
+        class R:
+            status = 403
+            text = "<html><body>you are blocked</body></html>"
+
+        stop, word, evidence = engine._is_protective_reply(
+            R(), "http://10.5.50.1/login")
+        self.assertTrue(stop)
+        self.assertIsInstance(evidence, dict)
+        self.assertIn("status", evidence)
+        self.assertIn("has_form", evidence)
+        self.assertIn("kind_hint", evidence)
+        self.assertEqual(evidence["status"], 403)
+
+    def test_custom_internet_checks_parse(self):
+        from kirapass import verify
+        checks = verify.resolve_internet_checks(
+            "http://example.test/ok|200|OK")
+        self.assertEqual(len(checks), 1)
+        self.assertEqual(checks[0][0], "http://example.test/ok")
+        self.assertEqual(checks[0][1], 200)
+        self.assertEqual(checks[0][2], "OK")
+        # empty falls back to defaults
+        defaults = verify.resolve_internet_checks("")
+        self.assertTrue(len(defaults) >= 1)
 
 
 class HttpTests(unittest.TestCase):
@@ -672,6 +1222,17 @@ class HttpTests(unittest.TestCase):
 
 
 class PortalParsingTests(unittest.TestCase):
+    def test_form_action_decodes_html_entities_and_redacts_get_credentials(self):
+        html = """<form action="/login?username=29728014&amp;password=hash123&amp;dst=%2F"
+        method="get"><input type="text" name="username">
+        <input type="password" name="password"></form>"""
+        form = portals.parse_form(html, "http://a.com/login")
+        self.assertEqual(form.action,
+                         "http://a.com/login?username=&password=&dst=%2F")
+        self.assertNotIn("29728014", form.action)
+        self.assertNotIn("hash123", form.action)
+        self.assertNotIn("&amp;", form.action)
+
     def test_mikrotik_chap_and_fields(self):
         html = """<html><script src="md5.js"></script>
         <script>document.login.password.value = hexMD5('abc123' +
@@ -690,6 +1251,165 @@ class PortalParsingTests(unittest.TestCase):
         self.assertIsNotNone(form.chap)
         self.assertEqual(form.chap["id"], "abc123")
         self.assertEqual(form.chap["challenge"], "def456")
+
+
+class CaptureTests(unittest.TestCase):
+    """Redacted browser-assisted recorder: secrets stay out of the report."""
+
+    def test_learn_words_uses_only_visible_body_text(self):
+        html = """<html lang='en'><head><title>HeadOnlyMarker</title>
+        <meta name='description' content='MetaOnlyMarker windows theme color apple touch icon sizes'>
+        <script>ScriptOnlyMarker</script><style>.css { content: 'StyleOnlyMarker'; }</style>
+        </head><body data-theme='BodyAttributeMarker'>
+        <p>PortalVisibleGreeting welcomes every guest today.</p>
+        </body></html>"""
+        words = {word.lower() for word in capture.learn_words(html)}
+        self.assertIn("portalvisiblegreeting", words)
+        for hidden in ("headonlymarker", "metaonlymarker", "windows", "theme",
+                       "color", "apple", "touch", "icon", "sizes",
+                       "scriptonlymarker", "styleonlymarker", "bodyattributemarker"):
+            self.assertNotIn(hidden, words)
+
+    def test_only_generalizable_password_patterns_are_learned(self):
+        html = "<form><input name='username'><input name='password'></form>"
+        same = capture.infer_pass_mode("0201", "0201", "0201", "0201", html,
+                                       ["username", "password"])
+        self.assertEqual(same["pass_mode"], "same")
+        self.assertFalse(same["needs_browser_js"])
+        empty = capture.infer_pass_mode("0201", "", "0201", "", html,
+                                        ["username", "password"])
+        self.assertEqual(empty["pass_mode"], "empty")
+        omit = capture.infer_pass_mode("0201", "x", "0201", "", html, ["username"])
+        self.assertEqual(omit["pass_mode"], "omit")
+        digest = capture._md5("0201")
+        md5user = capture.infer_pass_mode("0201", "0201", "0201", digest, html,
+                                          ["username", "password"])
+        self.assertEqual(md5user["pass_mode"], "md5user")
+        sha1 = capture.infer_pass_mode(
+            "0201", "0201", "0201", capture._sha1("0201"), html,
+            ["username", "password"])
+        self.assertEqual(sha1["pass_mode"], "sha1user")
+        self.assertFalse(sha1["needs_browser_js"])
+        sha256 = capture.infer_pass_mode(
+            "0201", "0201", "0201", capture._sha256("0201"), html,
+            ["username", "password"])
+        self.assertEqual(sha256["pass_mode"], "sha256user")
+        self.assertFalse(sha256["needs_browser_js"])
+        chap_html = ("<script>document.login.password.value = hexMD5('id12' +"
+                     " document.login.password.value + 'chal34');</script>"
+                     "<form><input name='username'><input name='password'></form>")
+        hashed = capture._md5("id12" + "0201" + "chal34")
+        chap = capture.infer_pass_mode("0201", "0201", "0201", hashed, chap_html,
+                                       ["username", "password"])
+        self.assertEqual(chap["pass_mode"], "chap")
+        self.assertFalse(chap["needs_browser_js"])
+
+    def test_unknown_js_password_transform_blocks_automation(self):
+        html = "<form><input name='username'><input name='password'></form>"
+        learned = capture.infer_pass_mode(
+            "020124042", "secret", "020124042", "deadbeefdeadbeefdeadbeefdeadbeef",
+            html, ["username", "password"])
+        self.assertTrue(learned["needs_browser_js"])
+        self.assertEqual(learned["reason"], "unknown_js_transform")
+        self.assertIn("JavaScript", learned["reason_ar"])
+        prof = store.new_profile(login_url="http://10.5.50.1/login",
+                                 charset="0123456789", length=10, prefix="02",
+                                 capture_needs_browser_js=True)
+        self.assertIn("needs_browser_js", store.validate(prof))
+
+    def test_http_200_is_not_success_or_reject_without_teaching(self):
+        self.assertEqual(capture.verdict_from_status(200), "unknown_http_200")
+        self.assertEqual(capture.verdict_from_status(200, "success"), "success")
+        self.assertEqual(capture.verdict_from_status(302), "redirect")
+
+    def test_login_form_cannot_be_marked_success_or_status(self):
+        with MockPortal(valid_cards={"0242"}) as portal:
+            hub = capture.Hub()
+            cap = hub.start(portal.url)
+            self.addCleanup(cap.close)
+            success = hub.mark(cap.id, "success")
+            status = hub.mark(cap.id, "status")
+            self.assertFalse(success["ok"])
+            self.assertEqual(success["error"], "login_form_still_visible")
+            self.assertFalse(status["ok"])
+            self.assertEqual(status["error"], "login_form_still_visible")
+            reject = hub.mark(cap.id, "reject")
+            self.assertTrue(reject["ok"])
+            duplicate = hub.mark(cap.id, "reject")
+            self.assertTrue(duplicate["ok"])
+            self.assertEqual(len(cap.marks), 1)
+
+    def test_report_never_contains_secrets(self):
+        card = "020124042"
+        with MockPortal(valid_cards={card}, pass_mode="same",
+                        require_session=True, success_page=True,
+                        dynamic=True) as portal:
+            hub = capture.Hub()
+            cap = hub.start(portal.url, guard="http://127.0.0.1:8770")
+            form = portals.parse_form(cap.html, cap.url)
+            fields = {
+                form.user_field: card,
+                form.pass_field: card,
+            }
+            for name, value in (form.fields or {}).items():
+                if name not in fields:
+                    fields[name] = value
+            hub.step(cap.id, {
+                "kind": "form", "method": form.method, "url": form.action,
+                "fields": fields, "fields_before": dict(fields),
+                "fields_after": dict(fields),
+            })
+            hub.mark(cap.id, "success")
+            learned_before_status = dict(cap.pass_learn)
+            hub.step(cap.id, {
+                "kind": "navigate", "method": "GET",
+                "url": portal.base + "/status",
+            })
+            self.assertEqual(cap.form.user_field, "username")
+            self.assertEqual(cap.form.pass_field, "password")
+            self.assertEqual(cap.form.dst_field, "dst")
+            self.assertEqual(cap.form.popup_field, "popup")
+            hub.mark(cap.id, "status")
+            # A form on the statistics page must not replace the login model
+            # or make its empty fields look like a new password transform.
+            hub.step(cap.id, {
+                "kind": "form", "method": "POST",
+                "url": portal.base + "/status",
+                "fields": {"erase-cookie": "1"},
+                "fields_before": {"erase-cookie": "1"},
+                "fields_after": {"erase-cookie": "1"},
+            })
+            self.assertEqual(cap.pass_learn, learned_before_status)
+            st = store.Store()
+            result = hub.finish(cap.id, st)
+            self.assertEqual(result["profile"]["user_field"], "username")
+            self.assertEqual(result["profile"]["pass_field"], "password")
+            self.assertEqual(result["profile"]["dst_field"], "dst")
+            self.assertEqual(result["profile"]["popup_field"], "popup")
+            self.assertEqual(result["profile"]["pass_mode"], "same")
+            blob = json.dumps(result["report"], ensure_ascii=False)
+            self.assertNotIn(card, blob)
+            self.assertNotIn("portal_sid=", blob)
+            for value in (form.fields or {}).values():
+                if value and len(str(value)) >= 8:
+                    self.assertNotIn(str(value), blob)
+            self.assertTrue(result["report"]["cookie_names"])
+            self.assertNotIn("values", json.dumps(result["report"].get("cookie_names")))
+            self.assertEqual(capture.rewrite_html("<html><head></head></html>",
+                                                  portal.url, cap.id,
+                                                  "http://127.0.0.1:8770").count(
+                "allow-same-origin"), 0)
+            self.assertIn("sandbox=\"allow-scripts allow-forms\"",
+                          capture.view_page(cap.id).decode("utf-8"))
+            self.assertNotIn("allow-same-origin",
+                             capture.view_page(cap.id).decode("utf-8"))
+            self.assertTrue(os.path.exists(
+                os.path.join(config.RUN_DIR, result["report_name"])))
+            self.assertTrue(result["profile"]["login_url"])
+            self.assertIn("/api/capture/start", " ".join([
+                "/api/capture/start", "/api/capture/step", "/api/capture/mark",
+                "/api/capture/finish", "/api/capture/status",
+                "/api/capture/report", "/capture/view"]))
 
 
 if __name__ == "__main__":

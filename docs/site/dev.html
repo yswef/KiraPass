@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>نظرة عامة للمطوّر · KiraPass</title>
+<link rel="stylesheet" href="assets/docs.css">
+</head>
+<body>
+<div id="kp-layout">
+<main class="doc">
+
+<h1>نظرة عامة للمطوّر</h1>
+<p class="lead">
+  هذه الصفحة هي <b>الخريطة</b>: ما الملفات الموجودة، ما مسؤولية كل ملف، من يعتمد على من،
+  وما القواعد التي كُتب المشروع عليها. بعدها انتقل إلى
+  <a href="architecture.html">المعمارية وتدفق البيانات</a> ثم إلى
+  <a href="files/index.html">صفحة الملف</a> الذي ستعدّله.
+</p>
+
+<div class="toc card"><b>محتويات الصفحة</b><div class="toc-auto"></div></div>
+
+<h2 id="one-paragraph">المشروع في فقرة واحدة</h2>
+<p>
+  KiraPass <b>باك-إند بايثون فقط</b> (بلا أي مكتبة خارجية) يشغّل سيرفر HTTP محلياً صغيراً
+  يقدّم صفحة واحدة (<code>ui.html</code> + <code>ui.js</code> + <code>ui.css</code>)
+  وواجهة JSON. الصفحة تجمع من المستخدم: رابط صفحة الدخول، صيغة البطاقة، وقوة التشغيل.
+  السيرفر يقرأ صفحة البوابة ويستنتج شكل الطلب، ثم <b>يتعلّم</b> كيف تبدو صفحة الرفض
+  بإرسال بطاقات تجريبية، ثم يشغّل <b>محركاً متعدد الخيوط</b> يرسل بطاقات ويصنّف كل رد
+  إلى حكم (مقبول/مرفوض/غير واضح/محجوب/…) <b>بسبب مقروء</b>، ويحفظ كل شيء في
+  <code>kirapass_data/</code>.
+</p>
+
+<h2 id="layout">خريطة المستودع</h2>
+<pre><code>KiraPass/
+├── KiraPass.py                 ← نقطة الدخول (27 سطراً): تصلح sys.path وتستدعي cli.main()
+├── README.md                   ← واجهة المشروع (عربي + إنجليزي)
+├── AUTHORIZED_USE_LICENSE.md   ← الترخيص: استخدام مصرّح به فقط
+├── AUDIT_REPORT.md             ← تقرير مراجعة أمنية/سلوكية للمشروع
+├── kirapass/                   ← الحزمة: كل منطق الأداة
+│   ├── __init__.py             ← يصدّر APP_NAME و VERSION فقط
+│   ├── __main__.py             ← يسمح بـ python -m kirapass
+│   ├── version_helpers.py      ← package_dir(): مسار مطلق داخل الحزمة
+│   ├── cli.py                  ← تحليل الأوامر + البانر + اختيار منفذ حر
+│   ├── config.py               ← كل الثوابت: مسارات، مَهلات، قوائم كلمات، حدود
+│   ├── errors.py               ← أي استثناء شبكة → kind + نص + هل يُعاد
+│   ├── httpclient.py           ← عميل HTTP بالمكتبة القياسية (keep-alive, كوكيز, gzip)
+│   ├── portals.py              ← قراءة صفحة الدخول: النموذج، الحقول، dst، chap
+│   ├── fingerprint.py          ← تعلّم الرموز المتغيّرة + محرك الأحكام (Judge)
+│   ├── verify.py               ← «هل الضيف متصل فعلاً؟» + صفحة الحالة + تسجيل الخروج
+│   ├── engine.py               ← القلب: المعايرة، التشغيل متعدد الخيوط، المحاسبة
+│   ├── store.py                ← البروفايلات (+الترحيل)، التقارير، الكاش، الصيغة الرياضية
+│   ├── capture.py              ← المسجّل المنقّح (إطار معزول + اعتراض الطلبات)
+│   ├── mockportal.py           ← راوتر وهمي للاختبار الذاتي
+│   ├── selftest.py             ← 15 سيناريو نهاية-لنهاية
+│   └── web/
+│       ├── server.py           ← سيرفر HTTP + كل نقاط /api/…
+│       ├── ui.html             ← هيكل الصفحة (كل النصوص لها data-i18n)
+│       ├── ui.js               ← كل منطق الصفحة + قاموس الترجمة I18N
+│       └── ui.css              ← التنسيق (متغيرات CSS في :root)
+├── docs/
+│   ├── site/                   ← ★ هذا الموقع
+│   ├── GUIDE_AR.md GUIDE_EN.md ← دليل الاستخدام (ماركداون)
+│   ├── DEV_NOTES.md            ← ملاحظات المطوّر المختصرة
+│   ├── CHANGES.md              ← سجل الإصلاحات
+│   ├── WHY_IT_STOPPED_*.md     ← تشخيص أعطال النسخة القديمة بالأدلة
+│   └── MAKE_PRIVATE.md         ← خطوات جعل المستودع خاصاً
+├── tests/test_kirapass.py      ← 90 اختبار unittest (وحدوي + سيناريوهات)
+├── tools/
+│   ├── practice_portal.py      ← بوابة تدريب وهمية للاستخدام اليدوي
+│   ├── checks/web_e2e.py       ← فحص الرحلة كاملة عبر API بدون متصفح
+│   └── docs/build_docs.py      ← ★ مولّد صفحات التوثيق + notes.py (الشرح العربي)
+└── Example pages/              ← أمثلة HTML محفوظة لبوابات حقيقية (مرجع بصري)</code></pre>
+
+<h2 id="files">مسؤولية كل ملف — بالتفصيل</h2>
+<p>لكل ملف صفحة مستقلة فيها <b>كل دالة وكل متغير وكل استدعاء</b>. الروابط:</p>
+<div class="scroll-x">
+<table class="t">
+  <thead><tr><th>الملف</th><th>الأسطر</th><th>المسؤولية</th><th>أهم ما فيه</th><th>الصفحة</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">KiraPass.py</td><td>27</td>
+        <td>نقطة الدخول الوحيدة التي يعرفها المستخدم</td>
+        <td><code>sys.path.insert</code> ثم <code>cli.main()</code></td>
+        <td><a href="files/kirapass-py.html">افتح</a></td></tr>
+    <tr><td class="mono">cli.py</td><td>189</td>
+        <td>الأوامر: تشغيل/فحص/مسح/اختبار ذاتي</td>
+        <td><code>build_parser</code> · <code>free_port</code> · <code>banner</code> · <code>main</code></td>
+        <td><a href="files/cli.html">افتح</a></td></tr>
+    <tr><td class="mono">config.py</td><td>260</td>
+        <td>كل رقم وكل قائمة كلمات في الأداة</td>
+        <td>المسارات · المَهلات · <code>REJECT_WORDS</code> · <code>BAN_WORDS</code> · <code>ACCEPT_WORDS</code> · حدود الأمان</td>
+        <td><a href="files/config.html">افتح</a></td></tr>
+    <tr><td class="mono">errors.py</td><td>128</td>
+        <td>ترجمة أي استثناء شبكة إلى كود ثابت</td>
+        <td><code>KINDS</code> · <code>NetError</code> · <code>classify()</code></td>
+        <td><a href="files/errors.html">افتح</a></td></tr>
+    <tr><td class="mono">httpclient.py</td><td>370</td>
+        <td>عميل HTTP بالمكتبة القياسية</td>
+        <td><code>Response</code> · <code>CookieStore</code> · <code>Session._send_once</code> (فصل مهلة الاتصال عن مهلة القراءة)</td>
+        <td><a href="files/httpclient.html">افتح</a></td></tr>
+    <tr><td class="mono">portals.py</td><td>365</td>
+        <td>قراءة صفحة الدخول واستنتاج شكل الطلب</td>
+        <td><code>parse_form</code> · <code>_score_form</code> · <code>discover</code> · <code>sanitize_login_url</code></td>
+        <td><a href="files/portals.html">افتح</a></td></tr>
+    <tr><td class="mono">fingerprint.py</td><td>574</td>
+        <td>تمييز الرد: تعلّم المتغيّر ثم إصدار الحكم</td>
+        <td><code>mask_text</code> · <code>learn_dynamic</code> · <code>learn_patterns</code> · <code>Fingerprinter</code> · <code>Judge.classify</code></td>
+        <td><a href="files/fingerprint.html">افتح</a></td></tr>
+    <tr><td class="mono">verify.py</td><td>123</td>
+        <td>إثبات أن الإنترنت فتح فعلاً</td>
+        <td><code>probe_internet</code> · <code>verify_online</code> · <code>portal_status_page</code> · <code>logout</code></td>
+        <td><a href="files/verify.html">افتح</a></td></tr>
+    <tr><td class="mono">engine.py</td><td>2342</td>
+        <td>المعايرة + التشغيل + المحاسبة + التقارير</td>
+        <td><code>build_fields</code> · <code>send_login</code> · <code>warm_up</code> · <code>absorb_form</code> · <code>calibrate</code> · <code>_tune_with_known_card</code> · <code>Engine</code> · <code>Engine._attempt</code> · <code>diagnose</code> · <code>probe_lockout</code></td>
+        <td><a href="files/engine.html">افتح</a></td></tr>
+    <tr><td class="mono">store.py</td><td>547</td>
+        <td>البروفايلات + رياضيات الفضاء + الحفظ والمسح</td>
+        <td><code>new_profile</code> · <code>migrate</code> · <code>validate</code> · <code>decode_card</code> · <code>card_at_walk_pos</code> · <code>Store</code> · <code>redact_review_body</code></td>
+        <td><a href="files/store.html">افتح</a></td></tr>
+    <tr><td class="mono">capture.py</td><td>1213</td>
+        <td>المسجّل المنقّح + التنقيح (redaction)</td>
+        <td><code>infer_pass_mode</code> · <code>INTERCEPTOR</code> · <code>rewrite_html</code> · <code>Hub</code> · <code>Capture._exchange</code> · <code>export_curl</code></td>
+        <td><a href="files/capture.html">افتح</a></td></tr>
+    <tr><td class="mono">mockportal.py</td><td>425</td>
+        <td>راوتر وهمي للاختبارات</td>
+        <td><code>PortalState</code> (كل أوضاع الفشل) · <code>Handler._handle</code></td>
+        <td><a href="files/mockportal.html">افتح</a></td></tr>
+    <tr><td class="mono">selftest.py</td><td>443</td>
+        <td>15 سيناريو نهاية-لنهاية</td>
+        <td><code>run_engine</code> · <code>SCENARIOS</code> · <code>run_all</code></td>
+        <td><a href="files/selftest.html">افتح</a></td></tr>
+    <tr><td class="mono">web/server.py</td><td>681</td>
+        <td>سيرفر HTTP + JSON API</td>
+        <td><code>KiraServer</code> · <code>Job</code> · <code>Handler._authorized</code> · <code>_api_get</code> · <code>_api_post</code> · <code>serve</code></td>
+        <td><a href="files/server.html">افتح</a></td></tr>
+    <tr><td class="mono">web/ui.html</td><td>396</td>
+        <td>هيكل الصفحة: 6 لوحات + نافذة منبثقة</td>
+        <td>كل عنصر له <code>id</code> و<code>data-i18n</code></td>
+        <td><a href="files/ui-html.html">افتح</a></td></tr>
+    <tr><td class="mono">web/ui.js</td><td>2661</td>
+        <td>منطق الصفحة + قاموس الترجمة</td>
+        <td><code>I18N</code> · <code>S</code> (الحالة) · <code>api()</code> · <code>profileFromForm</code> · <code>startRun</code> · <code>pollStatus</code> · <code>renderStatus</code> · <code>wire()</code></td>
+        <td><a href="files/ui-js.html">افتح</a></td></tr>
+    <tr><td class="mono">web/ui.css</td><td>480</td>
+        <td>التنسيق الكامل (بلا أي CDN)</td>
+        <td>متغيرات <code>:root</code> · أصناف النتائج <code>.v-*</code> · استعلامات الوسائط</td>
+        <td><a href="files/ui-css.html">افتح</a></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="layers">الطبقات وقواعد الاعتماد</h2>
+<p>الاعتماد يسير في اتجاه واحد؛ لا توجد دائرة استيراد واحدة في المشروع:</p>
+<pre><code>            ┌──────────────────────────────┐
+   الطبقة 5 │ cli.py  ·  web/server.py     │  ← نقاط الدخول (تربط كل شيء)
+            └───────────────┬──────────────┘
+                            │
+            ┌───────────────▼──────────────┐
+   الطبقة 4 │ engine.py  ·  capture.py     │  ← التنسيق والقرار
+            │ selftest.py                  │
+            └───────────────┬──────────────┘
+                            │
+            ┌───────────────▼──────────────┐
+   الطبقة 3 │ fingerprint.py · portals.py  │  ← الفهم: ماذا يعني هذا الرد؟
+            │ verify.py                    │     وماذا تطلب هذه البوابة؟
+            └───────────────┬──────────────┘
+                            │
+            ┌───────────────▼──────────────┐
+   الطبقة 2 │ httpclient.py · store.py     │  ← النقل والتخزين
+            └───────────────┬──────────────┘
+                            │
+            ┌───────────────▼──────────────┐
+   الطبقة 1 │ config.py · errors.py        │  ← الثوابت والتصنيف (لا تعتمد على شيء)
+            │ version_helpers.py           │
+            └──────────────────────────────┘</code></pre>
+<table class="t compact">
+  <thead><tr><th>القاعدة</th><th>الشرح</th></tr></thead>
+  <tbody>
+    <tr><td><code>config.py</code> لا يستورد من الحزمة</td><td>لكي يبقى كل رقم في مكان واحد يمكن قراءته وتعديله.</td></tr>
+    <tr><td><code>errors.py</code> لا يعرف شيئاً عن المحرك</td><td>يحوّل استثناءً إلى <code>kind</code> فقط.</td></tr>
+    <tr><td>لا وحدة تستورد <code>engine</code> ما عدا <code>cli/server/selftest/capture</code></td><td>يمنع الدوائر ويبقي المحرك قابلاً للاختبار.</td></tr>
+    <tr><td>الاستيراد داخل الدالة مسموح عند الحاجة فقط</td><td>مثل <code>from .portals import sanitize_login_url</code> داخل <code>store.migrate</code> لتجنّب دائرة.</td></tr>
+    <tr><td>لا مكتبات خارجية إطلاقاً</td><td>قاعدة تصميم صريحة: تعمل على هاتف/جهاز مقفل بدون <code>pip install</code>.</td></tr>
+  </tbody>
+</table>
+
+<h2 id="rules">قواعد التصميم السبع (كل واحدة وُلدت من عطل حقيقي)</h2>
+<ol>
+  <li><b>لا نجاح بلا دليل.</b> <code>Verdict.is_hit</code> صحيح فقط لأكواد <code>ACCEPTED*</code>،
+      وهذه لا تصدر إلا بتحويل خارج البوابة، أو كلمات نجاح متعلَّمة، أو فحص إنترنت حقيقي.
+      <span class="tag mod">fingerprint.py</span></li>
+  <li><b>لا تضيع أي محاولة.</b> مجموع العدّادات = عدد الكروت التي جُرّبت فعلاً؛
+      المنتج يستخدم <code>put()</code> بحد زمني حتى لا يعلّق الإيقافُ التشغيلَ،
+      وما يُترك يُحسب في <code>dropped</code>. <span class="tag mod">engine.py</span></li>
+  <li><b>خط أساس الرفض متعلَّم لا مفترض.</b> يُبنى من بطاقات تجريبية صحيحة الشكل،
+      ويقارَن بإخفاء القيم المتعلَّمة + الأنماط + تشابه الشكل.
+      بروفايل لا ينتج أي بطاقة يُرفض بسبب واضح بدل المعايرة على أساس فارغ.</li>
+  <li><b>التشغيل يُستأنف ولا يُعاد.</b> <code>space_pos</code> + <code>walk_a/walk_b</code>
+      في البروفايل، والصفحة تعيدها مع كل بداية.</li>
+  <li><b>عزل لكل خيط.</b> جلسة واحدة تشبه المتصفح لكل عامل: تفتح الصفحة أولاً لتأخذ
+      الكوكي والرمز، وتبتلع النموذج الجديد بعد كل رفض (رموز CSRF تُستخدم مرة).</li>
+  <li><b>الأسباب مفاتيح آلية</b> (<code>same_as_rejection_page_exact</code>،
+      <code>net_read_timeout</code>، <code>banned_by_router</code>…) والواجهة تترجمها —
+      فلا شيء مكتوب في مكانين.</li>
+  <li><b>كل مجهول يُحفظ ولا يُخمَّن.</b> الردود غير الواضحة تُكتب في
+      <code>kirapass_data/review/</code> مع كلمات الفرق.</li>
+</ol>
+<div class="danger">
+  <b>قاعدة صفر (تسبق السبع):</b> لا تُضف أي سلوك «يتجاوز» حجباً أو التواءً أو كابتشا.
+  كل مكان في الكود يتعامل مع الحجب يتوقف ويشرح ويطلب مراجعة مسؤول الشبكة.
+  تعديل هذا السلوك يغيّر طبيعة الأداة القانونية. انظر <a href="danger.html">أماكن الخطر</a>.
+</div>
+
+<h2 id="threads">الخيوط (threads) في لمحة</h2>
+<table class="t compact">
+  <thead><tr><th>الخيط</th><th>الاسم</th><th>ينشئه</th><th>وظيفته</th></tr></thead>
+  <tbody>
+    <tr><td>الرئيسي</td><td>MainThread</td><td><code>cli.main()</code></td><td>يشغّل <code>serve_forever</code> وينتظر <code>Ctrl+C</code></td></tr>
+    <tr><td>عامل HTTP</td><td>(ThreadingHTTPServer)</td><td>السيرفر</td><td>خيط لكل طلب وارد</td></tr>
+    <tr><td>منفّذ المهام</td><td><code>kirapass-job-*</code></td><td><code>ThreadPoolExecutor(2)</code></td><td>معايرة/تشخيص/قياس حجب في الخلفية</td></tr>
+    <tr><td>المحرك</td><td><code>kirapass-engine</code></td><td><code>Engine.start()</code></td><td>المعايرة ثم إنتاج الكروت في الطابور</td></tr>
+    <tr><td>العمّال</td><td><code>kirapass-w0…wN</code></td><td><code>Engine._run()</code></td><td>إرسال الكروت وتصنيف الردود</td></tr>
+    <tr><td>عمّال إضافيون</td><td><code>kirapass-wx*</code></td><td><code>_add_workers()</code></td><td>يزيدون تلقائياً عندما يكون الراوتر نظيفاً</td></tr>
+    <tr><td>المراقب</td><td><code>kirapass-watchdog</code></td><td><code>_start_watchdog()</code></td><td>يفحص كل 3 ثوانٍ: هل نزل الجدار؟</td></tr>
+    <tr><td>مؤقّت الإغلاق</td><td>Timer</td><td><code>/api/quit</code></td><td>يوقف السيرفر من خارج <code>serve_forever</code></td></tr>
+  </tbody>
+</table>
+<p><b>كل حالة مشتركة</b> في المحرك تُلمس فقط داخل <code>with self.lock:</code>.
+  هذا ليس تجميلياً: تحديث ضائع في <code>_ban_count</code> يعني صفحة حجب لا توقف التشغيل.</p>
+
+<h2 id="start-reading">من أين أبدأ القراءة؟</h2>
+<ol>
+  <li><a href="files/cli.html">cli.py</a> — 189 سطراً، يريك كل مداخل الأداة.</li>
+  <li><a href="files/config.html">config.py</a> — كل رقم ستحتاج معرفته.</li>
+  <li><a href="files/store.html">store.py</a> — شكل البروفايل ورياضيات الفضاء
+      (<code>decode_card</code> و<code>card_at_walk_pos</code>).</li>
+  <li><a href="files/portals.html">portals.py</a> — كيف تُقرأ صفحة الدخول.</li>
+  <li><a href="files/fingerprint.html">fingerprint.py</a> — قلب القرار: <code>Judge.classify</code>.</li>
+  <li><a href="files/engine.html">engine.py</a> — <code>calibrate</code> ثم <code>Engine._run</code> ثم <code>_attempt</code>.</li>
+  <li><a href="files/server.html">web/server.py</a> — كيف يصل كل ذلك إلى الصفحة.</li>
+  <li><a href="files/ui-js.html">web/ui.js</a> — كيف تُعرض النتائج.</li>
+</ol>
+
+<h2 id="run-tests">قبل أي تعديل وبعده</h2>
+<pre data-lines="1"><code># الاختبارات الوحدوية (90 اختباراً، ~70 ثانية)
+python3 -m unittest discover -s tests
+
+# السيناريوهات الكاملة على راوترات وهمية
+python3 KiraPass.py --selftest
+
+# فحص البيئة
+python3 KiraPass.py --check
+
+# الرحلة كاملة عبر API بدون متصفح
+python3 tools/checks/web_e2e.py</code></pre>
+<p>كل الاختبارات تعمل على <code>127.0.0.1</code> ضد <code>mockportal.MockPortal</code>،
+  ولا تلمس أي شبكة حقيقية، ولا تخلط بياناتها ببروفايلاتك
+  (عن طريق <code>config.set_data_dir()</code> إلى مجلد مؤقت).</p>
+
+<h2 id="conventions">اصطلاحات الكود</h2>
+<ul>
+  <li><b>بايثون</b>: <code>from __future__ import annotations</code> في كل وحدة،
+      تلميحات أنواع على التوقيعات، docstring إنجليزي قصير يشرح <i>السبب</i> لا <i>الماذا</i> الظاهر،
+      وتعليقات طويلة تشرح الدرس المستفاد من العطل القديم.</li>
+  <li><b>الأسطر</b>: ~79–100 عمود، ولا يوجد linter مفروض في المستودع.</li>
+  <li><b>الاستثناءات</b>: <code>except Exception:</code> مع <code># noqa: BLE001</code>
+      مقصود دائماً — الأداة يجب ألا تموت أبداً بسبب رد غريب.</li>
+  <li><b>المفاتيح الآلية</b>: كل سبب/حالة/كود هو نص إنجليزي صغير بحروف لاتينية وشرطات سفلية،
+      ويُترجم في <code>ui.js</code> فقط.</li>
+  <li><b>التنقيح (redaction)</b>: أي شيء يُكتب على القرص أو يُرسل للواجهة يمرّ عبر دالة تنقيح
+      (<code>safe_url</code>, <code>_safe_url_shape</code>, <code>redact_fields</code>,
+      <code>redact_review_body</code>, <code>safe_profile_snapshot</code>, <code>_scrub</code>).</li>
+  <li><b>جافاسكربت</b>: vanilla، <code>"use strict"</code>، لا build step، لا CDN،
+      كل النص عبر <code>t(key)</code>.</li>
+</ul>
+<p>التفاصيل الكاملة مع أمثلة في <a href="editing.html">دليل التعديل وأسلوب الكتابة</a>.</p>
+
+<footer class="docfoot">نظرة عامة للمطوّر · KiraPass — <code>docs/site/dev.html</code></footer>
+
+</main>
+</div>
+<script src="assets/docs.js"></script>
+<script>KPInit("dev");</script>
+</body>
+</html>

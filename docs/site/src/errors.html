@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>مصدر errors.py · KiraPass</title>
+<link rel="stylesheet" href="../assets/docs.css">
+
+</head>
+<body>
+<div id="kp-layout">
+<main class="doc">
+<h1>مصدر <code>errors.py</code></h1>
+<p class="lead">تحويل أي استثناء شبكة إلى كود ونص وتلميح — 138 سطراً. كل سطر يحمل تعليقه العربي.</p>
+<div class="card info"><b>هذه الصفحة مولّدة آلياً</b> من مصدر الكود مباشرة (<code>tools/docs/build_docs.py</code>). إن غيّرت الكود فأعد توليدها: <code>python3 tools/docs/build_docs.py</code>. الشرح اليدوي الأوسع في <a href="../architecture.html">المعمارية</a> و<a href="../editing.html">دليل التعديل</a> و<a href="../danger.html">أماكن الخطر</a>.</div>
+<p><a class="btn" href="../files/errors.html">← صفحة الشرح</a> <label class="muted"> قفز إلى سطر: <input id="kp-jump" style="width:6rem" placeholder="123"></label></p>
+<details class="src" open><summary>المصدر كاملاً</summary><pre data-lines="138"><code>
+<span class="ln" id="L1">1</span># بداية نص متعدد الأسطر — الأسطر التالية نصّ حرفي لا كود، فلا يقبل تعليقاً
+<span class="ln" id="L2">2</span>&quot;&quot;&quot;Turn any network exception into one clear, explainable answer.
+<span class="ln" id="L3">3</span> 
+<span class="ln" id="L4">4</span>The old version printed &quot;Err: &lt;python traceback&gt;&quot; or counted a card as
+<span class="ln" id="L5">5</span>&quot;tested&quot; when nothing was actually tested. Here every failure gets:
+<span class="ln" id="L6">6</span> 
+<span class="ln" id="L7">7</span>    kind   -&gt; a stable code the UI can colour and translate
+<span class="ln" id="L8">8</span>    text   -&gt; the raw message from the system (for experts)
+<span class="ln" id="L9">9</span>    hint   -&gt; a short plain-language explanation of what to check
+<span class="ln" id="L10">10</span> 
+<span class="ln" id="L11">11</span>`kind` values are deliberately few and meaningful.
+<span class="ln" id="L12">12</span>&quot;&quot;&quot;  # نهاية النص متعدد الأسطر
+<span class="ln" id="L13">13</span> 
+<span class="ln" id="L14">14</span>from __future__ import annotations  # استيراد annotations من الوحدة __future__
+<span class="ln" id="L15">15</span> 
+<span class="ln" id="L16">16</span>import errno  # استيراد الوحدة errno من المكتبة
+<span class="ln" id="L17">17</span>import http.client  # استيراد الوحدة http.client من المكتبة
+<span class="ln" id="L18">18</span>import socket  # استيراد الوحدة socket من المكتبة
+<span class="ln" id="L19">19</span>import ssl  # استيراد الوحدة ssl من المكتبة
+<span class="ln" id="L20">20</span> 
+<span class="ln" id="L21">21</span># النوع ← (قابل للإعادة، وصف عربي قصير، وصف إنجليزي قصير)
+<span class="ln" id="L22">22</span>KINDS = {  # إسناد قاموس إلى KINDS
+<span class="ln" id="L23">23</span>    &quot;dns&quot;: (False, &quot;اسم العنوان لم يُترجم (DNS)&quot;, &quot;host name could not be resolved&quot;),  # مفتاح dns في القاموس
+<span class="ln" id="L24">24</span>    &quot;refused&quot;: (False, &quot;الراوتر رفض الاتصال (البورت مغلق أو الحماية رفضتك)&quot;,  # مفتاح refused في القاموس
+<span class="ln" id="L25">25</span>                &quot;connection refused by the router&quot;),  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L26">26</span>    &quot;connect_timeout&quot;: (True, &quot;لا يوجد رد عند فتح الاتصال (الشبكة مقطوعة أو الراوتر مشغول)&quot;,  # مفتاح connect_timeout في القاموس
+<span class="ln" id="L27">27</span>                        &quot;timeout while opening the connection&quot;),  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L28">28</span>    &quot;read_timeout&quot;: (True, &quot;الاتصال نجح لكن الراوتر تأخر في الرد (ضغط أو RADIUS بطيء)&quot;,  # مفتاح read_timeout في القاموس
+<span class="ln" id="L29">29</span>                     &quot;the router accepted the connection but never answered&quot;),  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L30">30</span>    &quot;reset&quot;: (True, &quot;الراوتر قطع الاتصال فجأة (حماية أو عميل مطرود)&quot;,  # مفتاح reset في القاموس
+<span class="ln" id="L31">31</span>              &quot;the connection was reset in the middle&quot;),  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L32">32</span>    &quot;stale&quot;: (True, &quot;اتصال قديم أُغلق من جهة الراوتر (يُعاد تلقائياً)&quot;,  # مفتاح stale في القاموس
+<span class="ln" id="L33">33</span>              &quot;keep-alive connection was closed by the router&quot;),  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L34">34</span>    &quot;tls&quot;: (False, &quot;خطأ في شهادة TLS&quot;, &quot;TLS/certificate error&quot;),  # مفتاح tls في القاموس
+<span class="ln" id="L35">35</span>    &quot;unreachable&quot;: (False, &quot;الشبكة غير قابلة للوصول (لست متصلاً بها)&quot;,  # مفتاح unreachable في القاموس
+<span class="ln" id="L36">36</span>                    &quot;network is unreachable&quot;),  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L37">37</span>    &quot;bad_response&quot;: (True, &quot;رد غير مفهوم من الراوتر&quot;,  # مفتاح bad_response في القاموس
+<span class="ln" id="L38">38</span>                     &quot;the router sent an unreadable response&quot;),  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L39">39</span>    &quot;too_many_redirects&quot;: (False, &quot;دوران لا نهائي في التحويل (redirect loop)&quot;,  # مفتاح too_many_redirects في القاموس
+<span class="ln" id="L40">40</span>                           &quot;too many redirects&quot;),  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L41">41</span>    &quot;proto&quot;: (False, &quot;بروتوكول غير مدعوم&quot;, &quot;unsupported protocol&quot;),  # مفتاح proto في القاموس
+<span class="ln" id="L42">42</span>    &quot;unknown&quot;: (True, &quot;خطأ غير متوقع&quot;, &quot;unexpected network error&quot;),  # مفتاح unknown في القاموس
+<span class="ln" id="L43">43</span>    # البوابة لم تعطِنا صفحة دخولها، فالإرسال سيرفض
+<span class="ln" id="L44">44</span>    # فقط: البطاقة لم تُختبر، ونقول ذلك بدل التخمين
+<span class="ln" id="L45">45</span>    &quot;no_session&quot;: (True, &quot;لم نستطع أخذ صفحة الدخول (لا جلسة) - الكرت لم يُجرَّب&quot;,  # مفتاح no_session في القاموس
+<span class="ln" id="L46">46</span>                   &quot;could not fetch the login page (no session) - card not tested&quot;),  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L47">47</span>}  # إغلاق القوس المفتوح في السطر السابق
+<span class="ln" id="L48">48</span> 
+<span class="ln" id="L49">49</span># أخطاء غالباً مجرد اتصال keep-alive ميت: تُعاد بصمت.
+<span class="ln" id="L50">50</span>RETRY_KINDS = (&quot;stale&quot;, &quot;reset&quot;, &quot;read_timeout&quot;, &quot;bad_response&quot;, &quot;unknown&quot;)  # إسناد مجموعة إلى RETRY_KINDS
+<span class="ln" id="L51">51</span> 
+<span class="ln" id="L52">52</span> 
+<span class="ln" id="L53">53</span># خطأ شبكة واحد: kind (كود ثابت) + text (رسالة النظام) + url.
+<span class="ln" id="L54">54</span># retryable وshort خاصيتان محسوبتان من جدول KINDS.
+<span class="ln" id="L55">55</span>class NetError(Exception):  # تعريف الصنف NetError يرث من Exception
+<span class="ln" id="L56">56</span>    &quot;&quot;&quot;One network failure with a machine code and a human hint.&quot;&quot;&quot;  # نص توثيقي (docstring) يشرح ما يليه
+<span class="ln" id="L57">57</span> 
+<span class="ln" id="L58">58</span>    def __init__(self, kind: str, text: str, url: str = &quot;&quot;):  # تعريف الدالة __init__(self, kind, text, url)
+<span class="ln" id="L59">59</span>        super().__init__(text)  # استدعاء super().__init__ (معامل واحد)
+<span class="ln" id="L60">60</span>        self.kind = kind  # إسناد kind إلى self.kind
+<span class="ln" id="L61">61</span>        self.text = text  # إسناد text إلى self.text
+<span class="ln" id="L62">62</span>        self.url = url  # إسناد url إلى self.url
+<span class="ln" id="L63">63</span> 
+<span class="ln" id="L64">64</span>    @property  # مُزخرف (decorator) بـproperty
+<span class="ln" id="L65">65</span>    def retryable(self) -&gt; bool:  # تعريف الدالة retryable(self) ترجع bool
+<span class="ln" id="L66">66</span>        return KINDS.get(self.kind, KINDS[&quot;unknown&quot;])[0]  # إرجاع KINDS.get(self.kind, KINDS[&#x27;unknown&#x27;])[0]
+<span class="ln" id="L67">67</span> 
+<span class="ln" id="L68">68</span>    @property  # مُزخرف (decorator) بـproperty
+<span class="ln" id="L69">69</span>    def short(self) -&gt; str:  # تعريف الدالة short(self) ترجع str
+<span class="ln" id="L70">70</span>        return KINDS.get(self.kind, KINDS[&quot;unknown&quot;])[1]  # إرجاع KINDS.get(self.kind, KINDS[&#x27;unknown&#x27;])[1]
+<span class="ln" id="L71">71</span> 
+<span class="ln" id="L72">72</span>    def as_dict(self) -&gt; dict:  # تعريف الدالة as_dict(self) ترجع dict
+<span class="ln" id="L73">73</span>        return {&quot;kind&quot;: self.kind, &quot;text&quot;: self.text[:300], &quot;url&quot;: self.url}  # إرجاع قاموس
+<span class="ln" id="L74">74</span> 
+<span class="ln" id="L75">75</span> 
+<span class="ln" id="L76">76</span># يحوّل أي استثناء بايثون إلى NetError واحد له كود ونص وتلميح.
+<span class="ln" id="L77">77</span># ترتيب الفروع مقصود: الأنواع الدقيقة أولاً، ثم مطابقة النص.
+<span class="ln" id="L78">78</span># في بايثون ≥3.10 socket.timeout هو TimeoutError نفسه ويرتفع للمرحلتين،
+<span class="ln" id="L79">79</span># لذلك مرحلة فتح الاتصال ملفوفة في httpclient._send_once وحدها.
+<span class="ln" id="L80">80</span>def classify(exc: BaseException, url: str = &quot;&quot;) -&gt; NetError:  # تعريف الدالة classify(exc, url) ترجع NetError
+<span class="ln" id="L81">81</span>    &quot;&quot;&quot;Map a python exception to a NetError.&quot;&quot;&quot;  # نص توثيقي (docstring) يشرح ما يليه
+<span class="ln" id="L82">82</span>    if isinstance(exc, NetError):  # شرط: نتيجة isinstance(exc, NetError)
+<span class="ln" id="L83">83</span>        return exc  # إرجاع exc
+<span class="ln" id="L84">84</span> 
+<span class="ln" id="L85">85</span>    text = f&quot;{type(exc).__name__}: {exc}&quot;  # بناء نص منسّق وإسناده إلى text
+<span class="ln" id="L86">86</span>    low = text.lower()  # إسناد نتيجة استدعاء text.lower إلى low
+<span class="ln" id="L87">87</span> 
+<span class="ln" id="L88">88</span>    if isinstance(exc, ssl.SSLError):  # شرط: نتيجة isinstance(exc, ssl.SSLError)
+<span class="ln" id="L89">89</span>        kind = &quot;tls&quot;  # إسناد القيمة الثابتة kind
+<span class="ln" id="L90">90</span>    elif isinstance(exc, socket.gaierror):  # شرط: نتيجة isinstance(exc, socket.gaierror)
+<span class="ln" id="L91">91</span>        kind = &quot;dns&quot;  # إسناد القيمة الثابتة kind
+<span class="ln" id="L92">92</span>    elif isinstance(exc, (http.client.RemoteDisconnected,)):  # شرط: نتيجة isinstance(exc, مجموعة)
+<span class="ln" id="L93">93</span>        # اتصال keep-alive أغلقه الراوتر بين طلبين
+<span class="ln" id="L94">94</span>        kind = &quot;stale&quot;  # إسناد القيمة الثابتة kind
+<span class="ln" id="L95">95</span>    elif isinstance(exc, (http.client.IncompleteRead,  # شرط: نتيجة isinstance(exc, مجموعة)
+<span class="ln" id="L96">96</span>                          http.client.LineTooLong)):  # تكملة تعريف متعدد الأسطر
+<span class="ln" id="L97">97</span>        kind = &quot;bad_response&quot;  # إسناد القيمة الثابتة kind
+<span class="ln" id="L98">98</span>    elif isinstance(exc, socket.timeout):  # شرط: نتيجة isinstance(exc, socket.timeout)
+<span class="ln" id="L99">99</span>        # بايثون ≥ 3.10: socket.timeout هو TimeoutError نفسه، وhttp.client
+<span class="ln" id="L100">100</span>        # يرفعه للمرحلتين. العميل يلفّ مرحلة الاتصال
+<span class="ln" id="L101">101</span>        # بنفسه (انظر httpclient.Session._send_once)، لذلك أي شيء
+<span class="ln" id="L102">102</span>        # يصل إلى هنا كان فعلاً قراءة لم تكتمل.
+<span class="ln" id="L103">103</span>        kind = &quot;read_timeout&quot;  # إسناد القيمة الثابتة kind
+<span class="ln" id="L104">104</span>    elif isinstance(exc, ConnectionRefusedError):  # شرط: نتيجة isinstance(exc, ConnectionRefusedError)
+<span class="ln" id="L105">105</span>        kind = &quot;refused&quot;  # إسناد القيمة الثابتة kind
+<span class="ln" id="L106">106</span>    elif isinstance(exc, (ConnectionResetError, BrokenPipeError)):  # شرط: نتيجة isinstance(exc, مجموعة)
+<span class="ln" id="L107">107</span>        kind = &quot;reset&quot;  # إسناد القيمة الثابتة kind
+<span class="ln" id="L108">108</span>    elif isinstance(exc, ConnectionAbortedError):  # شرط: نتيجة isinstance(exc, ConnectionAbortedError)
+<span class="ln" id="L109">109</span>        kind = &quot;reset&quot;  # إسناد القيمة الثابتة kind
+<span class="ln" id="L110">110</span>    elif isinstance(exc, OSError) and getattr(exc, &quot;errno&quot;, None) == errno.ENETUNREACH:  # شرط مركّب (و)
+<span class="ln" id="L111">111</span>        kind = &quot;unreachable&quot;  # إسناد القيمة الثابتة kind
+<span class="ln" id="L112">112</span>    elif isinstance(exc, http.client.HTTPException):  # شرط: نتيجة isinstance(exc, http.client.HTTPException)
+<span class="ln" id="L113">113</span>        kind = &quot;bad_response&quot;  # إسناد القيمة الثابتة kind
+<span class="ln" id="L114">114</span>    # شرط مركّب (أو)
+<span class="ln" id="L115">115</span>    elif &quot;remotedisconnected&quot; in low or &quot;remote end closed&quot; in low \
+<span class="ln" id="L116">116</span>            or &quot;badstatusline&quot; in low or &quot;cannot read from timed out&quot; in low:  # تكملة تعريف متعدد الأسطر
+<span class="ln" id="L117">117</span>        kind = &quot;stale&quot;  # إسناد القيمة الثابتة kind
+<span class="ln" id="L118">118</span>    elif &quot;reset by peer&quot; in low or &quot;connection aborted&quot; in low:  # شرط مركّب (أو)
+<span class="ln" id="L119">119</span>        kind = &quot;reset&quot;  # إسناد القيمة الثابتة kind
+<span class="ln" id="L120">120</span>    elif &quot;refused&quot; in low:  # شرط: &#x27;refused&#x27; ضمن low
+<span class="ln" id="L121">121</span>        kind = &quot;refused&quot;  # إسناد القيمة الثابتة kind
+<span class="ln" id="L122">122</span>    elif &quot;timed out&quot; in low or &quot;timeout&quot; in low:  # شرط مركّب (أو)
+<span class="ln" id="L123">123</span>        kind = &quot;read_timeout&quot;  # إسناد القيمة الثابتة kind
+<span class="ln" id="L124">124</span>    # شرط مركّب (أو)
+<span class="ln" id="L125">125</span>    elif &quot;name or service not known&quot; in low or &quot;nodename nor servname&quot; in low \
+<span class="ln" id="L126">126</span>            or &quot;getaddrinfo&quot; in low or &quot;name resolution&quot; in low:  # تكملة تعريف متعدد الأسطر
+<span class="ln" id="L127">127</span>        kind = &quot;dns&quot;  # إسناد القيمة الثابتة kind
+<span class="ln" id="L128">128</span>    elif &quot;no route to host&quot; in low or &quot;network is unreachable&quot; in low:  # شرط مركّب (أو)
+<span class="ln" id="L129">129</span>        kind = &quot;unreachable&quot;  # إسناد القيمة الثابتة kind
+<span class="ln" id="L130">130</span>    elif &quot;incompleteread&quot; in low or &quot;chunked&quot; in low or &quot;invalid http&quot; in low:  # شرط مركّب (أو)
+<span class="ln" id="L131">131</span>        kind = &quot;bad_response&quot;  # إسناد القيمة الثابتة kind
+<span class="ln" id="L132">132</span>    elif isinstance(exc, ValueError):  # شرط: نتيجة isinstance(exc, ValueError)
+<span class="ln" id="L133">133</span>        kind = &quot;proto&quot;  # إسناد القيمة الثابتة kind
+<span class="ln" id="L134">134</span>    else:  # مفتاح else في القاموس
+<span class="ln" id="L135">135</span>        kind = &quot;unknown&quot;  # إسناد القيمة الثابتة kind
+<span class="ln" id="L136">136</span> 
+<span class="ln" id="L137">137</span>    return NetError(kind, text, url)  # إرجاع NetError(kind, text, url)
+<span class="ln" id="L138">138</span> 
+</code></pre></details>
+<script>
+document.getElementById("kp-jump").addEventListener("change", function (e) {
+  var n = parseInt(e.target.value, 10);
+  if (n > 0) { var el = document.getElementById("L" + n);
+    if (el) el.scrollIntoView({block: "center"}); }
+});
+if (location.hash) { var el = document.querySelector(location.hash);
+  if (el) setTimeout(function () { el.scrollIntoView({block: "center"}); }, 60); }
+</script>
+<footer class="docfoot">صفحة مولّدة آلياً من مصدر الكود · KiraPass —
+<code>files</code> · 2026-10-01 02:26</footer>
+</main>
+</div>
+<script src="../assets/docs.js"></script>
+<script>KPInit("files");</script>
+</body>
+</html>

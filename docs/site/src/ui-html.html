@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>مصدر web/ui.html · KiraPass</title>
+<link rel="stylesheet" href="../assets/docs.css">
+
+</head>
+<body>
+<div id="kp-layout">
+<main class="doc">
+<h1>مصدر <code>web/ui.html</code></h1>
+<p class="lead">هيكل الصفحة: كل العناصر والمعرّفات — 746 سطراً. كل سطر يحمل تعليقه العربي.</p>
+<div class="card info"><b>هذه الصفحة مولّدة آلياً</b> من مصدر الكود مباشرة (<code>tools/docs/build_docs.py</code>). إن غيّرت الكود فأعد توليدها: <code>python3 tools/docs/build_docs.py</code>. الشرح اليدوي الأوسع في <a href="../architecture.html">المعمارية</a> و<a href="../editing.html">دليل التعديل</a> و<a href="../danger.html">أماكن الخطر</a>.</div>
+<p><a class="btn" href="../files/ui-html.html">← صفحة الشرح</a> <label class="muted"> قفز إلى سطر: <input id="kp-jump" style="width:6rem" placeholder="123"></label></p>
+<details class="src" open><summary>المصدر كاملاً</summary><pre data-lines="746"><code>
+<span class="ln" id="L1">1</span>&lt;!-- إعلان نوع المستند (HTML5) --&gt;
+<span class="ln" id="L2">2</span>&lt;!DOCTYPE html&gt;
+<span class="ln" id="L3">3</span>&lt;!-- عنصر html --&gt;
+<span class="ln" id="L4">4</span>&lt;html lang=&quot;ar&quot; dir=&quot;rtl&quot;&gt;
+<span class="ln" id="L5">5</span>&lt;!-- عنصر head --&gt;
+<span class="ln" id="L6">6</span>&lt;head&gt;
+<span class="ln" id="L7">7</span>&lt;!-- وصف للمستند --&gt;
+<span class="ln" id="L8">8</span>&lt;meta charset=&quot;utf-8&quot;&gt;
+<span class="ln" id="L9">9</span>&lt;!-- وصف للمستند --&gt;
+<span class="ln" id="L10">10</span>&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1, viewport-fit=cover&quot;&gt;
+<span class="ln" id="L11">11</span>&lt;!-- وصف للمستند --&gt;
+<span class="ln" id="L12">12</span>&lt;meta name=&quot;color-scheme&quot; content=&quot;dark&quot;&gt;
+<span class="ln" id="L13">13</span>&lt;!-- وصف للمستند --&gt;
+<span class="ln" id="L14">14</span>&lt;meta name=&quot;theme-color&quot; content=&quot;#080d17&quot;&gt;
+<span class="ln" id="L15">15</span>&lt;!-- عنوان الصفحة --&gt;
+<span class="ln" id="L16">16</span>&lt;title&gt;KiraPass — أداة اختبار شبكات الهوتسبوت&lt;/title&gt;
+<span class="ln" id="L17">17</span>&lt;!-- ربط ملف خارجي --&gt;
+<span class="ln" id="L18">18</span>&lt;link rel=&quot;stylesheet&quot; href=&quot;/ui.css&quot;&gt;
+<span class="ln" id="L19">19</span>&lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L20">20</span>&lt;/head&gt;
+<span class="ln" id="L21">21</span>&lt;!-- عنصر body --&gt;
+<span class="ln" id="L22">22</span>&lt;body&gt;
+<span class="ln" id="L23">23</span>&lt;!-- رابط وصنف skip-link --&gt;
+<span class="ln" id="L24">24</span>&lt;a class=&quot;skip-link&quot; href=&quot;#panel-scan&quot; data-i18n=&quot;skip_content&quot;&gt;تجاوز إلى المحتوى&lt;/a&gt;
+<span class="ln" id="L25">25</span> 
+<span class="ln" id="L26">26</span>&lt;!-- ترويسة وصنف top --&gt;
+<span class="ln" id="L27">27</span>&lt;header class=&quot;top&quot;&gt;
+<span class="ln" id="L28">28</span>  &lt;!-- حاوية (div) وصنف brand --&gt;
+<span class="ln" id="L29">29</span>  &lt;div class=&quot;brand&quot;&gt;
+<span class="ln" id="L30">30</span>    &lt;!-- جزء نصي وصنف logo --&gt;
+<span class="ln" id="L31">31</span>    &lt;span class=&quot;logo&quot; aria-hidden=&quot;true&quot;&gt;K&lt;/span&gt;
+<span class="ln" id="L32">32</span>    &lt;!-- جزء نصي وصنف brand-copy --&gt;
+<span class="ln" id="L33">33</span>    &lt;span class=&quot;brand-copy&quot;&gt;&lt;span class=&quot;name&quot;&gt;KiraPass&lt;/span&gt;
+<span class="ln" id="L34">34</span>      &lt;!-- جزء نصي وصنف tagline --&gt;
+<span class="ln" id="L35">35</span>      &lt;span class=&quot;tagline&quot; data-i18n=&quot;brand_subtitle&quot;&gt;اختبار شبكات مصرح به&lt;/span&gt;&lt;/span&gt;
+<span class="ln" id="L36">36</span>    &lt;!-- جزء نصي بمعرّف verPill وصنف ver --&gt;
+<span class="ln" id="L37">37</span>    &lt;span class=&quot;ver&quot; id=&quot;verPill&quot;&gt;v5&lt;/span&gt;
+<span class="ln" id="L38">38</span>  &lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L39">39</span>  &lt;/div&gt;
+<span class="ln" id="L40">40</span>  &lt;!-- حاوية (div) وصنف top-actions --&gt;
+<span class="ln" id="L41">41</span>  &lt;div class=&quot;top-actions&quot;&gt;
+<span class="ln" id="L42">42</span>  &lt;!-- جزء نصي بمعرّف statePill وصنف pill --&gt;
+<span class="ln" id="L43">43</span>  &lt;span class=&quot;pill&quot; id=&quot;statePill&quot; aria-live=&quot;polite&quot;&gt;جاهز&lt;/span&gt;
+<span class="ln" id="L44">44</span>  &lt;!-- زر بمعرّف langBtn وصنف btn ghost --&gt;
+<span class="ln" id="L45">45</span>  &lt;button class=&quot;btn ghost&quot; id=&quot;langBtn&quot; title=&quot;اللغة&quot; aria-label=&quot;تغيير اللغة&quot;&gt;EN&lt;/button&gt;
+<span class="ln" id="L46">46</span>  &lt;!-- زر بمعرّف cacheBtn وصنف btn ghost icon-btn --&gt;
+<span class="ln" id="L47">47</span>  &lt;button class=&quot;btn ghost icon-btn&quot; id=&quot;cacheBtn&quot; title=&quot;مسح الكاش&quot; aria-label=&quot;مسح الكاش&quot;&gt;🧹&lt;/button&gt;
+<span class="ln" id="L48">48</span>  &lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L49">49</span>  &lt;/div&gt;
+<span class="ln" id="L50">50</span>&lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L51">51</span>&lt;/header&gt;
+<span class="ln" id="L52">52</span> 
+<span class="ln" id="L53">53</span>&lt;!-- حاوية (div) بمعرّف banner وصنف banner --&gt;
+<span class="ln" id="L54">54</span>&lt;div class=&quot;banner&quot; id=&quot;banner&quot;&gt;
+<span class="ln" id="L55">55</span>  &lt;!-- جزء نصي وصنف banner-icon --&gt;
+<span class="ln" id="L56">56</span>  &lt;span class=&quot;banner-icon&quot; aria-hidden=&quot;true&quot;&gt;!&lt;/span&gt;
+<span class="ln" id="L57">57</span>  &lt;!-- توكيد قوي بمعرّف bannerTitle --&gt;
+<span class="ln" id="L58">58</span>  &lt;strong id=&quot;bannerTitle&quot; data-i18n=&quot;banner_title&quot;&gt;استخدام مصرّح به فقط&lt;/strong&gt;
+<span class="ln" id="L59">59</span>  &lt;!-- جزء نصي بمعرّف bannerText --&gt;
+<span class="ln" id="L60">60</span>  &lt;span id=&quot;bannerText&quot; data-i18n=&quot;banner_text&quot;&gt;هذه الأداة للاختبار على شبكة تملكها أو لديك إذن كتابي من صاحبها. لا تستخدمها على شبكة غيرك.&lt;/span&gt;
+<span class="ln" id="L61">61</span>  &lt;!-- زر بمعرّف bannerMore وصنف btn tiny ghost --&gt;
+<span class="ln" id="L62">62</span>  &lt;button class=&quot;btn tiny ghost&quot; id=&quot;bannerMore&quot; data-i18n=&quot;banner_more&quot;&gt;التفاصيل&lt;/button&gt;
+<span class="ln" id="L63">63</span>&lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L64">64</span>&lt;/div&gt;
+<span class="ln" id="L65">65</span> 
+<span class="ln" id="L66">66</span>&lt;!-- شريط تنقّل بمعرّف steps وصنف steps steps-hidden --&gt;
+<span class="ln" id="L67">67</span>&lt;nav class=&quot;steps steps-hidden&quot; id=&quot;steps&quot; aria-label=&quot;خطوات الاستخدام&quot; hidden&gt;
+<span class="ln" id="L68">68</span>  &lt;!-- زر وصنف step --&gt;
+<span class="ln" id="L69">69</span>  &lt;button class=&quot;step&quot; data-step=&quot;start&quot;&gt;&lt;b&gt;•&lt;/b&gt;&lt;span data-i18n=&quot;step_start&quot;&gt;البداية&lt;/span&gt;&lt;/button&gt;
+<span class="ln" id="L70">70</span>  &lt;!-- زر وصنف step --&gt;
+<span class="ln" id="L71">71</span>  &lt;button class=&quot;step&quot; data-step=&quot;scan&quot;&gt;&lt;b&gt;1&lt;/b&gt;&lt;span data-i18n=&quot;step_scan&quot;&gt;فحص الشبكة&lt;/span&gt;&lt;/button&gt;
+<span class="ln" id="L72">72</span>  &lt;!-- زر وصنف step --&gt;
+<span class="ln" id="L73">73</span>  &lt;button class=&quot;step&quot; data-step=&quot;format&quot;&gt;&lt;b&gt;2&lt;/b&gt;&lt;span data-i18n=&quot;step_format&quot;&gt;صيغة البطاقة&lt;/span&gt;&lt;/button&gt;
+<span class="ln" id="L74">74</span>  &lt;!-- زر وصنف step --&gt;
+<span class="ln" id="L75">75</span>  &lt;button class=&quot;step&quot; data-step=&quot;run&quot;&gt;&lt;b&gt;3&lt;/b&gt;&lt;span data-i18n=&quot;step_run&quot;&gt;التشغيل&lt;/span&gt;&lt;/button&gt;
+<span class="ln" id="L76">76</span>  &lt;!-- زر وصنف step --&gt;
+<span class="ln" id="L77">77</span>  &lt;button class=&quot;step&quot; data-step=&quot;results&quot;&gt;&lt;b&gt;4&lt;/b&gt;&lt;span data-i18n=&quot;step_results&quot;&gt;النتائج&lt;/span&gt;&lt;/button&gt;
+<span class="ln" id="L78">78</span>&lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L79">79</span>&lt;/nav&gt;
+<span class="ln" id="L80">80</span> 
+<span class="ln" id="L81">81</span>&lt;!-- المحتوى الرئيسي --&gt;
+<span class="ln" id="L82">82</span>&lt;main&gt;
+<span class="ln" id="L83">83</span> 
+<span class="ln" id="L84">84</span>&lt;!-- ============ START: choice ============ --&gt;
+<span class="ln" id="L85">85</span>&lt;!-- قسم بمعرّف panel-start وصنف panel active --&gt;
+<span class="ln" id="L86">86</span>&lt;section class=&quot;panel active&quot; id=&quot;panel-start&quot;&gt;
+<span class="ln" id="L87">87</span>  &lt;!-- عنوان مستوى 2 --&gt;
+<span class="ln" id="L88">88</span>  &lt;h2 data-i18n=&quot;start_title&quot;&gt;KiraPass — البداية&lt;/h2&gt;
+<span class="ln" id="L89">89</span>  &lt;!-- فقرة وصنف hint --&gt;
+<span class="ln" id="L90">90</span>  &lt;p class=&quot;hint&quot; data-i18n=&quot;start_hint&quot;&gt;اختر مسار العمل. لن يبدأ أي فحص أو تخمين تلقائياً قبل تأكيدك الصريح.&lt;/p&gt;
+<span class="ln" id="L91">91</span>  &lt;!-- حاوية (div) وصنف row wrap --&gt;
+<span class="ln" id="L92">92</span>  &lt;div class=&quot;row wrap&quot; style=&quot;gap:16px&quot;&gt;
+<span class="ln" id="L93">93</span>    &lt;!-- زر بمعرّف btnNewProfile وصنف btn primary big --&gt;
+<span class="ln" id="L94">94</span>    &lt;button class=&quot;btn primary big&quot; id=&quot;btnNewProfile&quot; data-i18n=&quot;btn_new_profile&quot;&gt;بروفايل جديد&lt;/button&gt;
+<span class="ln" id="L95">95</span>    &lt;!-- زر بمعرّف btnSavedProfile وصنف btn big --&gt;
+<span class="ln" id="L96">96</span>    &lt;button class=&quot;btn big&quot; id=&quot;btnSavedProfile&quot; data-i18n=&quot;btn_saved_profile&quot;&gt;استخدام بروفايل محفوظ&lt;/button&gt;
+<span class="ln" id="L97">97</span>  &lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L98">98</span>  &lt;/div&gt;
+<span class="ln" id="L99">99</span>  &lt;!-- حاوية (div) بمعرّف startProfilesInfo وصنف card muted --&gt;
+<span class="ln" id="L100">100</span>  &lt;div class=&quot;card muted&quot; id=&quot;startProfilesInfo&quot;&gt;&lt;/div&gt;
+<span class="ln" id="L101">101</span>  &lt;!-- حاوية (div) بمعرّف startProbeCard وصنف card --&gt;
+<span class="ln" id="L102">102</span>  &lt;div class=&quot;card&quot; id=&quot;startProbeCard&quot;&gt;
+<span class="ln" id="L103">103</span>    &lt;!-- عنوان مستوى 3 --&gt;
+<span class="ln" id="L104">104</span>    &lt;h3 data-i18n=&quot;probe_link_title&quot;&gt;فحص الاتصال بالراوتر&lt;/h3&gt;
+<span class="ln" id="L105">105</span>    &lt;!-- فقرة وصنف hint --&gt;
+<span class="ln" id="L106">106</span>    &lt;p class=&quot;hint&quot; data-i18n=&quot;probe_link_hint&quot;&gt;طلب GET واحد فقط للرابط — يعرض النتيجة دون تخمين أو إرسال بطاقات.&lt;/p&gt;
+<span class="ln" id="L107">107</span>    &lt;!-- حاوية (div) وصنف row wrap --&gt;
+<span class="ln" id="L108">108</span>    &lt;div class=&quot;row wrap&quot;&gt;
+<span class="ln" id="L109">109</span>      &lt;!-- حقل إدخال بمعرّف probeUrl وصنف grow — ويستمر في السطر التالي بخصائص: placeholder --&gt;
+<span class="ln" id="L110">110</span>      &lt;input id=&quot;probeUrl&quot; class=&quot;grow&quot; type=&quot;url&quot; inputmode=&quot;url&quot; autocomplete=&quot;off&quot;
+<span class="ln" id="L111">111</span>             placeholder=&quot;http://10.5.50.1/login&quot;&gt;
+<span class="ln" id="L112">112</span>      &lt;!-- زر بمعرّف probeLinkBtn وصنف btn --&gt;
+<span class="ln" id="L113">113</span>      &lt;button class=&quot;btn&quot; id=&quot;probeLinkBtn&quot; data-i18n=&quot;probe_link_button&quot;&gt;افحص الاتصال&lt;/button&gt;
+<span class="ln" id="L114">114</span>    &lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L115">115</span>    &lt;/div&gt;
+<span class="ln" id="L116">116</span>    &lt;!-- حاوية (div) بمعرّف probeLinkResult وصنف hidden --&gt;
+<span class="ln" id="L117">117</span>    &lt;div class=&quot;hidden&quot; id=&quot;probeLinkResult&quot;&gt;&lt;/div&gt;
+<span class="ln" id="L118">118</span>  &lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L119">119</span>  &lt;/div&gt;
+<span class="ln" id="L120">120</span>  &lt;!-- حاوية (div) بمعرّف lanWarningCard وصنف card hidden --&gt;
+<span class="ln" id="L121">121</span>  &lt;div class=&quot;card hidden&quot; id=&quot;lanWarningCard&quot;&gt;&lt;/div&gt;
+<span class="ln" id="L122">122</span>&lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L123">123</span>&lt;/section&gt;
+<span class="ln" id="L124">124</span> 
+<span class="ln" id="L125">125</span>&lt;!-- ============ SAVED LIST ============ --&gt;
+<span class="ln" id="L126">126</span>&lt;!-- قسم بمعرّف panel-saved وصنف panel --&gt;
+<span class="ln" id="L127">127</span>&lt;section class=&quot;panel&quot; id=&quot;panel-saved&quot;&gt;
+<span class="ln" id="L128">128</span>  &lt;!-- عنوان مستوى 2 --&gt;
+<span class="ln" id="L129">129</span>  &lt;h2 data-i18n=&quot;saved_title&quot;&gt;البروفايلات المحفوظة&lt;/h2&gt;
+<span class="ln" id="L130">130</span>  &lt;!-- فقرة وصنف hint --&gt;
+<span class="ln" id="L131">131</span>  &lt;p class=&quot;hint&quot; data-i18n=&quot;saved_hint&quot;&gt;اختر بروفايل لمراجعة إعداداته قبل التشغيل. لن يبدأ أي فحص أو تخمين تلقائياً.&lt;/p&gt;
+<span class="ln" id="L132">132</span>  &lt;!-- حاوية (div) وصنف row wrap --&gt;
+<span class="ln" id="L133">133</span>  &lt;div class=&quot;row wrap&quot;&gt;
+<span class="ln" id="L134">134</span>    &lt;!-- تسمية حقل وصنف grow --&gt;
+<span class="ln" id="L135">135</span>    &lt;label class=&quot;grow&quot;&gt;&lt;span class=&quot;sr-only&quot; data-i18n=&quot;saved_search&quot;&gt;بحث في البروفايلات&lt;/span&gt;
+<span class="ln" id="L136">136</span>      &lt;!-- حقل إدخال بمعرّف savedSearch — ويستمر في السطر التالي بخصائص: data-i18n-placeholder, placeholder --&gt;
+<span class="ln" id="L137">137</span>      &lt;input id=&quot;savedSearch&quot; type=&quot;search&quot; autocomplete=&quot;off&quot;
+<span class="ln" id="L138">138</span>             data-i18n-placeholder=&quot;saved_search_ph&quot; placeholder=&quot;ابحث بالاسم أو الرابط…&quot;&gt;&lt;/label&gt;
+<span class="ln" id="L139">139</span>    &lt;!-- زر بمعرّف importProfileBtn وصنف btn --&gt;
+<span class="ln" id="L140">140</span>    &lt;button class=&quot;btn&quot; id=&quot;importProfileBtn&quot; data-i18n=&quot;btn_import_profile&quot;&gt;استيراد JSON&lt;/button&gt;
+<span class="ln" id="L141">141</span>    &lt;!-- حقل إدخال بمعرّف importProfileFile وصنف hidden --&gt;
+<span class="ln" id="L142">142</span>    &lt;input type=&quot;file&quot; id=&quot;importProfileFile&quot; accept=&quot;application/json,.json&quot; class=&quot;hidden&quot;&gt;
+<span class="ln" id="L143">143</span>  &lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L144">144</span>  &lt;/div&gt;
+<span class="ln" id="L145">145</span>  &lt;!-- حاوية (div) بمعرّف savedList --&gt;
+<span class="ln" id="L146">146</span>  &lt;div id=&quot;savedList&quot;&gt;&lt;/div&gt;
+<span class="ln" id="L147">147</span>  &lt;!-- حاوية (div) وصنف row end wrap --&gt;
+<span class="ln" id="L148">148</span>  &lt;div class=&quot;row end wrap&quot;&gt;
+<span class="ln" id="L149">149</span>    &lt;!-- زر بمعرّف backToStartFromSaved وصنف btn --&gt;
+<span class="ln" id="L150">150</span>    &lt;button class=&quot;btn&quot; id=&quot;backToStartFromSaved&quot; data-i18n=&quot;back_to_start&quot;&gt;رجوع للبداية&lt;/button&gt;
+<span class="ln" id="L151">151</span>  &lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L152">152</span>  &lt;/div&gt;
+<span class="ln" id="L153">153</span>&lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L154">154</span>&lt;/section&gt;
+<span class="ln" id="L155">155</span> 
+<span class="ln" id="L156">156</span>&lt;!-- ============ PROFILE REVIEW ============ --&gt;
+<span class="ln" id="L157">157</span>&lt;!-- قسم بمعرّف panel-profile-review وصنف panel --&gt;
+<span class="ln" id="L158">158</span>&lt;section class=&quot;panel&quot; id=&quot;panel-profile-review&quot;&gt;
+<span class="ln" id="L159">159</span>  &lt;!-- عنوان مستوى 2 --&gt;
+<span class="ln" id="L160">160</span>  &lt;h2 data-i18n=&quot;review_profile_title&quot;&gt;مراجعة البروفايل&lt;/h2&gt;
+<span class="ln" id="L161">161</span>  &lt;!-- فقرة وصنف hint --&gt;
+<span class="ln" id="L162">162</span>  &lt;p class=&quot;hint&quot; data-i18n=&quot;review_profile_hint&quot;&gt;راجع الإعدادات المحفوظة قبل التشغيل. إذا كانت مكتملة يمكنك البدء مباشرة، وإذا كانت ناقصة أصلحها يدوياً من دون إرسال طلبات تلقائية.&lt;/p&gt;
+<span class="ln" id="L163">163</span>  &lt;!-- حاوية (div) بمعرّف reviewSummaryCard وصنف card --&gt;
+<span class="ln" id="L164">164</span>  &lt;div class=&quot;card&quot; id=&quot;reviewSummaryCard&quot;&gt;&lt;/div&gt;
+<span class="ln" id="L165">165</span>  &lt;!-- حاوية (div) بمعرّف reviewProblemsCard وصنف card hidden --&gt;
+<span class="ln" id="L166">166</span>  &lt;div class=&quot;card hidden&quot; id=&quot;reviewProblemsCard&quot;&gt;&lt;/div&gt;
+<span class="ln" id="L167">167</span>  &lt;!-- حاوية (div) بمعرّف reviewEditGrid وصنف grid --&gt;
+<span class="ln" id="L168">168</span>  &lt;div class=&quot;grid&quot; id=&quot;reviewEditGrid&quot;&gt;
+<span class="ln" id="L169">169</span>    &lt;!-- تسمية حقل بمعرّف rv_login_url --&gt;
+<span class="ln" id="L170">170</span>    &lt;label&gt;&lt;span data-i18n=&quot;f_login_url&quot;&gt;رابط إرسال الدخول (action)&lt;/span&gt;&lt;input id=&quot;rv_login_url&quot; autocomplete=&quot;off&quot;&gt;&lt;/label&gt;
+<span class="ln" id="L171">171</span>    &lt;!-- تسمية حقل بمعرّف rv_method --&gt;
+<span class="ln" id="L172">172</span>    &lt;label&gt;&lt;span data-i18n=&quot;f_method&quot;&gt;طريقة الطلب&lt;/span&gt;&lt;select id=&quot;rv_method&quot;&gt;&lt;option value=&quot;post&quot;&gt;POST&lt;/option&gt;&lt;option value=&quot;get&quot;&gt;GET&lt;/option&gt;&lt;/select&gt;&lt;/label&gt;
+<span class="ln" id="L173">173</span>    &lt;!-- تسمية حقل بمعرّف rv_user_field --&gt;
+<span class="ln" id="L174">174</span>    &lt;label&gt;&lt;span data-i18n=&quot;f_user_field&quot;&gt;اسم حقل المستخدم&lt;/span&gt;&lt;input id=&quot;rv_user_field&quot;&gt;&lt;/label&gt;
+<span class="ln" id="L175">175</span>    &lt;!-- تسمية حقل بمعرّف rv_pass_field --&gt;
+<span class="ln" id="L176">176</span>    &lt;label&gt;&lt;span data-i18n=&quot;f_pass_field&quot;&gt;اسم حقل كلمة المرور&lt;/span&gt;&lt;input id=&quot;rv_pass_field&quot;&gt;&lt;/label&gt;
+<span class="ln" id="L177">177</span>    &lt;!-- تسمية حقل بمعرّف rv_pass_mode --&gt;
+<span class="ln" id="L178">178</span>    &lt;label&gt;&lt;span data-i18n=&quot;f_pass_mode&quot;&gt;قيمة كلمة المرور&lt;/span&gt;&lt;select id=&quot;rv_pass_mode&quot;&gt;&lt;/select&gt;&lt;/label&gt;
+<span class="ln" id="L179">179</span>    &lt;!-- تسمية حقل بمعرّف rv_dst --&gt;
+<span class="ln" id="L180">180</span>    &lt;label&gt;&lt;span data-i18n=&quot;f_dst&quot;&gt;قيمة dst (وجهة الضيف)&lt;/span&gt;&lt;input id=&quot;rv_dst&quot;&gt;&lt;/label&gt;
+<span class="ln" id="L181">181</span>    &lt;!-- تسمية حقل بمعرّف rv_prefix --&gt;
+<span class="ln" id="L182">182</span>    &lt;label&gt;&lt;span data-i18n=&quot;f_prefix&quot;&gt;البادئة الثابتة&lt;/span&gt;&lt;input id=&quot;rv_prefix&quot;&gt;&lt;/label&gt;
+<span class="ln" id="L183">183</span>    &lt;!-- تسمية حقل بمعرّف rv_length --&gt;
+<span class="ln" id="L184">184</span>    &lt;label&gt;&lt;span data-i18n=&quot;f_length&quot;&gt;طول الكرت الكامل&lt;/span&gt;&lt;input id=&quot;rv_length&quot; type=&quot;number&quot; min=&quot;1&quot; max=&quot;64&quot;&gt;&lt;/label&gt;
+<span class="ln" id="L185">185</span>    &lt;!-- تسمية حقل بمعرّف rv_charset --&gt;
+<span class="ln" id="L186">186</span>    &lt;label&gt;&lt;span data-i18n=&quot;f_charset&quot;&gt;الحروف/الأرقام المتغيّرة&lt;/span&gt;&lt;input id=&quot;rv_charset&quot;&gt;&lt;/label&gt;
+<span class="ln" id="L187">187</span>    &lt;!-- تسمية حقل بمعرّف rv_delay --&gt;
+<span class="ln" id="L188">188</span>    &lt;label&gt;&lt;span data-i18n=&quot;r_delay&quot;&gt;الانتظار بين الطلبات (ms)&lt;/span&gt;&lt;input id=&quot;rv_delay&quot; type=&quot;number&quot; min=&quot;0&quot; max=&quot;5000&quot; value=&quot;0&quot;&gt;&lt;/label&gt;
+<span class="ln" id="L189">189</span>    &lt;!-- تسمية حقل بمعرّف rv_threads --&gt;
+<span class="ln" id="L190">190</span>    &lt;label&gt;&lt;span data-i18n=&quot;r_threads&quot;&gt;عدد المسارات (Threads)&lt;/span&gt;&lt;input id=&quot;rv_threads&quot; type=&quot;number&quot; min=&quot;1&quot; max=&quot;200&quot; value=&quot;12&quot;&gt;&lt;/label&gt;
+<span class="ln" id="L191">191</span>    &lt;!-- تسمية حقل بمعرّف rv_attempts --&gt;
+<span class="ln" id="L192">192</span>    &lt;label&gt;&lt;span data-i18n=&quot;r_attempts&quot;&gt;عدد المحاولات&lt;/span&gt;&lt;input id=&quot;rv_attempts&quot; type=&quot;number&quot; min=&quot;1&quot; max=&quot;20000000&quot; value=&quot;2000&quot;&gt;&lt;/label&gt;
+<span class="ln" id="L193">193</span>    &lt;!-- تسمية حقل بمعرّف rv_resume وصنف check --&gt;
+<span class="ln" id="L194">194</span>    &lt;label class=&quot;check&quot;&gt;&lt;input type=&quot;checkbox&quot; id=&quot;rv_resume&quot; checked&gt;&lt;span data-i18n=&quot;r_resume&quot;&gt;المتابعة من حيث توقفت (بلا تكرار)&lt;/span&gt;&lt;/label&gt;
+<span class="ln" id="L195">195</span>  &lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L196">196</span>  &lt;/div&gt;
+<span class="ln" id="L197">197</span>  &lt;!-- حاوية (div) بمعرّف rvPreviewCard وصنف card --&gt;
+<span class="ln" id="L198">198</span>  &lt;div class=&quot;card&quot; id=&quot;rvPreviewCard&quot;&gt;
+<span class="ln" id="L199">199</span>    &lt;!-- حاوية (div) وصنف preview --&gt;
+<span class="ln" id="L200">200</span>    &lt;div class=&quot;preview&quot;&gt;&lt;span data-i18n=&quot;p_space&quot;&gt;عدد الاحتمالات&lt;/span&gt;:
+<span class="ln" id="L201">201</span>      &lt;!-- توكيد بمعرّف rvPvSpace --&gt;
+<span class="ln" id="L202">202</span>      &lt;b id=&quot;rvPvSpace&quot;&gt;—&lt;/b&gt;&lt;/div&gt;
+<span class="ln" id="L203">203</span>    &lt;!-- حاوية (div) وصنف preview --&gt;
+<span class="ln" id="L204">204</span>    &lt;div class=&quot;preview&quot;&gt;&lt;span data-i18n=&quot;p_samples&quot;&gt;أمثلة على البطاقات&lt;/span&gt;:
+<span class="ln" id="L205">205</span>      &lt;!-- جزء نصي بمعرّف rvPvSamples وصنف mono --&gt;
+<span class="ln" id="L206">206</span>      &lt;span id=&quot;rvPvSamples&quot; class=&quot;mono&quot;&gt;—&lt;/span&gt;&lt;/div&gt;
+<span class="ln" id="L207">207</span>    &lt;!-- حاوية (div) بمعرّف rvPvProblems وصنف preview warn hidden --&gt;
+<span class="ln" id="L208">208</span>    &lt;div class=&quot;preview warn hidden&quot; id=&quot;rvPvProblems&quot;&gt;&lt;/div&gt;
+<span class="ln" id="L209">209</span>    &lt;!-- حاوية (div) بمعرّف rvLoadWarn وصنف preview warn hidden --&gt;
+<span class="ln" id="L210">210</span>    &lt;div class=&quot;preview warn hidden&quot; id=&quot;rvLoadWarn&quot;&gt;&lt;/div&gt;
+<span class="ln" id="L211">211</span>  &lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L212">212</span>  &lt;/div&gt;
+<span class="ln" id="L213">213</span>  &lt;!-- حاوية (div) وصنف row wrap --&gt;
+<span class="ln" id="L214">214</span>  &lt;div class=&quot;row wrap&quot;&gt;
+<span class="ln" id="L215">215</span>    &lt;!-- زر بمعرّف editProfileBtn وصنف btn --&gt;
+<span class="ln" id="L216">216</span>    &lt;button class=&quot;btn&quot; id=&quot;editProfileBtn&quot; data-i18n=&quot;edit_settings&quot;&gt;تعديل الإعدادات&lt;/button&gt;
+<span class="ln" id="L217">217</span>    &lt;!-- زر بمعرّف exportProfileBtn وصنف btn ghost --&gt;
+<span class="ln" id="L218">218</span>    &lt;button class=&quot;btn ghost&quot; id=&quot;exportProfileBtn&quot; data-i18n=&quot;btn_export_profile&quot;&gt;تصدير JSON&lt;/button&gt;
+<span class="ln" id="L219">219</span>    &lt;!-- زر بمعرّف backToSavedBtn وصنف btn ghost --&gt;
+<span class="ln" id="L220">220</span>    &lt;button class=&quot;btn ghost&quot; id=&quot;backToSavedBtn&quot; data-i18n=&quot;back_to_saved&quot;&gt;رجوع للقائمة&lt;/button&gt;
+<span class="ln" id="L221">221</span>    &lt;!-- زر بمعرّف startFromReviewBtn وصنف btn primary big --&gt;
+<span class="ln" id="L222">222</span>    &lt;button class=&quot;btn primary big&quot; id=&quot;startFromReviewBtn&quot; data-i18n=&quot;btn_start_from_review&quot;&gt;ابدأ التخمين&lt;/button&gt;
+<span class="ln" id="L223">223</span>  &lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L224">224</span>  &lt;/div&gt;
+<span class="ln" id="L225">225</span>&lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L226">226</span>&lt;/section&gt;
+<span class="ln" id="L227">227</span> 
+<span class="ln" id="L228">228</span>&lt;!-- ============ STEP 1: scan ============ --&gt;
+<span class="ln" id="L229">229</span>&lt;!-- قسم بمعرّف panel-scan وصنف panel --&gt;
+<span class="ln" id="L230">230</span>&lt;section class=&quot;panel&quot; id=&quot;panel-scan&quot;&gt;
+<span class="ln" id="L231">231</span>  &lt;!-- عنوان مستوى 2 --&gt;
+<span class="ln" id="L232">232</span>  &lt;h2 data-i18n=&quot;scan_title&quot;&gt;1) افحص صفحة الدخول&lt;/h2&gt;
+<span class="ln" id="L233">233</span>  &lt;!-- فقرة وصنف hint --&gt;
+<span class="ln" id="L234">234</span>  &lt;p class=&quot;hint&quot; data-i18n=&quot;scan_hint&quot;&gt;
+<span class="ln" id="L235">235</span>    &lt;!-- تكملة العنصر السابق --&gt;
+<span class="ln" id="L236">236</span>    الصق رابط صفحة دخول الهوتسبوت كما تفتحها في المتصفح. الأداة تقرأ الصفحة
+<span class="ln" id="L237">237</span>    &lt;!-- تكملة العنصر السابق --&gt;
+<span class="ln" id="L238">238</span>    بنفسها وتكتشف نوع الطلب (POST/GET) وأسماء الحقول من دون أي أسئلة.
+<span class="ln" id="L239">239</span>  &lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L240">240</span>  &lt;/p&gt;
+<span class="ln" id="L241">241</span>  &lt;!-- حاوية (div) وصنف row --&gt;
+<span class="ln" id="L242">242</span>  &lt;div class=&quot;row&quot;&gt;
+<span class="ln" id="L243">243</span>    &lt;!-- تسمية حقل وصنف sr-only --&gt;
+<span class="ln" id="L244">244</span>    &lt;label class=&quot;sr-only&quot; for=&quot;scanUrl&quot; data-i18n=&quot;scan_url_label&quot;&gt;رابط صفحة الدخول&lt;/label&gt;
+<span class="ln" id="L245">245</span>    &lt;!-- حقل إدخال بمعرّف scanUrl وصنف grow — ويستمر في السطر التالي بخصائص: placeholder --&gt;
+<span class="ln" id="L246">246</span>    &lt;input id=&quot;scanUrl&quot; class=&quot;grow&quot; type=&quot;url&quot; inputmode=&quot;url&quot; autocomplete=&quot;off&quot;
+<span class="ln" id="L247">247</span>           placeholder=&quot;http://10.5.50.1/login&quot;&gt;
+<span class="ln" id="L248">248</span>    &lt;!-- زر بمعرّف scanBtn وصنف btn primary --&gt;
+<span class="ln" id="L249">249</span>    &lt;button class=&quot;btn primary&quot; id=&quot;scanBtn&quot; data-i18n=&quot;scan_button&quot;&gt;افحص الآن&lt;/button&gt;
+<span class="ln" id="L250">250</span>  &lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L251">251</span>  &lt;/div&gt;
+<span class="ln" id="L252">252</span>  &lt;!-- حاوية (div) وصنف row wrap small --&gt;
+<span class="ln" id="L253">253</span>  &lt;div class=&quot;row wrap small&quot;&gt;
+<span class="ln" id="L254">254</span>    &lt;!-- زر وصنف chip --&gt;
+<span class="ln" id="L255">255</span>    &lt;button class=&quot;chip&quot; data-url=&quot;http://192.168.88.1/login&quot;&gt;192.168.88.1/login&lt;/button&gt;
+<span class="ln" id="L256">256</span>    &lt;!-- زر وصنف chip --&gt;
+<span class="ln" id="L257">257</span>    &lt;button class=&quot;chip&quot; data-url=&quot;http://10.5.50.1/login&quot;&gt;10.5.50.1/login&lt;/button&gt;
+<span class="ln" id="L258">258</span>    &lt;!-- زر وصنف chip --&gt;
+<span class="ln" id="L259">259</span>    &lt;button class=&quot;chip&quot; data-url=&quot;http://192.168.8.1/login&quot;&gt;192.168.8.1/login&lt;/button&gt;
+<span class="ln" id="L260">260</span>  &lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L261">261</span>  &lt;/div&gt;
+<span class="ln" id="L262">262</span> 
+<span class="ln" id="L263">263</span>  &lt;!-- حاوية (div) بمعرّف internetCard وصنف card hidden --&gt;
+<span class="ln" id="L264">264</span>  &lt;div class=&quot;card hidden&quot; id=&quot;internetCard&quot;&gt;&lt;/div&gt;
+<span class="ln" id="L265">265</span>  &lt;!-- حاوية (div) بمعرّف portalCard وصنف card hidden --&gt;
+<span class="ln" id="L266">266</span>  &lt;div class=&quot;card hidden&quot; id=&quot;portalCard&quot;&gt;&lt;/div&gt;
+<span class="ln" id="L267">267</span> 
+<span class="ln" id="L268">268</span>  &lt;!-- حاوية (div) بمعرّف calibrationSetup وصنف card --&gt;
+<span class="ln" id="L269">269</span>  &lt;div class=&quot;card&quot; id=&quot;calibrationSetup&quot;&gt;
+<span class="ln" id="L270">270</span>    &lt;!-- عنوان مستوى 3 --&gt;
+<span class="ln" id="L271">271</span>    &lt;h3 data-i18n=&quot;calibration_setup_title&quot;&gt;اختبار البطاقة المعروفة وتعلّم الطلب&lt;/h3&gt;
+<span class="ln" id="L272">272</span>    &lt;!-- فقرة وصنف hint --&gt;
+<span class="ln" id="L273">273</span>    &lt;p class=&quot;hint&quot; data-i18n=&quot;calibration_setup_hint&quot;&gt;أدخل بطاقة مصرحاً بها وتعرف أنها تعمل. لن تُفتح إعدادات التخمين قبل أن يثبت الاختبار انتقال الإنترنت ثم تأكيد الخروج.&lt;/p&gt;
+<span class="ln" id="L274">274</span>    &lt;!-- حاوية (div) وصنف row wrap --&gt;
+<span class="ln" id="L275">275</span>    &lt;div class=&quot;row wrap&quot;&gt;
+<span class="ln" id="L276">276</span>      &lt;!-- تسمية حقل وصنف grow --&gt;
+<span class="ln" id="L277">277</span>      &lt;label class=&quot;grow&quot;&gt;&lt;span data-i18n=&quot;f_known&quot;&gt;بطاقة تعرف أنها تعمل&lt;/span&gt;
+<span class="ln" id="L278">278</span>        &lt;!-- حقل إدخال بمعرّف f_known --&gt;
+<span class="ln" id="L279">279</span>        &lt;input id=&quot;f_known&quot; autocomplete=&quot;off&quot; inputmode=&quot;text&quot;&gt;&lt;/label&gt;
+<span class="ln" id="L280">280</span>      &lt;!-- زر بمعرّف calibrateBtn وصنف btn primary --&gt;
+<span class="ln" id="L281">281</span>      &lt;button class=&quot;btn primary&quot; id=&quot;calibrateBtn&quot; disabled data-i18n=&quot;btn_calibrate&quot;&gt;اختبر البطاقة وتعلّم شكل الطلب&lt;/button&gt;
+<span class="ln" id="L282">282</span>    &lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L283">283</span>    &lt;/div&gt;
+<span class="ln" id="L284">284</span>  &lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L285">285</span>  &lt;/div&gt;
+<span class="ln" id="L286">286</span>  &lt;!-- حاوية (div) بمعرّف calibCard وصنف card hidden --&gt;
+<span class="ln" id="L287">287</span>  &lt;div class=&quot;card hidden&quot; id=&quot;calibCard&quot;&gt;&lt;/div&gt;
+<span class="ln" id="L288">288</span> 
+<span class="ln" id="L289">289</span>  &lt;!-- حاوية (div) وصنف row end wrap --&gt;
+<span class="ln" id="L290">290</span>  &lt;div class=&quot;row end wrap&quot;&gt;
+<span class="ln" id="L291">291</span>    &lt;!-- زر بمعرّف backToStartFromScan وصنف btn --&gt;
+<span class="ln" id="L292">292</span>    &lt;button class=&quot;btn&quot; id=&quot;backToStartFromScan&quot; data-i18n=&quot;back_to_start&quot;&gt;رجوع للبداية&lt;/button&gt;
+<span class="ln" id="L293">293</span>    &lt;!-- زر بمعرّف toFormat وصنف btn primary --&gt;
+<span class="ln" id="L294">294</span>    &lt;button class=&quot;btn primary&quot; id=&quot;toFormat&quot; disabled data-i18n=&quot;next_format&quot;&gt;
+<span class="ln" id="L295">295</span>      &lt;!-- تكملة العنصر السابق --&gt;
+<span class="ln" id="L296">296</span>      التالي: صيغة البطاقة ←
+<span class="ln" id="L297">297</span>    &lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L298">298</span>    &lt;/button&gt;
+<span class="ln" id="L299">299</span>  &lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L300">300</span>  &lt;/div&gt;
+<span class="ln" id="L301">301</span>&lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L302">302</span>&lt;/section&gt;
+<span class="ln" id="L303">303</span> 
+<span class="ln" id="L304">304</span>&lt;!-- ============ STEP 2: format ============ --&gt;
+<span class="ln" id="L305">305</span>&lt;!-- قسم بمعرّف panel-format وصنف panel --&gt;
+<span class="ln" id="L306">306</span>&lt;section class=&quot;panel&quot; id=&quot;panel-format&quot;&gt;
+<span class="ln" id="L307">307</span>  &lt;!-- عنوان مستوى 2 --&gt;
+<span class="ln" id="L308">308</span>  &lt;h2 data-i18n=&quot;format_title&quot;&gt;2) صيغة البطاقة&lt;/h2&gt;
+<span class="ln" id="L309">309</span>  &lt;!-- فقرة وصنف hint --&gt;
+<span class="ln" id="L310">310</span>  &lt;p class=&quot;hint&quot; data-i18n=&quot;format_hint&quot;&gt;
+<span class="ln" id="L311">311</span>    &lt;!-- تكملة العنصر السابق --&gt;
+<span class="ln" id="L312">312</span>    اكتب شكل الكرت: البادئة الثابتة + طول الكرت الكامل. الأرقام المتغيّرة هي التي
+<span class="ln" id="L313">313</span>    &lt;!-- تكملة العنصر السابق --&gt;
+<span class="ln" id="L314">314</span>    سيتم تخمينها. المعاينة تحت تخبرك فوراً بعدد الاحتمالات.
+<span class="ln" id="L315">315</span>  &lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L316">316</span>  &lt;/p&gt;
+<span class="ln" id="L317">317</span> 
+<span class="ln" id="L318">318</span>  &lt;!-- حاوية (div) وصنف row profrow --&gt;
+<span class="ln" id="L319">319</span>  &lt;div class=&quot;row profrow&quot;&gt;
+<span class="ln" id="L320">320</span>    &lt;!-- تسمية حقل وصنف grow --&gt;
+<span class="ln" id="L321">321</span>    &lt;label class=&quot;grow&quot;&gt;&lt;span data-i18n=&quot;saved_profiles&quot;&gt;الملفات التعريفية المحفوظة&lt;/span&gt;
+<span class="ln" id="L322">322</span>      &lt;!-- قائمة اختيار بمعرّف profSel --&gt;
+<span class="ln" id="L323">323</span>      &lt;select id=&quot;profSel&quot;&gt;&lt;/select&gt;&lt;/label&gt;
+<span class="ln" id="L324">324</span>    &lt;!-- زر بمعرّف profDelBtn وصنف btn danger --&gt;
+<span class="ln" id="L325">325</span>    &lt;button class=&quot;btn danger&quot; id=&quot;profDelBtn&quot; data-i18n=&quot;btn_delete_profile&quot;&gt;حذف&lt;/button&gt;
+<span class="ln" id="L326">326</span>  &lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L327">327</span>  &lt;/div&gt;
+<span class="ln" id="L328">328</span> 
+<span class="ln" id="L329">329</span>  &lt;!-- حاوية (div) وصنف grid --&gt;
+<span class="ln" id="L330">330</span>  &lt;div class=&quot;grid&quot;&gt;
+<span class="ln" id="L331">331</span>    &lt;!-- تسمية حقل --&gt;
+<span class="ln" id="L332">332</span>    &lt;label&gt;&lt;span data-i18n=&quot;f_prefix&quot;&gt;البادئة الثابتة&lt;/span&gt;
+<span class="ln" id="L333">333</span>      &lt;!-- حقل إدخال بمعرّف f_prefix --&gt;
+<span class="ln" id="L334">334</span>      &lt;input id=&quot;f_prefix&quot; placeholder=&quot;020124&quot; autocomplete=&quot;off&quot;&gt;&lt;/label&gt;
+<span class="ln" id="L335">335</span>    &lt;!-- تسمية حقل --&gt;
+<span class="ln" id="L336">336</span>    &lt;label&gt;&lt;span data-i18n=&quot;f_length&quot;&gt;طول الكرت الكامل&lt;/span&gt;
+<span class="ln" id="L337">337</span>      &lt;!-- حقل إدخال بمعرّف f_length --&gt;
+<span class="ln" id="L338">338</span>      &lt;input id=&quot;f_length&quot; type=&quot;number&quot; min=&quot;1&quot; max=&quot;64&quot; value=&quot;10&quot;&gt;&lt;/label&gt;
+<span class="ln" id="L339">339</span>    &lt;!-- تسمية حقل --&gt;
+<span class="ln" id="L340">340</span>    &lt;label&gt;&lt;span data-i18n=&quot;f_charset&quot;&gt;الحروف/الأرقام المتغيّرة&lt;/span&gt;
+<span class="ln" id="L341">341</span>      &lt;!-- قائمة اختيار بمعرّف f_charset --&gt;
+<span class="ln" id="L342">342</span>      &lt;select id=&quot;f_charset&quot;&gt;&lt;/select&gt;&lt;/label&gt;
+<span class="ln" id="L343">343</span>    &lt;!-- تسمية حقل بمعرّف f_customWrap وصنف hidden --&gt;
+<span class="ln" id="L344">344</span>    &lt;label id=&quot;f_customWrap&quot; class=&quot;hidden&quot;&gt;&lt;span data-i18n=&quot;f_custom&quot;&gt;محارف مخصّصة&lt;/span&gt;
+<span class="ln" id="L345">345</span>      &lt;!-- حقل إدخال بمعرّف f_custom --&gt;
+<span class="ln" id="L346">346</span>      &lt;input id=&quot;f_custom&quot; placeholder=&quot;0123456789ABCDEF&quot;&gt;&lt;/label&gt;
+<span class="ln" id="L347">347</span>    &lt;!-- تسمية حقل --&gt;
+<span class="ln" id="L348">348</span>    &lt;label&gt;&lt;span data-i18n=&quot;f_pass_mode&quot;&gt;قيمة كلمة المرور&lt;/span&gt;
+<span class="ln" id="L349">349</span>      &lt;!-- قائمة اختيار بمعرّف f_pass_mode --&gt;
+<span class="ln" id="L350">350</span>      &lt;select id=&quot;f_pass_mode&quot;&gt;&lt;/select&gt;&lt;/label&gt;
+<span class="ln" id="L351">351</span>    &lt;!-- تسمية حقل --&gt;
+<span class="ln" id="L352">352</span>    &lt;label&gt;&lt;span data-i18n=&quot;f_dst&quot;&gt;قيمة dst (وجهة الضيف)&lt;/span&gt;
+<span class="ln" id="L353">353</span>      &lt;!-- حقل إدخال بمعرّف f_dst --&gt;
+<span class="ln" id="L354">354</span>      &lt;input id=&quot;f_dst&quot; placeholder=&quot;http://www.msftconnecttest.com/redirect&quot;&gt;&lt;/label&gt;
+<span class="ln" id="L355">355</span>    &lt;!-- تسمية حقل --&gt;
+<span class="ln" id="L356">356</span>    &lt;label&gt;&lt;span data-i18n=&quot;f_name&quot;&gt;اسم الملف التعريفي&lt;/span&gt;
+<span class="ln" id="L357">357</span>      &lt;!-- حقل إدخال بمعرّف f_name --&gt;
+<span class="ln" id="L358">358</span>      &lt;input id=&quot;f_name&quot; placeholder=&quot;my-network&quot;&gt;&lt;/label&gt;
+<span class="ln" id="L359">359</span>  &lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L360">360</span>  &lt;/div&gt;
+<span class="ln" id="L361">361</span> 
+<span class="ln" id="L362">362</span>  &lt;!-- حاوية (div) بمعرّف previewCard وصنف card --&gt;
+<span class="ln" id="L363">363</span>  &lt;div class=&quot;card&quot; id=&quot;previewCard&quot;&gt;
+<span class="ln" id="L364">364</span>    &lt;!-- حاوية (div) وصنف preview --&gt;
+<span class="ln" id="L365">365</span>    &lt;div class=&quot;preview&quot;&gt;&lt;span data-i18n=&quot;p_space&quot;&gt;عدد الاحتمالات&lt;/span&gt;:
+<span class="ln" id="L366">366</span>      &lt;!-- توكيد بمعرّف pvSpace --&gt;
+<span class="ln" id="L367">367</span>      &lt;b id=&quot;pvSpace&quot;&gt;—&lt;/b&gt;&lt;/div&gt;
+<span class="ln" id="L368">368</span>    &lt;!-- حاوية (div) وصنف preview --&gt;
+<span class="ln" id="L369">369</span>    &lt;div class=&quot;preview&quot;&gt;&lt;span data-i18n=&quot;p_samples&quot;&gt;أمثلة على البطاقات&lt;/span&gt;:
+<span class="ln" id="L370">370</span>      &lt;!-- جزء نصي بمعرّف pvSamples وصنف mono --&gt;
+<span class="ln" id="L371">371</span>      &lt;span id=&quot;pvSamples&quot; class=&quot;mono&quot;&gt;—&lt;/span&gt;&lt;/div&gt;
+<span class="ln" id="L372">372</span>    &lt;!-- حاوية (div) وصنف preview --&gt;
+<span class="ln" id="L373">373</span>    &lt;div class=&quot;preview&quot;&gt;&lt;span data-i18n=&quot;p_request_shape&quot;&gt;شكل الطلب المتوقع&lt;/span&gt;:
+<span class="ln" id="L374">374</span>      &lt;!-- جزء نصي بمعرّف pvRequest وصنف mono --&gt;
+<span class="ln" id="L375">375</span>      &lt;span id=&quot;pvRequest&quot; class=&quot;mono&quot;&gt;—&lt;/span&gt;&lt;/div&gt;
+<span class="ln" id="L376">376</span>    &lt;!-- حاوية (div) بمعرّف pvCovered وصنف preview hidden --&gt;
+<span class="ln" id="L377">377</span>    &lt;div class=&quot;preview hidden&quot; id=&quot;pvCovered&quot;&gt;
+<span class="ln" id="L378">378</span>      &lt;!-- جزء نصي --&gt;
+<span class="ln" id="L379">379</span>      &lt;span data-i18n=&quot;p_covered&quot;&gt;مغطى من runs سابقة&lt;/span&gt;:
+<span class="ln" id="L380">380</span>      &lt;!-- توكيد بمعرّف pvCoveredVal وصنف mono --&gt;
+<span class="ln" id="L381">381</span>      &lt;b id=&quot;pvCoveredVal&quot; class=&quot;mono&quot;&gt;0&lt;/b&gt;&lt;/div&gt;
+<span class="ln" id="L382">382</span>    &lt;!-- حاوية (div) بمعرّف pvProblems وصنف preview warn hidden --&gt;
+<span class="ln" id="L383">383</span>    &lt;div class=&quot;preview warn hidden&quot; id=&quot;pvProblems&quot;&gt;&lt;/div&gt;
+<span class="ln" id="L384">384</span>  &lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L385">385</span>  &lt;/div&gt;
+<span class="ln" id="L386">386</span> 
+<span class="ln" id="L387">387</span>  &lt;!-- تفاصيل قابلة للطي وصنف adv --&gt;
+<span class="ln" id="L388">388</span>  &lt;details class=&quot;adv&quot;&gt;
+<span class="ln" id="L389">389</span>    &lt;!-- عنوان التفاصيل --&gt;
+<span class="ln" id="L390">390</span>    &lt;summary data-i18n=&quot;adv_open&quot;&gt;خيارات متقدمة (عادة لا تحتاجها)&lt;/summary&gt;
+<span class="ln" id="L391">391</span>    &lt;!-- حاوية (div) وصنف grid --&gt;
+<span class="ln" id="L392">392</span>    &lt;div class=&quot;grid&quot;&gt;
+<span class="ln" id="L393">393</span>      &lt;!-- تسمية حقل --&gt;
+<span class="ln" id="L394">394</span>      &lt;label&gt;&lt;span data-i18n=&quot;f_method&quot;&gt;طريقة الطلب&lt;/span&gt;
+<span class="ln" id="L395">395</span>        &lt;!-- قائمة اختيار بمعرّف f_method --&gt;
+<span class="ln" id="L396">396</span>        &lt;select id=&quot;f_method&quot;&gt;
+<span class="ln" id="L397">397</span>          &lt;!-- خيار في القائمة --&gt;
+<span class="ln" id="L398">398</span>          &lt;option value=&quot;post&quot; data-i18n=&quot;method_post&quot;&gt;POST (الأكثر توافقاً)&lt;/option&gt;
+<span class="ln" id="L399">399</span>          &lt;!-- خيار في القائمة --&gt;
+<span class="ln" id="L400">400</span>          &lt;option value=&quot;get&quot; data-i18n=&quot;method_get&quot;&gt;GET&lt;/option&gt;
+<span class="ln" id="L401">401</span>        &lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L402">402</span>        &lt;/select&gt;&lt;/label&gt;
+<span class="ln" id="L403">403</span>      &lt;!-- تسمية حقل --&gt;
+<span class="ln" id="L404">404</span>      &lt;label&gt;&lt;span data-i18n=&quot;f_user_field&quot;&gt;اسم حقل المستخدم&lt;/span&gt;
+<span class="ln" id="L405">405</span>        &lt;!-- حقل إدخال بمعرّف f_user_field --&gt;
+<span class="ln" id="L406">406</span>        &lt;input id=&quot;f_user_field&quot; value=&quot;username&quot;&gt;&lt;/label&gt;
+<span class="ln" id="L407">407</span>      &lt;!-- تسمية حقل --&gt;
+<span class="ln" id="L408">408</span>      &lt;label&gt;&lt;span data-i18n=&quot;f_pass_field&quot;&gt;اسم حقل كلمة المرور&lt;/span&gt;
+<span class="ln" id="L409">409</span>        &lt;!-- حقل إدخال بمعرّف f_pass_field --&gt;
+<span class="ln" id="L410">410</span>        &lt;input id=&quot;f_pass_field&quot; value=&quot;password&quot;&gt;&lt;/label&gt;
+<span class="ln" id="L411">411</span>      &lt;!-- تسمية حقل --&gt;
+<span class="ln" id="L412">412</span>      &lt;label&gt;&lt;span data-i18n=&quot;f_login_url&quot;&gt;رابط إرسال الدخول (action)&lt;/span&gt;
+<span class="ln" id="L413">413</span>        &lt;!-- حقل إدخال بمعرّف f_login_url --&gt;
+<span class="ln" id="L414">414</span>        &lt;input id=&quot;f_login_url&quot; placeholder=&quot;http://10.5.50.1/login&quot;&gt;&lt;/label&gt;
+<span class="ln" id="L415">415</span>      &lt;!-- تسمية حقل بمعرّف f_send_dst وصنف check --&gt;
+<span class="ln" id="L416">416</span>      &lt;label class=&quot;check&quot;&gt;&lt;input type=&quot;checkbox&quot; id=&quot;f_send_dst&quot; checked&gt;
+<span class="ln" id="L417">417</span>        &lt;!-- جزء نصي --&gt;
+<span class="ln" id="L418">418</span>        &lt;span data-i18n=&quot;f_send_dst&quot;&gt;إرسال حقل dst&lt;/span&gt;&lt;/label&gt;
+<span class="ln" id="L419">419</span>      &lt;!-- تسمية حقل بمعرّف f_send_popup وصنف check --&gt;
+<span class="ln" id="L420">420</span>      &lt;label class=&quot;check&quot;&gt;&lt;input type=&quot;checkbox&quot; id=&quot;f_send_popup&quot; checked&gt;
+<span class="ln" id="L421">421</span>        &lt;!-- جزء نصي --&gt;
+<span class="ln" id="L422">422</span>        &lt;span data-i18n=&quot;f_send_popup&quot;&gt;إرسال حقل popup&lt;/span&gt;&lt;/label&gt;
+<span class="ln" id="L423">423</span>      &lt;!-- تسمية حقل --&gt;
+<span class="ln" id="L424">424</span>      &lt;label&gt;&lt;span data-i18n=&quot;f_extra&quot;&gt;حقول ثابتة إضافية (name=value)&lt;/span&gt;
+<span class="ln" id="L425">425</span>        &lt;!-- حقل إدخال بمعرّف f_extra --&gt;
+<span class="ln" id="L426">426</span>        &lt;input id=&quot;f_extra&quot; placeholder=&quot;mac=AA:BB:CC:DD:EE:FF&quot;&gt;&lt;/label&gt;
+<span class="ln" id="L427">427</span>      &lt;!-- تسمية حقل --&gt;
+<span class="ln" id="L428">428</span>      &lt;label&gt;&lt;span data-i18n=&quot;f_ua&quot;&gt;هوية المتصفح User-Agent&lt;/span&gt;
+<span class="ln" id="L429">429</span>        &lt;!-- قائمة اختيار بمعرّف f_ua --&gt;
+<span class="ln" id="L430">430</span>        &lt;select id=&quot;f_ua&quot;&gt;
+<span class="ln" id="L431">431</span>          &lt;!-- خيار في القائمة --&gt;
+<span class="ln" id="L432">432</span>          &lt;option value=&quot;&quot; data-i18n=&quot;ua_default&quot;&gt;نفس المتصفح الافتراضي (Chrome/Windows)&lt;/option&gt;
+<span class="ln" id="L433">433</span>          &lt;!-- خيار في القائمة --&gt;
+<span class="ln" id="L434">434</span>          &lt;option value=&quot;android&quot; data-i18n=&quot;ua_android&quot;&gt;أندرويد Chrome&lt;/option&gt;
+<span class="ln" id="L435">435</span>          &lt;!-- خيار في القائمة --&gt;
+<span class="ln" id="L436">436</span>          &lt;option value=&quot;iphone&quot; data-i18n=&quot;ua_iphone&quot;&gt;آيفون Safari&lt;/option&gt;
+<span class="ln" id="L437">437</span>          &lt;!-- خيار في القائمة --&gt;
+<span class="ln" id="L438">438</span>          &lt;option value=&quot;custom&quot; data-i18n=&quot;ua_custom&quot;&gt;اكتبها بنفسك…&lt;/option&gt;
+<span class="ln" id="L439">439</span>        &lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L440">440</span>        &lt;/select&gt;&lt;small class=&quot;hint&quot; data-i18n=&quot;ua_hint&quot;&gt;غيّرها فقط إذا كان الكرت يعمل في متصفح هاتفك لكن الراوتر يرفض شكل طلب الأداة.&lt;/small&gt;&lt;/label&gt;
+<span class="ln" id="L441">441</span>      &lt;!-- تسمية حقل بمعرّف f_ua_custom_wrap وصنف hidden --&gt;
+<span class="ln" id="L442">442</span>      &lt;label id=&quot;f_ua_custom_wrap&quot; class=&quot;hidden&quot;&gt;&lt;span data-i18n=&quot;f_ua_custom&quot;&gt;User-Agent مخصص&lt;/span&gt;
+<span class="ln" id="L443">443</span>        &lt;!-- حقل إدخال بمعرّف f_ua_custom --&gt;
+<span class="ln" id="L444">444</span>        &lt;input id=&quot;f_ua_custom&quot; placeholder=&quot;Mozilla/5.0 ...&quot;&gt;&lt;/label&gt;
+<span class="ln" id="L445">445</span>      &lt;!-- تسمية حقل بمعرّف f_referer وصنف check --&gt;
+<span class="ln" id="L446">446</span>      &lt;label class=&quot;check&quot;&gt;&lt;input type=&quot;checkbox&quot; id=&quot;f_referer&quot; checked&gt;
+<span class="ln" id="L447">447</span>        &lt;!-- جزء نصي --&gt;
+<span class="ln" id="L448">448</span>        &lt;span data-i18n=&quot;f_referer&quot;&gt;إرسال ترويسات المتصفح (Referer/Origin)&lt;/span&gt;&lt;/label&gt;
+<span class="ln" id="L449">449</span>      &lt;!-- تسمية حقل --&gt;
+<span class="ln" id="L450">450</span>      &lt;label&gt;&lt;span data-i18n=&quot;f_words&quot;&gt;كلمات النجاح (اختياري)&lt;/span&gt;
+<span class="ln" id="L451">451</span>        &lt;!-- جزء نصي بمعرّف f_words وصنف input-action --&gt;
+<span class="ln" id="L452">452</span>        &lt;span class=&quot;input-action&quot;&gt;&lt;input id=&quot;f_words&quot; placeholder=&quot;You are logged in&quot;&gt;
+<span class="ln" id="L453">453</span>          &lt;!-- زر بمعرّف clearWordsBtn وصنف btn tiny ghost --&gt;
+<span class="ln" id="L454">454</span>          &lt;button type=&quot;button&quot; class=&quot;btn tiny ghost&quot; id=&quot;clearWordsBtn&quot; data-i18n=&quot;f_words_clear&quot;&gt;مسح&lt;/button&gt;&lt;/span&gt;
+<span class="ln" id="L455">455</span>        &lt;!-- نص صغير وصنف hint --&gt;
+<span class="ln" id="L456">456</span>        &lt;small class=&quot;hint&quot; data-i18n=&quot;f_words_hint&quot;&gt;تُطابق هذه الكلمات نص الصفحة الظاهر فقط. امسحها إذا كانت قديمة أو غير صحيحة.&lt;/small&gt;
+<span class="ln" id="L457">457</span>      &lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L458">458</span>      &lt;/label&gt;
+<span class="ln" id="L459">459</span>    &lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L460">460</span>    &lt;/div&gt;
+<span class="ln" id="L461">461</span>    &lt;!-- زر بمعرّف captureBtn وصنف btn --&gt;
+<span class="ln" id="L462">462</span>    &lt;button class=&quot;btn&quot; id=&quot;captureBtn&quot; data-i18n=&quot;btn_capture&quot;&gt;
+<span class="ln" id="L463">463</span>      &lt;!-- تكملة العنصر السابق --&gt;
+<span class="ln" id="L464">464</span>      افتح البوابة وسجّل دخولاً ناجحاً
+<span class="ln" id="L465">465</span>    &lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L466">466</span>    &lt;/button&gt;
+<span class="ln" id="L467">467</span>    &lt;!-- حاوية (div) بمعرّف captureCard وصنف card hidden --&gt;
+<span class="ln" id="L468">468</span>    &lt;div class=&quot;card hidden&quot; id=&quot;captureCard&quot;&gt;&lt;/div&gt;
+<span class="ln" id="L469">469</span>  &lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L470">470</span>  &lt;/details&gt;
+<span class="ln" id="L471">471</span> 
+<span class="ln" id="L472">472</span>  &lt;!-- حاوية (div) وصنف row end wrap --&gt;
+<span class="ln" id="L473">473</span>  &lt;div class=&quot;row end wrap&quot;&gt;
+<span class="ln" id="L474">474</span>    &lt;!-- زر بمعرّف backToScanBtn وصنف btn --&gt;
+<span class="ln" id="L475">475</span>    &lt;button class=&quot;btn&quot; id=&quot;backToScanBtn&quot; data-i18n=&quot;back_to_scan&quot;&gt;رجوع للفحص&lt;/button&gt;
+<span class="ln" id="L476">476</span>    &lt;!-- زر بمعرّف saveProfileBtn وصنف btn --&gt;
+<span class="ln" id="L477">477</span>    &lt;button class=&quot;btn&quot; id=&quot;saveProfileBtn&quot; data-i18n=&quot;btn_save&quot;&gt;احفظ الملف التعريفي&lt;/button&gt;
+<span class="ln" id="L478">478</span>    &lt;!-- زر بمعرّف toRun وصنف btn primary --&gt;
+<span class="ln" id="L479">479</span>    &lt;button class=&quot;btn primary&quot; id=&quot;toRun&quot; data-i18n=&quot;next_run&quot;&gt;التالي: التشغيل ←&lt;/button&gt;
+<span class="ln" id="L480">480</span>  &lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L481">481</span>  &lt;/div&gt;
+<span class="ln" id="L482">482</span>&lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L483">483</span>&lt;/section&gt;
+<span class="ln" id="L484">484</span> 
+<span class="ln" id="L485">485</span>&lt;!-- ============ STEP 3: run ============ --&gt;
+<span class="ln" id="L486">486</span>&lt;!-- قسم بمعرّف panel-run وصنف panel --&gt;
+<span class="ln" id="L487">487</span>&lt;section class=&quot;panel&quot; id=&quot;panel-run&quot;&gt;
+<span class="ln" id="L488">488</span>  &lt;!-- عنوان مستوى 2 --&gt;
+<span class="ln" id="L489">489</span>  &lt;h2 data-i18n=&quot;run_title&quot;&gt;3) التشغيل&lt;/h2&gt;
+<span class="ln" id="L490">490</span>  &lt;!-- فقرة وصنف hint --&gt;
+<span class="ln" id="L491">491</span>  &lt;p class=&quot;hint&quot; data-i18n=&quot;run_hint&quot;&gt;
+<span class="ln" id="L492">492</span>    &lt;!-- تكملة العنصر السابق --&gt;
+<span class="ln" id="L493">493</span>    اختر قوة مناسبة: كل ما زادت السرعة زاد احتمال أن يقطع الراوتر الاتصال أو
+<span class="ln" id="L494">494</span>    &lt;!-- تكملة العنصر السابق --&gt;
+<span class="ln" id="L495">495</span>    يحجبك. الأداة تخبرك داخل النتائج بسبب كل توقف.
+<span class="ln" id="L496">496</span>  &lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L497">497</span>  &lt;/p&gt;
+<span class="ln" id="L498">498</span> 
+<span class="ln" id="L499">499</span>  &lt;!-- حاوية (div) بمعرّف presetRow وصنف row wrap --&gt;
+<span class="ln" id="L500">500</span>  &lt;div class=&quot;row wrap&quot; id=&quot;presetRow&quot;&gt;&lt;/div&gt;
+<span class="ln" id="L501">501</span> 
+<span class="ln" id="L502">502</span>  &lt;!-- حاوية (div) وصنف grid --&gt;
+<span class="ln" id="L503">503</span>  &lt;div class=&quot;grid&quot;&gt;
+<span class="ln" id="L504">504</span>    &lt;!-- تسمية حقل --&gt;
+<span class="ln" id="L505">505</span>    &lt;label&gt;&lt;span data-i18n=&quot;r_threads&quot;&gt;عدد المسارات (Threads)&lt;/span&gt;
+<span class="ln" id="L506">506</span>      &lt;!-- حقل إدخال بمعرّف r_threads --&gt;
+<span class="ln" id="L507">507</span>      &lt;input id=&quot;r_threads&quot; type=&quot;number&quot; min=&quot;1&quot; max=&quot;200&quot; value=&quot;12&quot;&gt;&lt;/label&gt;
+<span class="ln" id="L508">508</span>    &lt;!-- تسمية حقل --&gt;
+<span class="ln" id="L509">509</span>    &lt;label&gt;&lt;span data-i18n=&quot;r_attempts&quot;&gt;عدد المحاولات&lt;/span&gt;
+<span class="ln" id="L510">510</span>      &lt;!-- حقل إدخال بمعرّف r_attempts --&gt;
+<span class="ln" id="L511">511</span>      &lt;input id=&quot;r_attempts&quot; type=&quot;number&quot; min=&quot;1&quot; max=&quot;20000000&quot; value=&quot;2000&quot;&gt;&lt;/label&gt;
+<span class="ln" id="L512">512</span>    &lt;!-- تسمية حقل --&gt;
+<span class="ln" id="L513">513</span>    &lt;label&gt;&lt;span data-i18n=&quot;r_delay&quot;&gt;الانتظار بين الطلبات (ms)&lt;/span&gt;
+<span class="ln" id="L514">514</span>      &lt;!-- حقل إدخال بمعرّف r_delay --&gt;
+<span class="ln" id="L515">515</span>      &lt;input id=&quot;r_delay&quot; type=&quot;number&quot; min=&quot;0&quot; max=&quot;5000&quot; value=&quot;0&quot;&gt;&lt;/label&gt;
+<span class="ln" id="L516">516</span>    &lt;!-- تسمية حقل بمعرّف r_verify وصنف check --&gt;
+<span class="ln" id="L517">517</span>    &lt;label class=&quot;check&quot;&gt;&lt;input type=&quot;checkbox&quot; id=&quot;r_verify&quot; checked&gt;
+<span class="ln" id="L518">518</span>      &lt;!-- جزء نصي --&gt;
+<span class="ln" id="L519">519</span>      &lt;span data-i18n=&quot;r_verify&quot;&gt;تأكيد الإنترنت بعد أي بطاقة مقبولة&lt;/span&gt;&lt;/label&gt;
+<span class="ln" id="L520">520</span>    &lt;!-- تسمية حقل بمعرّف r_autostop وصنف check --&gt;
+<span class="ln" id="L521">521</span>    &lt;label class=&quot;check&quot;&gt;&lt;input type=&quot;checkbox&quot; id=&quot;r_autostop&quot; checked&gt;
+<span class="ln" id="L522">522</span>      &lt;!-- جزء نصي --&gt;
+<span class="ln" id="L523">523</span>      &lt;span data-i18n=&quot;r_autostop&quot;&gt;إيقاف تلقائي عند أول نتيجة قوية&lt;/span&gt;&lt;/label&gt;
+<span class="ln" id="L524">524</span>    &lt;!-- تسمية حقل بمعرّف r_resume وصنف check --&gt;
+<span class="ln" id="L525">525</span>    &lt;label class=&quot;check&quot;&gt;&lt;input type=&quot;checkbox&quot; id=&quot;r_resume&quot; checked&gt;
+<span class="ln" id="L526">526</span>      &lt;!-- جزء نصي --&gt;
+<span class="ln" id="L527">527</span>      &lt;span data-i18n=&quot;r_resume&quot;&gt;المتابعة من حيث توقفت (بلا تكرار)&lt;/span&gt;&lt;/label&gt;
+<span class="ln" id="L528">528</span>  &lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L529">529</span>  &lt;/div&gt;
+<span class="ln" id="L530">530</span>  &lt;!-- حاوية (div) بمعرّف runLoadWarn وصنف card warn hidden --&gt;
+<span class="ln" id="L531">531</span>  &lt;div class=&quot;card warn hidden&quot; id=&quot;runLoadWarn&quot;&gt;&lt;/div&gt;
+<span class="ln" id="L532">532</span>  &lt;!-- حاوية (div) بمعرّف onlineAlreadyWarn وصنف card warn hidden --&gt;
+<span class="ln" id="L533">533</span>  &lt;div class=&quot;card warn hidden&quot; id=&quot;onlineAlreadyWarn&quot;&gt;&lt;/div&gt;
+<span class="ln" id="L534">534</span> 
+<span class="ln" id="L535">535</span>  &lt;!-- تفاصيل قابلة للطي وصنف adv --&gt;
+<span class="ln" id="L536">536</span>  &lt;details class=&quot;adv&quot;&gt;
+<span class="ln" id="L537">537</span>    &lt;!-- عنوان التفاصيل --&gt;
+<span class="ln" id="L538">538</span>    &lt;summary data-i18n=&quot;adv_run_open&quot;&gt;خيارات متقدمة للتشغيل والشبكة&lt;/summary&gt;
+<span class="ln" id="L539">539</span>    &lt;!-- حاوية (div) وصنف grid --&gt;
+<span class="ln" id="L540">540</span>    &lt;div class=&quot;grid&quot;&gt;
+<span class="ln" id="L541">541</span>      &lt;!-- تسمية حقل --&gt;
+<span class="ln" id="L542">542</span>      &lt;label&gt;&lt;span data-i18n=&quot;f_internet_check&quot;&gt;رابط اختبار الإنترنت المخصص&lt;/span&gt;
+<span class="ln" id="L543">543</span>        &lt;!-- حقل إدخال بمعرّف f_internet_check — ويستمر في السطر التالي بخصائص: autocomplete --&gt;
+<span class="ln" id="L544">544</span>        &lt;input id=&quot;f_internet_check&quot; placeholder=&quot;http://example.com/generate_204|204&quot;
+<span class="ln" id="L545">545</span>               autocomplete=&quot;off&quot;&gt;
+<span class="ln" id="L546">546</span>        &lt;!-- نص صغير وصنف hint --&gt;
+<span class="ln" id="L547">547</span>        &lt;small class=&quot;hint&quot; data-i18n=&quot;f_internet_check_hint&quot;&gt;يُستخدم بدل روابط Google/Microsoft/Apple عندما تحظرها الشبكة. الصيغة: url|status|نص اختياري&lt;/small&gt;&lt;/label&gt;
+<span class="ln" id="L548">548</span>      &lt;!-- تسمية حقل --&gt;
+<span class="ln" id="L549">549</span>      &lt;label&gt;&lt;span data-i18n=&quot;f_connect_timeout&quot;&gt;مهلة فتح الاتصال (ثوانٍ)&lt;/span&gt;
+<span class="ln" id="L550">550</span>        &lt;!-- حقل إدخال بمعرّف f_connect_timeout --&gt;
+<span class="ln" id="L551">551</span>        &lt;input id=&quot;f_connect_timeout&quot; type=&quot;number&quot; min=&quot;0.5&quot; max=&quot;120&quot; step=&quot;0.5&quot; value=&quot;4&quot;&gt;
+<span class="ln" id="L552">552</span>        &lt;!-- نص صغير وصنف hint --&gt;
+<span class="ln" id="L553">553</span>        &lt;small class=&quot;hint&quot; data-i18n=&quot;f_connect_timeout_hint&quot;&gt;ارفعها للراوترات البطيئة (RADIUS). القيمة تُحفظ محلياً.&lt;/small&gt;&lt;/label&gt;
+<span class="ln" id="L554">554</span>      &lt;!-- تسمية حقل --&gt;
+<span class="ln" id="L555">555</span>      &lt;label&gt;&lt;span data-i18n=&quot;f_read_timeout&quot;&gt;مهلة انتظار الرد (ثوانٍ)&lt;/span&gt;
+<span class="ln" id="L556">556</span>        &lt;!-- حقل إدخال بمعرّف f_read_timeout --&gt;
+<span class="ln" id="L557">557</span>        &lt;input id=&quot;f_read_timeout&quot; type=&quot;number&quot; min=&quot;0.5&quot; max=&quot;120&quot; step=&quot;0.5&quot; value=&quot;8&quot;&gt;&lt;/label&gt;
+<span class="ln" id="L558">558</span>      &lt;!-- زر بمعرّف saveNetSettingsBtn وصنف btn --&gt;
+<span class="ln" id="L559">559</span>      &lt;button type=&quot;button&quot; class=&quot;btn&quot; id=&quot;saveNetSettingsBtn&quot; data-i18n=&quot;btn_save_net_settings&quot;&gt;احفظ إعدادات الشبكة&lt;/button&gt;
+<span class="ln" id="L560">560</span>    &lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L561">561</span>    &lt;/div&gt;
+<span class="ln" id="L562">562</span>  &lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L563">563</span>  &lt;/details&gt;
+<span class="ln" id="L564">564</span> 
+<span class="ln" id="L565">565</span>  &lt;!-- حاوية (div) وصنف row wrap small --&gt;
+<span class="ln" id="L566">566</span>  &lt;div class=&quot;row wrap small&quot;&gt;
+<span class="ln" id="L567">567</span>    &lt;!-- زر بمعرّف diagnoseBtn وصنف btn --&gt;
+<span class="ln" id="L568">568</span>    &lt;button class=&quot;btn&quot; id=&quot;diagnoseBtn&quot; data-i18n=&quot;btn_diagnose&quot;&gt;تشخيص الشبكة أولاً&lt;/button&gt;
+<span class="ln" id="L569">569</span>    &lt;!-- زر بمعرّف lockoutBtn وصنف btn ghost --&gt;
+<span class="ln" id="L570">570</span>    &lt;button class=&quot;btn ghost&quot; id=&quot;lockoutBtn&quot; data-i18n=&quot;btn_lockout&quot;&gt;قِس حدّ الحظر&lt;/button&gt;
+<span class="ln" id="L571">571</span>    &lt;!-- زر بمعرّف clearReviewBtn وصنف btn ghost --&gt;
+<span class="ln" id="L572">572</span>    &lt;button class=&quot;btn ghost&quot; id=&quot;clearReviewBtn&quot; data-i18n=&quot;btn_clear_review&quot;&gt;مسح صفحات المراجعة&lt;/button&gt;
+<span class="ln" id="L573">573</span>  &lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L574">574</span>  &lt;/div&gt;
+<span class="ln" id="L575">575</span>  &lt;!-- حاوية (div) بمعرّف diagCard وصنف card hidden --&gt;
+<span class="ln" id="L576">576</span>  &lt;div class=&quot;card hidden&quot; id=&quot;diagCard&quot;&gt;&lt;/div&gt;
+<span class="ln" id="L577">577</span>  &lt;!-- حاوية (div) بمعرّف lockoutCard وصنف card hidden --&gt;
+<span class="ln" id="L578">578</span>  &lt;div class=&quot;card hidden&quot; id=&quot;lockoutCard&quot;&gt;&lt;/div&gt;
+<span class="ln" id="L579">579</span> 
+<span class="ln" id="L580">580</span>  &lt;!-- تسمية حقل وصنف license --&gt;
+<span class="ln" id="L581">581</span>  &lt;label class=&quot;license&quot;&gt;
+<span class="ln" id="L582">582</span>    &lt;!-- حقل إدخال بمعرّف licenseOk --&gt;
+<span class="ln" id="L583">583</span>    &lt;input type=&quot;checkbox&quot; id=&quot;licenseOk&quot;&gt;
+<span class="ln" id="L584">584</span>    &lt;!-- جزء نصي --&gt;
+<span class="ln" id="L585">585</span>    &lt;span data-i18n=&quot;license_check&quot;&gt;
+<span class="ln" id="L586">586</span>      &lt;!-- تكملة العنصر السابق --&gt;
+<span class="ln" id="L587">587</span>      أتعهّد بأنني أملك هذه الشبكة أو لدي إذن كتابي من صاحبها لاختبارها.
+<span class="ln" id="L588">588</span>    &lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L589">589</span>    &lt;/span&gt;
+<span class="ln" id="L590">590</span>  &lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L591">591</span>  &lt;/label&gt;
+<span class="ln" id="L592">592</span> 
+<span class="ln" id="L593">593</span>  &lt;!-- حاوية (div) وصنف row end wrap --&gt;
+<span class="ln" id="L594">594</span>  &lt;div class=&quot;row end wrap&quot;&gt;
+<span class="ln" id="L595">595</span>    &lt;!-- زر بمعرّف backToFormatBtn وصنف btn --&gt;
+<span class="ln" id="L596">596</span>    &lt;button class=&quot;btn&quot; id=&quot;backToFormatBtn&quot; data-i18n=&quot;back_to_format&quot;&gt;رجوع للصيغة&lt;/button&gt;
+<span class="ln" id="L597">597</span>    &lt;!-- زر بمعرّف startBtn وصنف btn primary big --&gt;
+<span class="ln" id="L598">598</span>    &lt;button class=&quot;btn primary big&quot; id=&quot;startBtn&quot; disabled data-i18n=&quot;btn_start&quot;&gt;
+<span class="ln" id="L599">599</span>      &lt;!-- تكملة العنصر السابق --&gt;
+<span class="ln" id="L600">600</span>      ابدأ التخمين
+<span class="ln" id="L601">601</span>    &lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L602">602</span>    &lt;/button&gt;
+<span class="ln" id="L603">603</span>    &lt;!-- زر بمعرّف stopBtn وصنف btn danger big hidden --&gt;
+<span class="ln" id="L604">604</span>    &lt;button class=&quot;btn danger big hidden&quot; id=&quot;stopBtn&quot; data-i18n=&quot;btn_stop&quot;&gt;
+<span class="ln" id="L605">605</span>      &lt;!-- تكملة العنصر السابق --&gt;
+<span class="ln" id="L606">606</span>      إيقاف
+<span class="ln" id="L607">607</span>    &lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L608">608</span>    &lt;/button&gt;
+<span class="ln" id="L609">609</span>  &lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L610">610</span>  &lt;/div&gt;
+<span class="ln" id="L611">611</span>&lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L612">612</span>&lt;/section&gt;
+<span class="ln" id="L613">613</span> 
+<span class="ln" id="L614">614</span>&lt;!-- ============ STEP 4: results ============ --&gt;
+<span class="ln" id="L615">615</span>&lt;!-- قسم بمعرّف panel-results وصنف panel --&gt;
+<span class="ln" id="L616">616</span>&lt;section class=&quot;panel&quot; id=&quot;panel-results&quot;&gt;
+<span class="ln" id="L617">617</span>  &lt;!-- عنوان مستوى 2 --&gt;
+<span class="ln" id="L618">618</span>  &lt;h2 data-i18n=&quot;res_title&quot;&gt;4) النتائج الحيّة&lt;/h2&gt;
+<span class="ln" id="L619">619</span> 
+<span class="ln" id="L620">620</span>  &lt;!-- حاوية (div) وصنف statline --&gt;
+<span class="ln" id="L621">621</span>  &lt;div class=&quot;statline&quot;&gt;
+<span class="ln" id="L622">622</span>    &lt;!-- حاوية (div) بمعرّف stSpeed وصنف stat --&gt;
+<span class="ln" id="L623">623</span>    &lt;div class=&quot;stat&quot;&gt;&lt;span data-i18n=&quot;s_speed&quot;&gt;السرعة&lt;/span&gt;&lt;b id=&quot;stSpeed&quot;&gt;0/s&lt;/b&gt;&lt;/div&gt;
+<span class="ln" id="L624">624</span>    &lt;!-- حاوية (div) بمعرّف stSent وصنف stat --&gt;
+<span class="ln" id="L625">625</span>    &lt;div class=&quot;stat&quot;&gt;&lt;span data-i18n=&quot;s_sent&quot;&gt;أُرسل&lt;/span&gt;&lt;b id=&quot;stSent&quot;&gt;0&lt;/b&gt;&lt;/div&gt;
+<span class="ln" id="L626">626</span>    &lt;!-- حاوية (div) بمعرّف stCovered وصنف stat --&gt;
+<span class="ln" id="L627">627</span>    &lt;div class=&quot;stat&quot;&gt;&lt;span data-i18n=&quot;s_covered&quot;&gt;المغطى&lt;/span&gt;&lt;b id=&quot;stCovered&quot;&gt;0&lt;/b&gt;&lt;/div&gt;
+<span class="ln" id="L628">628</span>    &lt;!-- حاوية (div) بمعرّف stLatency وصنف stat --&gt;
+<span class="ln" id="L629">629</span>    &lt;div class=&quot;stat&quot;&gt;&lt;span data-i18n=&quot;s_latency&quot;&gt;زمن الرد&lt;/span&gt;&lt;b id=&quot;stLatency&quot;&gt;— ms&lt;/b&gt;&lt;/div&gt;
+<span class="ln" id="L630">630</span>    &lt;!-- حاوية (div) بمعرّف stDelay وصنف stat --&gt;
+<span class="ln" id="L631">631</span>    &lt;div class=&quot;stat&quot;&gt;&lt;span data-i18n=&quot;s_delay&quot;&gt;التباطؤ الحالي&lt;/span&gt;&lt;b id=&quot;stDelay&quot;&gt;0 ms&lt;/b&gt;&lt;/div&gt;
+<span class="ln" id="L632">632</span>    &lt;!-- حاوية (div) بمعرّف stEta وصنف stat --&gt;
+<span class="ln" id="L633">633</span>    &lt;div class=&quot;stat&quot;&gt;&lt;span data-i18n=&quot;s_eta&quot;&gt;الوقت المتبقي&lt;/span&gt;&lt;b id=&quot;stEta&quot;&gt;—&lt;/b&gt;&lt;/div&gt;
+<span class="ln" id="L634">634</span>    &lt;!-- حاوية (div) بمعرّف stState وصنف stat --&gt;
+<span class="ln" id="L635">635</span>    &lt;div class=&quot;stat&quot;&gt;&lt;span data-i18n=&quot;s_state&quot;&gt;الحالة&lt;/span&gt;&lt;b id=&quot;stState&quot;&gt;جاهز&lt;/b&gt;&lt;/div&gt;
+<span class="ln" id="L636">636</span>  &lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L637">637</span>  &lt;/div&gt;
+<span class="ln" id="L638">638</span> 
+<span class="ln" id="L639">639</span>  &lt;!-- حاوية (div) بمعرّف progressTrack وصنف progress — ويستمر في السطر التالي بخصائص: aria-valuemin, aria-valuemax, aria-valuenow, id --&gt;
+<span class="ln" id="L640">640</span>  &lt;div class=&quot;progress&quot; id=&quot;progressTrack&quot; role=&quot;progressbar&quot; aria-label=&quot;تقدم التشغيل&quot;
+<span class="ln" id="L641">641</span>       aria-valuemin=&quot;0&quot; aria-valuemax=&quot;100&quot; aria-valuenow=&quot;0&quot;&gt;&lt;div id=&quot;bar&quot;&gt;&lt;/div&gt;&lt;/div&gt;
+<span class="ln" id="L642">642</span>  &lt;!-- حاوية (div) بمعرّف counterChips وصنف chips --&gt;
+<span class="ln" id="L643">643</span>  &lt;div class=&quot;chips&quot; id=&quot;counterChips&quot;&gt;&lt;/div&gt;
+<span class="ln" id="L644">644</span>  &lt;!-- حاوية (div) بمعرّف whyCard وصنف card hidden --&gt;
+<span class="ln" id="L645">645</span>  &lt;div class=&quot;card hidden&quot; id=&quot;whyCard&quot;&gt;&lt;/div&gt;
+<span class="ln" id="L646">646</span>  &lt;!-- حاوية (div) بمعرّف throttleCard وصنف card hidden --&gt;
+<span class="ln" id="L647">647</span>  &lt;div class=&quot;card hidden&quot; id=&quot;throttleCard&quot;&gt;&lt;/div&gt;
+<span class="ln" id="L648">648</span>  &lt;!-- حاوية (div) بمعرّف stopCard وصنف card hidden --&gt;
+<span class="ln" id="L649">649</span>  &lt;div class=&quot;card hidden&quot; id=&quot;stopCard&quot;&gt;&lt;/div&gt;
+<span class="ln" id="L650">650</span> 
+<span class="ln" id="L651">651</span>  &lt;!-- حاوية (div) وصنف logwrap --&gt;
+<span class="ln" id="L652">652</span>  &lt;div class=&quot;logwrap&quot;&gt;
+<span class="ln" id="L653">653</span>    &lt;!-- جدول وصنف log --&gt;
+<span class="ln" id="L654">654</span>    &lt;table class=&quot;log&quot;&gt;
+<span class="ln" id="L655">655</span>      &lt;!-- عنصر caption وصنف sr-only --&gt;
+<span class="ln" id="L656">656</span>      &lt;caption class=&quot;sr-only&quot; data-i18n=&quot;attempt_table&quot;&gt;سجل محاولات التشغيل&lt;/caption&gt;
+<span class="ln" id="L657">657</span>      &lt;!-- رأس الجدول --&gt;
+<span class="ln" id="L658">658</span>      &lt;thead&gt;&lt;tr&gt;
+<span class="ln" id="L659">659</span>        &lt;!-- خلية عنوان --&gt;
+<span class="ln" id="L660">660</span>        &lt;th&gt;#&lt;/th&gt;&lt;th data-i18n=&quot;t_card&quot;&gt;البطاقة&lt;/th&gt;&lt;th&gt;HTTP&lt;/th&gt;
+<span class="ln" id="L661">661</span>        &lt;!-- خلية عنوان --&gt;
+<span class="ln" id="L662">662</span>        &lt;th data-i18n=&quot;t_result&quot;&gt;النتيجة&lt;/th&gt;&lt;th data-i18n=&quot;t_why&quot;&gt;السبب&lt;/th&gt;
+<span class="ln" id="L663">663</span>        &lt;!-- خلية عنوان --&gt;
+<span class="ln" id="L664">664</span>        &lt;th data-i18n=&quot;t_ms&quot;&gt;ms&lt;/th&gt;&lt;th data-i18n=&quot;t_len&quot;&gt;الحجم&lt;/th&gt;
+<span class="ln" id="L665">665</span>      &lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L666">666</span>      &lt;/tr&gt;&lt;/thead&gt;
+<span class="ln" id="L667">667</span>      &lt;!-- جسم الجدول بمعرّف logBody --&gt;
+<span class="ln" id="L668">668</span>      &lt;tbody id=&quot;logBody&quot;&gt;&lt;/tbody&gt;
+<span class="ln" id="L669">669</span>    &lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L670">670</span>    &lt;/table&gt;
+<span class="ln" id="L671">671</span>  &lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L672">672</span>  &lt;/div&gt;
+<span class="ln" id="L673">673</span> 
+<span class="ln" id="L674">674</span>  &lt;!-- حاوية (div) وصنف row --&gt;
+<span class="ln" id="L675">675</span>  &lt;div class=&quot;row&quot;&gt;
+<span class="ln" id="L676">676</span>    &lt;!-- زر بمعرّف clearLogBtn وصنف btn --&gt;
+<span class="ln" id="L677">677</span>    &lt;button class=&quot;btn&quot; id=&quot;clearLogBtn&quot; data-i18n=&quot;btn_clear_log&quot;&gt;تفريغ السجل&lt;/button&gt;
+<span class="ln" id="L678">678</span>    &lt;!-- زر بمعرّف downloadBtn وصنف btn ghost --&gt;
+<span class="ln" id="L679">679</span>    &lt;button class=&quot;btn ghost&quot; id=&quot;downloadBtn&quot; data-i18n=&quot;btn_download&quot;&gt;تنزيل آخر تقرير&lt;/button&gt;
+<span class="ln" id="L680">680</span>  &lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L681">681</span>  &lt;/div&gt;
+<span class="ln" id="L682">682</span> 
+<span class="ln" id="L683">683</span>  &lt;!-- عنوان مستوى 3 --&gt;
+<span class="ln" id="L684">684</span>  &lt;h3 data-i18n=&quot;hits_title&quot;&gt;البطاقات المقبولة&lt;/h3&gt;
+<span class="ln" id="L685">685</span>  &lt;!-- حاوية (div) بمعرّف hitsBox وصنف card muted --&gt;
+<span class="ln" id="L686">686</span>  &lt;div id=&quot;hitsBox&quot; class=&quot;card muted&quot; data-i18n=&quot;hits_none&quot;&gt;لا شيء بعد.&lt;/div&gt;
+<span class="ln" id="L687">687</span> 
+<span class="ln" id="L688">688</span>  &lt;!-- عنوان مستوى 3 --&gt;
+<span class="ln" id="L689">689</span>  &lt;h3 data-i18n=&quot;review_title&quot;&gt;ردود غير واضحة (تحتاج نظرة منك)&lt;/h3&gt;
+<span class="ln" id="L690">690</span>  &lt;!-- فقرة وصنف hint --&gt;
+<span class="ln" id="L691">691</span>  &lt;p class=&quot;hint&quot; data-i18n=&quot;review_hint&quot;&gt;
+<span class="ln" id="L692">692</span>    &lt;!-- تكملة العنصر السابق --&gt;
+<span class="ln" id="L693">693</span>    هذه ردود ليست مثل صفحة الرفض وليست نجاحاً مؤكداً. محفوظة لك لتفتحها وتقرأها
+<span class="ln" id="L694">694</span>    &lt;!-- تكملة العنصر السابق --&gt;
+<span class="ln" id="L695">695</span>    بنفسك - الأداة لا تخمّن مكانك.
+<span class="ln" id="L696">696</span>  &lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L697">697</span>  &lt;/p&gt;
+<span class="ln" id="L698">698</span>  &lt;!-- حاوية (div) بمعرّف reviewBox وصنف card muted --&gt;
+<span class="ln" id="L699">699</span>  &lt;div id=&quot;reviewBox&quot; class=&quot;card muted&quot; data-i18n=&quot;review_none&quot;&gt;لا شيء بعد.&lt;/div&gt;
+<span class="ln" id="L700">700</span>&lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L701">701</span>&lt;/section&gt;
+<span class="ln" id="L702">702</span> 
+<span class="ln" id="L703">703</span>&lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L704">704</span>&lt;/main&gt;
+<span class="ln" id="L705">705</span> 
+<span class="ln" id="L706">706</span>&lt;!-- تذييل وصنف foot --&gt;
+<span class="ln" id="L707">707</span>&lt;footer class=&quot;foot&quot;&gt;
+<span class="ln" id="L708">708</span>  &lt;!-- جزء نصي بمعرّف footText --&gt;
+<span class="ln" id="L709">709</span>  &lt;span id=&quot;footText&quot;&gt;KiraPass — أداة اختبار أمن الشبكات. الاستخدام بدون إذن صاحب الشبكة مخالف للقانون.&lt;/span&gt;
+<span class="ln" id="L710">710</span>  &lt;!-- جزء نصي وصنف dot --&gt;
+<span class="ln" id="L711">711</span>  &lt;span class=&quot;dot&quot;&gt;•&lt;/span&gt;
+<span class="ln" id="L712">712</span>  &lt;!-- رابط بمعرّف licenseLink --&gt;
+<span class="ln" id="L713">713</span>  &lt;a href=&quot;#&quot; id=&quot;licenseLink&quot; data-i18n=&quot;license_link&quot;&gt;الترخيص&lt;/a&gt;
+<span class="ln" id="L714">714</span>  &lt;!-- جزء نصي وصنف dot --&gt;
+<span class="ln" id="L715">715</span>  &lt;span class=&quot;dot&quot;&gt;•&lt;/span&gt;
+<span class="ln" id="L716">716</span>  &lt;!-- رابط بمعرّف quitLink --&gt;
+<span class="ln" id="L717">717</span>  &lt;a href=&quot;#&quot; id=&quot;quitLink&quot; data-i18n=&quot;quit_tool&quot;&gt;إيقاف الأداة&lt;/a&gt;
+<span class="ln" id="L718">718</span>&lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L719">719</span>&lt;/footer&gt;
+<span class="ln" id="L720">720</span> 
+<span class="ln" id="L721">721</span>&lt;!-- حاوية (div) بمعرّف modal وصنف modal hidden --&gt;
+<span class="ln" id="L722">722</span>&lt;div class=&quot;modal hidden&quot; id=&quot;modal&quot; role=&quot;presentation&quot;&gt;
+<span class="ln" id="L723">723</span>  &lt;!-- حاوية (div) وصنف modal-box --&gt;
+<span class="ln" id="L724">724</span>  &lt;div class=&quot;modal-box&quot; role=&quot;dialog&quot; aria-modal=&quot;true&quot; aria-labelledby=&quot;modalTitle&quot;&gt;
+<span class="ln" id="L725">725</span>    &lt;!-- حاوية (div) وصنف modal-head --&gt;
+<span class="ln" id="L726">726</span>    &lt;div class=&quot;modal-head&quot;&gt;
+<span class="ln" id="L727">727</span>      &lt;!-- توكيد بمعرّف modalTitle --&gt;
+<span class="ln" id="L728">728</span>      &lt;b id=&quot;modalTitle&quot;&gt;—&lt;/b&gt;
+<span class="ln" id="L729">729</span>      &lt;!-- زر بمعرّف modalClose وصنف btn ghost --&gt;
+<span class="ln" id="L730">730</span>      &lt;button class=&quot;btn ghost&quot; id=&quot;modalClose&quot; aria-label=&quot;إغلاق&quot;&gt;✕&lt;/button&gt;
+<span class="ln" id="L731">731</span>    &lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L732">732</span>    &lt;/div&gt;
+<span class="ln" id="L733">733</span>    &lt;!-- حاوية (div) بمعرّف modalBody وصنف modal-body --&gt;
+<span class="ln" id="L734">734</span>    &lt;div class=&quot;modal-body&quot; id=&quot;modalBody&quot;&gt;&lt;/div&gt;
+<span class="ln" id="L735">735</span>  &lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L736">736</span>  &lt;/div&gt;
+<span class="ln" id="L737">737</span>&lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L738">738</span>&lt;/div&gt;
+<span class="ln" id="L739">739</span> 
+<span class="ln" id="L740">740</span>&lt;!-- سكربت --&gt;
+<span class="ln" id="L741">741</span>&lt;script src=&quot;/ui.js&quot;&gt;&lt;/script&gt;
+<span class="ln" id="L742">742</span>&lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L743">743</span>&lt;/body&gt;
+<span class="ln" id="L744">744</span>&lt;!-- إغلاق العنصر السابق --&gt;
+<span class="ln" id="L745">745</span>&lt;/html&gt;
+<span class="ln" id="L746">746</span> 
+</code></pre></details>
+<script>
+document.getElementById("kp-jump").addEventListener("change", function (e) {
+  var n = parseInt(e.target.value, 10);
+  if (n > 0) { var el = document.getElementById("L" + n);
+    if (el) el.scrollIntoView({block: "center"}); }
+});
+if (location.hash) { var el = document.querySelector(location.hash);
+  if (el) setTimeout(function () { el.scrollIntoView({block: "center"}); }, 60); }
+</script>
+<footer class="docfoot">صفحة مولّدة آلياً من مصدر الكود · KiraPass —
+<code>files</code> · 2026-10-01 02:26</footer>
+</main>
+</div>
+<script src="../assets/docs.js"></script>
+<script>KPInit("files");</script>
+</body>
+</html>

@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>مصدر mockportal.py · KiraPass</title>
+<link rel="stylesheet" href="../assets/docs.css">
+
+</head>
+<body>
+<div id="kp-layout">
+<main class="doc">
+<h1>مصدر <code>mockportal.py</code></h1>
+<p class="lead">راوتر وهمي كامل للاختبارات — 432 سطراً. كل سطر يحمل تعليقه العربي.</p>
+<div class="card info"><b>هذه الصفحة مولّدة آلياً</b> من مصدر الكود مباشرة (<code>tools/docs/build_docs.py</code>). إن غيّرت الكود فأعد توليدها: <code>python3 tools/docs/build_docs.py</code>. الشرح اليدوي الأوسع في <a href="../architecture.html">المعمارية</a> و<a href="../editing.html">دليل التعديل</a> و<a href="../danger.html">أماكن الخطر</a>.</div>
+<p><a class="btn" href="../files/mockportal.html">← صفحة الشرح</a> <label class="muted"> قفز إلى سطر: <input id="kp-jump" style="width:6rem" placeholder="123"></label></p>
+<details class="src" open><summary>المصدر كاملاً</summary><pre data-lines="432"><code>
+<span class="ln" id="L1">1</span># بداية نص متعدد الأسطر — الأسطر التالية نصّ حرفي لا كود، فلا يقبل تعليقاً
+<span class="ln" id="L2">2</span>&quot;&quot;&quot;A small, honest captive-portal simulator used by the self-test.
+<span class="ln" id="L3">3</span> 
+<span class="ln" id="L4">4</span>It behaves like the real thing in the ways that matter for this tool:
+<span class="ln" id="L5">5</span> 
+<span class="ln" id="L6">6</span>* POST / GET login form with hidden dst/popup fields
+<span class="ln" id="L7">7</span>* a per-request session token in the page (so naive byte comparison fails)
+<span class="ln" id="L8">8</span>* the error text re-rendered into the same page for a wrong card
+<span class="ln" id="L9">9</span>* 302 redirect to the internet for a good card
+<span class="ln" id="L10">10</span>* optional MikroTik chap (md5.js) password scheme
+<span class="ln" id="L11">11</span>* optional ban page, 429 rate limiting and dropped connections
+<span class="ln" id="L12">12</span> 
+<span class="ln" id="L13">13</span>The self-test is how a user can *see* the tool working without touching any
+<span class="ln" id="L14">14</span>real network.
+<span class="ln" id="L15">15</span>&quot;&quot;&quot;  # نهاية النص متعدد الأسطر
+<span class="ln" id="L16">16</span> 
+<span class="ln" id="L17">17</span>from __future__ import annotations  # استيراد annotations من الوحدة __future__
+<span class="ln" id="L18">18</span> 
+<span class="ln" id="L19">19</span>import hashlib  # استيراد الوحدة hashlib من المكتبة
+<span class="ln" id="L20">20</span>import http.server  # استيراد الوحدة http.server من المكتبة
+<span class="ln" id="L21">21</span>import random  # استيراد الوحدة random من المكتبة
+<span class="ln" id="L22">22</span>import socket  # استيراد الوحدة socket من المكتبة
+<span class="ln" id="L23">23</span>import socketserver  # استيراد الوحدة socketserver من المكتبة
+<span class="ln" id="L24">24</span>import string  # استيراد الوحدة string من المكتبة
+<span class="ln" id="L25">25</span>import threading  # استيراد الوحدة threading من المكتبة
+<span class="ln" id="L26">26</span>import time  # استيراد الوحدة time من المكتبة
+<span class="ln" id="L27">27</span>import urllib.parse  # استيراد الوحدة urllib.parse من المكتبة
+<span class="ln" id="L28">28</span>import uuid  # استيراد الوحدة uuid من المكتبة
+<span class="ln" id="L29">29</span> 
+<span class="ln" id="L30">30</span># بداية نص متعدد الأسطر — الأسطر التالية نصّ حرفي لا كود، فلا يقبل تعليقاً
+<span class="ln" id="L31">31</span>CARD_PAGE = &quot;&quot;&quot;&lt;!DOCTYPE html&gt;&lt;html&gt;&lt;head&gt;&lt;title&gt;Hotspot Login&lt;/title&gt;
+<span class="ln" id="L32">32</span>&lt;script type=&quot;text/javascript&quot; src=&quot;md5.js&quot;&gt;&lt;/script&gt;
+<span class="ln" id="L33">33</span>&lt;script&gt;
+<span class="ln" id="L34">34</span>var mac = &quot;4C:5E:0C:11:22:{mac_tail}&quot;;
+<span class="ln" id="L35">35</span>function doLogin() {{
+<span class="ln" id="L36">36</span>  document.login.password.value = hexMD5(&#x27;{chap_id}&#x27; +
+<span class="ln" id="L37">37</span>      document.login.password.value + &#x27;{chap_challenge}&#x27;);
+<span class="ln" id="L38">38</span>  return true;
+<span class="ln" id="L39">39</span>}}
+<span class="ln" id="L40">40</span>&lt;/script&gt;&lt;/head&gt;&lt;body&gt;
+<span class="ln" id="L41">41</span>&lt;div id=&quot;wrapper&quot;&gt;&lt;div id=&quot;main&quot;&gt;
+<span class="ln" id="L42">42</span>&lt;p id=&quot;message&quot;&gt;{message}&lt;/p&gt;
+<span class="ln" id="L43">43</span>&lt;form name=&quot;login&quot; action=&quot;{action}&quot; method=&quot;{method}&quot; onSubmit=&quot;return doLogin()&quot;&gt;
+<span class="ln" id="L44">44</span>&lt;input type=&quot;hidden&quot; name=&quot;dst&quot; value=&quot;{dst}&quot;&gt;
+<span class="ln" id="L45">45</span>&lt;input type=&quot;hidden&quot; name=&quot;popup&quot; value=&quot;true&quot;&gt;{tok_field}
+<span class="ln" id="L46">46</span>&lt;input type=&quot;text&quot; name=&quot;username&quot; value=&quot;{echo_user}&quot;&gt;
+<span class="ln" id="L47">47</span>&lt;input type=&quot;password&quot; name=&quot;password&quot; value=&quot;&quot;&gt;
+<span class="ln" id="L48">48</span>&lt;input type=&quot;submit&quot; value=&quot;Connect&quot;&gt;
+<span class="ln" id="L49">49</span>&lt;/form&gt;
+<span class="ln" id="L50">50</span>&lt;div id=&quot;session&quot;&gt;session: {nonce}&lt;/div&gt;
+<span class="ln" id="L51">51</span>&lt;script&gt;var nonce = &quot;{nonce}&quot;;&lt;/script&gt;
+<span class="ln" id="L52">52</span>&lt;/div&gt;&lt;/div&gt;&lt;/body&gt;&lt;/html&gt;&quot;&quot;&quot;  # نهاية النص متعدد الأسطر
+<span class="ln" id="L53">53</span> 
+<span class="ln" id="L54">54</span># بداية نص متعدد الأسطر — الأسطر التالية نصّ حرفي لا كود، فلا يقبل تعليقاً
+<span class="ln" id="L55">55</span>BAN_PAGE = &quot;&quot;&quot;&lt;html&gt;&lt;head&gt;&lt;title&gt;Blocked&lt;/title&gt;&lt;/head&gt;&lt;body&gt;
+<span class="ln" id="L56">56</span>&lt;h1&gt;You are blocked&lt;/h1&gt;&lt;p&gt;Too many login attempts from your address.&lt;/p&gt;
+<span class="ln" id="L57">57</span>&lt;/body&gt;&lt;/html&gt;&quot;&quot;&quot;  # نهاية النص متعدد الأسطر
+<span class="ln" id="L58">58</span> 
+<span class="ln" id="L59">59</span># بداية نص متعدد الأسطر — الأسطر التالية نصّ حرفي لا كود، فلا يقبل تعليقاً
+<span class="ln" id="L60">60</span>RATE_PAGE = &quot;&quot;&quot;&lt;html&gt;&lt;head&gt;&lt;title&gt;Slow down&lt;/title&gt;&lt;/head&gt;&lt;body&gt;
+<span class="ln" id="L61">61</span>&lt;p&gt;rate limit exceeded, please slow down&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;&quot;&quot;&quot;  # نهاية النص متعدد الأسطر
+<span class="ln" id="L62">62</span> 
+<span class="ln" id="L63">63</span># بداية نص متعدد الأسطر — الأسطر التالية نصّ حرفي لا كود، فلا يقبل تعليقاً
+<span class="ln" id="L64">64</span>SUCCESS_PAGE = &quot;&quot;&quot;&lt;!DOCTYPE html&gt;&lt;html&gt;&lt;head&gt;&lt;title&gt;Welcome&lt;/title&gt;&lt;/head&gt;
+<span class="ln" id="L65">65</span>&lt;body&gt;&lt;h1&gt;You are logged in&lt;/h1&gt;
+<span class="ln" id="L66">66</span>&lt;p&gt;Welcome to the network. Remaining time 3h 59m.&lt;/p&gt;
+<span class="ln" id="L67">67</span>&lt;p&gt;&lt;a href=&quot;/status&quot;&gt;statistics&lt;/a&gt;&lt;/p&gt;
+<span class="ln" id="L68">68</span>&lt;/body&gt;&lt;/html&gt;&quot;&quot;&quot;  # نهاية النص متعدد الأسطر
+<span class="ln" id="L69">69</span> 
+<span class="ln" id="L70">70</span> 
+<span class="ln" id="L71">71</span>class PortalState:  # تعريف الصنف PortalState
+<span class="ln" id="L72">72</span>    def __init__(self, valid_cards, pass_mode=&quot;same&quot;, method=&quot;post&quot;,  # تعريف الدالة __init__(self, valid_cards, pass_mode, method, dynamic, ban_after, ban_seconds, rate_limit_after, drop_every, drop_after, chap, prefix, length, error_text, hide_success, require_session, reject_shape, success_page, unknown_success_page, global_online_login_page)
+<span class="ln" id="L73">73</span>                 dynamic=True, ban_after=0, ban_seconds=0,  # المعامل المسمّى dynamic
+<span class="ln" id="L74">74</span>                 rate_limit_after=0, drop_every=0,  # المعامل المسمّى rate_limit_after
+<span class="ln" id="L75">75</span>                 drop_after=0, chap=False, prefix=&quot;02&quot;, length=6,  # المعامل المسمّى drop_after
+<span class="ln" id="L76">76</span>                 error_text=None, hide_success=False, require_session=False,  # المعامل المسمّى error_text
+<span class="ln" id="L77">77</span>                 reject_shape=False, success_page=False,  # المعامل المسمّى reject_shape
+<span class="ln" id="L78">78</span>                 unknown_success_page=False, global_online_login_page=False):  # المعامل المسمّى unknown_success_page
+<span class="ln" id="L79">79</span>        self.valid_cards = set(valid_cards)  # إسناد نتيجة استدعاء set (معامل واحد) إلى self.valid_cards
+<span class="ln" id="L80">80</span>        self.pass_mode = pass_mode          # same | empty | chap
+<span class="ln" id="L81">81</span>        self.method = method  # إسناد method إلى self.method
+<span class="ln" id="L82">82</span>        self.dynamic = dynamic  # إسناد dynamic إلى self.dynamic
+<span class="ln" id="L83">83</span>        self.ban_after = ban_after          # 0 = لا يحجب أبداً
+<span class="ln" id="L84">84</span>        self.ban_seconds = ban_seconds      # 0 = الحجب لا يزول أبداً
+<span class="ln" id="L85">85</span>        self.banned_at = 0.0  # إسناد القيمة الثابتة self.banned_at
+<span class="ln" id="L86">86</span>        # hide_success: البطاقة تُدخل الضيف فعلاً، لكن الراوتر ما يزال
+<span class="ln" id="L87">87</span>        # يردّ بصفحة الرفض — أخبث حالة حقيقية، والوحيدة
+<span class="ln" id="L88">88</span>        # التي لا يكشفها إلا مراقب «هل فتح الإنترنت؟»
+<span class="ln" id="L89">89</span>        self.hide_success = hide_success  # إسناد hide_success إلى self.hide_success
+<span class="ln" id="L90">90</span>        # require_session: بوابة حقيقية توزع كوكي جلسة ورمزاً
+<span class="ln" id="L91">91</span>        # في صفحة الدخول وترفض الإرسال بدونهما (هذا ما يفعله
+<span class="ln" id="L92">92</span>        # المتصفح تلقائياً ولا يفعله سكربت عارٍ)
+<span class="ln" id="L93">93</span>        self.require_session = require_session  # إسناد require_session إلى self.require_session
+<span class="ln" id="L94">94</span>        self.reject_shape = reject_shape  # إسناد reject_shape إلى self.reject_shape
+<span class="ln" id="L95">95</span>        self.success_page = success_page  # إسناد success_page إلى self.success_page
+<span class="ln" id="L96">96</span>        # البوابة تقبل البطاقة وتفتح الشبكة لكن تردّ بصفحة
+<span class="ln" id="L97">97</span>        # HTTP 200 مختلفة غير موسومة. هذا يحاكي نجاحاً لا يستطيع
+<span class="ln" id="L98">98</span>        # مصنف يعتمد على الرد وحده إثباته بلا فحص إنترنت.
+<span class="ln" id="L99">99</span>        self.unknown_success_page = unknown_success_page  # إسناد unknown_success_page إلى self.unknown_success_page
+<span class="ln" id="L100">100</span>        # بعض البوابات ترجع صفحة المصادقة/الحالة لكل طلب دخول
+<span class="ln" id="L101">101</span>        # لاحق من نفس الجهاز بمجرد فتح جلسة بوابته.
+<span class="ln" id="L102">102</span>        # هذا يحاكي تحققات كاذبة لكل بطاقة في التشغيلات المتوازية.
+<span class="ln" id="L103">103</span>        self.global_online_login_page = global_online_login_page  # إسناد global_online_login_page إلى self.global_online_login_page
+<span class="ln" id="L104">104</span>        self.tokens = {}  # إسناد قاموس إلى self.tokens
+<span class="ln" id="L105">105</span>        self.bad_requests = 0  # إسناد القيمة الثابتة self.bad_requests
+<span class="ln" id="L106">106</span>        self.rate_limit_after = rate_limit_after  # إسناد rate_limit_after إلى self.rate_limit_after
+<span class="ln" id="L107">107</span>        self.drop_every = drop_every  # إسناد drop_every إلى self.drop_every
+<span class="ln" id="L108">108</span>        self.drop_after = drop_after      # اقطع كل طلب بعد هذا العدد
+<span class="ln" id="L109">109</span>        self.chap = chap  # إسناد chap إلى self.chap
+<span class="ln" id="L110">110</span>        self.chap_id = &quot;a1b2c3d4&quot;  # إسناد القيمة الثابتة self.chap_id
+<span class="ln" id="L111">111</span>        self.chap_challenge = &quot;9f8e7d6c&quot;  # إسناد القيمة الثابتة self.chap_challenge
+<span class="ln" id="L112">112</span>        self.error_text = error_text or &quot;invalid username or password&quot;  # دمج منطقي (أو) وإسناده إلى self.error_text
+<span class="ln" id="L113">113</span>        self.use_prefix_free = True  # إسناد القيمة الثابتة self.use_prefix_free
+<span class="ln" id="L114">114</span>        self.lock = threading.Lock()  # إسناد نتيجة استدعاء threading.Lock إلى self.lock
+<span class="ln" id="L115">115</span>        self.requests = 0  # إسناد القيمة الثابتة self.requests
+<span class="ln" id="L116">116</span>        self.logins = 0  # إسناد القيمة الثابتة self.logins
+<span class="ln" id="L117">117</span>        self.failures = 0  # إسناد القيمة الثابتة self.failures
+<span class="ln" id="L118">118</span>        self.bans = 0  # إسناد القيمة الثابتة self.bans
+<span class="ln" id="L119">119</span>        self.hidden_successes = 0  # إسناد القيمة الثابتة self.hidden_successes
+<span class="ln" id="L120">120</span>        self.rate_hits = 0  # إسناد القيمة الثابتة self.rate_hits
+<span class="ln" id="L121">121</span>        self.online_ips = set()  # إسناد نتيجة استدعاء set إلى self.online_ips
+<span class="ln" id="L122">122</span>        self.asked_cards = []  # إسناد قائمة إلى self.asked_cards
+<span class="ln" id="L123">123</span>        self.started = time.time()  # إسناد نتيجة استدعاء time.time إلى self.started
+<span class="ln" id="L124">124</span> 
+<span class="ln" id="L125">125</span>    # -- العدّادات ---------------------------------------------------------
+<span class="ln" id="L126">126</span>    def bump(self, field, n=1):  # تعريف الدالة bump(self, field, n)
+<span class="ln" id="L127">127</span>        with self.lock:  # سياق مُدار: self.lock
+<span class="ln" id="L128">128</span>            setattr(self, field, getattr(self, field) + n)  # استدعاء setattr (3 معاملات)
+<span class="ln" id="L129">129</span> 
+<span class="ln" id="L130">130</span>    def snapshot(self) -&gt; dict:  # تعريف الدالة snapshot(self) ترجع dict
+<span class="ln" id="L131">131</span>        with self.lock:  # سياق مُدار: self.lock
+<span class="ln" id="L132">132</span>            return {&quot;requests&quot;: self.requests, &quot;logins&quot;: self.logins,  # إرجاع قاموس
+<span class="ln" id="L133">133</span>                    &quot;failures&quot;: self.failures, &quot;bans&quot;: self.bans,  # مفتاح failures في القاموس
+<span class="ln" id="L134">134</span>                    &quot;rate_hits&quot;: self.rate_hits,  # مفتاح rate_hits في القاموس
+<span class="ln" id="L135">135</span>                    &quot;online_ips&quot;: len(self.online_ips)}  # مفتاح online_ips في القاموس
+<span class="ln" id="L136">136</span> 
+<span class="ln" id="L137">137</span> 
+<span class="ln" id="L138">138</span>class Handler(http.server.BaseHTTPRequestHandler):  # تعريف الصنف Handler يرث من http.server.BaseHTTPRequestHandler
+<span class="ln" id="L139">139</span>    protocol_version = &quot;HTTP/1.1&quot;  # إسناد القيمة الثابتة protocol_version
+<span class="ln" id="L140">140</span>    server_version = &quot;MockHotspot/1.0&quot;  # إسناد القيمة الثابتة server_version
+<span class="ln" id="L141">141</span> 
+<span class="ln" id="L142">142</span>    def log_message(self, *args):  # تعريف الدالة log_message(self, *args)
+<span class="ln" id="L143">143</span>        if self.server.verbose:  # شرط: self.server.verbose
+<span class="ln" id="L144">144</span>            super().log_message(*args)  # استدعاء super().log_message (معامل واحد)
+<span class="ln" id="L145">145</span> 
+<span class="ln" id="L146">146</span>    # -- الأنابيب ---------------------------------------------------------
+<span class="ln" id="L147">147</span>    def _reply(self, code, body, headers=None):  # تعريف الدالة _reply(self, code, body, headers)
+<span class="ln" id="L148">148</span>        # بوابة حقيقية تضبط كوكي جلستها مع الصفحة
+<span class="ln" id="L149">149</span>        sid = getattr(self, &quot;_new_cookie&quot;, None)  # إسناد نتيجة استدعاء getattr (3 معاملات) إلى sid
+<span class="ln" id="L150">150</span>        if sid:  # شرط: sid
+<span class="ln" id="L151">151</span>            self._new_cookie = None  # إسناد القيمة الثابتة self._new_cookie
+<span class="ln" id="L152">152</span>            headers = dict(headers or {})  # إسناد نتيجة استدعاء dict (معامل واحد) إلى headers
+<span class="ln" id="L153">153</span>            headers[&quot;Set-Cookie&quot;] = &quot;portal_sid=%s; Path=/&quot; % sid  # حساب باقي القسمة بين &#x27;portal_sid=%s; Path=/&#x27; وsid وإسناده إلى headers[&#x27;Set-Cookie&#x27;]
+<span class="ln" id="L154">154</span>        return self._raw_reply(code, body, headers)  # إرجاع self._raw_reply(code, body, headers)
+<span class="ln" id="L155">155</span> 
+<span class="ln" id="L156">156</span>    def _raw_reply(self, code, body: str, headers=None):  # تعريف الدالة _raw_reply(self, code, body, headers)
+<span class="ln" id="L157">157</span>        payload = body.encode(&quot;utf-8&quot;)  # إسناد نتيجة استدعاء body.encode (معامل واحد) إلى payload
+<span class="ln" id="L158">158</span>        self.send_response(code)  # استدعاء self.send_response (معامل واحد)
+<span class="ln" id="L159">159</span>        self.send_header(&quot;Content-Type&quot;, &quot;text/html; charset=utf-8&quot;)  # استدعاء self.send_header (2 معاملات)
+<span class="ln" id="L160">160</span>        self.send_header(&quot;Content-Length&quot;, str(len(payload)))  # استدعاء self.send_header (2 معاملات)
+<span class="ln" id="L161">161</span>        for key, value in (headers or {}).items():  # دورة على headers أو قاموس.items() باسم مجموعة
+<span class="ln" id="L162">162</span>            self.send_header(key, value)  # استدعاء self.send_header (2 معاملات)
+<span class="ln" id="L163">163</span>        self.end_headers()  # استدعاء self.end_headers
+<span class="ln" id="L164">164</span>        if payload:  # شرط: payload
+<span class="ln" id="L165">165</span>            try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L166">166</span>                self.wfile.write(payload)  # استدعاء self.wfile.write (معامل واحد)
+<span class="ln" id="L167">167</span>            except (BrokenPipeError, ConnectionResetError):  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L168">168</span>                pass  # سطر فارغ منطقياً (pass) — مطلوب صياغياً
+<span class="ln" id="L169">169</span> 
+<span class="ln" id="L170">170</span>    def do_GET(self):  # تعريف الدالة do_GET(self)
+<span class="ln" id="L171">171</span>        self._handle(&quot;GET&quot;)  # استدعاء self._handle (معامل واحد)
+<span class="ln" id="L172">172</span> 
+<span class="ln" id="L173">173</span>    def do_POST(self):  # تعريف الدالة do_POST(self)
+<span class="ln" id="L174">174</span>        self._handle(&quot;POST&quot;)  # استدعاء self._handle (معامل واحد)
+<span class="ln" id="L175">175</span> 
+<span class="ln" id="L176">176</span>    def _handle(self, method):  # تعريف الدالة _handle(self, method)
+<span class="ln" id="L177">177</span>        st = self.server.state  # إسناد self.server.state إلى st
+<span class="ln" id="L178">178</span>        st.bump(&quot;requests&quot;)  # استدعاء st.bump (معامل واحد)
+<span class="ln" id="L179">179</span>        with st.lock:  # سياق مُدار: st.lock
+<span class="ln" id="L180">180</span>            n = st.requests  # إسناد st.requests إلى n
+<span class="ln" id="L181">181</span>        # يحاكي راوتراً يقطع الاتصالات (تحت ضغط، أو ميت)
+<span class="ln" id="L182">182</span>        drop = bool((st.drop_every and n % st.drop_every == 0)  # إسناد نتيجة استدعاء bool (معامل واحد) إلى drop
+<span class="ln" id="L183">183</span>                    or (st.drop_after and n &gt; st.drop_after))  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L184">184</span>        if drop:  # شرط: drop
+<span class="ln" id="L185">185</span>            try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L186">186</span>                self.connection.shutdown(socket.SHUT_RDWR)  # استدعاء self.connection.shutdown (معامل واحد)
+<span class="ln" id="L187">187</span>            except OSError:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L188">188</span>                pass  # سطر فارغ منطقياً (pass) — مطلوب صياغياً
+<span class="ln" id="L189">189</span>            try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L190">190</span>                self.connection.close()  # استدعاء self.connection.close
+<span class="ln" id="L191">191</span>            except OSError:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L192">192</span>                pass  # سطر فارغ منطقياً (pass) — مطلوب صياغياً
+<span class="ln" id="L193">193</span>            self.close_connection = True  # إسناد القيمة الثابتة self.close_connection
+<span class="ln" id="L194">194</span>            return  # إنهاء الدالة بلا قيمة (ترجع None ضمناً)
+<span class="ln" id="L195">195</span> 
+<span class="ln" id="L196">196</span>        # فرّغ الجسم دائماً، وإلا اختل تزامن keep-alive
+<span class="ln" id="L197">197</span>        body = b&quot;&quot;  # إسناد القيمة الثابتة body
+<span class="ln" id="L198">198</span>        try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L199">199</span>            length = int(self.headers.get(&quot;Content-Length&quot;) or 0)  # إسناد نتيجة استدعاء int (معامل واحد) إلى length
+<span class="ln" id="L200">200</span>        except ValueError:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L201">201</span>            length = 0  # إسناد القيمة الثابتة length
+<span class="ln" id="L202">202</span>        if length:  # شرط: length
+<span class="ln" id="L203">203</span>            body = self.rfile.read(length)  # إسناد نتيجة استدعاء self.rfile.read (معامل واحد) إلى body
+<span class="ln" id="L204">204</span> 
+<span class="ln" id="L205">205</span>        parts = urllib.parse.urlsplit(self.path)  # إسناد نتيجة استدعاء urllib.parse.urlsplit (معامل واحد) إلى parts
+<span class="ln" id="L206">206</span>        query = {k: v[0] for k, v in urllib.parse.parse_qs(parts.query).items()}  # بناء قاموس بالاشتقاق وإسناده إلى query
+<span class="ln" id="L207">207</span>        form = {k: v[0] for k, v in  # بناء قاموس بالاشتقاق وإسناده إلى form
+<span class="ln" id="L208">208</span>                urllib.parse.parse_qs(body.decode(&quot;utf-8&quot;, &quot;replace&quot;)).items()}  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L209">209</span>        fields = dict(query)  # إسناد نتيجة استدعاء dict (معامل واحد) إلى fields
+<span class="ln" id="L210">210</span>        fields.update(form)  # استدعاء fields.update (معامل واحد)
+<span class="ln" id="L211">211</span>        base = f&quot;http://{self.headers.get(&#x27;Host&#x27;, &#x27;127.0.0.1&#x27;)}&quot;  # بناء نص منسّق وإسناده إلى base
+<span class="ln" id="L212">212</span> 
+<span class="ln" id="L213">213</span>        if parts.path in (&quot;/generate_204&quot;, &quot;/connecttest.txt&quot;,  # شرط: parts.path ضمن مجموعة
+<span class="ln" id="L214">214</span>                          &quot;/hotspot-detect.html&quot;):  # تكملة تعريف متعدد الأسطر
+<span class="ln" id="L215">215</span>            return self._internet_check(parts.path, base)  # إرجاع self._internet_check(parts.path, base)
+<span class="ln" id="L216">216</span> 
+<span class="ln" id="L217">217</span>        if parts.path.startswith(&quot;/logout&quot;):  # شرط: نتيجة parts.path.startswith(&#x27;/logout&#x27;)
+<span class="ln" id="L218">218</span>            with st.lock:  # سياق مُدار: st.lock
+<span class="ln" id="L219">219</span>                st.online_ips = set()  # إسناد نتيجة استدعاء set إلى st.online_ips
+<span class="ln" id="L220">220</span>            return self._reply(200, &quot;&lt;html&gt;&lt;title&gt;Logged out&lt;/title&gt;bye&lt;/html&gt;&quot;)  # إرجاع self._reply(200, &#x27;&lt;html&gt;&lt;title&gt;Logged out&lt;/title&gt;bye&lt;/html&gt;&#x27;)
+<span class="ln" id="L221">221</span> 
+<span class="ln" id="L222">222</span>        if parts.path.startswith(&quot;/success&quot;):  # شرط: نتيجة parts.path.startswith(&#x27;/success&#x27;)
+<span class="ln" id="L223">223</span>            online = self.client_address[0] in st.online_ips  # مقارنة (ضمن) وإسناد النتيجة المنطقية إلى online
+<span class="ln" id="L224">224</span>            if not online:  # شرط معكوس: ليس online
+<span class="ln" id="L225">225</span>                return self._reply(302, &quot;&quot;, {&quot;Location&quot;: base + &quot;/login&quot;})  # إرجاع self._reply(302, &#x27;&#x27;, قاموس)
+<span class="ln" id="L226">226</span>            return self._reply(200, SUCCESS_PAGE)  # إرجاع self._reply(200, SUCCESS_PAGE)
+<span class="ln" id="L227">227</span> 
+<span class="ln" id="L228">228</span>        if parts.path.startswith(&quot;/status&quot;):  # شرط: نتيجة parts.path.startswith(&#x27;/status&#x27;)
+<span class="ln" id="L229">229</span>            online = self.client_address[0] in st.online_ips  # مقارنة (ضمن) وإسناد النتيجة المنطقية إلى online
+<span class="ln" id="L230">230</span>            if not online:  # شرط معكوس: ليس online
+<span class="ln" id="L231">231</span>                return self._reply(302, &quot;&quot;, {&quot;Location&quot;: base + &quot;/login&quot;})  # إرجاع self._reply(302, &#x27;&#x27;, قاموس)
+<span class="ln" id="L232">232</span>            return self._reply(200, &quot;&lt;html&gt;&lt;head&gt;&lt;title&gt;Status&lt;/title&gt;&lt;/head&gt;&lt;body&gt;&quot;  # إرجاع self._reply(200, &quot;&lt;html&gt;&lt;head&gt;&lt;title&gt;Status&lt;/title&gt;&lt;/head&gt;&lt;body&gt;You are logged in, session uptime 0:01:20 remaining 3h 59m &lt;a href=&#x27;/logout&#x27;&gt;logout&lt;/a&gt;&lt;form action=&#x27;/status&#x27;&gt;&lt;input type=&#x27;hidden&#x27; name=&#x27;erase-cookie&#x27; value=&#x27;1&#x27;&gt;&lt;/form&gt;&lt;/body&gt;&lt;/html&gt;&quot;)
+<span class="ln" id="L233">233</span>                                    &quot;You are logged in, session uptime 0:01:20 &quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L234">234</span>                                    &quot;remaining 3h 59m &lt;a href=&#x27;/logout&#x27;&gt;logout&lt;/a&gt;&quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L235">235</span>                                    &quot;&lt;form action=&#x27;/status&#x27;&gt;&lt;input type=&#x27;hidden&#x27; &quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L236">236</span>                                    &quot;name=&#x27;erase-cookie&#x27; value=&#x27;1&#x27;&gt;&lt;/form&gt;&lt;/body&gt;&lt;/html&gt;&quot;)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L237">237</span> 
+<span class="ln" id="L238">238</span>        if not parts.path.startswith(&quot;/login&quot;):  # شرط معكوس: ليس parts.path.startswith(&#x27;/login&#x27;)
+<span class="ln" id="L239">239</span>            return self._reply(404, &quot;&lt;html&gt;not found&lt;/html&gt;&quot;)  # إرجاع self._reply(404, &#x27;&lt;html&gt;not found&lt;/html&gt;&#x27;)
+<span class="ln" id="L240">240</span> 
+<span class="ln" id="L241">241</span>        # --- صفحة الدخول (GET بلا بطاقة = اعرض النموذج فقط) ----
+<span class="ln" id="L242">242</span>        if method == &quot;GET&quot; and not query.get(&quot;username&quot;):  # شرط مركّب (و)
+<span class="ln" id="L243">243</span>            return self._login_page(base, fields)  # إرجاع self._login_page(base, fields)
+<span class="ln" id="L244">244</span> 
+<span class="ln" id="L245">245</span>        # --- سلوك الحجب / تقييد الطلبات ------------------------------
+<span class="ln" id="L246">246</span>        # راوتر حقيقي يسامح بعد حين: مع ban_seconds يزول
+<span class="ln" id="L247">247</span>        # القفل وحده ويبدأ عدّاد الفشل من جديد (هذا ما يعتمد عليه
+<span class="ln" id="L248">248</span>        # «انتظر زواله وجرّب مجدداً»).
+<span class="ln" id="L249">249</span>        if (st.ban_after and st.banned_at and st.ban_seconds and  # شرط مركّب (و)
+<span class="ln" id="L250">250</span>                time.time() - st.banned_at &gt; st.ban_seconds):  # تكملة تعريف متعدد الأسطر
+<span class="ln" id="L251">251</span>            with st.lock:  # سياق مُدار: st.lock
+<span class="ln" id="L252">252</span>                st.failures = 0  # إسناد القيمة الثابتة st.failures
+<span class="ln" id="L253">253</span>                st.banned_at = 0.0  # إسناد القيمة الثابتة st.banned_at
+<span class="ln" id="L254">254</span>        if st.ban_after and st.failures &gt;= st.ban_after:  # شرط مركّب (و)
+<span class="ln" id="L255">255</span>            st.bump(&quot;bans&quot;)  # استدعاء st.bump (معامل واحد)
+<span class="ln" id="L256">256</span>            if not st.banned_at:  # شرط معكوس: ليس st.banned_at
+<span class="ln" id="L257">257</span>                st.banned_at = time.time()  # إسناد نتيجة استدعاء time.time إلى st.banned_at
+<span class="ln" id="L258">258</span>            return self._reply(403, BAN_PAGE,  # إرجاع self._reply(403, BAN_PAGE, قاموس)
+<span class="ln" id="L259">259</span>                               {&quot;Retry-After&quot;: str(st.ban_seconds or 30)})  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L260">260</span>        if st.rate_limit_after and st.failures &gt;= st.rate_limit_after:  # شرط مركّب (و)
+<span class="ln" id="L261">261</span>            st.bump(&quot;rate_hits&quot;)  # استدعاء st.bump (معامل واحد)
+<span class="ln" id="L262">262</span>            return self._reply(429, RATE_PAGE, {&quot;Retry-After&quot;: &quot;1&quot;})  # إرجاع self._reply(429, RATE_PAGE, قاموس)
+<span class="ln" id="L263">263</span> 
+<span class="ln" id="L264">264</span>        if st.require_session:  # شرط: st.require_session
+<span class="ln" id="L265">265</span>            sid = &quot;&quot;  # إسناد القيمة الثابتة sid
+<span class="ln" id="L266">266</span>            for part in (self.headers.get(&quot;Cookie&quot;) or &quot;&quot;).split(&quot;;&quot;):  # دورة على self.headers.get(&#x27;Cookie&#x27;) أو &#x27;&#x27;.split(&#x27;;&#x27;) باسم part
+<span class="ln" id="L267">267</span>                if part.strip().startswith(&quot;portal_sid=&quot;):  # شرط: نتيجة part.strip().startswith(&#x27;portal_sid=&#x27;)
+<span class="ln" id="L268">268</span>                    sid = part.strip().split(&quot;=&quot;, 1)[1]  # إسناد part.strip().split(&#x27;=&#x27;, 1)[1] إلى sid
+<span class="ln" id="L269">269</span>            if not sid or fields.get(&quot;tok&quot;) != st.tokens.get(sid):  # شرط مركّب (أو)
+<span class="ln" id="L270">270</span>                return self._bad_request()  # إرجاع self._bad_request()
+<span class="ln" id="L271">271</span>            # رمز CSRF الصارم أحادي الاستخدام: صفحة الدخول الراجعة تعطي
+<span class="ln" id="L272">272</span>            # المتصفح الرمز التالي. هذا يمسك السكربتات التي تجلب
+<span class="ln" id="L273">273</span>            # الصفحة مرة واحدة ثم تعيد استخدام قيمتها المخفية الأولى للأبد.
+<span class="ln" id="L274">274</span>            st.tokens[sid] = uuid.uuid4().hex[:16]  # إسناد uuid.uuid4().hex[] إلى st.tokens[sid]
+<span class="ln" id="L275">275</span> 
+<span class="ln" id="L276">276</span>        if st.reject_shape:  # شرط: st.reject_shape
+<span class="ln" id="L277">277</span>            return self._bad_request(&quot;bad request: request shape rejected&quot;)  # إرجاع self._bad_request(&#x27;bad request: request shape rejected&#x27;)
+<span class="ln" id="L278">278</span> 
+<span class="ln" id="L279">279</span>        card = fields.get(&quot;username&quot;, &quot;&quot;)  # إسناد نتيجة استدعاء fields.get (2 معاملات) إلى card
+<span class="ln" id="L280">280</span>        password = fields.get(&quot;password&quot;, &quot;&quot;)  # إسناد نتيجة استدعاء fields.get (2 معاملات) إلى password
+<span class="ln" id="L281">281</span>        with st.lock:  # سياق مُدار: st.lock
+<span class="ln" id="L282">282</span>            st.logins += 1  # تحديث st.logins بعملية جمع
+<span class="ln" id="L283">283</span>            st.asked_cards.append(card)  # استدعاء st.asked_cards.append (معامل واحد)
+<span class="ln" id="L284">284</span>            already_online = self.client_address[0] in st.online_ips  # مقارنة (ضمن) وإسناد النتيجة المنطقية إلى already_online
+<span class="ln" id="L285">285</span>        if st.global_online_login_page and already_online:  # شرط مركّب (و)
+<span class="ln" id="L286">286</span>            return self._reply(200, SUCCESS_PAGE)  # إرجاع self._reply(200, SUCCESS_PAGE)
+<span class="ln" id="L287">287</span> 
+<span class="ln" id="L288">288</span>        if self._is_valid(card, password):  # شرط: نتيجة self._is_valid(card, password)
+<span class="ln" id="L289">289</span>            with st.lock:  # سياق مُدار: st.lock
+<span class="ln" id="L290">290</span>                st.online_ips.add(self.client_address[0])  # استدعاء st.online_ips.add (معامل واحد)
+<span class="ln" id="L291">291</span>            if st.hide_success:  # شرط: st.hide_success
+<span class="ln" id="L292">292</span>                # دخل، لكن الردّ حرفياً صفحة رفض
+<span class="ln" id="L293">293</span>                st.bump(&quot;hidden_successes&quot;)  # استدعاء st.bump (معامل واحد)
+<span class="ln" id="L294">294</span>                return self._login_page(base, fields, error=True)  # إرجاع self._login_page(base, fields, error=True)
+<span class="ln" id="L295">295</span>            if st.unknown_success_page:  # شرط: st.unknown_success_page
+<span class="ln" id="L296">296</span>                return self._reply(  # إرجاع self._reply(200, &#x27;&lt;html&gt;&lt;body&gt;&lt;h1&gt;Portal session updated&lt;/h1&gt;&lt;p&gt;Account settings were refreshed.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;&#x27;)
+<span class="ln" id="L297">297</span>                    200, &quot;&lt;html&gt;&lt;body&gt;&lt;h1&gt;Portal session updated&lt;/h1&gt;&quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L298">298</span>                         &quot;&lt;p&gt;Account settings were refreshed.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;&quot;)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L299">299</span>            if st.success_page:  # شرط: st.success_page
+<span class="ln" id="L300">300</span>                return self._reply(302, &quot;&quot;, {&quot;Location&quot;: base + &quot;/success&quot;})  # إرجاع self._reply(302, &#x27;&#x27;, قاموس)
+<span class="ln" id="L301">301</span>            return self._reply(302, &quot;&quot;, {  # إرجاع self._reply(302, &#x27;&#x27;, قاموس)
+<span class="ln" id="L302">302</span>                &quot;Location&quot;: &quot;http://connectivitycheck.gstatic.com/generate_204&quot;})  # مفتاح Location في القاموس
+<span class="ln" id="L303">303</span> 
+<span class="ln" id="L304">304</span>        st.bump(&quot;failures&quot;)  # استدعاء st.bump (معامل واحد)
+<span class="ln" id="L305">305</span>        return self._login_page(base, fields, error=True)  # إرجاع self._login_page(base, fields, error=True)
+<span class="ln" id="L306">306</span> 
+<span class="ln" id="L307">307</span>    # -- مساعدات ---------------------------------------------------------
+<span class="ln" id="L308">308</span>    def _internet_check(self, path, base):  # تعريف الدالة _internet_check(self, path, base)
+<span class="ln" id="L309">309</span>        st = self.server.state  # إسناد self.server.state إلى st
+<span class="ln" id="L310">310</span>        online = self.client_address[0] in st.online_ips  # مقارنة (ضمن) وإسناد النتيجة المنطقية إلى online
+<span class="ln" id="L311">311</span>        if path == &quot;/generate_204&quot;:  # شرط: path يساوي &#x27;/generate_204&#x27;
+<span class="ln" id="L312">312</span>            if online:  # شرط: online
+<span class="ln" id="L313">313</span>                return self._reply(204, &quot;&quot;)  # إرجاع self._reply(204, &#x27;&#x27;)
+<span class="ln" id="L314">314</span>        elif path == &quot;/connecttest.txt&quot;:  # شرط: path يساوي &#x27;/connecttest.txt&#x27;
+<span class="ln" id="L315">315</span>            if online:  # شرط: online
+<span class="ln" id="L316">316</span>                return self._reply(200, &quot;Microsoft Connect Test&quot;)  # إرجاع self._reply(200, &#x27;Microsoft Connect Test&#x27;)
+<span class="ln" id="L317">317</span>        elif path == &quot;/hotspot-detect.html&quot;:  # شرط: path يساوي &#x27;/hotspot-detect.html&#x27;
+<span class="ln" id="L318">318</span>            if online:  # شرط: online
+<span class="ln" id="L319">319</span>                return self._reply(200, &quot;&lt;HTML&gt;&lt;HEAD&gt;&lt;TITLE&gt;Success&lt;/TITLE&gt;&lt;/HEAD&gt;&quot;  # إرجاع self._reply(200, &#x27;&lt;HTML&gt;&lt;HEAD&gt;&lt;TITLE&gt;Success&lt;/TITLE&gt;&lt;/HEAD&gt;&lt;BODY&gt;Success&lt;/BODY&gt;&lt;/HTML&gt;&#x27;)
+<span class="ln" id="L320">320</span>                                        &quot;&lt;BODY&gt;Success&lt;/BODY&gt;&lt;/HTML&gt;&quot;)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L321">321</span>        # بوابة أسر تعترض الطلب بدلاً من ذلك
+<span class="ln" id="L322">322</span>        return self._reply(302, &quot;&quot;, {&quot;Location&quot;: base + &quot;/login?dst=&quot; +  # إرجاع self._reply(302, &#x27;&#x27;, قاموس)
+<span class="ln" id="L323">323</span>                                     urllib.parse.quote(path, safe=&quot;&quot;)})  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L324">324</span> 
+<span class="ln" id="L325">325</span>    def _session_id(self) -&gt; str:  # تعريف الدالة _session_id(self) ترجع str
+<span class="ln" id="L326">326</span>        &quot;&quot;&quot;The portal&#x27;s session cookie: created on the first page view.&quot;&quot;&quot;  # نص توثيقي (docstring) يشرح ما يليه
+<span class="ln" id="L327">327</span>        st = self.server.state  # إسناد self.server.state إلى st
+<span class="ln" id="L328">328</span>        raw = self.headers.get(&quot;Cookie&quot;) or &quot;&quot;  # دمج منطقي (أو) وإسناده إلى raw
+<span class="ln" id="L329">329</span>        sid = &quot;&quot;  # إسناد القيمة الثابتة sid
+<span class="ln" id="L330">330</span>        for part in raw.split(&quot;;&quot;):  # دورة على raw.split(&#x27;;&#x27;) باسم part
+<span class="ln" id="L331">331</span>            if part.strip().startswith(&quot;portal_sid=&quot;):  # شرط: نتيجة part.strip().startswith(&#x27;portal_sid=&#x27;)
+<span class="ln" id="L332">332</span>                sid = part.strip().split(&quot;=&quot;, 1)[1]  # إسناد part.strip().split(&#x27;=&#x27;, 1)[1] إلى sid
+<span class="ln" id="L333">333</span>        if not sid or sid not in st.tokens:  # شرط مركّب (أو)
+<span class="ln" id="L334">334</span>            sid = uuid.uuid4().hex[:12]  # إسناد uuid.uuid4().hex[] إلى sid
+<span class="ln" id="L335">335</span>            st.tokens[sid] = uuid.uuid4().hex[:16]  # إسناد uuid.uuid4().hex[] إلى st.tokens[sid]
+<span class="ln" id="L336">336</span>            self._new_cookie = sid  # إسناد sid إلى self._new_cookie
+<span class="ln" id="L337">337</span>        return sid  # إرجاع sid
+<span class="ln" id="L338">338</span> 
+<span class="ln" id="L339">339</span>    def _bad_request(self, why=&quot;bad request: the form token is missing or old&quot;):  # تعريف الدالة _bad_request(self, why)
+<span class="ln" id="L340">340</span>        st = self.server.state  # إسناد self.server.state إلى st
+<span class="ln" id="L341">341</span>        st.bump(&quot;bad_requests&quot;)  # استدعاء st.bump (معامل واحد)
+<span class="ln" id="L342">342</span>        return self._reply(400, &quot;&lt;html&gt;&lt;body&gt;%s&lt;/body&gt;&lt;/html&gt;&quot; % why)  # إرجاع self._reply(400, باقي القسمة)
+<span class="ln" id="L343">343</span> 
+<span class="ln" id="L344">344</span>    def _is_valid(self, card, password) -&gt; bool:  # تعريف الدالة _is_valid(self, card, password) ترجع bool
+<span class="ln" id="L345">345</span>        st = self.server.state  # إسناد self.server.state إلى st
+<span class="ln" id="L346">346</span>        if card not in st.valid_cards:  # شرط: card ليس ضمن st.valid_cards
+<span class="ln" id="L347">347</span>            return False  # إرجاع False
+<span class="ln" id="L348">348</span>        if st.pass_mode == &quot;empty&quot;:  # شرط: st.pass_mode يساوي &#x27;empty&#x27;
+<span class="ln" id="L349">349</span>            return password == &quot;&quot;  # إرجاع مقارنة
+<span class="ln" id="L350">350</span>        if st.pass_mode == &quot;same&quot;:  # شرط: st.pass_mode يساوي &#x27;same&#x27;
+<span class="ln" id="L351">351</span>            if password == card:  # شرط: password يساوي card
+<span class="ln" id="L352">352</span>                return True  # إرجاع True
+<span class="ln" id="L353">353</span>            if st.chap:  # شرط: st.chap
+<span class="ln" id="L354">354</span>                return password == self._chap(card)  # إرجاع مقارنة
+<span class="ln" id="L355">355</span>            return False  # إرجاع False
+<span class="ln" id="L356">356</span>        if st.pass_mode == &quot;chap&quot;:  # شرط: st.pass_mode يساوي &#x27;chap&#x27;
+<span class="ln" id="L357">357</span>            return password == self._chap(card)  # إرجاع مقارنة
+<span class="ln" id="L358">358</span>        return False  # إرجاع False
+<span class="ln" id="L359">359</span> 
+<span class="ln" id="L360">360</span>    def _chap(self, raw: str) -&gt; str:  # تعريف الدالة _chap(self, raw) ترجع str
+<span class="ln" id="L361">361</span>        st = self.server.state  # إسناد self.server.state إلى st
+<span class="ln" id="L362">362</span>        return hashlib.md5(f&quot;{st.chap_id}{raw}{st.chap_challenge}&quot;.encode()).hexdigest()  # إرجاع hashlib.md5(نص منسّق (f-string).encode()).hexdigest()
+<span class="ln" id="L363">363</span> 
+<span class="ln" id="L364">364</span>    def _login_page(self, base, fields, error=False):  # تعريف الدالة _login_page(self, base, fields, error)
+<span class="ln" id="L365">365</span>        st = self.server.state  # إسناد self.server.state إلى st
+<span class="ln" id="L366">366</span>        tok_field = &quot;&quot;  # إسناد القيمة الثابتة tok_field
+<span class="ln" id="L367">367</span>        if st.require_session:  # شرط: st.require_session
+<span class="ln" id="L368">368</span>            sid = self._session_id()  # إسناد نتيجة استدعاء self._session_id إلى sid
+<span class="ln" id="L369">369</span>            tok_field = (&#x27;&lt;input type=&quot;hidden&quot; name=&quot;tok&quot; value=&quot;%s&quot;&gt;&#x27;  # حساب باقي القسمة بين &#x27;&lt;input type=&quot;hidden&quot; name=&quot;tok&quot; value=&quot;%s&quot;&gt;&#x27; وst.tokens.get(sid, &#x27;&#x27;) وإسناده إلى tok_field
+<span class="ln" id="L370">370</span>                         % st.tokens.get(sid, &quot;&quot;))  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L371">371</span>        # إسناد &#x27;&#x27;.join(random.choices(string.hexdigits.lower()[], k=8)) إن st.dynamic وإلا &#x27;fixednonce&#x27; إلى nonce
+<span class="ln" id="L372">372</span>        nonce = &quot;&quot;.join(random.choices(string.hexdigits.lower()[:16], k=8)) \
+<span class="ln" id="L373">373</span>            if st.dynamic else &quot;fixednonce&quot;  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L374">374</span>        message = st.error_text if error else &quot;&quot;  # إسناد st.error_text إن error وإلا &#x27;&#x27; إلى message
+<span class="ln" id="L375">375</span>        html = CARD_PAGE.format(  # إسناد نتيجة استدعاء CARD_PAGE.format (action=…، method=…، dst=…، echo_user=…، nonce=…، message=…، tok_field=…، chap_id=…، chap_challenge=…، mac_tail=…) إلى html
+<span class="ln" id="L376">376</span>            action=base + &quot;/login&quot;, method=st.method,  # المعامل المسمّى action
+<span class="ln" id="L377">377</span>            dst=fields.get(&quot;dst&quot;, &quot;&quot;), echo_user=fields.get(&quot;username&quot;, &quot;&quot;),  # المعامل المسمّى dst
+<span class="ln" id="L378">378</span>            nonce=nonce, message=message, tok_field=tok_field,  # المعامل المسمّى nonce
+<span class="ln" id="L379">379</span>            chap_id=st.chap_id, chap_challenge=st.chap_challenge,  # المعامل المسمّى chap_id
+<span class="ln" id="L380">380</span>            mac_tail=&quot;33:44&quot;)  # المعامل المسمّى mac_tail
+<span class="ln" id="L381">381</span>        return self._reply(200, html)  # إرجاع self._reply(200, html)
+<span class="ln" id="L382">382</span> 
+<span class="ln" id="L383">383</span> 
+<span class="ln" id="L384">384</span>class _Server(socketserver.ThreadingTCPServer):  # تعريف الصنف _Server يرث من socketserver.ThreadingTCPServer
+<span class="ln" id="L385">385</span>    allow_reuse_address = True  # إسناد القيمة الثابتة allow_reuse_address
+<span class="ln" id="L386">386</span> 
+<span class="ln" id="L387">387</span>    def server_bind(self):  # تعريف الدالة server_bind(self)
+<span class="ln" id="L388">388</span>        socketserver.TCPServer.server_bind(self)  # استدعاء socketserver.TCPServer.server_bind (معامل واحد)
+<span class="ln" id="L389">389</span>        host, port = self.server_address[:2]  # إسناد self.server_address[] إلى مجموعة
+<span class="ln" id="L390">390</span>        self.server_name, self.server_port = host, port  # إسناد مجموعة إلى مجموعة
+<span class="ln" id="L391">391</span> 
+<span class="ln" id="L392">392</span> 
+<span class="ln" id="L393">393</span>class MockPortal:  # تعريف الصنف MockPortal
+<span class="ln" id="L394">394</span>    &quot;&quot;&quot;Start/stop wrapper around the handler.&quot;&quot;&quot;  # نص توثيقي (docstring) يشرح ما يليه
+<span class="ln" id="L395">395</span> 
+<span class="ln" id="L396">396</span>    def __init__(self, port: int = 0, **kwargs):  # تعريف الدالة __init__(self, port, **kwargs)
+<span class="ln" id="L397">397</span>        self.state = PortalState(**kwargs)  # إسناد نتيجة استدعاء PortalState (**=…) إلى self.state
+<span class="ln" id="L398">398</span>        self.httpd = _Server((&quot;127.0.0.1&quot;, port), Handler)  # إسناد نتيجة استدعاء _Server (2 معاملات) إلى self.httpd
+<span class="ln" id="L399">399</span>        self.httpd.daemon_threads = True  # إسناد القيمة الثابتة self.httpd.daemon_threads
+<span class="ln" id="L400">400</span>        self.httpd.state = self.state  # إسناد self.state إلى self.httpd.state
+<span class="ln" id="L401">401</span>        self.httpd.verbose = False  # إسناد القيمة الثابتة self.httpd.verbose
+<span class="ln" id="L402">402</span>        self.port = self.httpd.server_address[1]  # إسناد self.httpd.server_address[1] إلى self.port
+<span class="ln" id="L403">403</span>        self.thread = None  # إسناد القيمة الثابتة self.thread
+<span class="ln" id="L404">404</span> 
+<span class="ln" id="L405">405</span>    @property  # مُزخرف (decorator) بـproperty
+<span class="ln" id="L406">406</span>    def url(self) -&gt; str:  # تعريف الدالة url(self) ترجع str
+<span class="ln" id="L407">407</span>        return f&quot;http://127.0.0.1:{self.port}/login&quot;  # إرجاع نص منسّق (f-string)
+<span class="ln" id="L408">408</span> 
+<span class="ln" id="L409">409</span>    @property  # مُزخرف (decorator) بـproperty
+<span class="ln" id="L410">410</span>    def base(self) -&gt; str:  # تعريف الدالة base(self) ترجع str
+<span class="ln" id="L411">411</span>        return f&quot;http://127.0.0.1:{self.port}&quot;  # إرجاع نص منسّق (f-string)
+<span class="ln" id="L412">412</span> 
+<span class="ln" id="L413">413</span>    def start(self):  # تعريف الدالة start(self)
+<span class="ln" id="L414">414</span>        self.thread = threading.Thread(target=self.httpd.serve_forever,  # إسناد نتيجة استدعاء threading.Thread (target=…، kwargs=…، daemon=…) إلى self.thread
+<span class="ln" id="L415">415</span>                                       kwargs={&quot;poll_interval&quot;: 0.1}, daemon=True)  # المعامل المسمّى kwargs
+<span class="ln" id="L416">416</span>        self.thread.start()  # استدعاء self.thread.start
+<span class="ln" id="L417">417</span>        return self  # إرجاع self
+<span class="ln" id="L418">418</span> 
+<span class="ln" id="L419">419</span>    def stop(self):  # تعريف الدالة stop(self)
+<span class="ln" id="L420">420</span>        try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L421">421</span>            self.httpd.shutdown()  # استدعاء self.httpd.shutdown
+<span class="ln" id="L422">422</span>            self.httpd.server_close()  # استدعاء self.httpd.server_close
+<span class="ln" id="L423">423</span>        except Exception:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L424">424</span>            pass  # سطر فارغ منطقياً (pass) — مطلوب صياغياً
+<span class="ln" id="L425">425</span> 
+<span class="ln" id="L426">426</span>    def __enter__(self):  # تعريف الدالة __enter__(self)
+<span class="ln" id="L427">427</span>        return self.start()  # إرجاع self.start()
+<span class="ln" id="L428">428</span> 
+<span class="ln" id="L429">429</span>    def __exit__(self, *exc):  # تعريف الدالة __exit__(self, *exc)
+<span class="ln" id="L430">430</span>        self.stop()  # استدعاء self.stop
+<span class="ln" id="L431">431</span>        return False  # إرجاع False
+<span class="ln" id="L432">432</span> 
+</code></pre></details>
+<script>
+document.getElementById("kp-jump").addEventListener("change", function (e) {
+  var n = parseInt(e.target.value, 10);
+  if (n > 0) { var el = document.getElementById("L" + n);
+    if (el) el.scrollIntoView({block: "center"}); }
+});
+if (location.hash) { var el = document.querySelector(location.hash);
+  if (el) setTimeout(function () { el.scrollIntoView({block: "center"}); }, 60); }
+</script>
+<footer class="docfoot">صفحة مولّدة آلياً من مصدر الكود · KiraPass —
+<code>files</code> · 2026-10-01 02:26</footer>
+</main>
+</div>
+<script src="../assets/docs.js"></script>
+<script>KPInit("files");</script>
+</body>
+</html>

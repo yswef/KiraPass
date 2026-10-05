@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>مصدر fingerprint.py · KiraPass</title>
+<link rel="stylesheet" href="../assets/docs.css">
+
+</head>
+<body>
+<div id="kp-layout">
+<main class="doc">
+<h1>مصدر <code>fingerprint.py</code></h1>
+<p class="lead">البصمة والحَكَم: من الردّ إلى الحكم — 598 سطراً. كل سطر يحمل تعليقه العربي.</p>
+<div class="card info"><b>هذه الصفحة مولّدة آلياً</b> من مصدر الكود مباشرة (<code>tools/docs/build_docs.py</code>). إن غيّرت الكود فأعد توليدها: <code>python3 tools/docs/build_docs.py</code>. الشرح اليدوي الأوسع في <a href="../architecture.html">المعمارية</a> و<a href="../editing.html">دليل التعديل</a> و<a href="../danger.html">أماكن الخطر</a>.</div>
+<p><a class="btn" href="../files/fingerprint.html">← صفحة الشرح</a> <label class="muted"> قفز إلى سطر: <input id="kp-jump" style="width:6rem" placeholder="123"></label></p>
+<details class="src" open><summary>المصدر كاملاً</summary><pre data-lines="598"><code>
+<span class="ln" id="L1">1</span># بداية نص متعدد الأسطر — الأسطر التالية نصّ حرفي لا كود، فلا يقبل تعليقاً
+<span class="ln" id="L2">2</span>&quot;&quot;&quot;Decide what a router&#x27;s answer means - without guessing.
+<span class="ln" id="L3">3</span> 
+<span class="ln" id="L4">4</span>The old version had two ways to judge a reply:
+<span class="ln" id="L5">5</span> 
+<span class="ln" id="L6">6</span>    1. byte-compare after masking  -&gt; failed as soon as the page carried a
+<span class="ln" id="L7">7</span>       session token / echoed card / timestamp the mask did not know about
+<span class="ln" id="L8">8</span>    2. &quot;if the length differs from the failure page by more than 40 bytes,
+<span class="ln" id="L9">9</span>       call it a DIFFERENT page and stop as a suspected match&quot;
+<span class="ln" id="L10">10</span> 
+<span class="ln" id="L11">11</span>Rule 2 is why wrong cards were reported as hits (see kirapass_hits.txt in the
+<span class="ln" id="L12">12</span>history: eight wrong cards, all &quot;DIFFERENT page len=8575&quot;), and why the tool
+<span class="ln" id="L13">13</span>could not recognise a *real* success that redirected to the internet.
+<span class="ln" id="L14">14</span> 
+<span class="ln" id="L15">15</span>This module does it the way a network engineer would:
+<span class="ln" id="L16">16</span> 
+<span class="ln" id="L17">17</span>    * send two deliberately-wrong probes and learn WHICH parts of the page
+<span class="ln" id="L18">18</span>      change on their own (tokens, mac echo, timestamps ...) -&gt; mask them
+<span class="ln" id="L19">19</span>    * a reply identical to that masked rejection page = REJECTED
+<span class="ln" id="L20">20</span>    * a reply is only ACCEPTED on positive evidence (redirect out of the
+<span class="ln" id="L21">21</span>      portal, learned success words, or a real internet check)
+<span class="ln" id="L22">22</span>    * anything else = UNKNOWN, reported honestly instead of being called a hit
+<span class="ln" id="L23">23</span>&quot;&quot;&quot;  # نهاية النص متعدد الأسطر
+<span class="ln" id="L24">24</span> 
+<span class="ln" id="L25">25</span>from __future__ import annotations  # استيراد annotations من الوحدة __future__
+<span class="ln" id="L26">26</span> 
+<span class="ln" id="L27">27</span>import difflib  # استيراد الوحدة difflib من المكتبة
+<span class="ln" id="L28">28</span>import hashlib  # استيراد الوحدة hashlib من المكتبة
+<span class="ln" id="L29">29</span>import html  # استيراد الوحدة html من المكتبة
+<span class="ln" id="L30">30</span>import re  # استيراد الوحدة re من المكتبة
+<span class="ln" id="L31">31</span> 
+<span class="ln" id="L32">32</span>from . import config  # استيراد config من الوحدة .
+<span class="ln" id="L33">33</span> 
+<span class="ln" id="L34">34</span>TOKEN_RE = re.compile(r&quot;[A-Za-z0-9_@.\-]+|[^\sA-Za-z0-9_]&quot;)  # إسناد نتيجة استدعاء re.compile (معامل واحد) إلى TOKEN_RE
+<span class="ln" id="L35">35</span>SCRIPT_RE = re.compile(r&quot;&lt;(script|style)\b.*?&lt;/\1&gt;&quot;, re.S | re.I)  # إسناد نتيجة استدعاء re.compile (2 معاملات) إلى SCRIPT_RE
+<span class="ln" id="L36">36</span>TAG_RE = re.compile(r&quot;&lt;[^&gt;]+&gt;&quot;)  # إسناد نتيجة استدعاء re.compile (معامل واحد) إلى TAG_RE
+<span class="ln" id="L37">37</span>WS_RE = re.compile(r&quot;[ \t\r\n]+&quot;)  # إسناد نتيجة استدعاء re.compile (معامل واحد) إلى WS_RE
+<span class="ln" id="L38">38</span> 
+<span class="ln" id="L39">39</span>UUID_RE = re.compile(r&quot;\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-&quot;  # إسناد نتيجة استدعاء re.compile (معامل واحد) إلى UUID_RE
+<span class="ln" id="L40">40</span>                     r&quot;[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b&quot;)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L41">41</span>LONGHEX_RE = re.compile(r&quot;\b[0-9a-fA-F]{12,}\b&quot;)  # إسناد نتيجة استدعاء re.compile (معامل واحد) إلى LONGHEX_RE
+<span class="ln" id="L42">42</span>LONGNUM_RE = re.compile(r&quot;\b\d{4,}\b&quot;)  # إسناد نتيجة استدعاء re.compile (معامل واحد) إلى LONGNUM_RE
+<span class="ln" id="L43">43</span>MAC_RE = re.compile(r&quot;\b(?:[0-9a-fA-F]{2}[:-]){5}[0-9a-fA-F]{2}\b&quot;)  # إسناد نتيجة استدعاء re.compile (معامل واحد) إلى MAC_RE
+<span class="ln" id="L44">44</span># رموز تبدو جلسة/nonce: 6 محارف فأكثر من hex/alnum تخلط حروفاً وأرقاماً
+<span class="ln" id="L45">45</span># («faded» أو «0201242548» لا تُخفى، و«5f30507b» تُخفى).
+<span class="ln" id="L46">46</span>TOKENLIKE_RE = re.compile(r&quot;[0-9A-Za-z]{6,}&quot;)  # إسناد نتيجة استدعاء re.compile (معامل واحد) إلى TOKENLIKE_RE
+<span class="ln" id="L47">47</span>HEXLIKE_RE = re.compile(r&quot;^[0-9a-fA-F]+$&quot;)  # إسناد نتيجة استدعاء re.compile (معامل واحد) إلى HEXLIKE_RE
+<span class="ln" id="L48">48</span>IP_RE = re.compile(r&quot;\b\d{1,3}(?:\.\d{1,3}){3}\b&quot;)  # إسناد نتيجة استدعاء re.compile (معامل واحد) إلى IP_RE
+<span class="ln" id="L49">49</span> 
+<span class="ln" id="L50">50</span> 
+<span class="ln" id="L51">51</span># ---------------------------------------------------------------------------
+<span class="ln" id="L52">52</span># مساعدات نصية
+<span class="ln" id="L53">53</span># ---------------------------------------------------------------------------
+<span class="ln" id="L54">54</span>def visible_text(body: str) -&gt; str:  # تعريف الدالة visible_text(body) ترجع str
+<span class="ln" id="L55">55</span>    &quot;&quot;&quot;What the guest actually sees: no &lt;script&gt;/&lt;style&gt;, no tags.&quot;&quot;&quot;  # نص توثيقي (docstring) يشرح ما يليه
+<span class="ln" id="L56">56</span>    if not body:  # شرط معكوس: ليس body
+<span class="ln" id="L57">57</span>        return &quot;&quot;  # إرجاع &#x27;&#x27;
+<span class="ln" id="L58">58</span>    text = SCRIPT_RE.sub(&quot; &quot;, body)  # إسناد نتيجة استدعاء SCRIPT_RE.sub (2 معاملات) إلى text
+<span class="ln" id="L59">59</span>    text = TAG_RE.sub(&quot; &quot;, text)  # إسناد نتيجة استدعاء TAG_RE.sub (2 معاملات) إلى text
+<span class="ln" id="L60">60</span>    text = html.unescape(text)  # إسناد نتيجة استدعاء html.unescape (معامل واحد) إلى text
+<span class="ln" id="L61">61</span>    return WS_RE.sub(&quot; &quot;, text).strip()  # إرجاع WS_RE.sub(&#x27; &#x27;, text).strip()
+<span class="ln" id="L62">62</span> 
+<span class="ln" id="L63">63</span> 
+<span class="ln" id="L64">64</span>def tokens(text: str) -&gt; list:  # تعريف الدالة tokens(text) ترجع list
+<span class="ln" id="L65">65</span>    return TOKEN_RE.findall(text or &quot;&quot;)  # إرجاع TOKEN_RE.findall(text أو &#x27;&#x27;)
+<span class="ln" id="L66">66</span> 
+<span class="ln" id="L67">67</span> 
+<span class="ln" id="L68">68</span>def _nonce_like(tok: str) -&gt; bool:  # تعريف الدالة _nonce_like(tok) ترجع bool
+<span class="ln" id="L69">69</span>    if len(tok) &lt; 6:  # شرط: len(tok) أصغر من 6
+<span class="ln" id="L70">70</span>        return False  # إرجاع False
+<span class="ln" id="L71">71</span>    has_digit = any(c.isdigit() for c in tok)  # إسناد نتيجة استدعاء any (معامل واحد) إلى has_digit
+<span class="ln" id="L72">72</span>    has_alpha = any(c.isalpha() for c in tok)  # إسناد نتيجة استدعاء any (معامل واحد) إلى has_alpha
+<span class="ln" id="L73">73</span>    return has_digit and has_alpha  # إرجاع has_digit و has_alpha
+<span class="ln" id="L74">74</span> 
+<span class="ln" id="L75">75</span> 
+<span class="ln" id="L76">76</span># يستبدل القيم المتغيّرة والأنماط المتعلَّمة بـ# حتى تصير المقارنة عادلة.
+<span class="ln" id="L77">77</span>def mask_text(text: str, literals=(), generic: bool = True, patterns=()) -&gt; str:  # تعريف الدالة mask_text(text, literals, generic, patterns) ترجع str
+<span class="ln" id="L78">78</span>    &quot;&quot;&quot;Replace values that legitimately change between two identical requests.&quot;&quot;&quot;  # نص توثيقي (docstring) يشرح ما يليه
+<span class="ln" id="L79">79</span>    out = text or &quot;&quot;  # دمج منطقي (أو) وإسناده إلى out
+<span class="ln" id="L80">80</span>    for lit in literals:  # دورة على literals باسم lit
+<span class="ln" id="L81">81</span>        if lit and len(str(lit)) &gt;= 3:  # شرط مركّب (و)
+<span class="ln" id="L82">82</span>            out = out.replace(str(lit), &quot;#&quot;)  # إسناد نتيجة استدعاء out.replace (2 معاملات) إلى out
+<span class="ln" id="L83">83</span>    for pattern in patterns:  # دورة على patterns باسم pattern
+<span class="ln" id="L84">84</span>        try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L85">85</span>            out = re.sub(pattern, &quot;#&quot;, out)  # إسناد نتيجة استدعاء re.sub (3 معاملات) إلى out
+<span class="ln" id="L86">86</span>        except re.error:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L87">87</span>            continue  # الانتقال إلى الدورة التالية
+<span class="ln" id="L88">88</span>    if generic:  # شرط: generic
+<span class="ln" id="L89">89</span>        out = TOKENLIKE_RE.sub(lambda m: &quot;#&quot; if _nonce_like(m.group(0))  # إسناد نتيجة استدعاء TOKENLIKE_RE.sub (2 معاملات) إلى out
+<span class="ln" id="L90">90</span>                               else m.group(0), out)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L91">91</span>        out = UUID_RE.sub(&quot;#&quot;, out)  # إسناد نتيجة استدعاء UUID_RE.sub (2 معاملات) إلى out
+<span class="ln" id="L92">92</span>        out = LONGHEX_RE.sub(&quot;#&quot;, out)  # إسناد نتيجة استدعاء LONGHEX_RE.sub (2 معاملات) إلى out
+<span class="ln" id="L93">93</span>        out = MAC_RE.sub(&quot;#&quot;, out)  # إسناد نتيجة استدعاء MAC_RE.sub (2 معاملات) إلى out
+<span class="ln" id="L94">94</span>        out = IP_RE.sub(&quot;#&quot;, out)  # إسناد نتيجة استدعاء IP_RE.sub (2 معاملات) إلى out
+<span class="ln" id="L95">95</span>        out = LONGNUM_RE.sub(&quot;#&quot;, out)  # إسناد نتيجة استدعاء LONGNUM_RE.sub (2 معاملات) إلى out
+<span class="ln" id="L96">96</span>    return out  # إرجاع out
+<span class="ln" id="L97">97</span> 
+<span class="ln" id="L98">98</span> 
+<span class="ln" id="L99">99</span># «شكل» الصفحة: تسلسل الرموز بعد تحويل كل رقم إلى # — للمقارنة التقريبية.
+<span class="ln" id="L100">100</span>def struct_tokens(text: str, literals=(), generic: bool = True, patterns=()) -&gt; list:  # تعريف الدالة struct_tokens(text, literals, generic, patterns) ترجع list
+<span class="ln" id="L101">101</span>    &quot;&quot;&quot;A shape-only view of the page, used when exact compare is impossible.&quot;&quot;&quot;  # نص توثيقي (docstring) يشرح ما يليه
+<span class="ln" id="L102">102</span>    masked = mask_text(text, literals, generic, patterns)  # إسناد نتيجة استدعاء mask_text (4 معاملات) إلى masked
+<span class="ln" id="L103">103</span>    out = []  # إسناد قائمة إلى out
+<span class="ln" id="L104">104</span>    for tok in tokens(masked):  # دورة على tokens(masked) باسم tok
+<span class="ln" id="L105">105</span>        if tok.isdigit():  # شرط: نتيجة tok.isdigit()
+<span class="ln" id="L106">106</span>            out.append(&quot;#&quot;)  # استدعاء out.append (معامل واحد)
+<span class="ln" id="L107">107</span>        else:  # مفتاح else في القاموس
+<span class="ln" id="L108">108</span>            out.append(tok.lower())  # استدعاء out.append (معامل واحد)
+<span class="ln" id="L109">109</span>    return out  # إرجاع out
+<span class="ln" id="L110">110</span> 
+<span class="ln" id="L111">111</span> 
+<span class="ln" id="L112">112</span>def ratio(a, b) -&gt; float:  # تعريف الدالة ratio(a, b) ترجع float
+<span class="ln" id="L113">113</span>    if not a and not b:  # شرط مركّب (و)
+<span class="ln" id="L114">114</span>        return 1.0  # إرجاع 1.0
+<span class="ln" id="L115">115</span>    return difflib.SequenceMatcher(None, a, b, autojunk=False).ratio()  # إرجاع difflib.SequenceMatcher(None, a, b, autojunk=False).ratio()
+<span class="ln" id="L116">116</span> 
+<span class="ln" id="L117">117</span> 
+<span class="ln" id="L118">118</span>def diff_words(page: str, reference: str, limit: int = 12) -&gt; dict:  # تعريف الدالة diff_words(page, reference, limit) ترجع dict
+<span class="ln" id="L119">119</span>    &quot;&quot;&quot;Words that appear in `page` but not in `reference`, and vice-versa.&quot;&quot;&quot;  # نص توثيقي (docstring) يشرح ما يليه
+<span class="ln" id="L120">120</span>    def words(t):  # تعريف الدالة words(t)
+<span class="ln" id="L121">121</span>        return set(re.findall(r&quot;[A-Za-z\u0600-\u06FF]{3,}&quot;, visible_text(t).lower()))  # إرجاع set(re.findall(&#x27;[A-Za-z\\u0600-\\u06FF]{3,}&#x27;, visible_text(t).lower()))
+<span class="ln" id="L122">122</span> 
+<span class="ln" id="L123">123</span>    pw, rw = words(page), words(reference)  # إسناد مجموعة إلى مجموعة
+<span class="ln" id="L124">124</span>    return {  # إرجاع قاموس
+<span class="ln" id="L125">125</span>        &quot;new_words&quot;: sorted(pw - rw, key=len, reverse=True)[:limit],  # مفتاح new_words في القاموس
+<span class="ln" id="L126">126</span>        &quot;missing_words&quot;: sorted(rw - pw, key=len, reverse=True)[:limit],  # مفتاح missing_words في القاموس
+<span class="ln" id="L127">127</span>    }  # إغلاق القوس المفتوح في السطر السابق
+<span class="ln" id="L128">128</span> 
+<span class="ln" id="L129">129</span> 
+<span class="ln" id="L130">130</span>def sha(text: str) -&gt; str:  # تعريف الدالة sha(text) ترجع str
+<span class="ln" id="L131">131</span>    return hashlib.sha256(text.encode(&quot;utf-8&quot;, &quot;replace&quot;)).hexdigest()[:16]  # إرجاع hashlib.sha256(text.encode(&#x27;utf-8&#x27;, &#x27;replace&#x27;)).hexdigest()[]
+<span class="ln" id="L132">132</span> 
+<span class="ln" id="L133">133</span> 
+<span class="ln" id="L134">134</span># ---------------------------------------------------------------------------
+<span class="ln" id="L135">135</span># مطابقة العبارات
+<span class="ln" id="L136">136</span># ---------------------------------------------------------------------------
+<span class="ln" id="L137">137</span># عبارة من قوائم الكلمات يجب أن تطابق كلمة كاملة، لا أي جزء:
+<span class="ln" id="L138">138</span># «error» يجب ألا تشتعل على «no errors found in the terminal»، وإلا فكل
+<span class="ln" id="L139">139</span># صفحة حالة ستبدو رفضاً. العبارات المتعلَّمة القصيرة (التي كتبها
+<span class="ln" id="L140">140</span># المستخدم) ما تزال تُطابق بمرونة — فهي كلماته هو.
+<span class="ln" id="L141">141</span>_PHRASE_CACHE = {}  # إسناد قاموس إلى _PHRASE_CACHE
+<span class="ln" id="L142">142</span> 
+<span class="ln" id="L143">143</span> 
+<span class="ln" id="L144">144</span>def _phrase_re(phrase: str):  # تعريف الدالة _phrase_re(phrase)
+<span class="ln" id="L145">145</span>    pat = _PHRASE_CACHE.get(phrase)  # إسناد نتيجة استدعاء _PHRASE_CACHE.get (معامل واحد) إلى pat
+<span class="ln" id="L146">146</span>    if pat is None:  # شرط: pat هو نفسه None
+<span class="ln" id="L147">147</span>        pat = re.compile(r&quot;(?&lt;![\w\-])&quot; + re.escape(phrase) + r&quot;(?![\w\-])&quot;,  # إسناد نتيجة استدعاء re.compile (2 معاملات) إلى pat
+<span class="ln" id="L148">148</span>                         re.I)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L149">149</span>        _PHRASE_CACHE[phrase] = pat  # إسناد pat إلى _PHRASE_CACHE[phrase]
+<span class="ln" id="L150">150</span>    return pat  # إرجاع pat
+<span class="ln" id="L151">151</span> 
+<span class="ln" id="L152">152</span> 
+<span class="ln" id="L153">153</span>def find_phrase(haystack: str, phrases) -&gt; str:  # تعريف الدالة find_phrase(haystack, phrases) ترجع str
+<span class="ln" id="L154">154</span>    &quot;&quot;&quot;-&gt; the first whole-word phrase found in `haystack`, else &#x27;&#x27;.&quot;&quot;&quot;  # نص توثيقي (docstring) يشرح ما يليه
+<span class="ln" id="L155">155</span>    for phrase in phrases or ():  # دورة على phrases أو مجموعة باسم phrase
+<span class="ln" id="L156">156</span>        if not phrase:  # شرط معكوس: ليس phrase
+<span class="ln" id="L157">157</span>            continue  # الانتقال إلى الدورة التالية
+<span class="ln" id="L158">158</span>        if _phrase_re(phrase).search(haystack or &quot;&quot;):  # شرط: نتيجة _phrase_re(phrase).search(haystack أو &#x27;&#x27;)
+<span class="ln" id="L159">159</span>            return phrase  # إرجاع phrase
+<span class="ln" id="L160">160</span>    return &quot;&quot;  # إرجاع &#x27;&#x27;
+<span class="ln" id="L161">161</span> 
+<span class="ln" id="L162">162</span> 
+<span class="ln" id="L163">163</span># ---------------------------------------------------------------------------
+<span class="ln" id="L164">164</span># تعلّم الأجزاء المتغيّرة في الصفحة
+<span class="ln" id="L165">165</span># ---------------------------------------------------------------------------
+<span class="ln" id="L166">166</span>def differing_tokens(a: str, b: str, limit: int = 40) -&gt; list:  # تعريف الدالة differing_tokens(a, b, limit) ترجع list
+<span class="ln" id="L167">167</span>    # بداية نص متعدد الأسطر — الأسطر التالية نصّ حرفي لا كود، فلا يقبل تعليقاً
+<span class="ln" id="L168">168</span>    &quot;&quot;&quot;Raw list of the values that change between two same-shape replies.
+<span class="ln" id="L169">169</span> 
+<span class="ln" id="L170">170</span>    Reported to the user (&quot;this page changes by itself in N places&quot;); the
+<span class="ln" id="L171">171</span>    masking engine below is what actually neutralises them.
+<span class="ln" id="L172">172</span>    &quot;&quot;&quot;  # نهاية النص متعدد الأسطر
+<span class="ln" id="L173">173</span>    if not a or not b:  # شرط مركّب (أو)
+<span class="ln" id="L174">174</span>        return []  # إرجاع قائمة
+<span class="ln" id="L175">175</span>    sm = difflib.SequenceMatcher(None, a, b, autojunk=False)  # إسناد نتيجة استدعاء difflib.SequenceMatcher (3 معاملات، autojunk=…) إلى sm
+<span class="ln" id="L176">176</span>    out, seen = [], set()  # إسناد مجموعة إلى مجموعة
+<span class="ln" id="L177">177</span>    for tag, i1, i2, j1, j2 in sm.get_opcodes():  # دورة على sm.get_opcodes() باسم مجموعة
+<span class="ln" id="L178">178</span>        if tag == &quot;equal&quot;:  # شرط: tag يساوي &#x27;equal&#x27;
+<span class="ln" id="L179">179</span>            continue  # الانتقال إلى الدورة التالية
+<span class="ln" id="L180">180</span>        for piece in (a[i1:i2], b[j1:j2]):  # دورة على مجموعة باسم piece
+<span class="ln" id="L181">181</span>            for tok in tokens(piece):  # دورة على tokens(piece) باسم tok
+<span class="ln" id="L182">182</span>                if len(tok) &gt;= 3 and tok not in seen:  # شرط مركّب (و)
+<span class="ln" id="L183">183</span>                    seen.add(tok)  # استدعاء seen.add (معامل واحد)
+<span class="ln" id="L184">184</span>                    out.append(tok)  # استدعاء out.append (معامل واحد)
+<span class="ln" id="L185">185</span>                    if len(out) &gt;= limit:  # شرط: len(out) أكبر أو يساوي limit
+<span class="ln" id="L186">186</span>                        return out  # إرجاع out
+<span class="ln" id="L187">187</span>    return out  # إرجاع out
+<span class="ln" id="L188">188</span> 
+<span class="ln" id="L189">189</span> 
+<span class="ln" id="L190">190</span># يحوّل القيم المتغيّرة إلى أنماط عامة بدل حفظ كل قيمة على حدة.
+<span class="ln" id="L191">191</span>def learn_patterns(samples, max_patterns: int = 6) -&gt; list:  # تعريف الدالة learn_patterns(samples, max_patterns) ترجع list
+<span class="ln" id="L192">192</span>    # بداية نص متعدد الأسطر — الأسطر التالية نصّ حرفي لا كود، فلا يقبل تعليقاً
+<span class="ln" id="L193">193</span>    &quot;&quot;&quot;Turn &quot;this span changes&quot; into &quot;a token like this changes&quot;.
+<span class="ln" id="L194">194</span> 
+<span class="ln" id="L195">195</span>    A session token of 8 hex characters is different on every reply, so
+<span class="ln" id="L196">196</span>    remembering the value is useless.  Seeing that the value LOOKED like
+<span class="ln" id="L197">197</span>    `[0-9a-fA-F]{8}` is what lets us ignore it forever.
+<span class="ln" id="L198">198</span>    &quot;&quot;&quot;  # نهاية النص متعدد الأسطر
+<span class="ln" id="L199">199</span>    samples = [x for x in samples if x]  # بناء اشتقاق قائمة وإسناده إلى samples
+<span class="ln" id="L200">200</span>    if len(samples) &lt; 2:  # شرط: len(samples) أصغر من 2
+<span class="ln" id="L201">201</span>        return []  # إرجاع قائمة
+<span class="ln" id="L202">202</span>    out, seen = [], set()  # إسناد مجموعة إلى مجموعة
+<span class="ln" id="L203">203</span>    base = samples[0]  # إسناد samples[0] إلى base
+<span class="ln" id="L204">204</span>    for other in samples[1:]:  # دورة على samples[] باسم other
+<span class="ln" id="L205">205</span>        sm = difflib.SequenceMatcher(None, base, other, autojunk=False)  # إسناد نتيجة استدعاء difflib.SequenceMatcher (3 معاملات، autojunk=…) إلى sm
+<span class="ln" id="L206">206</span>        for tag, i1, i2, j1, j2 in sm.get_opcodes():  # دورة على sm.get_opcodes() باسم مجموعة
+<span class="ln" id="L207">207</span>            if tag == &quot;equal&quot;:  # شرط: tag يساوي &#x27;equal&#x27;
+<span class="ln" id="L208">208</span>                continue  # الانتقال إلى الدورة التالية
+<span class="ln" id="L209">209</span>            for piece in (base[i1:i2], other[j1:j2]):  # دورة على مجموعة باسم piece
+<span class="ln" id="L210">210</span>                for tok in tokens(piece):  # دورة على tokens(piece) باسم tok
+<span class="ln" id="L211">211</span>                    if not _nonce_like(tok) or len(tok) &gt; 64:  # شرط مركّب (أو)
+<span class="ln" id="L212">212</span>                        continue  # الانتقال إلى الدورة التالية
+<span class="ln" id="L213">213</span>                    if HEXLIKE_RE.match(tok):  # شرط: نتيجة HEXLIKE_RE.match(tok)
+<span class="ln" id="L214">214</span>                        pattern = r&quot;\b[0-9a-fA-F]{%d}\b&quot; % len(tok)  # حساب باقي القسمة بين &#x27;\\b[0-9a-fA-F]{%d}\\b&#x27; وlen(tok) وإسناده إلى pattern
+<span class="ln" id="L215">215</span>                    else:  # مفتاح else في القاموس
+<span class="ln" id="L216">216</span>                        pattern = r&quot;\b[0-9A-Za-z]{%d}\b&quot; % len(tok)  # حساب باقي القسمة بين &#x27;\\b[0-9A-Za-z]{%d}\\b&#x27; وlen(tok) وإسناده إلى pattern
+<span class="ln" id="L217">217</span>                    if pattern not in seen:  # شرط: pattern ليس ضمن seen
+<span class="ln" id="L218">218</span>                        seen.add(pattern)  # استدعاء seen.add (معامل واحد)
+<span class="ln" id="L219">219</span>                        out.append(pattern)  # استدعاء out.append (معامل واحد)
+<span class="ln" id="L220">220</span>                        if len(out) &gt;= max_patterns:  # شرط: len(out) أكبر أو يساوي max_patterns
+<span class="ln" id="L221">221</span>                            return out  # إرجاع out
+<span class="ln" id="L222">222</span>    return out  # إرجاع out
+<span class="ln" id="L223">223</span> 
+<span class="ln" id="L224">224</span> 
+<span class="ln" id="L225">225</span># يكتشف القيم التي تتغير وحدها بين ردّين متطابقين (رمز جلسة، وقت، صدى البطاقة).
+<span class="ln" id="L226">226</span>def learn_dynamic(samples, rounds: int = 4) -&gt; set:  # تعريف الدالة learn_dynamic(samples, rounds) ترجع set
+<span class="ln" id="L227">227</span>    # بداية نص متعدد الأسطر — الأسطر التالية نصّ حرفي لا كود، فلا يقبل تعليقاً
+<span class="ln" id="L228">228</span>    &quot;&quot;&quot;Return the literal values that differ between two same-shape replies.
+<span class="ln" id="L229">229</span> 
+<span class="ln" id="L230">230</span>    Two wrong cards sent in a row normally produce the same page, except for
+<span class="ln" id="L231">231</span>    the session token, the echoed card, timestamps... Those are exactly the
+<span class="ln" id="L232">232</span>    values we must ignore, and we learn them instead of listing them by hand.
+<span class="ln" id="L233">233</span>    &quot;&quot;&quot;  # نهاية النص متعدد الأسطر
+<span class="ln" id="L234">234</span>    literals = set()  # إسناد نتيجة استدعاء set إلى literals
+<span class="ln" id="L235">235</span>    samples = [s for s in samples if s]  # بناء اشتقاق قائمة وإسناده إلى samples
+<span class="ln" id="L236">236</span>    if len(samples) &lt; 2:  # شرط: len(samples) أصغر من 2
+<span class="ln" id="L237">237</span>        return literals  # إرجاع literals
+<span class="ln" id="L238">238</span> 
+<span class="ln" id="L239">239</span>    for _ in range(rounds):  # دورة على range(rounds) باسم _
+<span class="ln" id="L240">240</span>        masked = [mask_text(s, literals) for s in samples]  # بناء اشتقاق قائمة وإسناده إلى masked
+<span class="ln" id="L241">241</span>        if all(m == masked[0] for m in masked):  # شرط: نتيجة all(مولّد)
+<span class="ln" id="L242">242</span>            break  # قطع الحلقة فوراً
+<span class="ln" id="L243">243</span>        base = masked[0]  # إسناد masked[0] إلى base
+<span class="ln" id="L244">244</span>        gained = False  # إسناد القيمة الثابتة gained
+<span class="ln" id="L245">245</span>        for other in samples[1:]:  # دورة على samples[] باسم other
+<span class="ln" id="L246">246</span>            sm = difflib.SequenceMatcher(None, base, other, autojunk=False)  # إسناد نتيجة استدعاء difflib.SequenceMatcher (3 معاملات، autojunk=…) إلى sm
+<span class="ln" id="L247">247</span>            for tag, i1, i2, j1, j2 in sm.get_opcodes():  # دورة على sm.get_opcodes() باسم مجموعة
+<span class="ln" id="L248">248</span>                if tag == &quot;equal&quot;:  # شرط: tag يساوي &#x27;equal&#x27;
+<span class="ln" id="L249">249</span>                    continue  # الانتقال إلى الدورة التالية
+<span class="ln" id="L250">250</span>                for piece in (base[i1:i2], other[j1:j2]):  # دورة على مجموعة باسم piece
+<span class="ln" id="L251">251</span>                    for tok in tokens(piece):  # دورة على tokens(piece) باسم tok
+<span class="ln" id="L252">252</span>                        # شرط مركّب (أو)
+<span class="ln" id="L253">253</span>                        if len(tok) &gt;= 3 and not tok.isdigit() or \
+<span class="ln" id="L254">254</span>                                (tok.isdigit() and len(tok) &gt;= 5):  # تكملة تعريف متعدد الأسطر
+<span class="ln" id="L255">255</span>                            if tok not in literals:  # شرط: tok ليس ضمن literals
+<span class="ln" id="L256">256</span>                                literals.add(tok)  # استدعاء literals.add (معامل واحد)
+<span class="ln" id="L257">257</span>                                gained = True  # إسناد القيمة الثابتة gained
+<span class="ln" id="L258">258</span>        if not gained:  # شرط معكوس: ليس gained
+<span class="ln" id="L259">259</span>            break  # قطع الحلقة فوراً
+<span class="ln" id="L260">260</span>    return literals  # إرجاع literals
+<span class="ln" id="L261">261</span> 
+<span class="ln" id="L262">262</span> 
+<span class="ln" id="L263">263</span># ---------------------------------------------------------------------------
+<span class="ln" id="L264">264</span># الأحكام
+<span class="ln" id="L265">265</span># ---------------------------------------------------------------------------
+<span class="ln" id="L266">266</span># حكم واحد: code + reason + confidence + data + evidence.
+<span class="ln" id="L267">267</span># is_hit: أي كود يبدأ بـACCEPTED. is_final: مؤكد أو ثقة ≥0.85.
+<span class="ln" id="L268">268</span>class Verdict:  # تعريف الصنف Verdict
+<span class="ln" id="L269">269</span>    &quot;&quot;&quot;One answer about one reply.&quot;&quot;&quot;  # نص توثيقي (docstring) يشرح ما يليه
+<span class="ln" id="L270">270</span> 
+<span class="ln" id="L271">271</span>    __slots__ = (&quot;code&quot;, &quot;confidence&quot;, &quot;reason&quot;, &quot;data&quot;, &quot;evidence&quot;)  # إسناد مجموعة إلى __slots__
+<span class="ln" id="L272">272</span> 
+<span class="ln" id="L273">273</span>    def __init__(self, code, reason, confidence=0.0, data=None, evidence=None):  # تعريف الدالة __init__(self, code, reason, confidence, data, evidence)
+<span class="ln" id="L274">274</span>        self.code = code  # إسناد code إلى self.code
+<span class="ln" id="L275">275</span>        self.reason = reason  # إسناد reason إلى self.reason
+<span class="ln" id="L276">276</span>        self.confidence = confidence  # إسناد confidence إلى self.confidence
+<span class="ln" id="L277">277</span>        self.data = data or {}  # دمج منطقي (أو) وإسناده إلى self.data
+<span class="ln" id="L278">278</span>        self.evidence = evidence or {}  # دمج منطقي (أو) وإسناده إلى self.evidence
+<span class="ln" id="L279">279</span> 
+<span class="ln" id="L280">280</span>    @property  # مُزخرف (decorator) بـproperty
+<span class="ln" id="L281">281</span>    def is_hit(self) -&gt; bool:  # تعريف الدالة is_hit(self) ترجع bool
+<span class="ln" id="L282">282</span>        return self.code.startswith(&quot;ACCEPTED&quot;)  # إرجاع self.code.startswith(&#x27;ACCEPTED&#x27;)
+<span class="ln" id="L283">283</span> 
+<span class="ln" id="L284">284</span>    @property  # مُزخرف (decorator) بـproperty
+<span class="ln" id="L285">285</span>    def is_final(self) -&gt; bool:  # تعريف الدالة is_final(self) ترجع bool
+<span class="ln" id="L286">286</span>        &quot;&quot;&quot;High-confidence hits stop the run; UNKNOWN never does.&quot;&quot;&quot;  # نص توثيقي (docstring) يشرح ما يليه
+<span class="ln" id="L287">287</span>        return self.code == &quot;ACCEPTED_VERIFIED&quot; or (  # إرجاع مقارنة أو مقارنة و مقارنة
+<span class="ln" id="L288">288</span>            self.code == &quot;ACCEPTED&quot; and self.confidence &gt;= 0.85)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L289">289</span> 
+<span class="ln" id="L290">290</span>    def as_dict(self) -&gt; dict:  # تعريف الدالة as_dict(self) ترجع dict
+<span class="ln" id="L291">291</span>        return {&quot;code&quot;: self.code, &quot;reason&quot;: self.reason,  # إرجاع قاموس
+<span class="ln" id="L292">292</span>                &quot;confidence&quot;: round(self.confidence, 2),  # مفتاح confidence في القاموس
+<span class="ln" id="L293">293</span>                &quot;data&quot;: self.data, &quot;evidence&quot;: self.evidence}  # مفتاح data في القاموس
+<span class="ln" id="L294">294</span> 
+<span class="ln" id="L295">295</span> 
+<span class="ln" id="L296">296</span>class Fingerprinter:  # تعريف الصنف Fingerprinter
+<span class="ln" id="L297">297</span>    &quot;&quot;&quot;Knows what the *rejection* page looks like, and how to compare.&quot;&quot;&quot;  # نص توثيقي (docstring) يشرح ما يليه
+<span class="ln" id="L298">298</span> 
+<span class="ln" id="L299">299</span>    def __init__(self):  # تعريف الدالة __init__(self)
+<span class="ln" id="L300">300</span>        self.literals = set()  # إسناد نتيجة استدعاء set إلى self.literals
+<span class="ln" id="L301">301</span>        self.patterns = []  # إسناد قائمة إلى self.patterns
+<span class="ln" id="L302">302</span>        self.exact = False  # إسناد القيمة الثابتة self.exact
+<span class="ln" id="L303">303</span>        self.reject_masked_sha = &quot;&quot;  # إسناد القيمة الثابتة self.reject_masked_sha
+<span class="ln" id="L304">304</span>        self.reject_tokens = []  # إسناد قائمة إلى self.reject_tokens
+<span class="ln" id="L305">305</span>        self.reject_status = 0  # إسناد القيمة الثابتة self.reject_status
+<span class="ln" id="L306">306</span>        self.reject_len = 0  # إسناد القيمة الثابتة self.reject_len
+<span class="ln" id="L307">307</span>        self.reject_text = &quot;&quot;  # إسناد القيمة الثابتة self.reject_text
+<span class="ln" id="L308">308</span>        # إلى أين تُحوَّل بطاقة خاطئة (فارغ = ليس تحويلاً، أو أنه
+<span class="ln" id="L309">309</span>        # يتغير وحده فلا يمكن مقارنته)
+<span class="ln" id="L310">310</span>        self.reject_location_key = ()  # إسناد مجموعة إلى self.reject_location_key
+<span class="ln" id="L311">311</span>        self.login_text = &quot;&quot;  # إسناد القيمة الثابتة self.login_text
+<span class="ln" id="L312">312</span>        self.samples = 0  # إسناد القيمة الثابتة self.samples
+<span class="ln" id="L313">313</span>        self.note = &quot;&quot;  # إسناد القيمة الثابتة self.note
+<span class="ln" id="L314">314</span>        self.dynamic_count = 0      # قيم تتغير وحدها
+<span class="ln" id="L315">315</span> 
+<span class="ln" id="L316">316</span>    # -- التعلّم ---------------------------------------------------------
+<span class="ln" id="L317">317</span>    @classmethod  # مُزخرف (decorator) بـclassmethod
+<span class="ln" id="L318">318</span>    # يبني «شكل صفحة الرفض» من ردود بطاقات خاطئة جيدة الصيغة.
+<span class="ln" id="L319">319</span>    # عيّنة فاشلة شبكياً تصل None فتُستبعد ولا تكسر التعلّم.
+<span class="ln" id="L320">320</span>    def learn(cls, reject_replies, login_reply=None) -&gt; &quot;Fingerprinter&quot;:  # تعريف الدالة learn(cls, reject_replies, login_reply) ترجع &#x27;Fingerprinter&#x27;
+<span class="ln" id="L321">321</span>        &quot;&quot;&quot;`reject_replies` = list of Replies to wrong-but-well-formed cards.&quot;&quot;&quot;  # نص توثيقي (docstring) يشرح ما يليه
+<span class="ln" id="L322">322</span>        fp = cls()  # إسناد نتيجة استدعاء cls إلى fp
+<span class="ln" id="L323">323</span>        # عيّنة فشلت بخطأ شبكي تصل None — ليست
+<span class="ln" id="L324">324</span>        # صفحة نستطيع التعلّم منها، ويجب ألا تُسقط التشغيل أيضاً
+<span class="ln" id="L325">325</span>        replies = [r for r in (reject_replies or []) if r is not None]  # بناء اشتقاق قائمة وإسناده إلى replies
+<span class="ln" id="L326">326</span>        bodies = [r.text for r in replies]  # بناء اشتقاق قائمة وإسناده إلى bodies
+<span class="ln" id="L327">327</span>        if login_reply is not None:  # شرط: login_reply ليس نفسه None
+<span class="ln" id="L328">328</span>            fp.login_text = login_reply.text[:40000]  # إسناد login_reply.text[] إلى fp.login_text
+<span class="ln" id="L329">329</span>        if not bodies:  # شرط معكوس: ليس bodies
+<span class="ln" id="L330">330</span>            fp.note = &quot;no rejection baseline&quot;  # إسناد القيمة الثابتة fp.note
+<span class="ln" id="L331">331</span>            return fp  # إرجاع fp
+<span class="ln" id="L332">332</span> 
+<span class="ln" id="L333">333</span>        fp.samples = len(bodies)  # إسناد نتيجة استدعاء len (معامل واحد) إلى fp.samples
+<span class="ln" id="L334">334</span>        fp.reject_status = replies[0].status  # إسناد replies[0].status إلى fp.reject_status
+<span class="ln" id="L335">335</span>        fp.reject_len = len(bodies[0])  # إسناد نتيجة استدعاء len (معامل واحد) إلى fp.reject_len
+<span class="ln" id="L336">336</span>        fp.reject_text = bodies[0][:40000]  # إسناد bodies[0][] إلى fp.reject_text
+<span class="ln" id="L337">337</span>        # قابل للاستخدام فقط عندما كانت كل عيّنة تحويلاً إلى نفس المكان: إن
+<span class="ln" id="L338">338</span>        # كان بعضها فقط، فخط الأساس مختلط ولا مقارنة
+<span class="ln" id="L339">339</span>        # آمنة (إحدى العيّنات قد تكون البطاقة العاملة).
+<span class="ln" id="L340">340</span>        if replies and all(r.is_redirect() for r in replies):  # شرط مركّب (و)
+<span class="ln" id="L341">341</span>            locs = {_loc_key(r.location) for r in replies}  # بناء اشتقاق مجموعة وإسناده إلى locs
+<span class="ln" id="L342">342</span>            fp.reject_location_key = locs.pop() if len(locs) == 1 else ()  # إسناد locs.pop() إن مقارنة وإلا مجموعة إلى fp.reject_location_key
+<span class="ln" id="L343">343</span>        fp.literals = learn_dynamic(bodies)  # إسناد نتيجة استدعاء learn_dynamic (معامل واحد) إلى fp.literals
+<span class="ln" id="L344">344</span>        fp.patterns = learn_patterns(bodies)  # إسناد نتيجة استدعاء learn_patterns (معامل واحد) إلى fp.patterns
+<span class="ln" id="L345">345</span>        # إسناد len(differing_tokens(bodies[0], bodies[1])) إن مقارنة وإلا 0 إلى fp.dynamic_count
+<span class="ln" id="L346">346</span>        fp.dynamic_count = len(differing_tokens(bodies[0], bodies[1])) \
+<span class="ln" id="L347">347</span>            if len(bodies) &gt; 1 else 0  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L348">348</span> 
+<span class="ln" id="L349">349</span>        masked = [mask_text(b, fp.literals, patterns=fp.patterns)  # بناء اشتقاق قائمة وإسناده إلى masked
+<span class="ln" id="L350">350</span>                  for b in bodies]  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L351">351</span>        fp.exact = all(m == masked[0] for m in masked)  # إسناد نتيجة استدعاء all (معامل واحد) إلى fp.exact
+<span class="ln" id="L352">352</span>        if fp.exact:  # شرط: fp.exact
+<span class="ln" id="L353">353</span>            fp.reject_masked_sha = sha(masked[0])  # إسناد نتيجة استدعاء sha (معامل واحد) إلى fp.reject_masked_sha
+<span class="ln" id="L354">354</span>            fp.note = &quot;exact comparison ready&quot;  # إسناد القيمة الثابتة fp.note
+<span class="ln" id="L355">355</span>        else:  # مفتاح else في القاموس
+<span class="ln" id="L356">356</span>            fp.reject_tokens = struct_tokens(bodies[0], fp.literals,  # إسناد نتيجة استدعاء struct_tokens (2 معاملات، patterns=…) إلى fp.reject_tokens
+<span class="ln" id="L357">357</span>                                             patterns=fp.patterns)  # المعامل المسمّى patterns
+<span class="ln" id="L358">358</span>            fp.note = &quot;page changes on its own - comparing by shape&quot;  # إسناد القيمة الثابتة fp.note
+<span class="ln" id="L359">359</span>        return fp  # إرجاع fp
+<span class="ln" id="L360">360</span> 
+<span class="ln" id="L361">361</span>    # -- المقارنة -------------------------------------------------------
+<span class="ln" id="L362">362</span>    # المقارنة بثلاث درجات: exact (SHA بعد الإخفاء) ← shape ← similar.
+<span class="ln" id="L363">363</span>    # الردّان الفارغان لا يعنيان تطابقاً: يُقارن مفتاح التحويل ثم الحالة.
+<span class="ln" id="L364">364</span>    def same_as_reject(self, resp, extra_literals=()) -&gt; tuple:  # تعريف الدالة same_as_reject(self, resp, extra_literals) ترجع tuple
+<span class="ln" id="L365">365</span>        # بداية نص متعدد الأسطر — الأسطر التالية نصّ حرفي لا كود، فلا يقبل تعليقاً
+<span class="ln" id="L366">366</span>        &quot;&quot;&quot;-&gt; (is_rejected, how, similarity)
+<span class="ln" id="L367">367</span> 
+<span class="ln" id="L368">368</span>        `extra_literals` are the values we just sent (card, password, dst):
+<span class="ln" id="L369">369</span>        a portal that echoes them back must not look like a different page.
+<span class="ln" id="L370">370</span>        &quot;&quot;&quot;  # نهاية النص متعدد الأسطر
+<span class="ln" id="L371">371</span>        body = resp.text or &quot;&quot;  # دمج منطقي (أو) وإسناده إلى body
+<span class="ln" id="L372">372</span>        literals = tuple(self.literals) + tuple(extra_literals or ())  # حساب جمع بين tuple(self.literals) وtuple(extra_literals أو مجموعة) وإسناده إلى literals
+<span class="ln" id="L373">373</span>        if not body and not self.reject_text:  # شرط مركّب (و)
+<span class="ln" id="L374">374</span>            # كلا الردّين صفحتان فارغتان — وهذا وحده لا يعني شيئاً. الراوتر
+<span class="ln" id="L375">375</span>            # الذي يحوّل عند بطاقة خاطئة يعيدنا إلى صفحة الدخول؛
+<span class="ln" id="L376">376</span>            # والبطاقة التي تعمل تذهب إلى مكان آخر. تجاهل ذلك كان
+<span class="ln" id="L377">377</span>            # يخفي كل إصابة حقيقية خلف «مثل صفحة الرفض».
+<span class="ln" id="L378">378</span>            if self.reject_location_key and resp.is_redirect():  # شرط مركّب (و)
+<span class="ln" id="L379">379</span>                same = _loc_key(resp.location) == self.reject_location_key  # مقارنة (يساوي) وإسناد النتيجة المنطقية إلى same
+<span class="ln" id="L380">380</span>                return same, &quot;redirect&quot;, 1.0 if same else 0.0  # إرجاع مجموعة
+<span class="ln" id="L381">381</span>            if self.reject_status and resp.status != self.reject_status:  # شرط مركّب (و)
+<span class="ln" id="L382">382</span>                return False, &quot;empty_status_differs&quot;, 0.0  # إرجاع مجموعة
+<span class="ln" id="L383">383</span>            return True, &quot;empty&quot;, 1.0  # إرجاع مجموعة
+<span class="ln" id="L384">384</span> 
+<span class="ln" id="L385">385</span>        masked = mask_text(body, literals, patterns=self.patterns)  # إسناد نتيجة استدعاء mask_text (2 معاملات، patterns=…) إلى masked
+<span class="ln" id="L386">386</span>        if self.exact:  # شرط: self.exact
+<span class="ln" id="L387">387</span>            if sha(masked) == self.reject_masked_sha:  # شرط: sha(masked) يساوي self.reject_masked_sha
+<span class="ln" id="L388">388</span>                return True, &quot;exact&quot;, 1.0  # إرجاع مجموعة
+<span class="ln" id="L389">389</span>        if self.reject_tokens:  # شرط: self.reject_tokens
+<span class="ln" id="L390">390</span>            sim = ratio(struct_tokens(body, literals, patterns=self.patterns),  # إسناد نتيجة استدعاء ratio (2 معاملات) إلى sim
+<span class="ln" id="L391">391</span>                        self.reject_tokens)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L392">392</span>            if sim &gt;= 0.995:  # شرط: sim أكبر أو يساوي 0.995
+<span class="ln" id="L393">393</span>                return True, &quot;shape&quot;, sim  # إرجاع مجموعة
+<span class="ln" id="L394">394</span>            return False, &quot;shape&quot;, sim  # إرجاع مجموعة
+<span class="ln" id="L395">395</span> 
+<span class="ln" id="L396">396</span>        # لا خط أساس دقيق: نرجع إلى الحالة + تشابه الشكل
+<span class="ln" id="L397">397</span>        sim = ratio(struct_tokens(body, literals, patterns=self.patterns),  # إسناد نتيجة استدعاء ratio (2 معاملات) إلى sim
+<span class="ln" id="L398">398</span>                    struct_tokens(self.reject_text, literals,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L399">399</span>                                  patterns=self.patterns))  # المعامل المسمّى patterns
+<span class="ln" id="L400">400</span>        if resp.status == self.reject_status and sim &gt;= 0.97:  # شرط مركّب (و)
+<span class="ln" id="L401">401</span>            return True, &quot;similar&quot;, sim  # إرجاع مجموعة
+<span class="ln" id="L402">402</span>        return False, &quot;similar&quot;, sim  # إرجاع مجموعة
+<span class="ln" id="L403">403</span> 
+<span class="ln" id="L404">404</span> 
+<span class="ln" id="L405">405</span>class Judge:  # تعريف الصنف Judge
+<span class="ln" id="L406">406</span>    &quot;&quot;&quot;Turns one reply into one Verdict with a reason a human can read.&quot;&quot;&quot;  # نص توثيقي (docstring) يشرح ما يليه
+<span class="ln" id="L407">407</span> 
+<span class="ln" id="L408">408</span>    def __init__(self, fingerprint: Fingerprinter, login_url: str,  # تعريف الدالة __init__(self, fingerprint, login_url, success_words, success_url_contains, exit_host_markers)
+<span class="ln" id="L409">409</span>                 success_words=(), success_url_contains=&quot;&quot;,  # المعامل المسمّى success_words
+<span class="ln" id="L410">410</span>                 exit_host_markers=config.EXIT_HOST_MARKERS):  # المعامل المسمّى exit_host_markers
+<span class="ln" id="L411">411</span>        self.fp = fingerprint  # إسناد fingerprint إلى self.fp
+<span class="ln" id="L412">412</span>        self.login_url = login_url  # إسناد login_url إلى self.login_url
+<span class="ln" id="L413">413</span>        self.success_words = [w.lower() for w in (success_words or []) if w]  # بناء اشتقاق قائمة وإسناده إلى self.success_words
+<span class="ln" id="L414">414</span>        self.success_url_contains = (success_url_contains or &quot;&quot;).lower()  # إسناد نتيجة استدعاء success_url_contains أو &#x27;&#x27;.lower إلى self.success_url_contains
+<span class="ln" id="L415">415</span>        self.exit_markers = tuple(exit_host_markers)  # إسناد نتيجة استدعاء tuple (معامل واحد) إلى self.exit_markers
+<span class="ln" id="L416">416</span>        self.portal_host = _host(login_url)  # إسناد نتيجة استدعاء _host (معامل واحد) إلى self.portal_host
+<span class="ln" id="L417">417</span> 
+<span class="ln" id="L418">418</span>        from urllib.parse import urlsplit  # استيراد urlsplit من الوحدة urllib.parse
+<span class="ln" id="L419">419</span>        self.portal_host = urlsplit(login_url).hostname or &quot;&quot;  # دمج منطقي (أو) وإسناده إلى self.portal_host
+<span class="ln" id="L420">420</span> 
+<span class="ln" id="L421">421</span>        reject_text = (fingerprint.reject_text or &quot;&quot;).lower()  # إسناد نتيجة استدعاء fingerprint.reject_text أو &#x27;&#x27;.lower إلى reject_text
+<span class="ln" id="L422">422</span>        login_text = (fingerprint.login_text or &quot;&quot;).lower()  # إسناد نتيجة استدعاء fingerprint.login_text أو &#x27;&#x27;.lower إلى login_text
+<span class="ln" id="L423">423</span> 
+<span class="ln" id="L424">424</span>        # الكلمات تُحسب فقط عندما لا تكون موجودة أصلاً في صفحة الرفض/الدخول
+<span class="ln" id="L425">425</span>        # — وإلا فكل صفحة ستبدو فشلاً.
+<span class="ln" id="L426">426</span>        self.reject_phrases = [w for w in config.REJECT_WORDS  # بناء اشتقاق قائمة وإسناده إلى self.reject_phrases
+<span class="ln" id="L427">427</span>                               if w in reject_text or w not in login_text]  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L428">428</span>        self.accept_phrases = [w for w in config.ACCEPT_WORDS  # بناء اشتقاق قائمة وإسناده إلى self.accept_phrases
+<span class="ln" id="L429">429</span>                               if w not in reject_text and w not in login_text]  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L430">430</span> 
+<span class="ln" id="L431">431</span>    # -- مساعدات ---------------------------------------------------------
+<span class="ln" id="L432">432</span>    @staticmethod  # مُزخرف (decorator) بـstaticmethod
+<span class="ln" id="L433">433</span>    def _has_any(haystack: str, needles) -&gt; str:  # تعريف الدالة _has_any(haystack, needles) ترجع str
+<span class="ln" id="L434">434</span>        &quot;&quot;&quot;Loose (substring) match - for words the user gave us himself.&quot;&quot;&quot;  # نص توثيقي (docstring) يشرح ما يليه
+<span class="ln" id="L435">435</span>        for n in needles:  # دورة على needles باسم n
+<span class="ln" id="L436">436</span>            if n and n in haystack:  # شرط مركّب (و)
+<span class="ln" id="L437">437</span>                return n  # إرجاع n
+<span class="ln" id="L438">438</span>        return &quot;&quot;  # إرجاع &#x27;&#x27;
+<span class="ln" id="L439">439</span> 
+<span class="ln" id="L440">440</span>    @staticmethod  # مُزخرف (decorator) بـstaticmethod
+<span class="ln" id="L441">441</span>    def _has_phrase(haystack: str, needles) -&gt; str:  # تعريف الدالة _has_phrase(haystack, needles) ترجع str
+<span class="ln" id="L442">442</span>        &quot;&quot;&quot;Whole-word match - for the built-in reject/accept/ban phrases.&quot;&quot;&quot;  # نص توثيقي (docstring) يشرح ما يليه
+<span class="ln" id="L443">443</span>        return find_phrase(haystack, needles)  # إرجاع find_phrase(haystack, needles)
+<span class="ln" id="L444">444</span> 
+<span class="ln" id="L445">445</span>    # -- القرار ----------------------------------------------------
+<span class="ln" id="L446">446</span>    # قلب الأداة: ردّ واحد ⇒ حكم واحد.
+<span class="ln" id="L447">447</span>    # الترتيب هو القرار: (1) الحجب/الكابتشا (2) مطابقة صفحة الرفض
+<span class="ln" id="L448">448</span>    # (3) الأدلة الإيجابية: تحويل خارج البوابة، كلمات نجاح، رابط نجاح
+<span class="ln" id="L449">449</span>    # (4) UNKNOWN لكل ما لا يُثبت. لا يُسمّى شيء نجاحاً بلا دليل.
+<span class="ln" id="L450">450</span>    def classify(self, resp, submitted=None) -&gt; Verdict:  # تعريف الدالة classify(self, resp, submitted) ترجع Verdict
+<span class="ln" id="L451">451</span>        body = resp.text or &quot;&quot;  # دمج منطقي (أو) وإسناده إلى body
+<span class="ln" id="L452">452</span>        text = visible_text(body)  # إسناد نتيجة استدعاء visible_text (معامل واحد) إلى text
+<span class="ln" id="L453">453</span>        low = text.lower()  # إسناد نتيجة استدعاء text.lower إلى low
+<span class="ln" id="L454">454</span>        raw_low = body.lower()  # إسناد نتيجة استدعاء body.lower إلى raw_low
+<span class="ln" id="L455">455</span>        loc = resp.location  # إسناد resp.location إلى loc
+<span class="ln" id="L456">456</span>        sub = [str(s) for s in (submitted or []) if s]  # بناء اشتقاق قائمة وإسناده إلى sub
+<span class="ln" id="L457">457</span> 
+<span class="ln" id="L458">458</span>        # --- الراوتر يحجبنا (يُفحص أولاً: إن كان خط الأساس قد
+<span class="ln" id="L459">459</span>        # تُعلّم ونحن محجوبون أصلاً، فقد تبدو صفحة الحجب
+<span class="ln" id="L460">460</span>        # رفضاً عادياً) ----------------------------------
+<span class="ln" id="L461">461</span>        # دمج منطقي (أو) وإسناده إلى ban
+<span class="ln" id="L462">462</span>        ban = self._has_phrase(raw_low, config.BAN_WORDS) or \
+<span class="ln" id="L463">463</span>            self._has_phrase(low, config.BAN_WORDS)  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L464">464</span>        if ban or resp.status in (403, 429, 503):  # شرط مركّب (أو)
+<span class="ln" id="L465">465</span>            if resp.status == 429 or (ban and (&quot;rate limit&quot; in ban  # شرط مركّب (أو)
+<span class="ln" id="L466">466</span>                                               or &quot;slow down&quot; in ban)):  # تكملة تعريف متعدد الأسطر
+<span class="ln" id="L467">467</span>                return Verdict(&quot;RATE_LIMITED&quot;, &quot;ban_page&quot; if ban else &quot;http_429&quot;,  # إرجاع Verdict(&#x27;RATE_LIMITED&#x27;, &#x27;ban_page&#x27; إن ban وإلا &#x27;http_429&#x27;, 0.9, data=قاموس, evidence=resp.as_dict())
+<span class="ln" id="L468">468</span>                               0.9, data={&quot;word&quot;: ban, &quot;status&quot;: resp.status},  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L469">469</span>                               evidence=resp.as_dict())  # المعامل المسمّى evidence
+<span class="ln" id="L470">470</span>            if resp.status == 503 and not ban:  # شرط مركّب (و)
+<span class="ln" id="L471">471</span>                # «service unavailable» راوتر/RADIUS يغرق —
+<span class="ln" id="L472">472</span>                # وإخبار المستخدم أنه محجوب سيرسله ليعيد تشغيل
+<span class="ln" id="L473">473</span>                # الراوتر بلا سبب. تُعامل كتقييد طلبات: أبطئ،
+<span class="ln" id="L474">474</span>                # وتوقّف إن استمر.
+<span class="ln" id="L475">475</span>                return Verdict(&quot;RATE_LIMITED&quot;, &quot;http_503&quot;, 0.9,  # إرجاع Verdict(&#x27;RATE_LIMITED&#x27;, &#x27;http_503&#x27;, 0.9, data=قاموس, evidence=resp.as_dict())
+<span class="ln" id="L476">476</span>                               data={&quot;status&quot;: resp.status},  # المعامل المسمّى data
+<span class="ln" id="L477">477</span>                               evidence=resp.as_dict())  # المعامل المسمّى evidence
+<span class="ln" id="L478">478</span>            return Verdict(&quot;BANNED&quot;, &quot;ban_page&quot; if ban else f&quot;http_{resp.status}&quot;,  # إرجاع Verdict(&#x27;BANNED&#x27;, &#x27;ban_page&#x27; إن ban وإلا نص منسّق (f-string), 0.9, data=قاموس, evidence=resp.as_dict())
+<span class="ln" id="L479">479</span>                           0.9, data={&quot;word&quot;: ban, &quot;status&quot;: resp.status},  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L480">480</span>                           evidence=resp.as_dict())  # المعامل المسمّى evidence
+<span class="ln" id="L481">481</span> 
+<span class="ln" id="L482">482</span>        rejected, how, sim = self.fp.same_as_reject(resp, extra_literals=sub)  # إسناد نتيجة استدعاء self.fp.same_as_reject (معامل واحد، extra_literals=…) إلى مجموعة
+<span class="ln" id="L483">483</span>        if rejected and how != &quot;redirect&quot; and resp.is_redirect():  # شرط مركّب (و)
+<span class="ln" id="L484">484</span>            # لا يمكن أن يكون الردّ «مثل صفحة الرفض» ويخرج بالمتصفح
+<span class="ln" id="L485">485</span>            # من البوابة في الوقت نفسه: الراوتر يردّ بشيء آخر
+<span class="ln" id="L486">486</span>            # على هذه البطاقة. تسمية ذلك رفضاً عادياً هي كيف تضيع
+<span class="ln" id="L487">487</span>            # بطاقة عاملة، لذلك تذهب إلى المراجعة
+<span class="ln" id="L488">488</span>            # — مع السبب والوجهة مكتوبين.
+<span class="ln" id="L489">489</span>            host = _host(loc)  # إسناد نتيجة استدعاء _host (معامل واحد) إلى host
+<span class="ln" id="L490">490</span>            if host and host != self.portal_host:  # شرط مركّب (و)
+<span class="ln" id="L491">491</span>                return Verdict(&quot;UNKNOWN&quot;,  # إرجاع Verdict(&#x27;UNKNOWN&#x27;, &#x27;redirect_out_of_portal_but_page_matches&#x27;, 0.0, data=قاموس, evidence=resp.as_dict())
+<span class="ln" id="L492">492</span>                               &quot;redirect_out_of_portal_but_page_matches&quot;,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L493">493</span>                               0.0,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L494">494</span>                               data={&quot;location&quot;: loc[:200], &quot;how&quot;: how,  # المعامل المسمّى data
+<span class="ln" id="L495">495</span>                                     &quot;similarity&quot;: round(sim, 3)},  # مفتاح similarity في القاموس
+<span class="ln" id="L496">496</span>                               evidence=resp.as_dict())  # المعامل المسمّى evidence
+<span class="ln" id="L497">497</span>        if rejected:  # شرط: rejected
+<span class="ln" id="L498">498</span>            seen_ok = [w for w in self.success_words if w in low or w in raw_low]  # بناء اشتقاق قائمة وإسناده إلى seen_ok
+<span class="ln" id="L499">499</span>            if seen_ok and how != &quot;exact&quot;:  # شرط مركّب (و)
+<span class="ln" id="L500">500</span>                # الصفحة تطابق شكل الرفض، لكن كلمات تعلّمناها
+<span class="ln" id="L501">501</span>                # من بطاقة عاملة موجودة ⇒ دَع إنساناً ينظر إليها
+<span class="ln" id="L502">502</span>                return Verdict(&quot;UNKNOWN&quot;, &quot;looks_rejected_but_success_words_found&quot;,  # إرجاع Verdict(&#x27;UNKNOWN&#x27;, &#x27;looks_rejected_but_success_words_found&#x27;, 0.0, data=قاموس, evidence=resp.as_dict())
+<span class="ln" id="L503">503</span>                               0.0, data={&quot;words&quot;: seen_ok[:6]},  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L504">504</span>                               evidence=resp.as_dict())  # المعامل المسمّى evidence
+<span class="ln" id="L505">505</span>            return Verdict(&quot;REJECTED&quot;, f&quot;same_as_rejection_page_{how}&quot;, 1.0,  # إرجاع Verdict(&#x27;REJECTED&#x27;, نص منسّق (f-string), 1.0, data=قاموس, evidence=resp.as_dict())
+<span class="ln" id="L506">506</span>                           data={&quot;similarity&quot;: round(sim, 3)},  # المعامل المسمّى data
+<span class="ln" id="L507">507</span>                           evidence=resp.as_dict())  # المعامل المسمّى evidence
+<span class="ln" id="L508">508</span> 
+<span class="ln" id="L509">509</span>        # --- أُضيف كابتشا / تحد ---------------------------
+<span class="ln" id="L510">510</span>        if any(w in raw_low for w in (&quot;captcha&quot;, &quot;g-recaptcha&quot;, &quot;hcaptcha&quot;)):  # شرط: نتيجة any(مولّد)
+<span class="ln" id="L511">511</span>            return Verdict(&quot;CHALLENGE&quot;, &quot;captcha_present&quot;, 0.6,  # إرجاع Verdict(&#x27;CHALLENGE&#x27;, &#x27;captcha_present&#x27;, 0.6, evidence=resp.as_dict())
+<span class="ln" id="L512">512</span>                           evidence=resp.as_dict())  # المعامل المسمّى evidence
+<span class="ln" id="L513">513</span> 
+<span class="ln" id="L514">514</span>        # --- دليل إيجابي: البوابة أخرجتنا ---------------------
+<span class="ln" id="L515">515</span>        if resp.is_redirect():  # شرط: نتيجة resp.is_redirect()
+<span class="ln" id="L516">516</span>            host = _host(loc)  # إسناد نتيجة استدعاء _host (معامل واحد) إلى host
+<span class="ln" id="L517">517</span>            if host and host != self.portal_host:  # شرط مركّب (و)
+<span class="ln" id="L518">518</span>                marker = self._has_any(loc.lower(), self.exit_markers)  # إسناد نتيجة استدعاء self._has_any (2 معاملات) إلى marker
+<span class="ln" id="L519">519</span>                if not marker and self._has_any(loc.lower(),  # شرط مركّب (و)
+<span class="ln" id="L520">520</span>                                                config.PORTAL_URL_WORDS):  # تكملة تعريف متعدد الأسطر
+<span class="ln" id="L521">521</span>                    # صفحة أخرى من نفس البوابة — ليس خروجاً، وليس
+<span class="ln" id="L522">522</span>                    # شيئاً يجوز أن نسميه بطاقة عاملة أيضاً
+<span class="ln" id="L523">523</span>                    return Verdict(&quot;UNKNOWN&quot;, &quot;redirect_to_another_portal_page&quot;,  # إرجاع Verdict(&#x27;UNKNOWN&#x27;, &#x27;redirect_to_another_portal_page&#x27;, 0.0, data=قاموس, evidence=resp.as_dict())
+<span class="ln" id="L524">524</span>                                   0.0, data={&quot;location&quot;: loc[:200]},  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L525">525</span>                                   evidence=resp.as_dict())  # المعامل المسمّى evidence
+<span class="ln" id="L526">526</span>                confident = 0.95 if marker else 0.85  # إسناد 0.95 إن marker وإلا 0.85 إلى confident
+<span class="ln" id="L527">527</span>                return Verdict(&quot;ACCEPTED&quot;, &quot;redirect_out_of_portal&quot;, confident,  # إرجاع Verdict(&#x27;ACCEPTED&#x27;, &#x27;redirect_out_of_portal&#x27;, confident, data=قاموس, evidence=resp.as_dict())
+<span class="ln" id="L528">528</span>                               data={&quot;location&quot;: loc[:200]},  # المعامل المسمّى data
+<span class="ln" id="L529">529</span>                               evidence=resp.as_dict())  # المعامل المسمّى evidence
+<span class="ln" id="L530">530</span>            # الراوتر يرسلنا إلى مكان غير الذي يرسل إليه بطاقة
+<span class="ln" id="L531">531</span>            # خاطئة — هذا دليل حقيقي، حتى لو كانت الوجهة صفحة
+<span class="ln" id="L532">532</span>            # حالته هو (لا يكفي وحده أبداً لإيقاف تشغيل)
+<span class="ln" id="L533">533</span>            if self.fp.reject_location_key and resp.is_redirect():  # شرط مركّب (و)
+<span class="ln" id="L534">534</span>                if _loc_key(loc) != self.fp.reject_location_key:  # شرط: _loc_key(loc) لا يساوي self.fp.reject_location_key
+<span class="ln" id="L535">535</span>                    return Verdict(&quot;ACCEPTED&quot;, &quot;redirect_differs_from_rejection&quot;,  # إرجاع Verdict(&#x27;ACCEPTED&#x27;, &#x27;redirect_differs_from_rejection&#x27;, 0.7, data=قاموس, evidence=resp.as_dict())
+<span class="ln" id="L536">536</span>                                   0.7, data={&quot;location&quot;: loc[:200]},  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L537">537</span>                                   evidence=resp.as_dict())  # المعامل المسمّى evidence
+<span class="ln" id="L538">538</span>            if self.success_url_contains and self.success_url_contains in loc.lower():  # شرط مركّب (و)
+<span class="ln" id="L539">539</span>                return Verdict(&quot;ACCEPTED&quot;, &quot;success_url_contains&quot;, 0.9,  # إرجاع Verdict(&#x27;ACCEPTED&#x27;, &#x27;success_url_contains&#x27;, 0.9, data=قاموس, evidence=resp.as_dict())
+<span class="ln" id="L540">540</span>                               data={&quot;location&quot;: loc[:200]},  # المعامل المسمّى data
+<span class="ln" id="L541">541</span>                               evidence=resp.as_dict())  # المعامل المسمّى evidence
+<span class="ln" id="L542">542</span> 
+<span class="ln" id="L543">543</span>        # --- دليل إيجابي: كلمات نجاح متعلَّمة ---------------------
+<span class="ln" id="L544">544</span>        seen = [w for w in self.success_words if w in low or w in raw_low]  # بناء اشتقاق قائمة وإسناده إلى seen
+<span class="ln" id="L545">545</span>        if len(seen) &gt;= 1 and not self._has_phrase(low, self.reject_phrases):  # شرط مركّب (و)
+<span class="ln" id="L546">546</span>            return Verdict(&quot;ACCEPTED&quot;, &quot;learned_success_words&quot;,  # إرجاع Verdict(&#x27;ACCEPTED&#x27;, &#x27;learned_success_words&#x27;, min(0.9, جمع), data=قاموس, evidence=resp.as_dict())
+<span class="ln" id="L547">547</span>                           min(0.9, 0.6 + 0.1 * len(seen)),  # عنصر في القائمة/المعاملات (يتبعه المزيد)
+<span class="ln" id="L548">548</span>                           data={&quot;words&quot;: seen[:6]}, evidence=resp.as_dict())  # المعامل المسمّى data
+<span class="ln" id="L549">549</span> 
+<span class="ln" id="L550">550</span>        if self.success_url_contains and self.success_url_contains in resp.url.lower():  # شرط مركّب (و)
+<span class="ln" id="L551">551</span>            return Verdict(&quot;ACCEPTED&quot;, &quot;success_url_contains&quot;, 0.9,  # إرجاع Verdict(&#x27;ACCEPTED&#x27;, &#x27;success_url_contains&#x27;, 0.9, data=قاموس, evidence=resp.as_dict())
+<span class="ln" id="L552">552</span>                           data={&quot;url&quot;: resp.url[:200]}, evidence=resp.as_dict())  # المعامل المسمّى data
+<span class="ln" id="L553">553</span> 
+<span class="ln" id="L554">554</span>        # --- كلمات إيجابية خاصة بصفحة *جيدة* -----------
+<span class="ln" id="L555">555</span>        accept_hit = self._has_phrase(low, self.accept_phrases)  # إسناد نتيجة استدعاء self._has_phrase (2 معاملات) إلى accept_hit
+<span class="ln" id="L556">556</span>        reject_hit = self._has_phrase(low, self.reject_phrases)  # إسناد نتيجة استدعاء self._has_phrase (2 معاملات) إلى reject_hit
+<span class="ln" id="L557">557</span>        if accept_hit and not reject_hit:  # شرط مركّب (و)
+<span class="ln" id="L558">558</span>            return Verdict(&quot;ACCEPTED&quot;, &quot;welcome_words&quot;, 0.7,  # إرجاع Verdict(&#x27;ACCEPTED&#x27;, &#x27;welcome_words&#x27;, 0.7, data=قاموس, evidence=resp.as_dict())
+<span class="ln" id="L559">559</span>                           data={&quot;word&quot;: accept_hit}, evidence=resp.as_dict())  # المعامل المسمّى data
+<span class="ln" id="L560">560</span> 
+<span class="ln" id="L561">561</span>        # --- ليست صفحة الرفض، وليست نجاحاً مثبتاً --------------
+<span class="ln" id="L562">562</span>        diff = diff_words(body, self.fp.reject_text)  # إسناد نتيجة استدعاء diff_words (2 معاملات) إلى diff
+<span class="ln" id="L563">563</span>        if reject_hit:  # شرط: reject_hit
+<span class="ln" id="L564">564</span>            # صفحة رفض متغيّرة لا نستطيع مقارنتها بدقة
+<span class="ln" id="L565">565</span>            return Verdict(&quot;REJECTED&quot;, &quot;rejection_wording&quot;, 0.75,  # إرجاع Verdict(&#x27;REJECTED&#x27;, &#x27;rejection_wording&#x27;, 0.75, data=قاموس, evidence=resp.as_dict())
+<span class="ln" id="L566">566</span>                           data={&quot;word&quot;: reject_hit}, evidence=resp.as_dict())  # المعامل المسمّى data
+<span class="ln" id="L567">567</span> 
+<span class="ln" id="L568">568</span>        return Verdict(&quot;UNKNOWN&quot;, &quot;reply_differs_not_proven&quot;, 0.0,  # إرجاع Verdict(&#x27;UNKNOWN&#x27;, &#x27;reply_differs_not_proven&#x27;, 0.0, data=قاموس, evidence=resp.as_dict())
+<span class="ln" id="L569">569</span>                       data={&quot;diff&quot;: diff, &quot;similarity&quot;: round(sim, 3),  # المعامل المسمّى data
+<span class="ln" id="L570">570</span>                             &quot;status&quot;: resp.status, &quot;length&quot;: resp.length},  # مفتاح status في القاموس
+<span class="ln" id="L571">571</span>                       evidence=resp.as_dict())  # المعامل المسمّى evidence
+<span class="ln" id="L572">572</span> 
+<span class="ln" id="L573">573</span> 
+<span class="ln" id="L574">574</span>def _loc_key(url: str) -&gt; tuple:  # تعريف الدالة _loc_key(url) ترجع tuple
+<span class="ln" id="L575">575</span>    # بداية نص متعدد الأسطر — الأسطر التالية نصّ حرفي لا كود، فلا يقبل تعليقاً
+<span class="ln" id="L576">576</span>    &quot;&quot;&quot;The stable part of a redirect target: scheme + host + path.
+<span class="ln" id="L577">577</span> 
+<span class="ln" id="L578">578</span>    A router that answers &quot;wrong card&quot; with a redirect usually appends a
+<span class="ln" id="L579">579</span>    changing token or the guest&#x27;s own dst to the query string - comparing the
+<span class="ln" id="L580">580</span>    whole URL would call every reply different.
+<span class="ln" id="L581">581</span>    &quot;&quot;&quot;  # نهاية النص متعدد الأسطر
+<span class="ln" id="L582">582</span>    from urllib.parse import urlsplit  # استيراد urlsplit من الوحدة urllib.parse
+<span class="ln" id="L583">583</span>    try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L584">584</span>        parts = urlsplit(url or &quot;&quot;)  # إسناد نتيجة استدعاء urlsplit (معامل واحد) إلى parts
+<span class="ln" id="L585">585</span>    except Exception:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L586">586</span>        return ()  # إرجاع مجموعة
+<span class="ln" id="L587">587</span>    if not parts.netloc and not parts.path:  # شرط مركّب (و)
+<span class="ln" id="L588">588</span>        return ()  # إرجاع مجموعة
+<span class="ln" id="L589">589</span>    return (parts.scheme, parts.netloc.lower(), parts.path or &quot;/&quot;)  # إرجاع مجموعة
+<span class="ln" id="L590">590</span> 
+<span class="ln" id="L591">591</span> 
+<span class="ln" id="L592">592</span>def _host(url: str) -&gt; str:  # تعريف الدالة _host(url) ترجع str
+<span class="ln" id="L593">593</span>    from urllib.parse import urlsplit  # استيراد urlsplit من الوحدة urllib.parse
+<span class="ln" id="L594">594</span>    try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L595">595</span>        return (urlsplit(url).hostname or &quot;&quot;).lower()  # إرجاع urlsplit(url).hostname أو &#x27;&#x27;.lower()
+<span class="ln" id="L596">596</span>    except Exception:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L597">597</span>        return &quot;&quot;  # إرجاع &#x27;&#x27;
+<span class="ln" id="L598">598</span> 
+</code></pre></details>
+<script>
+document.getElementById("kp-jump").addEventListener("change", function (e) {
+  var n = parseInt(e.target.value, 10);
+  if (n > 0) { var el = document.getElementById("L" + n);
+    if (el) el.scrollIntoView({block: "center"}); }
+});
+if (location.hash) { var el = document.querySelector(location.hash);
+  if (el) setTimeout(function () { el.scrollIntoView({block: "center"}); }, 60); }
+</script>
+<footer class="docfoot">صفحة مولّدة آلياً من مصدر الكود · KiraPass —
+<code>files</code> · 2026-10-01 02:26</footer>
+</main>
+</div>
+<script src="../assets/docs.js"></script>
+<script>KPInit("files");</script>
+</body>
+</html>

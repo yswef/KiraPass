@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>حلّ المشكلات · KiraPass</title>
+<link rel="stylesheet" href="assets/docs.css">
+</head>
+<body>
+<div id="kp-layout">
+<main class="doc">
+
+<h1>حلّ المشكلات: من العَرَض إلى السبب إلى الحل</h1>
+<p class="lead">
+  الأداة لا تقول «فشل» وحسب: كل فشل له <b>مفتاح آلية</b> ثابت (يظهر في التقرير وفي سطر الأوامر)
+  ونصّ مترجم في الواجهة. هذه الصفحة مرتّبة حسب ما تراه أنت.
+</p>
+
+<div class="card info">
+  <b>أول ثلاث خطوات دائماً:</b>
+  <ol>
+    <li>افتح <b>سجل التشغيل</b> في الواجهة — آخر حدث <code>state</code> أو <code>report</code> فيه السبب.</li>
+    <li>افتح آخر تقرير في <code>kirapass_data/runs/</code> وانظر إلى
+        <code>result.stop_reason</code> و<code>calibration.error</code> و<code>net_kinds</code>.</li>
+    <li>جرّب نفس البروفايل على <code>tools/practice_portal.py</code>: إن نجح هناك فالمشكلة في
+        الشبكة/البوابة لا في الأداة.</li>
+  </ol>
+</div>
+
+<div class="toc card"><b>محتويات الصفحة</b><div class="toc-auto"></div></div>
+
+<h2 id="boot">١) الإقلاع والواجهة</h2>
+<table class="t">
+  <thead><tr><th>العَرَض</th><th>السبب</th><th>الحل</th></tr></thead>
+  <tbody>
+    <tr><td><code>Address already in use</code></td>
+        <td>منفذ 8770 مشغول (نسخة سابقة ما زالت تعمل)</td>
+        <td><code>--port 8771</code>، أو أوقف النسخة القديمة، أو زر «إغلاق الأداة» في الصفحة القديمة</td></tr>
+    <tr><td>المتصفح لا يفتح</td>
+        <td><code>--no-browser</code> أو <code>KIRAPASS_NO_BROWSER</code> أو بيئة بلا واجهة رسومية</td>
+        <td>افتح الرابط المطروح في الطرفية يدوياً</td></tr>
+    <tr><td>الصفحة تطلب رمزاً ولا أعرفه</td>
+        <td>الرمز يُطبع <b>مرة واحدة</b> في الطرفية عند الإقلاع</td>
+        <td>انسخه من الطرفية؛ أو شغّل بـ<code>--token kirapass</code> (محلياً فقط)</td></tr>
+    <tr><td>من جهاز آخر: <code>401 unauthorized</code></td>
+        <td>الطلب من غير العموم المحلي بلا رمز صحيح</td>
+        <td>أضف الرمز في الصفحة. وإن كنت على نفس الجهاز فاعلم أن العميل المحلي مسموح دائماً —
+            أي 401 محلي يعني أن الطلب جاء من عنوان غير <code>127.0.0.1/::1</code></td></tr>
+    <tr><td>«الأداة توقفت» في منتصف العمل</td>
+        <td>السيرفر أُغلق (زر الإغلاق، إغلاق الطرفية، انهيار)</td>
+        <td>الصفحة لا تتجمد بل تعرض نافذة صريحة. <code>hits.txt</code> والتقارير محفوظة على القرص —
+            أعد التشغيل وستجد ما وُجد</td></tr>
+    <tr><td>لا شيء يُكتب على القرص</td>
+        <td>مجلد المشروع غير قابل للكتابة</td>
+        <td><code>atomic_write</code> يبتلع <code>OSError</code> عمداً حتى لا يسقط التشغيل؛
+            تحقّق من صلاحيات المجلد</td></tr>
+  </tbody>
+</table>
+
+<h2 id="scan">٢) الفحص الأول (قراءة صفحة الدخول)</h2>
+<table class="t">
+  <thead><tr><th>العَرَض</th><th>السبب</th><th>الحل</th></tr></thead>
+  <tbody>
+    <tr><td>«لم يُعثر على نموذج دخول»</td>
+        <td>الرابط ليس صفحة الدخول (موقع عادي، أو صفحة حالة)</td>
+        <td>انسخ الرابط من شريط المتصفح وأنت <b>خلف الجدار</b>، أو استخدم المسجّل</td></tr>
+    <tr><td>الحالة «متصل» قبل أن تدخل أي كرت</td>
+        <td>الجهاز متصل من شبكة أخرى (واي‑فاي آخر، بيانات جوال)</td>
+        <td>افصل الشبكة الأخرى. الأداة لن تخمّن وأنت متصل أصلاً — وستقول
+            <code>accepted_internet_already_open</code> إن وجدت «إصابة»</td></tr>
+    <tr><td>«لا يمكن أتمتة هذه البوابة» (<code>needs_browser_js</code>)</td>
+        <td>البوابة تحوّل كلمة المرور بـJavaScript غير معروف (تشفير مخصص)</td>
+        <td>هذا <b>قرار مقصود</b>: الأداة لا تنفّذ JS مجهولاً ولا تدّعي ما لا تعرفه.
+            سجّل الدخول يدوياً في المسجّل وصدّر <code>curl</code> لتدرسه</td></tr>
+    <tr><td>فحص الإنترنت يقول OFFLINE وأنت خلف البوابة</td>
+        <td>مواقع الفحص الثلاثة محجوبة في شبكتك</td>
+        <td>اضبط <code>KIRAPASS_INTERNET_CHECKS</code> أو «موقع فحص إضافي» في الإعدادات
+            (راجع <a href="env.html">البيئة</a>)</td></tr>
+    <tr><td>اسم حقل المستخدم/كلمة المرور خاطئ</td>
+        <td>بوابة بأسماء غريبة، أو أكثر من نموذج في الصفحة</td>
+        <td>عدّله يدوياً في خطوة «الصيغة». <code>parse_form</code> يختار أعلى نموذج تسجيلاً
+            ثم يسقط على <code>username</code>/<code>password</code></td></tr>
+  </tbody>
+</table>
+
+<h2 id="calibration">٣) المعايرة — كل خطأ معناه</h2>
+<p>المعايرة تسلسل خطوات؛ أي خطوة تفشل ⇒ <code>calibration.error</code> ولا يبدأ التخمين.
+الخطوات بالترتيب: <code>profile_valid</code> → <code>reach_login_page</code> →
+<code>internet_state</code> → (<code>known_card_preflight</code> → <code>shape_tuned</code>) →
+<code>rejection_probe</code> → <code>rejection_baseline</code> →
+(<code>probe_looked_accepted</code>).</p>
+
+<table class="t">
+  <thead><tr><th>المفتاح</th><th>ما يعنيه حرفياً</th><th>ماذا تفعل</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">card_space_empty</td>
+        <td>الصيغة لا تنتج أي بطاقة: الطول ≤ البادئة+اللاحقة، أو أبجدية فيها رمز واحد</td>
+        <td>صحّح الطول أو البادئة. المشكلة تُعرض أيضاً في <code>problems</code> قبل المعايرة</td></tr>
+    <tr><td class="mono">net_&lt;kind&gt;</td>
+        <td>لم نصل إلى صفحة الدخول أصلاً: <code>net_dns</code>, <code>net_refused</code>,
+            <code>net_connect_timeout</code>, <code>net_unreachable</code>, <code>net_tls</code>, …</td>
+        <td>انظر جدول أنواع الأخطاء أدناه — المشكلة في الاتصال لا في الكروت</td></tr>
+    <tr><td class="mono">blocked_already</td>
+        <td>البوابة تحجبنا <b>قبل أن نرسل أي بطاقة</b></td>
+        <td>هذا ليس ذنب التشغيل. اطلب من مسؤول الشبكة رفع الحجب عن جهازك،
+            ولا تعد المحاولة — الأداة ترفض المتابعة عمداً</td></tr>
+    <tr><td class="mono">captcha_challenge</td>
+        <td>ظهر اختبار بشري في صفحة الدخول</td>
+        <td>الأداة لا تحلّ كابتشا. ادخل يدوياً مرة لتجاوزها ثم أعد الفحص</td></tr>
+    <tr><td class="mono">known_card_out_of_format</td>
+        <td>البطاقة المعروفة التي أعطيتنا إياها لا تطابق الصيغة التي ستُخمَّن
+            (طول/بادئة/أبجدية مختلفة)</td>
+        <td>إما صحّح الصيغة لتطابق بطاقتك، أو لا تعطِ بطاقة معروفة. التخمين بصيغة لا تشبه
+            بطاقتك لا معنى له</td></tr>
+    <tr><td class="mono">known_card_not_proven</td>
+        <td>جرّبنا البطاقة المعروفة بكل التركيبات المعقولة (حتى 8 طلبات) ولم يثبت أنها فتحت الإنترنت</td>
+        <td>إما البطاقة مستهلكة/منتهية، أو شكل الطلب ما زال خاطئاً.
+            سجّل الدخول يدوياً في المسجّل وقارن <b>شكل الطلب</b> المعروض هناك بما عندك</td></tr>
+    <tr><td class="mono">logout_unconfirmed</td>
+        <td>البطاقة نجحت لكن الجهاز لم يعد خلف البوابة بعد تسجيل الخروج</td>
+        <td>خطير: قد تكون بطاقتك ما زالت مستهلكة. ادخل صفحة الراوتر واخرج يدوياً،
+            ثم أعد المحاولة. الأداة لا تخمّن في هذه الحالة أبداً</td></tr>
+    <tr><td class="mono">no_rejection_baseline</td>
+        <td>أرسلنا البطاقات التجريبية لكن الردود لم تكن متسقة كفاية لبناء «شكل صفحة الرفض»</td>
+        <td>غالباً لأن البوابة تردّ بشيء مختلف لكل طلب (أو تردّ 400).
+            انظر <code>reason_counts</code>: إن كان <code>r_reply_differs_not_proven</code>
+            مرتفعاً فالصفحة غير مستقرة</td></tr>
+    <tr><td class="mono">request_shape_rejected</td>
+        <td>البوابة ترفض <b>شكل</b> الطلب (عادة HTTP 400) لا البطاقة</td>
+        <td>ترويسة ناقصة، أو حقل <code>dst</code>/<code>popup</code> مطلوب،
+            أو الرابط يجب أن يكون الرابط المنسوخ من المتصفح. جرّب
+            «تفعيل/إيقاف dst وpopup» و<code>pass_mode</code> مختلفاً، أو استخدم المسجّل</td></tr>
+    <tr><td class="mono">probe_looked_accepted</td>
+        <td>بطاقة تجريبية <b>خاطئة</b> بدت مقبولة — أي أننا كدنا نتعلّم صفحة النجاح كصفحة رفض</td>
+        <td>ليست مشكلة: الأداة تُخرج تلك العيّنة وتعيد التعلّم. إن تكرّر كثيراً فالبوابة
+            تردّ بنفس الصفحة لكل شيء، وستحتاج بطاقة معروفة لتعلّم كلمات النجاح</td></tr>
+    <tr><td class="mono">calibration_failed</td> (سبب توقف)
+        <td>المعايرة فشلت فرفض المحرك بدء التخمين</td>
+        <td>السبب الحقيقي في <code>calibration.error</code> أعلاه</td></tr>
+  </tbody>
+</table>
+
+<h2 id="stop">٤) التشغيل — كل سبب توقف</h2>
+<table class="t">
+  <thead><tr><th><code>stop_reason</code></th><th>ماذا حدث</th><th>هل هذا جيد؟</th><th>ماذا تفعل</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">found_verified</td>
+        <td>بطاقة قُبلت <b>وثبت</b> فتح الإنترنت</td><td class="ok">نعم — أفضل نتيجة</td>
+        <td>البطاقة في <code>hits.txt</code>. لاحظ أن التشغيل يتوقف فوراً حتى لو أطفأت الإيقاف التلقائي</td></tr>
+    <tr><td class="mono">found_strong_evidence</td>
+        <td>دليل قوي (تحويل خارج البوابة أو كلمات نجاح متعلَّمة) بثقة ≥0.85</td>
+        <td class="ok">نعم، لكن غير مؤكد</td>
+        <td>جرّب البطاقة في المتصفح. إن عملت فهي صالحة</td></tr>
+    <tr><td class="mono">internet_opened</td>
+        <td>المراقب لاحظ أن الجدار نزل أثناء التشغيل — <b>لكن لا يعرف أي بطاقة فعلتها</b></td>
+        <td class="warn">محتمل جداً</td>
+        <td>قائمة «المشتبه بها» (حتى 40 بطاقة، الأحدث أقرب) في التقرير.
+            جرّبها بالترتيب في المتصفح. هذا يحدث مع بوابات «تُدخلك وتردّ بصفحة الرفض»</td></tr>
+    <tr><td class="mono">attempts_done</td>
+        <td>انتهى عدد المحاولات الذي طلبته</td><td>محايد</td>
+        <td>زد العدد أو «تابع من حيث توقفت» — الموضع محفوظ في البروفايل</td></tr>
+    <tr><td class="mono">space_done</td>
+        <td>غُطّي الفضاء كله ولم توجد بطاقة</td><td>محايد (نتيجة نهائية)</td>
+        <td>راجع الصيغة: البادئة والطول والأبجدية. خطأ واحد فيها يعني أنك خمّنت فضاءً لا يحتوي بطاقتك</td></tr>
+    <tr><td class="mono">user_stop</td><td>أنت ضغطت «إيقاف»</td><td>—</td>
+        <td>المتابعة متاحة: <code>space_pos</code> حُفظ</td></tr>
+    <tr><td class="mono">banned_by_router</td>
+        <td>صفحة حجب أو HTTP 403</td><td class="bad">توقف أخلاقي</td>
+        <td>انظر «دليل الحظر» في التقرير وخذها لمسؤول الشبكة. <b>لا تستأنف تلقائياً</b> —
+            يلزم زر صريح + علامة تأكيد</td></tr>
+    <tr><td class="mono">rate_limited_by_router</td>
+        <td>HTTP 429/503 أو صفحة «أبطئ»</td><td class="bad">توقف أخلاقي</td>
+        <td>قلّل المسارات وأضف تأخيراً. الأداة تخفض الوتيرة تلقائياً قبل أن تصل إلى هنا</td></tr>
+    <tr><td class="mono">captcha_challenge</td><td>ظهر اختبار بشري</td><td class="bad">توقف</td>
+        <td>لا تتجاوزه آلياً. ادخل يدوياً مرة</td></tr>
+    <tr><td class="mono">target_unreachable</td>
+        <td>ثلاثة إخفاقات نقل متتالية، أو صمت 6 ثوانٍ، أو انفجار 20 خطأ</td><td class="bad">مشكلة اتصال</td>
+        <td>تحقّق أنك ما زالت متصلاً بشبكة الواي‑فاي نفسها وأن عنوان البوابة صحيح
+            (انظر <code>net_kinds</code> في التقرير)</td></tr>
+    <tr><td class="mono">calibration_failed</td><td>فشل المعايرة</td><td class="bad">—</td>
+        <td>راجع قسم المعايرة أعلاه</td></tr>
+    <tr><td class="mono">engine_error</td><td>استثناء غير متوقع داخل المحرك</td><td class="bad">عطل في الأداة</td>
+        <td><code>result.error</code> يحمل الرسالة. أبلغ عنها مع التقرير — هذا لا يجب أن يحدث</td></tr>
+  </tbody>
+</table>
+
+<h2 id="netkinds">٥) أنواع أخطاء الشبكة (<code>net_kinds</code>)</h2>
+<table class="t">
+  <thead><tr><th>النوع</th><th>يُعاد تلقائياً؟</th><th>معناه</th><th>ماذا تفعل</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">dns</td><td>لا</td><td>اسم العنوان لم يُترجم</td><td>استخدم IP البوابة مباشرة</td></tr>
+    <tr><td class="mono">refused</td><td>لا</td><td>الراوتر رفض الاتصال (بورت مغلق أو حماية)</td><td>تحقق من المنفذ في الرابط</td></tr>
+    <tr><td class="mono">connect_timeout</td><td>نعم</td><td>لا رد عند فتح الاتصال — الشبكة مقطوعة أو الراوتر مشغول</td><td>قلّل المسارات؛ إن استمر فالرابط ميت</td></tr>
+    <tr><td class="mono">read_timeout</td><td>نعم</td><td>الاتصال نجح لكن الرد لم يأتِ (ضغط أو RADIUS بطيء)</td><td>ارفع <code>KIRAPASS_READ_TIMEOUT</code> وقلّل المسارات</td></tr>
+    <tr><td class="mono">reset</td><td>نعم</td><td>قطع مفاجئ في منتصف الاتصال (حماية أو طرد عميل)</td><td>أضف تأخيراً وقلّل المسارات</td></tr>
+    <tr><td class="mono">stale</td><td>نعم</td><td>اتصال keep-alive أغلقه الراوتر — يُعاد بصمت مرة واحدة</td><td>طبيعي؛ لا يحتاج تدخلاً إلا إن كان كثيراً</td></tr>
+    <tr><td class="mono">tls</td><td>لا</td><td>خطأ شهادة</td><td>نادر لأن <code>VERIFY_TLS=False</code>؛ يعني عادة بروتوكول TLS قديم جداً</td></tr>
+    <tr><td class="mono">unreachable</td><td>لا</td><td>لا طريق إلى الشبكة</td><td>لست متصلاً بشبكة البوابة</td></tr>
+    <tr><td class="mono">bad_response</td><td>نعم</td><td>رد HTTP غير مقروء</td><td>غالباً راوتر مقطوع؛ إن تكرر استخدم رابط المتصفح المنسوخ</td></tr>
+    <tr><td class="mono">too_many_redirects</td><td>لا</td><td>دوران تحويل (&gt;8)</td><td>الرابط خاطئ أو البوابة في حلقة</td></tr>
+    <tr><td class="mono">proto</td><td>لا</td><td>بروتوكول غير مدعوم</td><td>الرابط ليس http/https</td></tr>
+    <tr><td class="mono">no_session</td><td>نعم</td><td>لم نستطع أخذ صفحة الدخول ⇒ <b>البطاقة لم تُجرَّب</b></td><td>لا يُحسب تغطية. إن تكرر فالإحماء يفشل (راوتر يتطلب كوكي/رمزاً)</td></tr>
+    <tr><td class="mono">unknown</td><td>نعم</td><td>استثناء غير مصنَّف</td><td>أبلغ عنه مع <code>text</code> من التقرير</td></tr>
+  </tbody>
+</table>
+
+<h2 id="results">٦) نتائج غريبة</h2>
+<table class="t">
+  <thead><tr><th>العَرَض</th><th>السبب الأرجح</th><th>الحل</th></tr></thead>
+  <tbody>
+    <tr><td>كل النتائج <code>REJECTED</code> ولم يجد شيئاً رغم أن معك بطاقة صالحة</td>
+        <td>الصيغة لا تنتج بطاقتك (بادئة/طول/أبجدية)</td>
+        <td>أعطِ بطاقتك كـ«بطاقة معروفة»: إن قال <code>known_card_out_of_format</code>
+            فستعرف المشكلة فوراً بالأرقام</td></tr>
+    <tr><td>كل النتائج <code>UNKNOWN</code></td>
+        <td>صفحة الرفض غير مستقرة (رمز يتغير كثيراً) ولم تُبنَ بصمة</td>
+        <td>افتح «صفحات المراجعة» وقارن صفحتين: ما الذي يختلف؟
+            ثم أعطِ بطاقة معروفة لتعلّم <code>success_words</code></td></tr>
+    <tr><td>إصابة لكن <code>accepted_internet_already_open</code></td>
+        <td>الجهاز كان متصلاً أصلاً، ففحص الإنترنت لا يثبت شيئاً</td>
+        <td>ليست كذبة — الأداة تصادق. افصل الشبكة الأخرى وأعد التشغيل</td></tr>
+    <tr><td>البوابة ردّت بصفحة الرفض لكن الإنترنت فتح فعلاً</td>
+        <td>بوابة <code>hide_success</code> — أخبث حالة في الواقع</td>
+        <td>هذا بالضبط عمل المراقب: توقّع <code>internet_opened</code> + قائمة مشتبه بها.
+            لا تلغي المراقب</td></tr>
+    <tr><td>أرقام بطاقات مكررة في السجل</td>
+        <td>المسار لم يتغير بين دورتين</td><td>تحقق أن <code>walk_a/walk_b</code> محفوظان؛
+            اختبار <code>test_walk_visits_everything_once</code> يحرس هذا</td></tr>
+    <tr><td>«تابع من حيث توقفت» بدأ من الصفر</td>
+        <td>البروفايل لم يُحفظ، أو الصيغة تغيّرت (فضاء مختلف)</td>
+        <td>احفظ البروفايل باسم ثابت. تغيير الطول/الأبجدية يعني فضاءً جديداً فالموضع لا معنى له</td></tr>
+    <tr><td>التشغيل الثاني أسرع/أبطأ كثيراً من الأول</td>
+        <td>ضبط الوتيرة التلقائي (AIMD) يغيّر المسارات والتأخير حسب ردود الراوتر</td>
+        <td>طبيعي. للأرقام المقارنة استخدم <code>KIRAPASS_AUTO_PACE=0</code></td></tr>
+    <tr><td>صفحة حجب ظهرت لكن الأداة سمّتها رفضاً</td>
+        <td>عبارة الحجب غير موجودة في <code>BAN_WORDS</code> بلغتك</td>
+        <td>أضف العبارة (كلمة كاملة!) — <a href="editing.html#recipe3">وصفة 3</a>،
+            ثم شغّل <code>BlockFalsePositiveTests</code></td></tr>
+    <tr><td>صفحة دخول عادية سُمّيت حجباً</td>
+        <td>كلمة حجب موجودة في تحذير داخل صفحة الدخول</td>
+        <td>الكود يعالج هذا (<code>_is_protective_reply</code> يتجاهل الكلمة إن كان نموذج
+            الدخول ظاهراً). إن حدث فأبلغ — هذا عطل</td></tr>
+  </tbody>
+</table>
+
+<h2 id="perf">٧) الأداء</h2>
+<table class="t">
+  <thead><tr><th>العَرَض</th><th>السبب</th><th>الحل</th></tr></thead>
+  <tbody>
+    <tr><td>سرعة أقل بكثير مما تتوقع</td>
+        <td>مهلة قراءة طويلة على راوتر بطيء، أو تأخير مفروض من ضبط الوتيرة</td>
+        <td>انظر <code>latency.avg/max</code> و<code>throttle_events</code> في التقرير:
+            إن كانت أحداث التباطؤ كثيرة فالراوتر يشتكي — قلّل المسارات بيدك</td></tr>
+    <tr><td>أكثر من 50 مسارة لا تزيد السرعة</td>
+        <td>عنق الزجاجة هو الراوتر لا الأداة</td>
+        <td>لا ترفع فوق 32 إلا إن كان القياس يثبت فائدة؛ <code>PACE_MAX_THREADS=32</code>
+            حدّ لما تضيفه الأداة بنفسه</td></tr>
+    <tr><td>الصفحة تتثاقل بعد ساعات</td>
+        <td>جدول السجل ممتلئ</td><td>يُحدّ بـ400 صف تلقائياً؛ حدّث الصفحة إن ثقلت</td></tr>
+    <tr><td>الإيقاف يستغرق ثواني</td>
+        <td>ينتظر تفريغ الطابور وإكمال الإعادة والمهام المعلّقة حتى لا يضيع حساب</td>
+        <td>طبيعي ومقصود — هذا ما يجعل <code>dropped</code> و<code>unevaluated</code> صادقين</td></tr>
+    <tr><td>استهلاك CPU مرتفع في الخمول</td>
+        <td>لا يجب أن يحدث: الاستطلاع كل 550ms والمهام كل 700ms والإحصاء مُخنَّق بـ400ms</td>
+        <td>إن حدث فأبلغ — هذا عطل</td></tr>
+  </tbody>
+</table>
+
+<h2 id="report">٨) كيف تقرأ التقرير لتشخّص بنفسك</h2>
+<p>افتح آخر ملف في <code>kirapass_data/runs/</code> وافتش هذه المفاتيح بالترتيب:</p>
+<table class="t compact">
+  <thead><tr><th>المفتاح</th><th>السؤال الذي يجيب عنه</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">result.stop_reason</td><td>لماذا انتهى؟</td></tr>
+    <tr><td class="mono">result.state</td><td>هل كان الجهاز خلف الجدار أصلاً؟</td></tr>
+    <tr><td class="mono">calibration.error + calibration.steps</td><td>أين بالضبط فشلت المعايرة؟</td></tr>
+    <tr><td class="mono">counters</td><td>كم رفضاً/إصابة/خطأ نقل/غير واضح؟</td></tr>
+    <tr><td class="mono">net_kinds</td><td>ما نوع الفشل الشبكي الغالب؟</td></tr>
+    <tr><td class="mono">reason_counts</td><td>بأي دليل حكم المحرك؟ (أسباب <code>r_*</code>)</td></tr>
+    <tr><td class="mono">progress.unevaluated + dropped</td><td>كم بطاقة لم تصلها إجابة فعلية؟</td></tr>
+    <tr><td class="mono">latency + speed</td><td>هل الراوتر بطيء؟</td></tr>
+    <tr><td class="mono">throttle_events</td><td>كم مرة اشتكى الراوتر وكم خفّضنا؟</td></tr>
+    <tr><td class="mono">ban_evidence</td><td>ما دليل الحجب الذي تذهب به للمسؤول؟</td></tr>
+    <tr><td class="mono">review_files</td><td>هل هناك صفحات غير واضحة تستحق النظر؟</td></tr>
+    <tr><td class="mono">profile_snapshot</td><td>ما الصيغة التي استُخدمت فعلاً (منقّحة)؟</td></tr>
+  </tbody>
+</table>
+
+<h2 id="escalate">٩) حين تحتاج إلى مسؤول الشبكة</h2>
+<p>جهّز له هذه الأربعة (لا تحتوي أسراراً):</p>
+<ol>
+  <li><code>ban_evidence</code> من التقرير (الحالة، العبارة، هل نموذج الدخول ما زال ظاهراً).</li>
+  <li><code>result.stop_reason</code> + <code>net_kinds</code>.</li>
+  <li>اسم البروفايل ورابط البوابة.</li>
+  <li>الوقت والتاريخ من اسم ملف التقرير.</li>
+</ol>
+<div class="danger">
+  <b>لا ترسل:</b> <code>hits.txt</code>، ولا لقطات شاشة فيها أرقام بطاقات،
+  ولا رمز الواجهة. لا شيء في التقارير يحتاجها.
+</div>
+
+<h2 id="still">١٠) ما زالت المشكلة قائمة؟</h2>
+<ol>
+  <li>أعد الإنتاج على <code>tools/practice_portal.py</code> بأعلام تحاكي حالتك
+      (<code>--ban-after</code>, <code>--drop-every</code>, <code>--session</code>, <code>--chap</code>).</li>
+  <li>شغّل <code>python3 -m unittest discover -s tests -v</code> وتأكد أن الأساس سليم.</li>
+  <li>فعّل <code>KIRAPASS_DEBUG=1</code> وانسخ آخر 30 طلباً من الطرفية.</li>
+  <li>أرفق: التقرير + سطر الأوامر + نسخة الأداة (<code>--version</code>) + نسخة بايثون
+      (<code>python3 --version</code>).</li>
+</ol>
+
+<footer class="docfoot">حلّ المشكلات · KiraPass — <code>docs/site/troubleshooting.html</code></footer>
+
+</main>
+</div>
+<script src="assets/docs.js"></script>
+<script>KPInit("troubleshooting");</script>
+</body>
+</html>

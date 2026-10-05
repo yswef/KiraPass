@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>مصدر KiraPass.py · KiraPass</title>
+<link rel="stylesheet" href="../assets/docs.css">
+
+</head>
+<body>
+<div id="kp-layout">
+<main class="doc">
+<h1>مصدر <code>KiraPass.py</code></h1>
+<p class="lead">نقطة الدخول: يشغّل الأداة من سطر الأوامر — 30 سطراً. كل سطر يحمل تعليقه العربي.</p>
+<div class="card info"><b>هذه الصفحة مولّدة آلياً</b> من مصدر الكود مباشرة (<code>tools/docs/build_docs.py</code>). إن غيّرت الكود فأعد توليدها: <code>python3 tools/docs/build_docs.py</code>. الشرح اليدوي الأوسع في <a href="../architecture.html">المعمارية</a> و<a href="../editing.html">دليل التعديل</a> و<a href="../danger.html">أماكن الخطر</a>.</div>
+<p><a class="btn" href="../files/kirapass-py.html">← صفحة الشرح</a> <label class="muted"> قفز إلى سطر: <input id="kp-jump" style="width:6rem" placeholder="123"></label></p>
+<details class="src" open><summary>المصدر كاملاً</summary><pre data-lines="30"><code>
+<span class="ln" id="L1">1</span>#!/usr/bin/env python3
+<span class="ln" id="L2">2</span># بداية نص متعدد الأسطر — الأسطر التالية نصّ حرفي لا كود، فلا يقبل تعليقاً
+<span class="ln" id="L3">3</span>&quot;&quot;&quot;KiraPass v5 — authorized hotspot / captive-portal security testing.
+<span class="ln" id="L4">4</span> 
+<span class="ln" id="L5">5</span>    python3 KiraPass.py                  # start the local page and open it
+<span class="ln" id="L6">6</span>    python3 KiraPass.py --selftest       # prove it works, no real network used
+<span class="ln" id="L7">7</span>    python3 KiraPass.py --clear-cache    # delete tool cache / review pages
+<span class="ln" id="L8">8</span>    python3 KiraPass.py --host 0.0.0.0   # also open it to your phone (token)
+<span class="ln" id="L9">9</span> 
+<span class="ln" id="L10">10</span>Everything else (the target, the card format, the load, the results) is
+<span class="ln" id="L11">11</span>answered in the browser page - see docs/README_AR.md or docs/README_EN.md.
+<span class="ln" id="L12">12</span> 
+<span class="ln" id="L13">13</span>Use only on networks you own or have written permission to test.
+<span class="ln" id="L14">14</span>&quot;&quot;&quot;  # نهاية النص متعدد الأسطر
+<span class="ln" id="L15">15</span> 
+<span class="ln" id="L16">16</span>import os  # استيراد الوحدة os من المكتبة
+<span class="ln" id="L17">17</span>import sys  # استيراد الوحدة sys من المكتبة
+<span class="ln" id="L18">18</span> 
+<span class="ln" id="L19">19</span>sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # استدعاء sys.path.insert (2 معاملات)
+<span class="ln" id="L20">20</span> 
+<span class="ln" id="L21">21</span># استيراد main من الوحدة kirapass.cli
+<span class="ln" id="L22">22</span>from kirapass.cli import main   # noqa: E402
+<span class="ln" id="L23">23</span> 
+<span class="ln" id="L24">24</span>if __name__ == &quot;__main__&quot;:  # شرط: __name__ يساوي &#x27;__main__&#x27;
+<span class="ln" id="L25">25</span>    try:  # بدايةtry محمية (يليها except/finally)
+<span class="ln" id="L26">26</span>        sys.exit(main())  # استدعاء sys.exit (معامل واحد)
+<span class="ln" id="L27">27</span>    except KeyboardInterrupt:  # تكملة السطر السابق داخل القوس
+<span class="ln" id="L28">28</span>        print(&quot;\n  stopped.&quot;)  # استدعاء print (معامل واحد)
+<span class="ln" id="L29">29</span>        sys.exit(0)  # استدعاء sys.exit (معامل واحد)
+<span class="ln" id="L30">30</span> 
+</code></pre></details>
+<script>
+document.getElementById("kp-jump").addEventListener("change", function (e) {
+  var n = parseInt(e.target.value, 10);
+  if (n > 0) { var el = document.getElementById("L" + n);
+    if (el) el.scrollIntoView({block: "center"}); }
+});
+if (location.hash) { var el = document.querySelector(location.hash);
+  if (el) setTimeout(function () { el.scrollIntoView({block: "center"}); }, 60); }
+</script>
+<footer class="docfoot">صفحة مولّدة آلياً من مصدر الكود · KiraPass —
+<code>files</code> · 2026-10-01 02:26</footer>
+</main>
+</div>
+<script src="../assets/docs.js"></script>
+<script>KPInit("files");</script>
+</body>
+</html>

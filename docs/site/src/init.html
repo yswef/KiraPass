@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>مصدر __init__.py · KiraPass</title>
+<link rel="stylesheet" href="../assets/docs.css">
+
+</head>
+<body>
+<div id="kp-layout">
+<main class="doc">
+<h1>مصدر <code>__init__.py</code></h1>
+<p class="lead">تعريف الحزمة ورقم النسخة — 16 سطراً. كل سطر يحمل تعليقه العربي.</p>
+<div class="card info"><b>هذه الصفحة مولّدة آلياً</b> من مصدر الكود مباشرة (<code>tools/docs/build_docs.py</code>). إن غيّرت الكود فأعد توليدها: <code>python3 tools/docs/build_docs.py</code>. الشرح اليدوي الأوسع في <a href="../architecture.html">المعمارية</a> و<a href="../editing.html">دليل التعديل</a> و<a href="../danger.html">أماكن الخطر</a>.</div>
+<p><a class="btn" href="../files/init.html">← صفحة الشرح</a> <label class="muted"> قفز إلى سطر: <input id="kp-jump" style="width:6rem" placeholder="123"></label></p>
+<details class="src" open><summary>المصدر كاملاً</summary><pre data-lines="16"><code>
+<span class="ln" id="L1">1</span># بداية نص متعدد الأسطر — الأسطر التالية نصّ حرفي لا كود، فلا يقبل تعليقاً
+<span class="ln" id="L2">2</span>&quot;&quot;&quot;KiraPass - authorized captive-portal / hotspot security testing tool.
+<span class="ln" id="L3">3</span> 
+<span class="ln" id="L4">4</span>Public API (small on purpose):
+<span class="ln" id="L5">5</span> 
+<span class="ln" id="L6">6</span>    from kirapass import engine, store
+<span class="ln" id="L7">7</span>    cal = engine.calibrate(profile, known_card=&quot;0201242548&quot;)
+<span class="ln" id="L8">8</span>    eng = engine.Engine(store.Store())
+<span class="ln" id="L9">9</span>    eng.start(profile, attempts=500, threads=8)
+<span class="ln" id="L10">10</span>&quot;&quot;&quot;  # نهاية النص متعدد الأسطر
+<span class="ln" id="L11">11</span> 
+<span class="ln" id="L12">12</span>from .config import APP_NAME, VERSION  # استيراد APP_NAME, VERSION من الوحدة config
+<span class="ln" id="L13">13</span> 
+<span class="ln" id="L14">14</span>__all__ = [&quot;APP_NAME&quot;, &quot;VERSION&quot;]  # إسناد قائمة إلى __all__
+<span class="ln" id="L15">15</span>__version__ = VERSION  # إسناد VERSION إلى __version__
+<span class="ln" id="L16">16</span> 
+</code></pre></details>
+<script>
+document.getElementById("kp-jump").addEventListener("change", function (e) {
+  var n = parseInt(e.target.value, 10);
+  if (n > 0) { var el = document.getElementById("L" + n);
+    if (el) el.scrollIntoView({block: "center"}); }
+});
+if (location.hash) { var el = document.querySelector(location.hash);
+  if (el) setTimeout(function () { el.scrollIntoView({block: "center"}); }, 60); }
+</script>
+<footer class="docfoot">صفحة مولّدة آلياً من مصدر الكود · KiraPass —
+<code>files</code> · 2026-10-01 02:26</footer>
+</main>
+</div>
+<script src="../assets/docs.js"></script>
+<script>KPInit("files");</script>
+</body>
+</html>

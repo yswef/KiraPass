@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ملف engine.py · KiraPass</title>
+<link rel="stylesheet" href="../assets/docs.css">
+
+</head>
+<body>
+<div id="kp-layout">
+<main class="doc">
+<h1>ملف <code>engine.py</code></h1>
+<p class="lead">المحرك: المعايرة، التشغيل، الخيوط، المراقب، التقرير — <code>kirapass/engine.py</code></p>
+<div class="card info"><b>هذه الصفحة مولّدة آلياً</b> من مصدر الكود مباشرة (<code>tools/docs/build_docs.py</code>). إن غيّرت الكود فأعد توليدها: <code>python3 tools/docs/build_docs.py</code>. الشرح اليدوي الأوسع في <a href="../architecture.html">المعمارية</a> و<a href="../editing.html">دليل التعديل</a> و<a href="../danger.html">أماكن الخطر</a>.</div>
+<div class="grid3"><div class="card"><b>2416</b><br>سطراً</div><div class="card"><b>63</b><br>دالة</div><div class="card"><b>2</b><br>صنف</div></div>
+<div class="note"><b>ملخّص المؤلف للملف (نصه الأصلي بالإنجليزية):</b> <span class="muted">The engine: calibrate, then try cards and report exactly what happened.</span></div>
+<p><a class="btn primary" href="../src/engine.html">افتح المصدر كاملاً مرقّماً</a></p>
+<h2 id="imports">الاستيرادات</h2><table class="t compact"><thead><tr><th>السطر</th><th>الاستيراد</th><th>لماذا</th></tr></thead><tbody>
+<tr><td class="mono">15</td><td class="mono">from __future__ import annotations</td><td>استيراد annotations من الوحدة __future__</td></tr>
+<tr><td class="mono">17</td><td class="mono">import hashlib</td><td>استيراد الوحدة hashlib من المكتبة</td></tr>
+<tr><td class="mono">18</td><td class="mono">import json</td><td>استيراد الوحدة json من المكتبة</td></tr>
+<tr><td class="mono">19</td><td class="mono">import os</td><td>استيراد الوحدة os من المكتبة</td></tr>
+<tr><td class="mono">20</td><td class="mono">import queue</td><td>استيراد الوحدة queue من المكتبة</td></tr>
+<tr><td class="mono">21</td><td class="mono">import random</td><td>استيراد الوحدة random من المكتبة</td></tr>
+<tr><td class="mono">22</td><td class="mono">import re</td><td>استيراد الوحدة re من المكتبة</td></tr>
+<tr><td class="mono">23</td><td class="mono">import threading</td><td>استيراد الوحدة threading من المكتبة</td></tr>
+<tr><td class="mono">24</td><td class="mono">import time</td><td>استيراد الوحدة time من المكتبة</td></tr>
+<tr><td class="mono">25</td><td class="mono">from collections import Counter, deque</td><td>استيراد Counter, deque من الوحدة collections</td></tr>
+<tr><td class="mono">26</td><td class="mono">from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit</td><td>استيراد parse_qsl, urlencode, urlsplit, urlunsplit من الوحدة urllib.parse</td></tr>
+<tr><td class="mono">28</td><td class="mono">from . import config, portals, verify</td><td>استيراد config, portals, verify من الوحدة .</td></tr>
+<tr><td class="mono">29</td><td class="mono">from .errors import classify</td><td>استيراد classify من الوحدة errors</td></tr>
+<tr><td class="mono">30</td><td class="mono">from .fingerprint import Fingerprinter, Judge, Verdict, find_phrase</td><td>استيراد Fingerprinter, Judge, Verdict, find_phrase من الوحدة fingerprint</td></tr>
+<tr><td class="mono">31</td><td class="mono">from .httpclient import Session</td><td>استيراد Session من الوحدة httpclient</td></tr>
+<tr><td class="mono">32</td><td class="mono">from . import store</td><td>استيراد store من الوحدة .</td></tr>
+</tbody></table>
+<h2 id="vars">متغيرات وثوابت على مستوى الوحدة</h2><div class="scroll-x"><table class="t compact"><thead><tr><th>الاسم</th><th>السطر</th><th>القيمة</th><th>الشرح</th></tr></thead><tbody>
+<tr><td class="mono"><span class="tag var">CALIBRATION_RETRYABLE</span></td><td class="mono"><a href="../src/engine.html#L988">988</a></td><td class="mono">(&#x27;stale&#x27;, &#x27;reset&#x27;, &#x27;read_timeout&#x27;, &#x27;connect_timeout&#x27;, &#x27;bad_response&#x27;, </td><td>إسناد مجموعة إلى CALIBRATION_RETRYABLE</td></tr>
+<tr><td class="mono"><span class="tag var">_REPORT_SECRET_FIELD</span></td><td class="mono"><a href="../src/engine.html#L1198">1198</a></td><td class="mono">re.compile(&#x27;(pass|pwd|pin|user|card|voucher|token|csrf|nonce|session|c</td><td>إسناد نتيجة استدعاء re.compile (2 معاملات) إلى _REPORT_SECRET_FIELD</td></tr>
+</tbody></table></div>
+<h2 id="classes">الأصناف</h2>
+<div class="sym head" id="c-Calibration"><span class="tag mod">صنف</span> <b>Calibration</b> <a class="tag api" href="../src/engine.html#L379">سطر 379</a><div>تعريف الصنف Calibration</div></div>
+<div class="sym body">دواله: <a href="#f-Calibration.__init__"><code>__init__</code></a> · <a href="#f-Calibration.step"><code>step</code></a> · <a href="#f-Calibration.as_dict"><code>as_dict</code></a></div>
+<div class="sym head" id="c-Engine"><span class="tag mod">صنف</span> <b>Engine</b> <a class="tag api" href="../src/engine.html#L1229">سطر 1229</a><div>تعريف الصنف Engine</div></div>
+<div class="sym body">دواله: <a href="#f-Engine.__init__"><code>__init__</code></a> · <a href="#f-Engine.emit"><code>emit</code></a> · <a href="#f-Engine.events_since"><code>events_since</code></a> · <a href="#f-Engine.status"><code>status</code></a> · <a href="#f-Engine.stop"><code>stop</code></a> · <a href="#f-Engine._wait"><code>_wait</code></a> · <a href="#f-Engine.start"><code>start</code></a> · <a href="#f-Engine._run"><code>_run</code></a> · <a href="#f-Engine._record_transport_health"><code>_record_transport_health</code></a> · <a href="#f-Engine._attempt"><code>_attempt</code></a> · <a href="#f-Engine._retry_later"><code>_retry_later</code></a> · <a href="#f-Engine._finish_retries"><code>_finish_retries</code></a> · <a href="#f-Engine._verify_hit"><code>_verify_hit</code></a> · <a href="#f-Engine._register_hit"><code>_register_hit</code></a> · <a href="#f-Engine._save_unknown"><code>_save_unknown</code></a> · <a href="#f-Engine._emit_attempt"><code>_emit_attempt</code></a> · <a href="#f-Engine._emit_net_error"><code>_emit_net_error</code></a> · <a href="#f-Engine._emit_stats"><code>_emit_stats</code></a> · <a href="#f-Engine.status_snapshot"><code>status_snapshot</code></a> · <a href="#f-Engine._apply_delay_pressure"><code>_apply_delay_pressure</code></a> · <a href="#f-Engine._maybe_decay_delay"><code>_maybe_decay_delay</code></a> · <a href="#f-Engine._auto_pace"><code>_auto_pace</code></a> · <a href="#f-Engine._add_workers"><code>_add_workers</code></a> · <a href="#f-Engine._start_watchdog"><code>_start_watchdog</code></a> · <a href="#f-Engine._check_stop_rules"><code>_check_stop_rules</code></a> · <a href="#f-Engine._save_report"><code>_save_report</code></a></div>
+<h2 id="funcs">الدوال — واحدة واحدة</h2>
+<div class="sym head" id="f-password_value"><span class="tag fn">دالة</span> <b>password_value(p, card)</b>
+ <a class="tag api" href="../src/engine.html#L38">سطر 38–60</a>
+<div>تعريف الدالة password_value(p, card) <span class="muted">(نص المؤلف الأصلي في docstring: Return the password value, or None when the field must be omitted.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>9 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>blob, chap, mode, raw</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-build_fields"><code>build_fields</code></a> <span class="muted">(engine.py:65)</span> <a href="../files/engine.html#f-submitted_values"><code>submitted_values</code></a> <span class="muted">(engine.py:190)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-build_fields"><span class="tag fn">دالة</span> <b>build_fields(p, card)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/engine.html#L63">سطر 63–81</a>
+<div>تعريف الدالة build_fields(p, card) ترجع dict</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>fields, pw, special_fields</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/engine.html#f-password_value"><code>password_value</code></a><span class="muted">×1 سطر 65 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-Calibration.as_dict"><code>Calibration.as_dict</code></a> <span class="muted">(engine.py:405)</span> <a href="../files/engine.html#f-_request_components"><code>_request_components</code></a> <span class="muted">(engine.py:137)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-_without_query_fields"><span class="tag fn">دالة</span> <b>_without_query_fields(url, names)</b>
+ <span class="muted">→ str</span>
+ <a class="tag api" href="../src/engine.html#L84">سطر 84–104</a>
+<div>تعريف الدالة _without_query_fields(url, names) ترجع str <span class="muted">(نص المؤلف الأصلي في docstring: Remove stale form values from a copied, already-submitted URL.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>parts, query, remove, url</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/portals.html#f-sanitize_login_url"><code>sanitize_login_url</code></a><span class="muted">×1 سطر 94</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-_request_components"><code>_request_components</code></a> <span class="muted">(engine.py:140)</span> <a href="../files/engine.html#f-browser_headers"><code>browser_headers</code></a> <span class="muted">(engine.py:213)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-_get_request_url"><span class="tag fn">دالة</span> <b>_get_request_url(p, fields)</b>
+ <span class="muted">→ str</span>
+ <a class="tag api" href="../src/engine.html#L107">سطر 107–133</a>
+<div>تعريف الدالة _get_request_url(p, fields) ترجع str <span class="muted">(نص المؤلف الأصلي في docstring: Build GET query pairs in the order the copied/form URL established.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>parts, source, submitted, url</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/portals.html#f-sanitize_login_url"><code>sanitize_login_url</code></a><span class="muted">×1 سطر 116</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-_request_components"><code>_request_components</code></a> <span class="muted">(engine.py:144)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-_request_components"><span class="tag fn">دالة</span> <b>_request_components(p, card)</b>
+ <a class="tag api" href="../src/engine.html#L136">سطر 136–145</a>
+<div>تعريف الدالة _request_components(p, card)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>fields, method, url</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/engine.html#f-build_fields"><code>build_fields</code></a><span class="muted">×1 سطر 137 (نفس الملف)</span> · <a href="../files/engine.html#f-_without_query_fields"><code>_without_query_fields</code></a><span class="muted">×1 سطر 140 (نفس الملف)</span> · <a href="../files/engine.html#f-_get_request_url"><code>_get_request_url</code></a><span class="muted">×1 سطر 144 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-safe_request_shape"><code>safe_request_shape</code></a> <span class="muted">(engine.py:172)</span> <a href="../files/engine.html#f-send_login"><code>send_login</code></a> <span class="muted">(engine.py:182)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-_safe_url_shape"><span class="tag fn">دالة</span> <b>_safe_url_shape(url, p)</b>
+ <span class="muted">→ str</span>
+ <a class="tag api" href="../src/engine.html#L148">سطر 148–166</a>
+<div>تعريف الدالة _safe_url_shape(url, p) ترجع str</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>low, netloc, parts, pass_name, safe_pairs, shown, user_name</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-_known_card_preflight"><code>_known_card_preflight</code></a> <span class="muted">(engine.py:926)</span> <a href="../files/engine.html#f-_known_card_preflight"><code>_known_card_preflight</code></a> <span class="muted">(engine.py:941)</span> <a href="../files/engine.html#f-_known_card_preflight"><code>_known_card_preflight</code></a> <span class="muted">(engine.py:970)</span> <a href="../files/engine.html#f-_tune_with_known_card"><code>_tune_with_known_card</code></a> <span class="muted">(engine.py:806)</span> <a href="../files/engine.html#f-_tune_with_known_card"><code>_tune_with_known_card</code></a> <span class="muted">(engine.py:819)</span> <a href="../files/engine.html#f-_tune_with_known_card"><code>_tune_with_known_card</code></a> <span class="muted">(engine.py:824)</span> <a href="../files/engine.html#f-_tune_with_known_card"><code>_tune_with_known_card</code></a> <span class="muted">(engine.py:857)</span> <a href="../files/engine.html#f-_tune_with_known_card"><code>_tune_with_known_card</code></a> <span class="muted">(engine.py:861)</span> <a href="../files/engine.html#f-_tune_with_known_card"><code>_tune_with_known_card</code></a> <span class="muted">(engine.py:896)</span> <a href="../files/engine.html#f-safe_request_shape"><code>safe_request_shape</code></a> <span class="muted">(engine.py:173)</span> <a href="../files/server.html#f-_safe_calibration_report"><code>_safe_calibration_report</code></a> <span class="muted">(server.py:54)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-safe_request_shape"><span class="tag fn">دالة</span> <b>safe_request_shape(p, card)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/engine.html#L170">سطر 170–175</a>
+<div>شكل الطلب كما يُعرض: [CARD] و[EMPTY] و[REDACTED] بدل القيم، وحذف userinfo@. <span class="muted">(نص المؤلف الأصلي في docstring: Describe the actual request without preserving card/token values.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/engine.html#f-_request_components"><code>_request_components</code></a><span class="muted">×1 سطر 172 (نفس الملف)</span> · <a href="../files/engine.html#f-_safe_url_shape"><code>_safe_url_shape</code></a><span class="muted">×1 سطر 173 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-_known_card_preflight"><code>_known_card_preflight</code></a> <span class="muted">(engine.py:908)</span> <a href="../files/engine.html#f-_tune_with_known_card"><code>_tune_with_known_card</code></a> <span class="muted">(engine.py:799)</span> <a href="../files/server.html#f-Handler._preview"><code>Handler._preview</code></a> <span class="muted">(server.py:577)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-send_login"><span class="tag fn">دالة</span> <b>send_login(session, p, card, timeout)</b>
+ <a class="tag api" href="../src/engine.html#L178">سطر 178–186</a>
+<div>تعريف الدالة send_login(session, p, card, timeout) <span class="muted">(نص المؤلف الأصلي في docstring: One login attempt. Redirects are NOT followed: we must see the)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/engine.html#f-_request_components"><code>_request_components</code></a><span class="muted">×1 سطر 182 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-Engine._attempt"><code>Engine._attempt</code></a> <span class="muted">(engine.py:1734)</span> <a href="../files/engine.html#f-_known_card_preflight"><code>_known_card_preflight</code></a> <span class="muted">(engine.py:910)</span> <a href="../files/engine.html#f-_sample"><code>_sample</code></a> <span class="muted">(engine.py:1118)</span> <a href="../files/engine.html#f-_sample.one"><code>_sample.one</code></a> <span class="muted">(engine.py:1118)</span> <a href="../files/engine.html#f-_tune_with_known_card"><code>_tune_with_known_card</code></a> <span class="muted">(engine.py:802)</span> <a href="../files/engine.html#f-calibrate"><code>calibrate</code></a> <span class="muted">(engine.py:600)</span> <a href="../files/engine.html#f-probe_lockout"><code>probe_lockout</code></a> <span class="muted">(engine.py:2323)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-submitted_values"><span class="tag fn">دالة</span> <b>submitted_values(p, card)</b>
+ <span class="muted">→ list</span>
+ <a class="tag api" href="../src/engine.html#L189">سطر 189–193</a>
+<div>تعريف الدالة submitted_values(p, card) ترجع list</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>values</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/engine.html#f-password_value"><code>password_value</code></a><span class="muted">×1 سطر 190 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-Engine._attempt"><code>Engine._attempt</code></a> <span class="muted">(engine.py:1761)</span> <a href="../files/engine.html#f-_tune_with_known_card"><code>_tune_with_known_card</code></a> <span class="muted">(engine.py:812)</span> <a href="../files/engine.html#f-calibrate"><code>calibrate</code></a> <span class="muted">(engine.py:662)</span> <a href="../files/engine.html#f-calibrate"><code>calibrate</code></a> <span class="muted">(engine.py:682)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-browser_headers"><span class="tag fn">دالة</span> <b>browser_headers(p, url)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/engine.html#L197">سطر 197–230</a>
+<div>ترويسات كما يرسلها المتصفح: Origin على POST فقط، وReferer منقّى. <span class="muted">(نص المؤلف الأصلي في docstring: The headers a browser would send with this request.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>h, method, parts, ref_url, ua</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/engine.html#f-_without_query_fields"><code>_without_query_fields</code></a><span class="muted">×1 سطر 213 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-Engine._run"><code>Engine._run</code></a> <span class="muted">(engine.py:1512)</span> <a href="../files/engine.html#f-_sample"><code>_sample</code></a> <span class="muted">(engine.py:1149)</span> <a href="../files/engine.html#f-calibrate"><code>calibrate</code></a> <span class="muted">(engine.py:484)</span> <a href="../files/engine.html#f-diagnose"><code>diagnose</code></a> <span class="muted">(engine.py:1015)</span> <a href="../files/engine.html#f-probe_lockout"><code>probe_lockout</code></a> <span class="muted">(engine.py:2286)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-new_session"><span class="tag fn">دالة</span> <b>new_session(timeout, for_attack, headers)</b>
+ <span class="muted">→ Session</span>
+ <a class="tag api" href="../src/engine.html#L233">سطر 233–239</a>
+<div>تعريف الدالة new_session(timeout, for_attack, headers) ترجع Session <span class="muted">(نص المؤلف الأصلي في docstring: A fresh session. `for_attack` uses the tighter login timeout.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>timeout</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/httpclient.html#f-Session"><code>Session</code></a><span class="muted">×1 سطر 238</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-Engine._run"><code>Engine._run</code></a> <span class="muted">(engine.py:1511)</span> <a href="../files/engine.html#f-Engine._start_watchdog"><code>Engine._start_watchdog</code></a> <span class="muted">(engine.py:2151)</span> <a href="../files/engine.html#f-Engine._start_watchdog.watch"><code>Engine._start_watchdog.watch</code></a> <span class="muted">(engine.py:2151)</span> <a href="../files/engine.html#f-_sample"><code>_sample</code></a> <span class="muted">(engine.py:1148)</span> <a href="../files/engine.html#f-calibrate"><code>calibrate</code></a> <span class="muted">(engine.py:484)</span> <a href="../files/engine.html#f-diagnose"><code>diagnose</code></a> <span class="muted">(engine.py:1015)</span> <a href="../files/engine.html#f-probe_lockout"><code>probe_lockout</code></a> <span class="muted">(engine.py:2286)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-absorb_form"><span class="tag fn">دالة</span> <b>absorb_form(p, html, url)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/engine.html#L244">سطر 244–294</a>
+<div>يأخذ أسماء الحقول والرابط والقيم المخفية من صفحة طازجة. if not form.inputs: return p مقصود: صفحة حجب لا تستبدل أسماء الحقول بالافتراضية. <span class="muted">(نص المؤلف الأصلي في docstring: Take what a freshly fetched login page is offering: field names, the)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>3 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>extra, form, fresh, out</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/portals.html#f-parse_form"><code>parse_form</code></a><span class="muted">×1 سطر 255</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-Engine._attempt"><code>Engine._attempt</code></a> <span class="muted">(engine.py:1766)</span> <a href="../files/engine.html#f-_known_card_preflight"><code>_known_card_preflight</code></a> <span class="muted">(engine.py:930)</span> <a href="../files/engine.html#f-_sample"><code>_sample</code></a> <span class="muted">(engine.py:1128)</span> <a href="../files/engine.html#f-_sample"><code>_sample</code></a> <span class="muted">(engine.py:1164)</span> <a href="../files/engine.html#f-_sample.one"><code>_sample.one</code></a> <span class="muted">(engine.py:1128)</span> <a href="../files/engine.html#f-_tune_with_known_card"><code>_tune_with_known_card</code></a> <span class="muted">(engine.py:814)</span> <a href="../files/engine.html#f-calibrate"><code>calibrate</code></a> <span class="muted">(engine.py:502)</span> <a href="../files/engine.html#f-calibrate"><code>calibrate</code></a> <span class="muted">(engine.py:624)</span> <a href="../files/engine.html#f-diagnose"><code>diagnose</code></a> <span class="muted">(engine.py:1034)</span> <a href="../files/engine.html#f-probe_lockout"><code>probe_lockout</code></a> <span class="muted">(engine.py:2298)</span> <a href="../files/engine.html#f-probe_lockout"><code>probe_lockout</code></a> <span class="muted">(engine.py:2353)</span> <a href="../files/engine.html#f-warm_up"><code>warm_up</code></a> <span class="muted">(engine.py:318)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-warm_up"><span class="tag fn">دالة</span> <b>warm_up(session, p, tries)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/engine.html#L299">سطر 299–321</a>
+<div>طلب صفحة الدخول لأخذ الكوكي والحقول المخفية. بلا صفحة ⇒ None ⇒ no_session والبطاقة لا تُرسل أصلاً (الإرسال بلا جلسة يقيس رفض الشكل لا رفض البطاقة). <span class="muted">(نص المؤلف الأصلي في docstring: Ask for the login page first, the way a browser does.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>resp</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/engine.html#f-absorb_form"><code>absorb_form</code></a><span class="muted">×1 سطر 318 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-Engine._run"><code>Engine._run</code></a> <span class="muted">(engine.py:1517)</span> <a href="../files/engine.html#f-Engine._run"><code>Engine._run</code></a> <span class="muted">(engine.py:1537)</span> <a href="../files/engine.html#f-Engine._run"><code>Engine._run</code></a> <span class="muted">(engine.py:1553)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-_ban_evidence"><span class="tag fn">دالة</span> <b>_ban_evidence(resp, login_url, word, stop, reason)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/engine.html#L324">سطر 324–346</a>
+<div>تعريف الدالة _ban_evidence(resp, login_url, word, stop, reason) ترجع dict <span class="muted">(نص المؤلف الأصلي في docstring: Structured stop evidence for the operator — never a bypass hint.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>body, has_form, status</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/portals.html#f-parse_form"><code>parse_form</code></a><span class="muted">×1 سطر 328</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-Engine._attempt"><code>Engine._attempt</code></a> <span class="muted">(engine.py:1791)</span> <a href="../files/engine.html#f-Engine._attempt"><code>Engine._attempt</code></a> <span class="muted">(engine.py:1800)</span> <a href="../files/engine.html#f-Engine._attempt"><code>Engine._attempt</code></a> <span class="muted">(engine.py:1810)</span> <a href="../files/engine.html#f-_is_protective_reply"><code>_is_protective_reply</code></a> <span class="muted">(engine.py:360)</span> <a href="../files/engine.html#f-_is_protective_reply"><code>_is_protective_reply</code></a> <span class="muted">(engine.py:364)</span> <a href="../files/engine.html#f-_is_protective_reply"><code>_is_protective_reply</code></a> <span class="muted">(engine.py:370)</span> <a href="../files/engine.html#f-_is_protective_reply"><code>_is_protective_reply</code></a> <span class="muted">(engine.py:372)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-_is_protective_reply"><span class="tag fn">دالة</span> <b>_is_protective_reply(resp, login_url)</b>
+ <span class="muted">→ tuple</span>
+ <a class="tag api" href="../src/engine.html#L349">سطر 349–373</a>
+<div>تعريف الدالة _is_protective_reply(resp, login_url) ترجع tuple <span class="muted">(نص المؤلف الأصلي في docstring: Return (stop, evidence_str, evidence_dict) for blocks / limits / CAPTCHA.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>4 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>body, evidence, has_form, raw, reason, word</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/engine.html#f-_ban_evidence"><code>_ban_evidence</code></a><span class="muted">×4 سطر 372 (نفس الملف)</span> · <a href="../files/fingerprint.html#f-find_phrase"><code>find_phrase</code></a><span class="muted">×1 سطر 367</span> · <a href="../files/portals.html#f-parse_form"><code>parse_form</code></a><span class="muted">×1 سطر 368</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-_known_card_preflight"><code>_known_card_preflight</code></a> <span class="muted">(engine.py:919)</span> <a href="../files/engine.html#f-_sample"><code>_sample</code></a> <span class="muted">(engine.py:1127)</span> <a href="../files/engine.html#f-_sample"><code>_sample</code></a> <span class="muted">(engine.py:1157)</span> <a href="../files/engine.html#f-_sample.one"><code>_sample.one</code></a> <span class="muted">(engine.py:1127)</span> <a href="../files/engine.html#f-_tune_with_known_card"><code>_tune_with_known_card</code></a> <span class="muted">(engine.py:815)</span> <a href="../files/engine.html#f-calibrate"><code>calibrate</code></a> <span class="muted">(engine.py:514)</span> <a href="../files/engine.html#f-calibrate"><code>calibrate</code></a> <span class="muted">(engine.py:609)</span> <a href="../files/engine.html#f-diagnose"><code>diagnose</code></a> <span class="muted">(engine.py:1025)</span> <a href="../files/engine.html#f-probe_lockout"><code>probe_lockout</code></a> <span class="muted">(engine.py:2302)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Calibration.__init__"><span class="tag fn">دالة</span> <b>Calibration.__init__(self)</b>
+ <a class="tag api" href="../src/engine.html#L380">سطر 380–390</a>
+<div>تعريف الدالة __init__(self)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>يُسند إلى</th><td><code>self.error, self.fingerprint, self.internet, self.judge, self.ok, self.portal, self.profile, self.steps, self.success_words, self.tuned</code></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Calibration.step"><span class="tag fn">دالة</span> <b>Calibration.step(self, sid, ok, reason, detail)</b>
+ <span class="muted">→ None</span>
+ <a class="tag api" href="../src/engine.html#L392">سطر 392–394</a>
+<div>تعريف الدالة step(self, sid, ok, reason, detail) ترجع None</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-diagnose"><code>diagnose</code></a> <span class="muted">(engine.py:1027)</span> <a href="../files/engine.html#f-diagnose"><code>diagnose</code></a> <span class="muted">(engine.py:1035)</span> <a href="../files/engine.html#f-diagnose"><code>diagnose</code></a> <span class="muted">(engine.py:1040)</span> <a href="../files/engine.html#f-diagnose"><code>diagnose</code></a> <span class="muted">(engine.py:1045)</span> <a href="../files/engine.html#f-diagnose"><code>diagnose</code></a> <span class="muted">(engine.py:1056)</span> <a href="../files/engine.html#f-diagnose"><code>diagnose</code></a> <span class="muted">(engine.py:1067)</span> <a href="../files/engine.html#f-diagnose"><code>diagnose</code></a> <span class="muted">(engine.py:1072)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Calibration.as_dict"><span class="tag fn">دالة</span> <b>Calibration.as_dict(self)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/engine.html#L396">سطر 396–420</a>
+<div>تعريف الدالة as_dict(self) ترجع dict</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>applied</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/engine.html#f-build_fields"><code>build_fields</code></a><span class="muted">×1 سطر 405 (نفس الملف)</span> · <a href="../files/engine.html#f-Calibration.as_dict"><code>Calibration.as_dict</code></a><span class="muted">×1 سطر 420 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-Calibration.as_dict"><code>Calibration.as_dict</code></a> <span class="muted">(engine.py:420)</span> <a href="../files/server.html#f-Handler._api_post"><code>Handler._api_post</code></a> <span class="muted">(server.py:360)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-bench_cards"><span class="tag fn">دالة</span> <b>bench_cards(p, count, seed, exclude)</b>
+ <span class="muted">→ list</span>
+ <a class="tag api" href="../src/engine.html#L425">سطر 425–455</a>
+<div>بطاقات تجريبية من داخل الفضاء الحقيقي حتى يردّ الراوتر بصفحة «بطاقة خاطئة» لا بصفحة «صيغة خاطئة». <span class="muted">(نص المؤلف الأصلي في docstring: Format-valid cards used to learn the rejection page.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>3 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>attempts, card, excluded, idx, picks, rnd, space, wanted</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/store.html#f-decode_card"><code>decode_card</code></a><span class="muted">×3 سطر 446</span> · <a href="../files/store.html#f-space_size"><code>space_size</code></a><span class="muted">×1 سطر 433</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-_sample"><code>_sample</code></a> <span class="muted">(engine.py:1100)</span> <a href="../files/engine.html#f-calibrate"><code>calibrate</code></a> <span class="muted">(engine.py:596)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-calibrate"><span class="tag fn">دالة</span> <b>calibrate(profile, known_card, keyword, learn_known, log, checks, probes, preflight_only)</b>
+ <span class="muted">→ Calibration</span>
+ <a class="tag api" href="../src/engine.html#L460">سطر 460–747</a>
+<div>مرحلة التعلّم قبل التخمين، بخطوات مفهرسة يستطيع المستخدم قراءتها. أي خطوة تفشل ⇒ cal.error ولا يبدأ التخمين.</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>15 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>cal, err, error, fingerprint, first_judge, first_verdict, fp, internet, is_challenge, judge, known_card, known_preflight, known_preflight_response, known_preflight_tuned, logout_unconfirmed, ms…</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/fingerprint.html#f-Judge"><code>Judge</code></a><span class="muted">×3 سطر 742</span> · <a href="../files/engine.html#f-absorb_form"><code>absorb_form</code></a><span class="muted">×2 سطر 502 (نفس الملف)</span> · <a href="../files/engine.html#f-_is_protective_reply"><code>_is_protective_reply</code></a><span class="muted">×2 سطر 514 (نفس الملف)</span> · <a href="../files/engine.html#f-submitted_values"><code>submitted_values</code></a><span class="muted">×2 سطر 682 (نفس الملف)</span> · <a href="../files/engine.html#f-_summarise_trials"><code>_summarise_trials</code></a><span class="muted">×2 سطر 713 (نفس الملف)</span> · <a href="../files/store.html#f-migrate"><code>migrate</code></a><span class="muted">×1 سطر 463</span> · <a href="../files/engine.html#f-Calibration"><code>Calibration</code></a><span class="muted">×1 سطر 464 (نفس الملف)</span> · <a href="../files/engine.html#f-new_session"><code>new_session</code></a><span class="muted">×1 سطر 484 (نفس الملف)</span> · <a href="../files/store.html#f-space_size"><code>space_size</code></a><span class="muted">×1 سطر 477</span> · <a href="../files/fingerprint.html#f-find_phrase"><code>find_phrase</code></a><span class="muted">×1 سطر 524</span> · <a href="../files/verify.html#f-probe_internet"><code>probe_internet</code></a><span class="muted">×1 سطر 534</span> · <a href="../files/engine.html#f-bench_cards"><code>bench_cards</code></a><span class="muted">×1 سطر 596 (نفس الملف)</span> · <a href="../files/store.html#f-validate"><code>validate</code></a><span class="muted">×1 سطر 471</span> · <a href="../files/engine.html#f-browser_headers"><code>browser_headers</code></a><span class="muted">×1 سطر 484 (نفس الملف)</span> · <a href="../files/engine.html#f-known_card_problem"><code>known_card_problem</code></a><span class="muted">×1 سطر 551 (نفس الملف)</span> · <a href="../files/engine.html#f-_known_card_preflight"><code>_known_card_preflight</code></a><span class="muted">×1 سطر 558 (نفس الملف)</span> · <a href="../files/engine.html#f-_tune_with_known_card"><code>_tune_with_known_card</code></a><span class="muted">×1 سطر 699 (نفس الملف)</span> · <a href="../files/engine.html#f-send_login"><code>send_login</code></a><span class="muted">×1 سطر 600 (نفس الملف)</span> · <a href="../files/engine.html#f-_new_words"><code>_new_words</code></a><span class="muted">×1 سطر 686 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-Engine._run"><code>Engine._run</code></a> <span class="muted">(engine.py:1444)</span> <a href="../files/engine.html#f-Engine._run"><code>Engine._run</code></a> <span class="muted">(engine.py:1453)</span> <a href="../files/selftest.html#f-t_calibration"><code>t_calibration</code></a> <span class="muted">(selftest.py:118)</span> <a href="../files/selftest.html#f-t_chap_portal"><code>t_chap_portal</code></a> <span class="muted">(selftest.py:261)</span> <a href="../files/server.html#f-Handler._api_post"><code>Handler._api_post</code></a> <span class="muted">(server.py:360)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-_tune_with_known_card"><span class="tag fn">دالة</span> <b>_tune_with_known_card(p, known_card, fp, session, checks, internet_before, initial_trials, skip_shape)</b>
+ <a class="tag api" href="../src/engine.html#L750">سطر 750–897</a>
+<div>تعريف الدالة _tune_with_known_card(p, known_card, fp, session, checks, internet_before, initial_trials, skip_shape) <span class="muted">(نص المؤلف الأصلي في docstring: Try the sensible (password value x dst) combinations for the good card.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>before_state, best, body, candidate, candidates, dsts, err, evidence, flag_shapes, host, judge, logout, logout_record, logout_state, methods, modes…</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/engine.html#f-_safe_url_shape"><code>_safe_url_shape</code></a><span class="muted">×6 سطر 896 (نفس الملف)</span> · <a href="../files/fingerprint.html#f-find_phrase"><code>find_phrase</code></a><span class="muted">×2 سطر 863</span> · <a href="../files/engine.html#f-safe_request_shape"><code>safe_request_shape</code></a><span class="muted">×1 سطر 799 (نفس الملف)</span> · <a href="../files/fingerprint.html#f-Judge"><code>Judge</code></a><span class="muted">×1 سطر 800</span> · <a href="../files/engine.html#f-absorb_form"><code>absorb_form</code></a><span class="muted">×1 سطر 814 (نفس الملف)</span> · <a href="../files/engine.html#f-_is_protective_reply"><code>_is_protective_reply</code></a><span class="muted">×1 سطر 815 (نفس الملف)</span> · <a href="../files/verify.html#f-verify_online"><code>verify_online</code></a><span class="muted">×1 سطر 832</span> · <a href="../files/engine.html#f-send_login"><code>send_login</code></a><span class="muted">×1 سطر 802 (نفس الملف)</span> · <a href="../files/engine.html#f-submitted_values"><code>submitted_values</code></a><span class="muted">×1 سطر 812 (نفس الملف)</span> · <a href="../files/verify.html#f-logout"><code>logout</code></a><span class="muted">×1 سطر 845</span> · <a href="../files/verify.html#f-probe_internet"><code>probe_internet</code></a><span class="muted">×1 سطر 846</span> · <a href="../files/engine.html#f-_new_words"><code>_new_words</code></a><span class="muted">×1 سطر 872 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-calibrate"><code>calibrate</code></a> <span class="muted">(engine.py:699)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-_known_card_preflight"><span class="tag fn">دالة</span> <b>_known_card_preflight(p, card, session, internet_before, checks)</b>
+ <a class="tag api" href="../src/engine.html#L900">سطر 900–976</a>
+<div>تعريف الدالة _known_card_preflight(p, card, session, internet_before, checks) <span class="muted">(نص المؤلف الأصلي في docstring: Try the submitted known card once, then verify actual network state.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>6 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>after_logout, before_state, code, err, host, login_host, logout, redirect_out, refreshed, resp, shape, transition, trial, tuned</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/engine.html#f-_safe_url_shape"><code>_safe_url_shape</code></a><span class="muted">×3 سطر 970 (نفس الملف)</span> · <a href="../files/engine.html#f-safe_request_shape"><code>safe_request_shape</code></a><span class="muted">×1 سطر 908 (نفس الملف)</span> · <a href="../files/engine.html#f-_is_protective_reply"><code>_is_protective_reply</code></a><span class="muted">×1 سطر 919 (نفس الملف)</span> · <a href="../files/engine.html#f-absorb_form"><code>absorb_form</code></a><span class="muted">×1 سطر 930 (نفس الملف)</span> · <a href="../files/verify.html#f-verify_online"><code>verify_online</code></a><span class="muted">×1 سطر 935</span> · <a href="../files/verify.html#f-logout"><code>logout</code></a><span class="muted">×1 سطر 958</span> · <a href="../files/verify.html#f-probe_internet"><code>probe_internet</code></a><span class="muted">×1 سطر 959</span> · <a href="../files/engine.html#f-send_login"><code>send_login</code></a><span class="muted">×1 سطر 910 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-calibrate"><code>calibrate</code></a> <span class="muted">(engine.py:558)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-_new_words"><span class="tag fn">دالة</span> <b>_new_words(page, reference, limit)</b>
+ <span class="muted">→ list</span>
+ <a class="tag api" href="../src/engine.html#L979">سطر 979–981</a>
+<div>تعريف الدالة _new_words(page, reference, limit) ترجع list</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/fingerprint.html#f-diff_words"><code>diff_words</code></a><span class="muted">×1 سطر 981</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-_tune_with_known_card"><code>_tune_with_known_card</code></a> <span class="muted">(engine.py:872)</span> <a href="../files/engine.html#f-calibrate"><code>calibrate</code></a> <span class="muted">(engine.py:686)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-calibration_retryable"><span class="tag fn">دالة</span> <b>calibration_retryable(error)</b>
+ <span class="muted">→ bool</span>
+ <a class="tag api" href="../src/engine.html#L992">سطر 992–993</a>
+<div>تعريف الدالة calibration_retryable(error) ترجع bool</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-Engine._run"><code>Engine._run</code></a> <span class="muted">(engine.py:1448)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-block_caused_by_probes"><span class="tag fn">دالة</span> <b>block_caused_by_probes(cal)</b>
+ <span class="muted">→ bool</span>
+ <a class="tag api" href="../src/engine.html#L996">سطر 996–1006</a>
+<div>تعريف الدالة block_caused_by_probes(cal) ترجع bool <span class="muted">(نص المؤلف الأصلي في docstring: True when the router returned a block page during our test cards.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-diagnose"><span class="tag fn">دالة</span> <b>diagnose(profile, threads, log, checks)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/engine.html#L1012">سطر 1012–1089</a>
+<div>تعريف الدالة diagnose(profile, threads, log, checks) ترجع dict</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>3 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>ban_seen, err, out, p, par, r, rec, remaining, seq, seq_count, session, t0, use_threads</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/engine.html#f-Calibration.step"><code>Calibration.step</code></a><span class="muted">×7 سطر 1045 (نفس الملف)</span> · <a href="../files/engine.html#f-_sample"><code>_sample</code></a><span class="muted">×2 سطر 1054 (نفس الملف)</span> · <a href="../files/store.html#f-migrate"><code>migrate</code></a><span class="muted">×1 سطر 1013</span> · <a href="../files/engine.html#f-new_session"><code>new_session</code></a><span class="muted">×1 سطر 1015 (نفس الملف)</span> · <a href="../files/verify.html#f-probe_internet"><code>probe_internet</code></a><span class="muted">×1 سطر 1044</span> · <a href="../files/engine.html#f-browser_headers"><code>browser_headers</code></a><span class="muted">×1 سطر 1015 (نفس الملف)</span> · <a href="../files/engine.html#f-_is_protective_reply"><code>_is_protective_reply</code></a><span class="muted">×1 سطر 1025 (نفس الملف)</span> · <a href="../files/engine.html#f-absorb_form"><code>absorb_form</code></a><span class="muted">×1 سطر 1034 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/selftest.html#f-t_diagnose_dead_target"><code>t_diagnose_dead_target</code></a> <span class="muted">(selftest.py:313)</span> <a href="../files/server.html#f-Handler._api_post"><code>Handler._api_post</code></a> <span class="muted">(server.py:350)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-diagnose.step"><span class="tag fn">دالة</span> <b>diagnose.step(sid, ok, reason, detail)</b>
+ <a class="tag api" href="../src/engine.html#L1017">سطر 1017–1019</a>
+<div>تعريف الدالة step(sid, ok, reason, detail)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-_sample"><span class="tag fn">دالة</span> <b>_sample(session, p, count, threads)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/engine.html#L1092">سطر 1092–1192</a>
+<div>تعريف الدالة _sample(session, p, count, threads) ترجع dict <span class="muted">(نص المؤلف الأصلي في docstring: Send wrong-but-valid cards and measure - never counts them as done.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>5 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>card, cards, err, fresh, halt, lat, live, lock, page, q, r, sess, stats, t0, ws</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/engine.html#f-_is_protective_reply"><code>_is_protective_reply</code></a><span class="muted">×2 سطر 1127 (نفس الملف)</span> · <a href="../files/engine.html#f-absorb_form"><code>absorb_form</code></a><span class="muted">×2 سطر 1128 (نفس الملف)</span> · <a href="../files/engine.html#f-_sample.one"><code>_sample.one</code></a><span class="muted">×2 سطر 1141 (نفس الملف)</span> · <a href="../files/engine.html#f-bench_cards"><code>bench_cards</code></a><span class="muted">×1 سطر 1100 (نفس الملف)</span> · <a href="../files/engine.html#f-send_login"><code>send_login</code></a><span class="muted">×1 سطر 1118 (نفس الملف)</span> · <a href="../files/engine.html#f-new_session"><code>new_session</code></a><span class="muted">×1 سطر 1148 (نفس الملف)</span> · <a href="../files/engine.html#f-browser_headers"><code>browser_headers</code></a><span class="muted">×1 سطر 1149 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-diagnose"><code>diagnose</code></a> <span class="muted">(engine.py:1054)</span> <a href="../files/engine.html#f-diagnose"><code>diagnose</code></a> <span class="muted">(engine.py:1065)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-_sample.one"><span class="tag fn">دالة</span> <b>_sample.one(sess, live, card)</b>
+ <a class="tag api" href="../src/engine.html#L1107">سطر 1107–1136</a>
+<div>تعريف الدالة one(sess, live, card)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>4 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>err, fresh, r, t0</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/engine.html#f-_is_protective_reply"><code>_is_protective_reply</code></a><span class="muted">×1 سطر 1127 (نفس الملف)</span> · <a href="../files/engine.html#f-absorb_form"><code>absorb_form</code></a><span class="muted">×1 سطر 1128 (نفس الملف)</span> · <a href="../files/engine.html#f-send_login"><code>send_login</code></a><span class="muted">×1 سطر 1118 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-_sample"><code>_sample</code></a> <span class="muted">(engine.py:1141)</span> <a href="../files/engine.html#f-_sample"><code>_sample</code></a> <span class="muted">(engine.py:1174)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-safe_profile_snapshot"><span class="tag fn">دالة</span> <b>safe_profile_snapshot(profile)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/engine.html#L1204">سطر 1204–1226</a>
+<div>نسخة البروفايل التي تُحفظ في التقرير: كل قيمة سرّية ⇒ [redacted]. <span class="muted">(نص المؤلف الأصلي في docstring: Keep debugging shape while removing reusable credentials/live tokens.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>chap, extras, safe</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/store.html#f-migrate"><code>migrate</code></a><span class="muted">×1 سطر 1206</span> · <a href="../files/portals.html#f-sanitize_login_url"><code>sanitize_login_url</code></a><span class="muted">×1 سطر 1207</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-Engine._save_report"><code>Engine._save_report</code></a> <span class="muted">(engine.py:2226)</span> <a href="../files/server.html#f-Handler._api_post"><code>Handler._api_post</code></a> <span class="muted">(server.py:460)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Engine.__init__"><span class="tag fn">دالة</span> <b>Engine.__init__(self, store_obj, persist, checks)</b>
+ <a class="tag api" href="../src/engine.html#L1232">سطر 1232–1284</a>
+<div>تعريف الدالة __init__(self, store_obj, persist, checks)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>يُسند إلى</th><td><code>self._ban_count, self._clean_streak, self._internet_before, self._internet_opened, self._last_ban_evidence, self._last_event_at, self._pace, self._pending, self._pool, self._rate_count, self._recent, self._rejected_since_emit, self._retried, self._retry_processed, self._since_check, self._transport_error_streak…</code></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Engine.emit"><span class="tag fn">دالة</span> <b>Engine.emit(self, kind, payload)</b>
+ <span class="muted">→ None</span>
+ <a class="tag api" href="../src/engine.html#L1287">سطر 1287–1291</a>
+<div>-- الأحداث ----------------------------------------------------------</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-Engine._apply_delay_pressure"><code>Engine._apply_delay_pressure</code></a> <span class="muted">(engine.py:2047)</span> <a href="../files/engine.html#f-Engine._auto_pace"><code>Engine._auto_pace</code></a> <span class="muted">(engine.py:2111)</span> <a href="../files/engine.html#f-Engine._emit_attempt"><code>Engine._emit_attempt</code></a> <span class="muted">(engine.py:1985)</span> <a href="../files/engine.html#f-Engine._emit_net_error"><code>Engine._emit_net_error</code></a> <span class="muted">(engine.py:1997)</span> <a href="../files/engine.html#f-Engine._emit_stats"><code>Engine._emit_stats</code></a> <span class="muted">(engine.py:2007)</span> <a href="../files/engine.html#f-Engine._maybe_decay_delay"><code>Engine._maybe_decay_delay</code></a> <span class="muted">(engine.py:2060)</span> <a href="../files/engine.html#f-Engine._register_hit"><code>Engine._register_hit</code></a> <span class="muted">(engine.py:1952)</span> <a href="../files/engine.html#f-Engine._run"><code>Engine._run</code></a> <span class="muted">(engine.py:1450)</span> <a href="../files/engine.html#f-Engine._run"><code>Engine._run</code></a> <span class="muted">(engine.py:1465)</span> <a href="../files/engine.html#f-Engine._run"><code>Engine._run</code></a> <span class="muted">(engine.py:1470)</span> <a href="../files/engine.html#f-Engine._run"><code>Engine._run</code></a> <span class="muted">(engine.py:1491)</span> <a href="../files/engine.html#f-Engine._run"><code>Engine._run</code></a> <span class="muted">(engine.py:1502)</span> <a href="../files/engine.html#f-Engine._run"><code>Engine._run</code></a> <span class="muted">(engine.py:1571)</span> <a href="../files/engine.html#f-Engine._run"><code>Engine._run</code></a> <span class="muted">(engine.py:1686)</span> <span class="muted">+7 غيرها</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Engine.events_since"><span class="tag fn">دالة</span> <b>Engine.events_since(self, since)</b>
+ <span class="muted">→ list</span>
+ <a class="tag api" href="../src/engine.html#L1293">سطر 1293–1295</a>
+<div>تعريف الدالة events_since(self, since) ترجع list</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Engine.status"><span class="tag fn">دالة</span> <b>Engine.status(self, since)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/engine.html#L1298">سطر 1298–1345</a>
+<div>-- الواجهة العامة ------------------------------------------------------</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>elapsed, lat, left, now, planned, processed, progress, self.speed</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-Engine._save_report"><code>Engine._save_report</code></a> <span class="muted">(engine.py:2206)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Engine.stop"><span class="tag fn">دالة</span> <b>Engine.stop(self, reason)</b>
+ <span class="muted">→ None</span>
+ <a class="tag api" href="../src/engine.html#L1347">سطر 1347–1350</a>
+<div>تعريف الدالة stop(self, reason) ترجع None</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>يُسند إلى</th><td><code>self.stop_reason</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-Engine._attempt"><code>Engine._attempt</code></a> <span class="muted">(engine.py:1815)</span> <a href="../files/engine.html#f-Engine._check_stop_rules"><code>Engine._check_stop_rules</code></a> <span class="muted">(engine.py:2192)</span> <a href="../files/engine.html#f-Engine._check_stop_rules"><code>Engine._check_stop_rules</code></a> <span class="muted">(engine.py:2196)</span> <a href="../files/engine.html#f-Engine._check_stop_rules"><code>Engine._check_stop_rules</code></a> <span class="muted">(engine.py:2199)</span> <a href="../files/engine.html#f-Engine._check_stop_rules"><code>Engine._check_stop_rules</code></a> <span class="muted">(engine.py:2202)</span> <a href="../files/engine.html#f-Engine._record_transport_health"><code>Engine._record_transport_health</code></a> <span class="muted">(engine.py:1715)</span> <a href="../files/engine.html#f-Engine._register_hit"><code>Engine._register_hit</code></a> <span class="muted">(engine.py:1959)</span> <a href="../files/engine.html#f-Engine._register_hit"><code>Engine._register_hit</code></a> <span class="muted">(engine.py:1961)</span> <a href="../files/engine.html#f-Engine._run"><code>Engine._run</code></a> <span class="muted">(engine.py:1617)</span> <a href="../files/engine.html#f-Engine._start_watchdog"><code>Engine._start_watchdog</code></a> <span class="muted">(engine.py:2175)</span> <a href="../files/engine.html#f-Engine._start_watchdog.watch"><code>Engine._start_watchdog.watch</code></a> <span class="muted">(engine.py:2175)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Engine._wait"><span class="tag fn">دالة</span> <b>Engine._wait(self, seconds)</b>
+ <span class="muted">→ bool</span>
+ <a class="tag api" href="../src/engine.html#L1352">سطر 1352–1362</a>
+<div>تعريف الدالة _wait(self, seconds) ترجع bool <span class="muted">(نص المؤلف الأصلي في docstring: Sleep in small steps and wake up the moment the user stops the run.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>end</code></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Engine.start"><span class="tag fn">دالة</span> <b>Engine.start(self, profile, attempts, threads, delay_ms, keyword, known_card, verify_after, auto_stop, resume, preflight_only)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/engine.html#L1364">سطر 1364–1435</a>
+<div>تعريف الدالة start(self, profile, attempts, threads, delay_ms, keyword, known_card, verify_after, auto_stop, resume, preflight_only) ترجع dict</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>3 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>hard, p, pos, problems, remaining, self._ban_count, self._clean_streak, self._internet_opened, self._last_ban_evidence, self._pace, self._pending, self._pool, self._rate_count, self._retried, self._retry_processed, self._since_check…</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/store.html#f-migrate"><code>migrate</code></a><span class="muted">×1 سطر 1370</span> · <a href="../files/store.html#f-validate"><code>validate</code></a><span class="muted">×1 سطر 1375</span> · <a href="../files/store.html#f-space_size"><code>space_size</code></a><span class="muted">×1 سطر 1417</span> · <a href="../files/engine.html#f-Engine.emit"><code>Engine.emit</code></a><span class="muted">×1 سطر 1429 (نفس الملف)</span> · <a href="../files/engine.html#f-Engine.start"><code>Engine.start</code></a><span class="muted">×1 سطر 1434 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-Engine._start_watchdog"><code>Engine._start_watchdog</code></a> <span class="muted">(engine.py:2182)</span> <a href="../files/engine.html#f-Engine.start"><code>Engine.start</code></a> <span class="muted">(engine.py:1434)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Engine._run"><span class="tag fn">دالة</span> <b>Engine._run(self, p, attempts, threads, delay_ms, keyword, known_card, preflight_only)</b>
+ <span class="muted">→ None</span>
+ <a class="tag api" href="../src/engine.html#L1441">سطر 1441–1697</a>
+<div>-- التشغيل --------------------------------------------------------- جسم التشغيل: معايرة ← بناء الفضاء ← طابور ← خيوط ← تلخيص ← حفظ. resume_pos يحسب ما غُطّي فعلاً ويخصم البطاقات بلا إجابة (_unevaluated + _pending) حتى لا تُعتبر البطاقات المحجوبة «مجرَّبة» وتُفقد إلى الأبد.</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>يُسند إلى</th><td><code>cal, card, deadline, dropped, error, item, judge, known_card_failure, live, planned, pos, processed, refused, resume_pos, self._internet_before, self._pool…</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/engine.html#f-Engine.emit"><code>Engine.emit</code></a><span class="muted">×9 سطر 1465 (نفس الملف)</span> · <a href="../files/engine.html#f-warm_up"><code>warm_up</code></a><span class="muted">×3 سطر 1517 (نفس الملف)</span> · <a href="../files/engine.html#f-calibrate"><code>calibrate</code></a><span class="muted">×2 سطر 1444 (نفس الملف)</span> · <a href="../files/engine.html#f-_coprime"><code>_coprime</code></a><span class="muted">×2 سطر 1497 (نفس الملف)</span> · <a href="../files/engine.html#f-Engine._retry_later"><code>Engine._retry_later</code></a><span class="muted">×2 سطر 1542 (نفس الملف)</span> · <a href="../files/engine.html#f-Engine._start_watchdog"><code>Engine._start_watchdog</code></a><span class="muted">×1 سطر 1492 (نفس الملف)</span> · <a href="../files/store.html#f-space_size"><code>space_size</code></a><span class="muted">×1 سطر 1494</span> · <a href="../files/engine.html#f-Engine._save_report"><code>Engine._save_report</code></a><span class="muted">×1 سطر 1685 (نفس الملف)</span> · <a href="../files/engine.html#f-calibration_retryable"><code>calibration_retryable</code></a><span class="muted">×1 سطر 1448 (نفس الملف)</span> · <a href="../files/engine.html#f-new_session"><code>new_session</code></a><span class="muted">×1 سطر 1511 (نفس الملف)</span> · <a href="../files/engine.html#f-Engine._finish_retries"><code>Engine._finish_retries</code></a><span class="muted">×1 سطر 1621 (نفس الملف)</span> · <a href="../files/store.html#f-card_at_walk_pos"><code>card_at_walk_pos</code></a><span class="muted">×1 سطر 1598</span> · <a href="../files/engine.html#f-Engine.stop"><code>Engine.stop</code></a><span class="muted">×1 سطر 1617 (نفس الملف)</span> · <a href="../files/engine.html#f-browser_headers"><code>browser_headers</code></a><span class="muted">×1 سطر 1512 (نفس الملف)</span> · <a href="../files/engine.html#f-Engine._attempt"><code>Engine._attempt</code></a><span class="muted">×1 سطر 1556 (نفس الملف)</span> · <a href="../files/engine.html#f-Engine._record_transport_health"><code>Engine._record_transport_health</code></a><span class="muted">×1 سطر 1541 (نفس الملف)</span> · <a href="../files/engine.html#f-Engine._emit_net_error"><code>Engine._emit_net_error</code></a><span class="muted">×1 سطر 1545 (نفس الملف)</span> · <a href="../files/engine.html#f-Engine._apply_delay_pressure"><code>Engine._apply_delay_pressure</code></a><span class="muted">×1 سطر 1547 (نفس الملف)</span> · <a href="../files/engine.html#f-Engine._check_stop_rules"><code>Engine._check_stop_rules</code></a><span class="muted">×1 سطر 1548 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Engine._record_transport_health"><span class="tag fn">دالة</span> <b>Engine._record_transport_health(self, failure)</b>
+ <span class="muted">→ None</span>
+ <a class="tag api" href="../src/engine.html#L1699">سطر 1699–1715</a>
+<div>تعريف الدالة _record_transport_health(self, failure) ترجع None <span class="muted">(نص المؤلف الأصلي في docstring: Stop after a short burst of transport failures; never reconnect.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>يُسند إلى</th><td><code>self._transport_error_streak, stop_now</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/engine.html#f-Engine.stop"><code>Engine.stop</code></a><span class="muted">×1 سطر 1715 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-Engine._attempt"><code>Engine._attempt</code></a> <span class="muted">(engine.py:1747)</span> <a href="../files/engine.html#f-Engine._attempt"><code>Engine._attempt</code></a> <span class="muted">(engine.py:1759)</span> <a href="../files/engine.html#f-Engine._run"><code>Engine._run</code></a> <span class="muted">(engine.py:1541)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Engine._attempt"><span class="tag fn">دالة</span> <b>Engine._attempt(self, sess, judge, card, sent_index, profile)</b>
+ <span class="muted">→ None</span>
+ <a class="tag api" href="../src/engine.html#L1720">سطر 1720–1832</a>
+<div>-- محاولة واحدة ----------------------------------------------------- محاولة واحدة: إحماء ← بناء الحقول ← إرسال ← حكم ← تسجيل. ابتلاع النموذج يحدّث قاموس العامل نفسه لا البروفايل العام (سباق خيوط).</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>يُسند إلى</th><td><code>ban_ev, delay, elapsed_ms, err, fresh, kind, last_err, p, read_timeout, resp, row, self._clean_streak, self._last_ban_evidence, started, verdict</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/engine.html#f-Engine._apply_delay_pressure"><code>Engine._apply_delay_pressure</code></a><span class="muted">×3 سطر 1755 (نفس الملف)</span> · <a href="../files/engine.html#f-_ban_evidence"><code>_ban_evidence</code></a><span class="muted">×3 سطر 1791 (نفس الملف)</span> · <a href="../files/engine.html#f-Engine._record_transport_health"><code>Engine._record_transport_health</code></a><span class="muted">×2 سطر 1759 (نفس الملف)</span> · <a href="../files/engine.html#f-Engine._check_stop_rules"><code>Engine._check_stop_rules</code></a><span class="muted">×2 سطر 1832 (نفس الملف)</span> · <a href="../files/engine.html#f-Engine._emit_attempt"><code>Engine._emit_attempt</code></a><span class="muted">×1 سطر 1829 (نفس الملف)</span> · <a href="../files/engine.html#f-Engine._maybe_decay_delay"><code>Engine._maybe_decay_delay</code></a><span class="muted">×1 سطر 1830 (نفس الملف)</span> · <a href="../files/engine.html#f-Engine._auto_pace"><code>Engine._auto_pace</code></a><span class="muted">×1 سطر 1831 (نفس الملف)</span> · <a href="../files/engine.html#f-Engine._emit_net_error"><code>Engine._emit_net_error</code></a><span class="muted">×1 سطر 1754 (نفس الملف)</span> · <a href="../files/engine.html#f-submitted_values"><code>submitted_values</code></a><span class="muted">×1 سطر 1761 (نفس الملف)</span> · <a href="../files/engine.html#f-absorb_form"><code>absorb_form</code></a><span class="muted">×1 سطر 1766 (نفس الملف)</span> · <a href="../files/engine.html#f-Engine._verify_hit"><code>Engine._verify_hit</code></a><span class="muted">×1 سطر 1772 (نفس الملف)</span> · <a href="../files/engine.html#f-Engine._register_hit"><code>Engine._register_hit</code></a><span class="muted">×1 سطر 1784 (نفس الملف)</span> · <a href="../files/engine.html#f-send_login"><code>send_login</code></a><span class="muted">×1 سطر 1734 (نفس الملف)</span> · <a href="../files/engine.html#f-Engine._retry_later"><code>Engine._retry_later</code></a><span class="muted">×1 سطر 1751 (نفس الملف)</span> · <a href="../files/engine.html#f-Engine._save_unknown"><code>Engine._save_unknown</code></a><span class="muted">×1 سطر 1786 (نفس الملف)</span> · <a href="../files/engine.html#f-Engine.stop"><code>Engine.stop</code></a><span class="muted">×1 سطر 1815 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-Engine._run"><code>Engine._run</code></a> <span class="muted">(engine.py:1556)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Engine._retry_later"><span class="tag fn">دالة</span> <b>Engine._retry_later(self, card, sent_index)</b>
+ <span class="muted">→ bool</span>
+ <a class="tag api" href="../src/engine.html#L1834">سطر 1834–1852</a>
+<div>تعريف الدالة _retry_later(self, card, sent_index) ترجع bool <span class="muted">(نص المؤلف الأصلي في docstring: Remember a card we never got an answer for, and ask again later.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>3 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>tries</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-Engine._attempt"><code>Engine._attempt</code></a> <span class="muted">(engine.py:1751)</span> <a href="../files/engine.html#f-Engine._run"><code>Engine._run</code></a> <span class="muted">(engine.py:1542)</span> <a href="../files/engine.html#f-Engine._run"><code>Engine._run</code></a> <span class="muted">(engine.py:1568)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Engine._finish_retries"><span class="tag fn">دالة</span> <b>Engine._finish_retries(self, task_q)</b>
+ <span class="muted">→ None</span>
+ <a class="tag api" href="../src/engine.html#L1854">سطر 1854–1892</a>
+<div>تعريف الدالة _finish_retries(self, task_q) ترجع None <span class="muted">(نص المؤلف الأصلي في docstring: Hand the cards that got no answer back to the workers.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>يُسند إلى</th><td><code>deadline, self._pending</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-Engine._run"><code>Engine._run</code></a> <span class="muted">(engine.py:1621)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Engine._verify_hit"><span class="tag fn">دالة</span> <b>Engine._verify_hit(self, sess, verdict, card)</b>
+ <span class="muted">→ Verdict</span>
+ <a class="tag api" href="../src/engine.html#L1895">سطر 1895–1938</a>
+<div>التحقق من إصابة: إن كان الجهاز ONLINE أصلاً ففحص الإنترنت لا يثبت شيئاً. <span class="muted">(نص المؤلف الأصلي في docstring: A hit is only final when the card really opened the internet.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>already_online, code, status, v</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/fingerprint.html#f-Verdict"><code>Verdict</code></a><span class="muted">×2 سطر 1928</span> · <a href="../files/verify.html#f-portal_status_page"><code>portal_status_page</code></a><span class="muted">×2 سطر 1905</span> · <a href="../files/verify.html#f-verify_online"><code>verify_online</code></a><span class="muted">×1 سطر 1917</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-Engine._attempt"><code>Engine._attempt</code></a> <span class="muted">(engine.py:1772)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Engine._register_hit"><span class="tag fn">دالة</span> <b>Engine._register_hit(self, card, verdict)</b>
+ <span class="muted">→ None</span>
+ <a class="tag api" href="../src/engine.html#L1943">سطر 1943–1961</a>
+<div>يسجّل الإصابة في الذاكرة وفي hits.txt ويبثّ الحدث. ACCEPTED_VERIFIED يوقف التشغيل بلا شرط: الإرسال لبوابة مفتوحة قد يولّد تحققات كاذبة لنفس البطاقات التالية.</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>يُسند إلى</th><td><code>hit, strong</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/engine.html#f-Engine.stop"><code>Engine.stop</code></a><span class="muted">×2 سطر 1959 (نفس الملف)</span> · <a href="../files/engine.html#f-Engine.emit"><code>Engine.emit</code></a><span class="muted">×1 سطر 1952 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-Engine._attempt"><code>Engine._attempt</code></a> <span class="muted">(engine.py:1784)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Engine._save_unknown"><span class="tag fn">دالة</span> <b>Engine._save_unknown(self, card, verdict, resp)</b>
+ <span class="muted">→ None</span>
+ <a class="tag api" href="../src/engine.html#L1963">سطر 1963–1973</a>
+<div>تعريف الدالة _save_unknown(self, card, verdict, resp) ترجع None</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>يُسند إلى</th><td><code>saved</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/engine.html#f-Engine.emit"><code>Engine.emit</code></a><span class="muted">×1 سطر 1973 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-Engine._attempt"><code>Engine._attempt</code></a> <span class="muted">(engine.py:1786)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Engine._emit_attempt"><span class="tag fn">دالة</span> <b>Engine._emit_attempt(self, card, resp, verdict, idx)</b>
+ <span class="muted">→ None</span>
+ <a class="tag api" href="../src/engine.html#L1975">سطر 1975–1991</a>
+<div>تعريف الدالة _emit_attempt(self, card, resp, verdict, idx) ترجع None</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>يُسند إلى</th><td><code>interesting, quiet, self._rejected_since_emit</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/engine.html#f-Engine._emit_stats"><code>Engine._emit_stats</code></a><span class="muted">×2 سطر 1991 (نفس الملف)</span> · <a href="../files/engine.html#f-Engine.emit"><code>Engine.emit</code></a><span class="muted">×1 سطر 1985 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-Engine._attempt"><code>Engine._attempt</code></a> <span class="muted">(engine.py:1829)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Engine._emit_net_error"><span class="tag fn">دالة</span> <b>Engine._emit_net_error(self, kind, card, err)</b>
+ <span class="muted">→ None</span>
+ <a class="tag api" href="../src/engine.html#L1993">سطر 1993–2000</a>
+<div>تعريف الدالة _emit_net_error(self, kind, card, err) ترجع None</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/engine.html#f-Engine.emit"><code>Engine.emit</code></a><span class="muted">×1 سطر 1997 (نفس الملف)</span> · <a href="../files/engine.html#f-Engine._emit_stats"><code>Engine._emit_stats</code></a><span class="muted">×1 سطر 2000 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-Engine._attempt"><code>Engine._attempt</code></a> <span class="muted">(engine.py:1754)</span> <a href="../files/engine.html#f-Engine._run"><code>Engine._run</code></a> <span class="muted">(engine.py:1545)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Engine._emit_stats"><span class="tag fn">دالة</span> <b>Engine._emit_stats(self)</b>
+ <span class="muted">→ None</span>
+ <a class="tag api" href="../src/engine.html#L2002">سطر 2002–2007</a>
+<div>تعريف الدالة _emit_stats(self) ترجع None</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>يُسند إلى</th><td><code>now, self._last_event_at</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/engine.html#f-Engine.emit"><code>Engine.emit</code></a><span class="muted">×1 سطر 2007 (نفس الملف)</span> · <a href="../files/engine.html#f-Engine.status_snapshot"><code>Engine.status_snapshot</code></a><span class="muted">×1 سطر 2007 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-Engine._emit_attempt"><code>Engine._emit_attempt</code></a> <span class="muted">(engine.py:1981)</span> <a href="../files/engine.html#f-Engine._emit_attempt"><code>Engine._emit_attempt</code></a> <span class="muted">(engine.py:1991)</span> <a href="../files/engine.html#f-Engine._emit_net_error"><code>Engine._emit_net_error</code></a> <span class="muted">(engine.py:2000)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Engine.status_snapshot"><span class="tag fn">دالة</span> <b>Engine.status_snapshot(self)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/engine.html#L2009">سطر 2009–2017</a>
+<div>تعريف الدالة status_snapshot(self) ترجع dict</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-Engine._emit_stats"><code>Engine._emit_stats</code></a> <span class="muted">(engine.py:2007)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Engine._apply_delay_pressure"><span class="tag fn">دالة</span> <b>Engine._apply_delay_pressure(self, reason, resp)</b>
+ <span class="muted">→ None</span>
+ <a class="tag api" href="../src/engine.html#L2020">سطر 2020–2047</a>
+<div>-- التحكم في التدفق ---------------------------------------------------- <span class="muted">(نص المؤلف الأصلي في docstring: Slow down on purpose and say why. Never slow down silently.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>يُسند إلى</th><td><code>base, cap, current, new, note, wait</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/engine.html#f-Engine.emit"><code>Engine.emit</code></a><span class="muted">×1 سطر 2047 (نفس الملف)</span> · <a href="../files/engine.html#f-_retry_after"><code>_retry_after</code></a><span class="muted">×1 سطر 2027 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-Engine._attempt"><code>Engine._attempt</code></a> <span class="muted">(engine.py:1755)</span> <a href="../files/engine.html#f-Engine._attempt"><code>Engine._attempt</code></a> <span class="muted">(engine.py:1798)</span> <a href="../files/engine.html#f-Engine._attempt"><code>Engine._attempt</code></a> <span class="muted">(engine.py:1808)</span> <a href="../files/engine.html#f-Engine._run"><code>Engine._run</code></a> <span class="muted">(engine.py:1547)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Engine._maybe_decay_delay"><span class="tag fn">دالة</span> <b>Engine._maybe_decay_delay(self)</b>
+ <span class="muted">→ None</span>
+ <a class="tag api" href="../src/engine.html#L2049">سطر 2049–2060</a>
+<div>تعريف الدالة _maybe_decay_delay(self) ترجع None <span class="muted">(نص المؤلف الأصلي في docstring: Restore the configured delay after sustained clean responses.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>يُسند إلى</th><td><code>base, current, new, self._clean_streak</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/engine.html#f-Engine.emit"><code>Engine.emit</code></a><span class="muted">×1 سطر 2060 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-Engine._attempt"><code>Engine._attempt</code></a> <span class="muted">(engine.py:1830)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Engine._auto_pace"><span class="tag fn">دالة</span> <b>Engine._auto_pace(self, code)</b>
+ <span class="muted">→ None</span>
+ <a class="tag api" href="../src/engine.html#L2064">سطر 2064–2112</a>
+<div>-- إيجاد أسرع وتيرة يسمح بها هذا الراوتر فعلاً ------------- ضبط الوتيرة AIMD: زيادة جمعية عند النظافة، نقصان مضاعف عند الشكوى. <span class="muted">(نص المؤلف الأصلي في docstring: Additive increase / multiplicative decrease, the way TCP does it.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>يُسند إلى</th><td><code>added, new, note, now, ratio, self._pace, threads, w</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/engine.html#f-Engine.emit"><code>Engine.emit</code></a><span class="muted">×1 سطر 2111 (نفس الملف)</span> · <a href="../files/engine.html#f-Engine._add_workers"><code>Engine._add_workers</code></a><span class="muted">×1 سطر 2095 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-Engine._attempt"><code>Engine._attempt</code></a> <span class="muted">(engine.py:1831)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Engine._add_workers"><span class="tag fn">دالة</span> <b>Engine._add_workers(self, count)</b>
+ <span class="muted">→ int</span>
+ <a class="tag api" href="../src/engine.html#L2114">سطر 2114–2130</a>
+<div>تعريف الدالة _add_workers(self, count) ترجع int <span class="muted">(نص المؤلف الأصلي في docstring: Give the run more hands - only when the router is answering cleanly.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>added, cap, pool, t</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-Engine._auto_pace"><code>Engine._auto_pace</code></a> <span class="muted">(engine.py:2095)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Engine._start_watchdog"><span class="tag fn">دالة</span> <b>Engine._start_watchdog(self)</b>
+ <span class="muted">→ None</span>
+ <a class="tag api" href="../src/engine.html#L2135">سطر 2135–2182</a>
+<div>-- «هل نزل الجدار؟» ----------------------------------------- المراقب: يفحص الإنترنت كل 3 ثوانٍ أثناء التشغيل. يعمل فقط إن بدأنا خلف الجدار؛ عند ONLINE ينسخ البطاقات الأخيرة كمشتبه بها. <span class="muted">(نص المؤلف الأصلي في docstring: Watch the internet while the run is going.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>يُسند إلى</th><td><code>checks, self._internet_opened, self._since_check, self._watch_thread, sess, state, suspects</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/engine.html#f-Engine.start"><code>Engine.start</code></a><span class="muted">×1 سطر 2182 (نفس الملف)</span> · <a href="../files/engine.html#f-new_session"><code>new_session</code></a><span class="muted">×1 سطر 2151 (نفس الملف)</span> · <a href="../files/engine.html#f-Engine.emit"><code>Engine.emit</code></a><span class="muted">×1 سطر 2171 (نفس الملف)</span> · <a href="../files/engine.html#f-Engine.stop"><code>Engine.stop</code></a><span class="muted">×1 سطر 2175 (نفس الملف)</span> · <a href="../files/verify.html#f-probe_internet"><code>probe_internet</code></a><span class="muted">×1 سطر 2155</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-Engine._run"><code>Engine._run</code></a> <span class="muted">(engine.py:1492)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Engine._start_watchdog.watch"><span class="tag fn">دالة</span> <b>Engine._start_watchdog.watch()</b>
+ <a class="tag api" href="../src/engine.html#L2150">سطر 2150–2178</a>
+<div>تعريف الدالة watch()</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>يُسند إلى</th><td><code>self._internet_opened, self._since_check, sess, state, suspects</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/engine.html#f-new_session"><code>new_session</code></a><span class="muted">×1 سطر 2151 (نفس الملف)</span> · <a href="../files/engine.html#f-Engine.emit"><code>Engine.emit</code></a><span class="muted">×1 سطر 2171 (نفس الملف)</span> · <a href="../files/engine.html#f-Engine.stop"><code>Engine.stop</code></a><span class="muted">×1 سطر 2175 (نفس الملف)</span> · <a href="../files/verify.html#f-probe_internet"><code>probe_internet</code></a><span class="muted">×1 سطر 2155</span></td></tr>
+<tr><th>من يناديها</th><td><span class="muted">لا تُنادى من داخل بايثون (نقطة دخول، أو تناديها الواجهة/الاختبارات)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Engine._check_stop_rules"><span class="tag fn">دالة</span> <b>Engine._check_stop_rules(self)</b>
+ <span class="muted">→ None</span>
+ <a class="tag api" href="../src/engine.html#L2186">سطر 2186–2202</a>
+<div>قواعد التوقف الأخلاقية: حجب واحد، تقييد واحد، كابتشا واحدة ⇒ توقف. وثلاثة إخفاقات نقل متتالية أو انفجار 20 خطأ ⇒ target_unreachable. <span class="muted">(نص المؤلف الأصلي في docstring: Stop only for reasons we can explain.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>يُسند إلى</th><td><code>attempts, counters, errors</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/engine.html#f-Engine.stop"><code>Engine.stop</code></a><span class="muted">×4 سطر 2192 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-Engine._attempt"><code>Engine._attempt</code></a> <span class="muted">(engine.py:1756)</span> <a href="../files/engine.html#f-Engine._attempt"><code>Engine._attempt</code></a> <span class="muted">(engine.py:1832)</span> <a href="../files/engine.html#f-Engine._run"><code>Engine._run</code></a> <span class="muted">(engine.py:1548)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-Engine._save_report"><span class="tag fn">دالة</span> <b>Engine._save_report(self)</b>
+ <span class="muted">→ None</span>
+ <a class="tag api" href="../src/engine.html#L2205">سطر 2205–2233</a>
+<div>-- التقرير ----------------------------------------------------------</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>يُسند إلى</th><td><code>path, report, status</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/engine.html#f-Engine.status"><code>Engine.status</code></a><span class="muted">×1 سطر 2206 (نفس الملف)</span> · <a href="../files/engine.html#f-safe_profile_snapshot"><code>safe_profile_snapshot</code></a><span class="muted">×1 سطر 2226 (نفس الملف)</span> · <a href="../files/engine.html#f-Engine.emit"><code>Engine.emit</code></a><span class="muted">×1 سطر 2230 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-Engine._run"><code>Engine._run</code></a> <span class="muted">(engine.py:1685)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-_coprime"><span class="tag fn">دالة</span> <b>_coprime(space)</b>
+ <span class="muted">→ int</span>
+ <a class="tag api" href="../src/engine.html#L2237">سطر 2237–2245</a>
+<div>خطوة أولية نسبياً مع حجم الفضاء حتى يزور المسار كل بطاقة مرة واحدة. <span class="muted">(نص المؤلف الأصلي في docstring: A step that visits every index exactly once before repeating.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>a</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-Engine._run"><code>Engine._run</code></a> <span class="muted">(engine.py:1497)</span> <a href="../files/engine.html#f-Engine._run"><code>Engine._run</code></a> <span class="muted">(engine.py:1670)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-_retry_after"><span class="tag fn">دالة</span> <b>_retry_after(resp)</b>
+ <span class="muted">→ int</span>
+ <a class="tag api" href="../src/engine.html#L2248">سطر 2248–2253</a>
+<div>تعريف الدالة _retry_after(resp) ترجع int</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>2 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>value</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-Engine._apply_delay_pressure"><code>Engine._apply_delay_pressure</code></a> <span class="muted">(engine.py:2027)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-probe_lockout"><span class="tag fn">دالة</span> <b>probe_lockout(profile, checks, max_failures, wait_limit, step, pace, log)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/engine.html#L2261">سطر 2261–2361</a>
+<div>قياس مدى تسامح الراوتر: محدود بـ8 فشل ويتوقف عند أول رد حماية. wait_limit وstep مقبولان للتوافق لكنهما متجاهلان عمداً: لا ننتظر زوال الحجب. <span class="muted">(نص المؤلف الأصلي في docstring: Run a capped, explicit diagnostic and stop at the first protective reply.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>8 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>card, err, failures, limit, out, p, r, resp, say, session, space</code></td></tr>
+<tr><th>ينادي من دوال المشروع</th><td><a href="../files/engine.html#f-probe_lockout.step_row"><code>probe_lockout.step_row</code></a><span class="muted">×9 سطر 2283 (نفس الملف)</span> · <a href="../files/store.html#f-space_size"><code>space_size</code></a><span class="muted">×2 سطر 2281</span> · <a href="../files/engine.html#f-absorb_form"><code>absorb_form</code></a><span class="muted">×2 سطر 2298 (نفس الملف)</span> · <a href="../files/store.html#f-migrate"><code>migrate</code></a><span class="muted">×1 سطر 2271</span> · <a href="../files/engine.html#f-new_session"><code>new_session</code></a><span class="muted">×1 سطر 2286 (نفس الملف)</span> · <a href="../files/engine.html#f-browser_headers"><code>browser_headers</code></a><span class="muted">×1 سطر 2286 (نفس الملف)</span> · <a href="../files/engine.html#f-_is_protective_reply"><code>_is_protective_reply</code></a><span class="muted">×1 سطر 2302 (نفس الملف)</span> · <a href="../files/store.html#f-decode_card"><code>decode_card</code></a><span class="muted">×1 سطر 2321</span> · <a href="../files/engine.html#f-send_login"><code>send_login</code></a><span class="muted">×1 سطر 2323 (نفس الملف)</span></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/server.html#f-Handler._api_post"><code>Handler._api_post</code></a> <span class="muted">(server.py:383)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-probe_lockout.step_row"><span class="tag fn">دالة</span> <b>probe_lockout.step_row(step_id, ok, reason, detail)</b>
+ <a class="tag api" href="../src/engine.html#L2277">سطر 2277–2279</a>
+<div>تعريف الدالة step_row(step_id, ok, reason, detail)</div></div>
+<div class="sym body"><table class="kv">
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-probe_lockout"><code>probe_lockout</code></a> <span class="muted">(engine.py:2283)</span> <a href="../files/engine.html#f-probe_lockout"><code>probe_lockout</code></a> <span class="muted">(engine.py:2294)</span> <a href="../files/engine.html#f-probe_lockout"><code>probe_lockout</code></a> <span class="muted">(engine.py:2309)</span> <a href="../files/engine.html#f-probe_lockout"><code>probe_lockout</code></a> <span class="muted">(engine.py:2313)</span> <a href="../files/engine.html#f-probe_lockout"><code>probe_lockout</code></a> <span class="muted">(engine.py:2328)</span> <a href="../files/engine.html#f-probe_lockout"><code>probe_lockout</code></a> <span class="muted">(engine.py:2340)</span> <a href="../files/engine.html#f-probe_lockout"><code>probe_lockout</code></a> <span class="muted">(engine.py:2346)</span> <a href="../files/engine.html#f-probe_lockout"><code>probe_lockout</code></a> <span class="muted">(engine.py:2350)</span> <a href="../files/engine.html#f-probe_lockout"><code>probe_lockout</code></a> <span class="muted">(engine.py:2357)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-known_card_problem"><span class="tag fn">دالة</span> <b>known_card_problem(p, card)</b>
+ <span class="muted">→ dict</span>
+ <a class="tag api" href="../src/engine.html#L2364">سطر 2364–2392</a>
+<div>تعريف الدالة known_card_problem(p, card) ترجع dict <span class="muted">(نص المؤلف الأصلي في docstring: Does this card even fit the format we were asked to guess?)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>6 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>alien, card, charset, length, middle, prefix, suffix</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-calibrate"><code>calibrate</code></a> <span class="muted">(engine.py:551)</span></td></tr>
+</table></div>
+<div class="sym head" id="f-_summarise_trials"><span class="tag fn">دالة</span> <b>_summarise_trials(trials, limit)</b>
+ <span class="muted">→ list</span>
+ <a class="tag api" href="../src/engine.html#L2395">سطر 2395–2415</a>
+<div>تعريف الدالة _summarise_trials(trials, limit) ترجع list <span class="muted">(نص المؤلف الأصلي في docstring: Keep safe request shapes and response evidence, in request order.)</span></div></div>
+<div class="sym body"><table class="kv">
+<tr><th>قيمة إرجاع</th><td>1 موضع <code>return</code></td></tr>
+<tr><th>يُسند إلى</th><td><code>out</code></td></tr>
+<tr><th>من يناديها</th><td><a href="../files/engine.html#f-calibrate"><code>calibrate</code></a> <span class="muted">(engine.py:713)</span> <a href="../files/engine.html#f-calibrate"><code>calibrate</code></a> <span class="muted">(engine.py:724)</span></td></tr>
+</table></div>
+<footer class="docfoot">صفحة مولّدة آلياً من مصدر الكود · KiraPass —
+<code>files</code> · 2026-10-01 02:26</footer>
+</main>
+</div>
+<script src="../assets/docs.js"></script>
+<script>KPInit("files");</script>
+</body>
+</html>

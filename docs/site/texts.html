@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>النصوص المعروضة · KiraPass</title>
+<link rel="stylesheet" href="assets/docs.css">
+
+</head>
+<body>
+<div id="kp-layout">
+<main class="doc">
+<h1>النصوص المعروضة وأماكنها</h1>
+<p class="lead">كل نص يراه المستخدم، وأين يسكن، وكيف تغيّره. القاعدة الذهبية:
+<b>النصوص الثابتة في <code>ui.html</code></b> (مع مفتاح <code>data-i18n</code>)،
+<b>والنصوص الديناميكية في <code>I18N</code> داخل <code>ui.js</code></b>،
+<b>والمفاتيح الآلية في بايثون</b> (لا تُترجم هناك — تُترجم في الواجهة).</p>
+<div class="card info"><b>هذه الصفحة مولّدة آلياً</b> من مصدر الكود مباشرة (<code>tools/docs/build_docs.py</code>). إن غيّرت الكود فأعد توليدها: <code>python3 tools/docs/build_docs.py</code>. الشرح اليدوي الأوسع في <a href="architecture.html">المعمارية</a> و<a href="editing.html">دليل التعديل</a> و<a href="danger.html">أماكن الخطر</a>.</div>
+<div class="grid3"><div class="card"><b>424</b><br>مفتاح ترجمة عربي في ui.js</div><div class="card"><b>424</b><br>مفتاح ترجمة إنجليزي</div><div class="card"><b>138</b><br>نص ثابت في ui.html</div></div>
+<div class="card ok"><b>ثلاث قواعد لا تُكسر:</b>
+<ol>
+<li>كل مفتاح يُضاف إلى <code>data-i18n</code> في <code>ui.html</code> <b>يجب</b> أن يكون له
+نصّان في <code>I18N</code> (ar وen) — وإلا سقط اختبار
+<code>UIIntegrityTests.test_ui_ids_are_unique_and_static_translations_exist</code>.</li>
+<li>لا تُعرّب المفاتيح الآلية في بايثون: <code>v_*</code> و<code>stop_*</code> و<code>r_*</code>
+و<code>net_*</code> تبقى بالإنجليزية وتترجمها الواجهة. تغييرها يكسر التقارير القديمة.</li>
+<li>الكلمات التي تُطابق صفحات الراوتر (<code>REJECT_WORDS</code>/<code>BAN_WORDS</code>/
+<code>ACCEPT_WORDS</code>) ليست نصوصاً معروضة: هي <b>أدوات كشف</b>، وتُطابق كلمة كاملة.
+أضف إليها بحذر واختبر.</li>
+</ol></div>
+<h2 id="static">١) النصوص الثابتة في ui.html</h2><p>كل عنصر يحمل <code>data-i18n</code>: النص العربي مكتوب مباشرة في العنصر، والمفتاح يربطه بترجمته الإنجليزية في <code>I18N.en</code>.</p><div class="scroll-x"><table class="t compact"><thead><tr><th>المفتاح</th><th>النص العربي المعروض</th><th>السطر</th><th>الإنجليزي</th></tr></thead><tbody>
+<tr><td class="mono">skip_content</td><td>تجاوز إلى المحتوى</td><td class="mono"><a href="src/ui-html.html#L24">24</a></td><td>Skip to content</td></tr>
+<tr><td class="mono">brand_subtitle</td><td>اختبار شبكات مصرح به</td><td class="mono"><a href="src/ui-html.html#L35">35</a></td><td>Authorized network testing</td></tr>
+<tr><td class="mono">banner_title</td><td>استخدام مصرّح به فقط</td><td class="mono"><a href="src/ui-html.html#L58">58</a></td><td>Authorized use only</td></tr>
+<tr><td class="mono">banner_text</td><td>هذه الأداة للاختبار على شبكة تملكها أو لديك إذن كتابي من صاحبها. لا تستخدمها على شبكة غيرك.</td><td class="mono"><a href="src/ui-html.html#L60">60</a></td><td>Use this tool only on a network you own or have written permission to test. Neve</td></tr>
+<tr><td class="mono">banner_more</td><td>التفاصيل</td><td class="mono"><a href="src/ui-html.html#L62">62</a></td><td>Details</td></tr>
+<tr><td class="mono">step_start</td><td>•البداية</td><td class="mono"><a href="src/ui-html.html#L69">69</a></td><td>Start</td></tr>
+<tr><td class="mono">step_scan</td><td>1فحص الشبكة</td><td class="mono"><a href="src/ui-html.html#L71">71</a></td><td>Scan</td></tr>
+<tr><td class="mono">step_format</td><td>2صيغة البطاقة</td><td class="mono"><a href="src/ui-html.html#L73">73</a></td><td>Card format</td></tr>
+<tr><td class="mono">step_run</td><td>3التشغيل</td><td class="mono"><a href="src/ui-html.html#L75">75</a></td><td>Run</td></tr>
+<tr><td class="mono">step_results</td><td>4النتائج</td><td class="mono"><a href="src/ui-html.html#L77">77</a></td><td>Results</td></tr>
+<tr><td class="mono">start_title</td><td>KiraPass — البداية</td><td class="mono"><a href="src/ui-html.html#L88">88</a></td><td>KiraPass — Start</td></tr>
+<tr><td class="mono">start_hint</td><td>اختر مسار العمل. لن يبدأ أي فحص أو تخمين تلقائياً قبل تأكيدك الصريح.</td><td class="mono"><a href="src/ui-html.html#L90">90</a></td><td>Choose your workflow. No scan or guessing starts automatically before your expli</td></tr>
+<tr><td class="mono">btn_new_profile</td><td>بروفايل جديد</td><td class="mono"><a href="src/ui-html.html#L94">94</a></td><td>New profile</td></tr>
+<tr><td class="mono">btn_saved_profile</td><td>استخدام بروفايل محفوظ</td><td class="mono"><a href="src/ui-html.html#L96">96</a></td><td>Use saved profile</td></tr>
+<tr><td class="mono">probe_link_title</td><td>فحص الاتصال بالراوتر</td><td class="mono"><a href="src/ui-html.html#L104">104</a></td><td>Check router connectivity</td></tr>
+<tr><td class="mono">probe_link_hint</td><td>طلب GET واحد فقط للرابط — يعرض النتيجة دون تخمين أو إرسال بطاقات.</td><td class="mono"><a href="src/ui-html.html#L106">106</a></td><td>A single GET to the URL — shows the result with no guessing and no card posts.</td></tr>
+<tr><td class="mono">probe_link_button</td><td>افحص الاتصال</td><td class="mono"><a href="src/ui-html.html#L113">113</a></td><td>Check link</td></tr>
+<tr><td class="mono">saved_title</td><td>البروفايلات المحفوظة</td><td class="mono"><a href="src/ui-html.html#L129">129</a></td><td>Saved profiles</td></tr>
+<tr><td class="mono">saved_hint</td><td>اختر بروفايل لمراجعة إعداداته قبل التشغيل. لن يبدأ أي فحص أو تخمين تلقائياً.</td><td class="mono"><a href="src/ui-html.html#L131">131</a></td><td>Pick a profile to review its settings before running. No automatic scan or guess</td></tr>
+<tr><td class="mono">saved_search</td><td>بحث في البروفايلات</td><td class="mono"><a href="src/ui-html.html#L135">135</a></td><td>Search profiles</td></tr>
+<tr><td class="mono">btn_import_profile</td><td>استيراد JSON</td><td class="mono"><a href="src/ui-html.html#L140">140</a></td><td>Import JSON</td></tr>
+<tr><td class="mono">back_to_start</td><td>رجوع للبداية</td><td class="mono"><a href="src/ui-html.html#L150">150</a></td><td>Back to start</td></tr>
+<tr><td class="mono">review_profile_title</td><td>مراجعة البروفايل</td><td class="mono"><a href="src/ui-html.html#L160">160</a></td><td>Profile review</td></tr>
+<tr><td class="mono">review_profile_hint</td><td>راجع الإعدادات المحفوظة قبل التشغيل. إذا كانت مكتملة يمكنك البدء مباشرة، وإذا كانت ناقصة أصلحها يدوياً من دون </td><td class="mono"><a href="src/ui-html.html#L162">162</a></td><td>Review saved settings before running. If complete you can start directly; if inc</td></tr>
+<tr><td class="mono">f_login_url</td><td>رابط إرسال الدخول (action)</td><td class="mono"><a href="src/ui-html.html#L170">170</a></td><td>Form action URL</td></tr>
+<tr><td class="mono">f_method</td><td>طريقة الطلبPOSTGET</td><td class="mono"><a href="src/ui-html.html#L172">172</a></td><td>Request method</td></tr>
+<tr><td class="mono">f_user_field</td><td>اسم حقل المستخدم</td><td class="mono"><a href="src/ui-html.html#L174">174</a></td><td>Username field</td></tr>
+<tr><td class="mono">f_pass_field</td><td>اسم حقل كلمة المرور</td><td class="mono"><a href="src/ui-html.html#L176">176</a></td><td>Password field</td></tr>
+<tr><td class="mono">f_pass_mode</td><td>قيمة كلمة المرور</td><td class="mono"><a href="src/ui-html.html#L178">178</a></td><td>Password value</td></tr>
+<tr><td class="mono">f_dst</td><td>قيمة dst (وجهة الضيف)</td><td class="mono"><a href="src/ui-html.html#L180">180</a></td><td>dst value (guest destination)</td></tr>
+<tr><td class="mono">f_prefix</td><td>البادئة الثابتة</td><td class="mono"><a href="src/ui-html.html#L182">182</a></td><td>Fixed prefix</td></tr>
+<tr><td class="mono">f_length</td><td>طول الكرت الكامل</td><td class="mono"><a href="src/ui-html.html#L184">184</a></td><td>Full card length</td></tr>
+<tr><td class="mono">f_charset</td><td>الحروف/الأرقام المتغيّرة</td><td class="mono"><a href="src/ui-html.html#L186">186</a></td><td>Variable characters</td></tr>
+<tr><td class="mono">r_delay</td><td>الانتظار بين الطلبات (ms)</td><td class="mono"><a href="src/ui-html.html#L188">188</a></td><td>Delay between requests (ms)</td></tr>
+<tr><td class="mono">r_threads</td><td>عدد المسارات (Threads)</td><td class="mono"><a href="src/ui-html.html#L190">190</a></td><td>Threads</td></tr>
+<tr><td class="mono">r_attempts</td><td>عدد المحاولات</td><td class="mono"><a href="src/ui-html.html#L192">192</a></td><td>Attempts</td></tr>
+<tr><td class="mono">r_resume</td><td>المتابعة من حيث توقفت (بلا تكرار)</td><td class="mono"><a href="src/ui-html.html#L194">194</a></td><td>Continue where you stopped (no repeats)</td></tr>
+<tr><td class="mono">p_space</td><td>عدد الاحتمالات:</td><td class="mono"><a href="src/ui-html.html#L200">200</a></td><td>Combinations</td></tr>
+<tr><td class="mono">p_samples</td><td>أمثلة على البطاقات:</td><td class="mono"><a href="src/ui-html.html#L204">204</a></td><td>Sample cards</td></tr>
+<tr><td class="mono">edit_settings</td><td>تعديل الإعدادات</td><td class="mono"><a href="src/ui-html.html#L216">216</a></td><td>Edit settings</td></tr>
+<tr><td class="mono">btn_export_profile</td><td>تصدير JSON</td><td class="mono"><a href="src/ui-html.html#L218">218</a></td><td>Export JSON</td></tr>
+<tr><td class="mono">back_to_saved</td><td>رجوع للقائمة</td><td class="mono"><a href="src/ui-html.html#L220">220</a></td><td>Back to list</td></tr>
+<tr><td class="mono">btn_start_from_review</td><td>ابدأ التخمين</td><td class="mono"><a href="src/ui-html.html#L222">222</a></td><td>Start guessing</td></tr>
+<tr><td class="mono">scan_title</td><td>1) افحص صفحة الدخول</td><td class="mono"><a href="src/ui-html.html#L232">232</a></td><td>1) Check the network and test the known card</td></tr>
+<tr><td class="mono">scan_hint</td><td></td><td class="mono"><a href="src/ui-html.html#L234">234</a></td><td>Paste the hotspot login URL as it opens in your browser. After scanning, enter a</td></tr>
+<tr><td class="mono">scan_url_label</td><td>رابط صفحة الدخول</td><td class="mono"><a href="src/ui-html.html#L244">244</a></td><td>Login page URL</td></tr>
+<tr><td class="mono">scan_button</td><td>افحص الآن</td><td class="mono"><a href="src/ui-html.html#L249">249</a></td><td>Scan now</td></tr>
+<tr><td class="mono">calibration_setup_title</td><td>اختبار البطاقة المعروفة وتعلّم الطلب</td><td class="mono"><a href="src/ui-html.html#L271">271</a></td><td>Test the known card and learn the request</td></tr>
+<tr><td class="mono">calibration_setup_hint</td><td>أدخل بطاقة مصرحاً بها وتعرف أنها تعمل. لن تُفتح إعدادات التخمين قبل أن يثبت الاختبار انتقال الإنترنت ثم تأكيد </td><td class="mono"><a href="src/ui-html.html#L273">273</a></td><td>Enter an authorized card you know works. Card-format settings stay locked until </td></tr>
+<tr><td class="mono">f_known</td><td>بطاقة تعرف أنها تعمل</td><td class="mono"><a href="src/ui-html.html#L277">277</a></td><td>An authorized card you know works</td></tr>
+<tr><td class="mono">btn_calibrate</td><td>اختبر البطاقة وتعلّم شكل الطلب</td><td class="mono"><a href="src/ui-html.html#L281">281</a></td><td>Test card and learn request shape</td></tr>
+<tr><td class="mono">back_to_start</td><td>رجوع للبداية</td><td class="mono"><a href="src/ui-html.html#L292">292</a></td><td>Back to start</td></tr>
+<tr><td class="mono">next_format</td><td></td><td class="mono"><a href="src/ui-html.html#L294">294</a></td><td>Next: card format →</td></tr>
+<tr><td class="mono">format_title</td><td>2) صيغة البطاقة</td><td class="mono"><a href="src/ui-html.html#L308">308</a></td><td>2) Card format</td></tr>
+<tr><td class="mono">format_hint</td><td></td><td class="mono"><a href="src/ui-html.html#L310">310</a></td><td>Describe the card with its fixed prefix and full length. The login request shown</td></tr>
+<tr><td class="mono">saved_profiles</td><td>الملفات التعريفية المحفوظة</td><td class="mono"><a href="src/ui-html.html#L321">321</a></td><td>Saved profile</td></tr>
+<tr><td class="mono">btn_delete_profile</td><td>حذف</td><td class="mono"><a href="src/ui-html.html#L325">325</a></td><td>Delete this profile</td></tr>
+<tr><td class="mono">f_prefix</td><td>البادئة الثابتة</td><td class="mono"><a href="src/ui-html.html#L332">332</a></td><td>Fixed prefix</td></tr>
+<tr><td class="mono">f_length</td><td>طول الكرت الكامل</td><td class="mono"><a href="src/ui-html.html#L336">336</a></td><td>Full card length</td></tr>
+<tr><td class="mono">f_charset</td><td>الحروف/الأرقام المتغيّرة</td><td class="mono"><a href="src/ui-html.html#L340">340</a></td><td>Variable characters</td></tr>
+<tr><td class="mono">f_custom</td><td>محارف مخصّصة</td><td class="mono"><a href="src/ui-html.html#L344">344</a></td><td>Custom characters</td></tr>
+<tr><td class="mono">f_pass_mode</td><td>قيمة كلمة المرور</td><td class="mono"><a href="src/ui-html.html#L348">348</a></td><td>Password value</td></tr>
+<tr><td class="mono">f_dst</td><td>قيمة dst (وجهة الضيف)</td><td class="mono"><a href="src/ui-html.html#L352">352</a></td><td>dst value (guest destination)</td></tr>
+<tr><td class="mono">f_name</td><td>اسم الملف التعريفي</td><td class="mono"><a href="src/ui-html.html#L356">356</a></td><td>Profile name</td></tr>
+<tr><td class="mono">p_space</td><td>عدد الاحتمالات:</td><td class="mono"><a href="src/ui-html.html#L365">365</a></td><td>Combinations</td></tr>
+<tr><td class="mono">p_samples</td><td>أمثلة على البطاقات:</td><td class="mono"><a href="src/ui-html.html#L369">369</a></td><td>Sample cards</td></tr>
+<tr><td class="mono">p_request_shape</td><td>شكل الطلب المتوقع:</td><td class="mono"><a href="src/ui-html.html#L373">373</a></td><td>Expected request shape (sensitive values hidden)</td></tr>
+<tr><td class="mono">p_covered</td><td>مغطى من runs سابقة:</td><td class="mono"><a href="src/ui-html.html#L379">379</a></td><td>covered</td></tr>
+<tr><td class="mono">adv_open</td><td>خيارات متقدمة (عادة لا تحتاجها)</td><td class="mono"><a href="src/ui-html.html#L390">390</a></td><td>Advanced options (usually not needed)</td></tr>
+<tr><td class="mono">f_method</td><td>طريقة الطلب</td><td class="mono"><a href="src/ui-html.html#L394">394</a></td><td>Request method</td></tr>
+<tr><td class="mono">method_post</td><td>POST (الأكثر توافقاً)</td><td class="mono"><a href="src/ui-html.html#L398">398</a></td><td>POST (widest support)</td></tr>
+<tr><td class="mono">method_get</td><td>GET</td><td class="mono"><a href="src/ui-html.html#L400">400</a></td><td>GET</td></tr>
+<tr><td class="mono">f_user_field</td><td>اسم حقل المستخدم</td><td class="mono"><a href="src/ui-html.html#L404">404</a></td><td>Username field</td></tr>
+<tr><td class="mono">f_pass_field</td><td>اسم حقل كلمة المرور</td><td class="mono"><a href="src/ui-html.html#L408">408</a></td><td>Password field</td></tr>
+<tr><td class="mono">f_login_url</td><td>رابط إرسال الدخول (action)</td><td class="mono"><a href="src/ui-html.html#L412">412</a></td><td>Form action URL</td></tr>
+<tr><td class="mono">f_send_dst</td><td>إرسال حقل dst</td><td class="mono"><a href="src/ui-html.html#L418">418</a></td><td>Send the dst field</td></tr>
+<tr><td class="mono">f_send_popup</td><td>إرسال حقل popup</td><td class="mono"><a href="src/ui-html.html#L422">422</a></td><td>Send the popup field</td></tr>
+<tr><td class="mono">f_extra</td><td>حقول ثابتة إضافية (name=value)</td><td class="mono"><a href="src/ui-html.html#L424">424</a></td><td>Extra fixed fields (name=value)</td></tr>
+<tr><td class="mono">f_ua</td><td>هوية المتصفح User-Agent</td><td class="mono"><a href="src/ui-html.html#L428">428</a></td><td>browser identity (User-Agent)</td></tr>
+<tr><td class="mono">ua_default</td><td>نفس المتصفح الافتراضي (Chrome/Windows)</td><td class="mono"><a href="src/ui-html.html#L432">432</a></td><td>default browser (Chrome/Windows)</td></tr>
+<tr><td class="mono">ua_android</td><td>أندرويد Chrome</td><td class="mono"><a href="src/ui-html.html#L434">434</a></td><td>Android Chrome</td></tr>
+<tr><td class="mono">ua_iphone</td><td>آيفون Safari</td><td class="mono"><a href="src/ui-html.html#L436">436</a></td><td>iPhone Safari</td></tr>
+<tr><td class="mono">ua_custom</td><td>اكتبها بنفسك…</td><td class="mono"><a href="src/ui-html.html#L438">438</a></td><td>write a custom value…</td></tr>
+<tr><td class="mono">ua_hint</td><td>غيّرها فقط إذا كان الكرت يعمل في متصفح هاتفك لكن الراوتر يرفض شكل طلب الأداة.</td><td class="mono"><a href="src/ui-html.html#L440">440</a></td><td>Change this only when a card works in your phone browser but the router rejects </td></tr>
+<tr><td class="mono">f_ua_custom</td><td>User-Agent مخصص</td><td class="mono"><a href="src/ui-html.html#L442">442</a></td><td>custom User-Agent</td></tr>
+<tr><td class="mono">f_referer</td><td>إرسال ترويسات المتصفح (Referer/Origin)</td><td class="mono"><a href="src/ui-html.html#L448">448</a></td><td>send browser headers (Referer/Origin)</td></tr>
+<tr><td class="mono">f_words</td><td>كلمات النجاح (اختياري)</td><td class="mono"><a href="src/ui-html.html#L450">450</a></td><td>Success words (optional)</td></tr>
+<tr><td class="mono">f_words_clear</td><td>مسح</td><td class="mono"><a href="src/ui-html.html#L454">454</a></td><td>Clear</td></tr>
+<tr><td class="mono">f_words_hint</td><td>تُطابق هذه الكلمات نص الصفحة الظاهر فقط. امسحها إذا كانت قديمة أو غير صحيحة.</td><td class="mono"><a href="src/ui-html.html#L456">456</a></td><td>Only visible page text is matched. Clear these if they came from an old or incor</td></tr>
+<tr><td class="mono">btn_capture</td><td></td><td class="mono"><a href="src/ui-html.html#L462">462</a></td><td>Open the portal and record a successful login</td></tr>
+<tr><td class="mono">back_to_scan</td><td>رجوع للفحص</td><td class="mono"><a href="src/ui-html.html#L475">475</a></td><td>Back to scan</td></tr>
+<tr><td class="mono">btn_save</td><td>احفظ الملف التعريفي</td><td class="mono"><a href="src/ui-html.html#L477">477</a></td><td>Save profile</td></tr>
+<tr><td class="mono">next_run</td><td>التالي: التشغيل ←</td><td class="mono"><a href="src/ui-html.html#L479">479</a></td><td>Next: run →</td></tr>
+<tr><td class="mono">run_title</td><td>3) التشغيل</td><td class="mono"><a href="src/ui-html.html#L489">489</a></td><td>3) Run</td></tr>
+<tr><td class="mono">run_hint</td><td></td><td class="mono"><a href="src/ui-html.html#L491">491</a></td><td>Choose a safe load: faster settings increase the chance of a disconnect or netwo</td></tr>
+<tr><td class="mono">r_threads</td><td>عدد المسارات (Threads)</td><td class="mono"><a href="src/ui-html.html#L505">505</a></td><td>Threads</td></tr>
+<tr><td class="mono">r_attempts</td><td>عدد المحاولات</td><td class="mono"><a href="src/ui-html.html#L509">509</a></td><td>Attempts</td></tr>
+<tr><td class="mono">r_delay</td><td>الانتظار بين الطلبات (ms)</td><td class="mono"><a href="src/ui-html.html#L513">513</a></td><td>Delay between requests (ms)</td></tr>
+<tr><td class="mono">r_verify</td><td>تأكيد الإنترنت بعد أي بطاقة مقبولة</td><td class="mono"><a href="src/ui-html.html#L519">519</a></td><td>Verify internet after any accepted card</td></tr>
+<tr><td class="mono">r_autostop</td><td>إيقاف تلقائي عند أول نتيجة قوية</td><td class="mono"><a href="src/ui-html.html#L523">523</a></td><td>Auto-stop on the first strong result</td></tr>
+<tr><td class="mono">r_resume</td><td>المتابعة من حيث توقفت (بلا تكرار)</td><td class="mono"><a href="src/ui-html.html#L527">527</a></td><td>Continue where you stopped (no repeats)</td></tr>
+<tr><td class="mono">adv_run_open</td><td>خيارات متقدمة للتشغيل والشبكة</td><td class="mono"><a href="src/ui-html.html#L538">538</a></td><td>Advanced run &amp; network options</td></tr>
+<tr><td class="mono">f_internet_check</td><td>رابط اختبار الإنترنت المخصص</td><td class="mono"><a href="src/ui-html.html#L542">542</a></td><td>Custom internet-check URL</td></tr>
+<tr><td class="mono">f_internet_check_hint</td><td>يُستخدم بدل روابط Google/Microsoft/Apple عندما تحظرها الشبكة. الصيغة: url|status|نص اختياري</td><td class="mono"><a href="src/ui-html.html#L547">547</a></td><td>Used instead of Google/Microsoft/Apple when the network blocks them. Format: url</td></tr>
+<tr><td class="mono">f_connect_timeout</td><td>مهلة فتح الاتصال (ثوانٍ)</td><td class="mono"><a href="src/ui-html.html#L549">549</a></td><td>Connect timeout (seconds)</td></tr>
+<tr><td class="mono">f_connect_timeout_hint</td><td>ارفعها للراوترات البطيئة (RADIUS). القيمة تُحفظ محلياً.</td><td class="mono"><a href="src/ui-html.html#L553">553</a></td><td>Raise this for slow RADIUS routers. The value is stored locally.</td></tr>
+<tr><td class="mono">f_read_timeout</td><td>مهلة انتظار الرد (ثوانٍ)</td><td class="mono"><a href="src/ui-html.html#L555">555</a></td><td>Read timeout (seconds)</td></tr>
+<tr><td class="mono">btn_save_net_settings</td><td>احفظ إعدادات الشبكة</td><td class="mono"><a href="src/ui-html.html#L559">559</a></td><td>Save network settings</td></tr>
+<tr><td class="mono">btn_diagnose</td><td>تشخيص الشبكة أولاً</td><td class="mono"><a href="src/ui-html.html#L568">568</a></td><td>Diagnose the network first</td></tr>
+<tr><td class="mono">btn_lockout</td><td>قِس حدّ الحظر</td><td class="mono"><a href="src/ui-html.html#L570">570</a></td><td>measure the lock-out</td></tr>
+<tr><td class="mono">btn_clear_review</td><td>مسح صفحات المراجعة</td><td class="mono"><a href="src/ui-html.html#L572">572</a></td><td>Clear review pages</td></tr>
+<tr><td class="mono">license_check</td><td></td><td class="mono"><a href="src/ui-html.html#L585">585</a></td><td>I confirm I own this network or hold written permission from its owner.</td></tr>
+<tr><td class="mono">back_to_format</td><td>رجوع للصيغة</td><td class="mono"><a href="src/ui-html.html#L596">596</a></td><td>Back to format</td></tr>
+<tr><td class="mono">btn_start</td><td></td><td class="mono"><a href="src/ui-html.html#L598">598</a></td><td>Start guessing</td></tr>
+<tr><td class="mono">btn_stop</td><td></td><td class="mono"><a href="src/ui-html.html#L604">604</a></td><td>Stop</td></tr>
+<tr><td class="mono">res_title</td><td>4) النتائج الحيّة</td><td class="mono"><a href="src/ui-html.html#L618">618</a></td><td>4) Live results</td></tr>
+<tr><td class="mono">s_speed</td><td>السرعة0/s</td><td class="mono"><a href="src/ui-html.html#L623">623</a></td><td>Speed</td></tr>
+<tr><td class="mono">s_sent</td><td>أُرسل0</td><td class="mono"><a href="src/ui-html.html#L625">625</a></td><td>Sent</td></tr>
+<tr><td class="mono">s_covered</td><td>المغطى0</td><td class="mono"><a href="src/ui-html.html#L627">627</a></td><td>Covered</td></tr>
+<tr><td class="mono">s_latency</td><td>زمن الرد— ms</td><td class="mono"><a href="src/ui-html.html#L629">629</a></td><td>Latency</td></tr>
+<tr><td class="mono">s_delay</td><td>التباطؤ الحالي0 ms</td><td class="mono"><a href="src/ui-html.html#L631">631</a></td><td>Current slowdown</td></tr>
+<tr><td class="mono">s_eta</td><td>الوقت المتبقي—</td><td class="mono"><a href="src/ui-html.html#L633">633</a></td><td>time left</td></tr>
+<tr><td class="mono">s_state</td><td>الحالةجاهز</td><td class="mono"><a href="src/ui-html.html#L635">635</a></td><td>State</td></tr>
+<tr><td class="mono">attempt_table</td><td>سجل محاولات التشغيل</td><td class="mono"><a href="src/ui-html.html#L656">656</a></td><td>Run attempt log</td></tr>
+<tr><td class="mono">t_card</td><td>#البطاقةHTTP</td><td class="mono"><a href="src/ui-html.html#L660">660</a></td><td>Card</td></tr>
+<tr><td class="mono">t_result</td><td>النتيجةالسبب</td><td class="mono"><a href="src/ui-html.html#L662">662</a></td><td>Result</td></tr>
+<tr><td class="mono">t_why</td><td>النتيجةالسبب</td><td class="mono"><a href="src/ui-html.html#L662">662</a></td><td>Reason</td></tr>
+<tr><td class="mono">t_ms</td><td>msالحجم</td><td class="mono"><a href="src/ui-html.html#L664">664</a></td><td>ms</td></tr>
+<tr><td class="mono">t_len</td><td>msالحجم</td><td class="mono"><a href="src/ui-html.html#L664">664</a></td><td>Size</td></tr>
+<tr><td class="mono">btn_clear_log</td><td>تفريغ السجل</td><td class="mono"><a href="src/ui-html.html#L677">677</a></td><td>Clear log</td></tr>
+<tr><td class="mono">btn_download</td><td>تنزيل آخر تقرير</td><td class="mono"><a href="src/ui-html.html#L679">679</a></td><td>Download last report</td></tr>
+<tr><td class="mono">hits_title</td><td>البطاقات المقبولة</td><td class="mono"><a href="src/ui-html.html#L684">684</a></td><td>Accepted cards</td></tr>
+<tr><td class="mono">hits_none</td><td>لا شيء بعد.</td><td class="mono"><a href="src/ui-html.html#L686">686</a></td><td>Nothing yet.</td></tr>
+<tr><td class="mono">review_title</td><td>ردود غير واضحة (تحتاج نظرة منك)</td><td class="mono"><a href="src/ui-html.html#L689">689</a></td><td>Unclear replies (need your eyes)</td></tr>
+<tr><td class="mono">review_hint</td><td></td><td class="mono"><a href="src/ui-html.html#L691">691</a></td><td>Replies that are neither the rejection page nor a proven success. Saved for you </td></tr>
+<tr><td class="mono">review_none</td><td>لا شيء بعد.</td><td class="mono"><a href="src/ui-html.html#L699">699</a></td><td>Nothing yet.</td></tr>
+<tr><td class="mono">license_link</td><td>الترخيص</td><td class="mono"><a href="src/ui-html.html#L713">713</a></td><td>License</td></tr>
+<tr><td class="mono">quit_tool</td><td>إيقاف الأداة</td><td class="mono"><a href="src/ui-html.html#L717">717</a></td><td>Stop the tool</td></tr>
+</tbody></table></div>
+<h2 id="i18n">٢) قاموس الترجمة I18N في ui.js</h2><p>النصوص الديناميكية: رسائل، أسباب توقف، أحكام، أزرار تُبنى من مفاتيح آلية. <b>المفتاح + النص العربي + السطر</b>:</p><div class="scroll-x"><table class="t compact"><thead><tr><th>المفتاح</th><th>العربي</th><th>السطر</th><th>الإنجليزي</th></tr></thead><tbody>
+<tr><td class="mono">adv_open</td><td>خيارات متقدمة (عادة لا تحتاجها)</td><td class="mono"><a href="src/ui-js.html#L115">115</a></td><td>Advanced options (usually not needed)</td></tr>
+<tr><td class="mono">adv_run_open</td><td>خيارات متقدمة للتشغيل والشبكة</td><td class="mono"><a href="src/ui-js.html#L53">53</a></td><td>Advanced run &amp; network options</td></tr>
+<tr><td class="mono">advice</td><td>ماذا أفعل الآن</td><td class="mono"><a href="src/ui-js.html#L224">224</a></td><td>What to do next</td></tr>
+<tr><td class="mono">advice_already_online_no_captive_portal</td><td>أنت متصل بالإنترنت فعلاً - تأكد أنك على شبكة الضيف الصحيحة.</td><td class="mono"><a href="src/ui-js.html#L371">371</a></td><td>You are online already - make sure you are on the guest network.</td></tr>
+<tr><td class="mono">advice_blocked_already</td><td>الشبكة تحجب هذا الجهاز. أوقف المحاولات واطلب من مسؤول الشبكة مراجعة الوصول وإعادة الخدمة.</td><td class="mono"><a href="src/ui-js.html#L368">368</a></td><td>The network is blocking this device. Stop attempts and ask the network administrator to re</td></tr>
+<tr><td class="mono">advice_router_pressure</td><td>الأخطاء سببها ضغط على الراوتر: قلّل عدد المسارات.</td><td class="mono"><a href="src/ui-js.html#L369">369</a></td><td>The errors come from router pressure: lower the thread count.</td></tr>
+<tr><td class="mono">advice_slow_router</td><td>الراوتر بطيء في الرد: استخدم مسارات أقل وانتظاراً أطول.</td><td class="mono"><a href="src/ui-js.html#L370">370</a></td><td>The router answers slowly: fewer threads and more delay.</td></tr>
+<tr><td class="mono">attempt</td><td>محاولة</td><td class="mono"><a href="src/ui-js.html#L179">179</a></td><td>attempt</td></tr>
+<tr><td class="mono">attempt_table</td><td>سجل محاولات التشغيل</td><td class="mono"><a href="src/ui-js.html#L94">94</a></td><td>Run attempt log</td></tr>
+<tr><td class="mono">back_to_format</td><td>رجوع للصيغة</td><td class="mono"><a href="src/ui-js.html#L20">20</a></td><td>Back to format</td></tr>
+<tr><td class="mono">back_to_saved</td><td>رجوع للقائمة</td><td class="mono"><a href="src/ui-js.html#L18">18</a></td><td>Back to list</td></tr>
+<tr><td class="mono">back_to_scan</td><td>رجوع للفحص</td><td class="mono"><a href="src/ui-js.html#L19">19</a></td><td>Back to scan</td></tr>
+<tr><td class="mono">back_to_start</td><td>رجوع للبداية</td><td class="mono"><a href="src/ui-js.html#L17">17</a></td><td>Back to start</td></tr>
+<tr><td class="mono">ban_evidence_form</td><td>نموذج الدخول لا يزال ظاهراً</td><td class="mono"><a href="src/ui-js.html#L62">62</a></td><td>Login form still visible</td></tr>
+<tr><td class="mono">ban_evidence_kind</td><td>تصنيف مبدئي</td><td class="mono"><a href="src/ui-js.html#L63">63</a></td><td>Soft classification</td></tr>
+<tr><td class="mono">ban_evidence_label</td><td>دليل الحظر للمشرف</td><td class="mono"><a href="src/ui-js.html#L59">59</a></td><td>Block evidence for the admin</td></tr>
+<tr><td class="mono">ban_evidence_status</td><td>حالة HTTP</td><td class="mono"><a href="src/ui-js.html#L60">60</a></td><td>HTTP status</td></tr>
+<tr><td class="mono">ban_evidence_word</td><td>العبارة المكتشفة</td><td class="mono"><a href="src/ui-js.html#L61">61</a></td><td>Matched phrase</td></tr>
+<tr><td class="mono">banner_more</td><td>التفاصيل</td><td class="mono"><a href="src/ui-js.html#L81">81</a></td><td>Details</td></tr>
+<tr><td class="mono">banner_text</td><td>هذه الأداة للاختبار على شبكة تملكها أو لديك إذن كتابي من صاحبها. لا تستخدمها على شبكة غيرك.</td><td class="mono"><a href="src/ui-js.html#L80">80</a></td><td>Use this tool only on a network you own or have written permission to test. Never test som</td></tr>
+<tr><td class="mono">banner_title</td><td>استخدام مصرّح به فقط</td><td class="mono"><a href="src/ui-js.html#L79">79</a></td><td>Authorized use only</td></tr>
+<tr><td class="mono">block_but_form_present</td><td>لكن الصفحة ما زال فيها نموذج الدخول</td><td class="mono"><a href="src/ui-js.html#L262">262</a></td><td>but the page still has the login form</td></tr>
+<tr><td class="mono">brand_subtitle</td><td>اختبار شبكات مصرح به</td><td class="mono"><a href="src/ui-js.html#L74">74</a></td><td>Authorized network testing</td></tr>
+<tr><td class="mono">btn_calibrate</td><td>اختبر البطاقة وتعلّم شكل الطلب</td><td class="mono"><a href="src/ui-js.html#L120">120</a></td><td>Test card and learn request shape</td></tr>
+<tr><td class="mono">btn_cancel</td><td>إلغاء</td><td class="mono"><a href="src/ui-js.html#L71">71</a></td><td>Cancel</td></tr>
+<tr><td class="mono">btn_capture</td><td>افتح البوابة وسجّل دخولاً ناجحاً</td><td class="mono"><a href="src/ui-js.html#L121">121</a></td><td>Open the portal and record a successful login</td></tr>
+<tr><td class="mono">btn_clear_log</td><td>تفريغ السجل</td><td class="mono"><a href="src/ui-js.html#L189">189</a></td><td>Clear log</td></tr>
+<tr><td class="mono">btn_clear_review</td><td>مسح صفحات المراجعة</td><td class="mono"><a href="src/ui-js.html#L182">182</a></td><td>Clear review pages</td></tr>
+<tr><td class="mono">btn_continue</td><td>متابعة</td><td class="mono"><a href="src/ui-js.html#L70">70</a></td><td>Continue</td></tr>
+<tr><td class="mono">btn_delete_profile</td><td>حذف هذا الملف</td><td class="mono"><a href="src/ui-js.html#L101">101</a></td><td>Delete this profile</td></tr>
+<tr><td class="mono">btn_diagnose</td><td>تشخيص الشبكة أولاً</td><td class="mono"><a href="src/ui-js.html#L181">181</a></td><td>Diagnose the network first</td></tr>
+<tr><td class="mono">btn_download</td><td>تنزيل آخر تقرير</td><td class="mono"><a href="src/ui-js.html#L189">189</a></td><td>Download last report</td></tr>
+<tr><td class="mono">btn_export_profile</td><td>تصدير JSON</td><td class="mono"><a href="src/ui-js.html#L40">40</a></td><td>Export JSON</td></tr>
+<tr><td class="mono">btn_import_profile</td><td>استيراد JSON</td><td class="mono"><a href="src/ui-js.html#L41">41</a></td><td>Import JSON</td></tr>
+<tr><td class="mono">btn_lockout</td><td>قِس حدّ الحظر</td><td class="mono"><a href="src/ui-js.html#L168">168</a></td><td>measure the lock-out</td></tr>
+<tr><td class="mono">btn_new_profile</td><td>بروفايل جديد</td><td class="mono"><a href="src/ui-js.html#L13">13</a></td><td>New profile</td></tr>
+<tr><td class="mono">btn_save</td><td>احفظ الملف التعريفي</td><td class="mono"><a href="src/ui-js.html#L133">133</a></td><td>Save profile</td></tr>
+<tr><td class="mono">btn_save_net_settings</td><td>احفظ إعدادات الشبكة</td><td class="mono"><a href="src/ui-js.html#L52">52</a></td><td>Save network settings</td></tr>
+<tr><td class="mono">btn_saved_profile</td><td>استخدام بروفايل محفوظ</td><td class="mono"><a href="src/ui-js.html#L14">14</a></td><td>Use saved profile</td></tr>
+<tr><td class="mono">btn_start</td><td>ابدأ التخمين</td><td class="mono"><a href="src/ui-js.html#L184">184</a></td><td>Start guessing</td></tr>
+<tr><td class="mono">btn_start_from_review</td><td>ابدأ التخمين</td><td class="mono"><a href="src/ui-js.html#L24">24</a></td><td>Start guessing</td></tr>
+<tr><td class="mono">btn_stop</td><td>إيقاف</td><td class="mono"><a href="src/ui-js.html#L184">184</a></td><td>Stop</td></tr>
+<tr><td class="mono">cache_all</td><td>مسح كل شيء</td><td class="mono"><a href="src/ui-js.html#L204">204</a></td><td>Clear everything</td></tr>
+<tr><td class="mono">cache_freed</td><td>تم المسح. حجم ما أُزيل:</td><td class="mono"><a href="src/ui-js.html#L205">205</a></td><td>Cleared. Freed:</td></tr>
+<tr><td class="mono">cache_hint</td><td>الكاش = صفحات المراجعة + التقارير + السجلات. الملفات التعريفية منفصلة، و«مسح التقارير» يحذف أيضاً سجل البطاقات.</td><td class="mono"><a href="src/ui-js.html#L200">200</a></td><td>Cache = review pages + reports + logs. Profiles are separate; clearing the results also de</td></tr>
+<tr><td class="mono">cache_profiles</td><td>مسح الملفات التعريفية</td><td class="mono"><a href="src/ui-js.html#L203">203</a></td><td>Clear profiles</td></tr>
+<tr><td class="mono">cache_results</td><td>مسح التقارير والسجلات</td><td class="mono"><a href="src/ui-js.html#L202">202</a></td><td>Clear reports, logs &amp; hits</td></tr>
+<tr><td class="mono">cache_temp</td><td>مسح المؤقت وصفحات المراجعة</td><td class="mono"><a href="src/ui-js.html#L201">201</a></td><td>Clear temp + review pages</td></tr>
+<tr><td class="mono">cache_title</td><td>الكاش ومسحه</td><td class="mono"><a href="src/ui-js.html#L199">199</a></td><td>Cache &amp; cleanup</td></tr>
+<tr><td class="mono">cal_blocked_already</td><td>الراوتر يرفض الطلبات بسبب حجب نشط (توقفت الأداة دون إعادة المحاولة)</td><td class="mono"><a href="src/ui-js.html#L342">342</a></td><td>the router is refusing requests due to an active block (the tool stopped without retrying)</td></tr>
+<tr><td class="mono">cal_blocked_before_probes</td><td>صفحة الحجب ظهرت قبل أن نجرّب أي بطاقة: الراوتر حاجب هذا الجهاز من قبل</td><td class="mono"><a href="src/ui-js.html#L343">343</a></td><td>the block page was already there before we tried any card - the router blocked this device</td></tr>
+<tr><td class="mono">cal_blocked_by_our_probes</td><td>ظهر رد حجب أثناء المعايرة فتوقفت الأداة دون انتظار أو إعادة محاولة</td><td class="mono"><a href="src/ui-js.html#L344">344</a></td><td>a block reply appeared during calibration, so the tool stopped without waiting or retrying</td></tr>
+<tr><td class="mono">cal_browser_trace</td><td>افتح F12 في المتصفح وانسخ بيانات نموذج الدخول وأرسلها لي</td><td class="mono"><a href="src/ui-js.html#L360">360</a></td><td>open F12 in the browser and copy the login form data</td></tr>
+<tr><td class="mono">cal_captcha_challenge</td><td>ظهرت كابتشا أو خطوة تحقق؛ توقفت الأداة ولن تتابع الطلبات</td><td class="mono"><a href="src/ui-js.html#L345">345</a></td><td>a CAPTCHA or verification challenge appeared; the tool stopped sending requests</td></tr>
+<tr><td class="mono">cal_card_space_empty</td><td>صيغة البطاقة لا تترك شيئاً للتخمين</td><td class="mono"><a href="src/ui-js.html#L346">346</a></td><td>the card format leaves nothing to guess</td></tr>
+<tr><td class="mono">cal_failed_hint</td><td>لم تُجرَ أي محاولة لأن الأداة لم تستطع تعلّم شكل صفحة الرفض. هذا ما فعله الراوتر:</td><td class="mono"><a href="src/ui-js.html#L241">241</a></td><td>No attempt was made because the tool could not learn what a rejected card looks like. This</td></tr>
+<tr><td class="mono">cal_failed_title</td><td>لم أبدأ التخمين: فشل التعلّم الأولي</td><td class="mono"><a href="src/ui-js.html#L240">240</a></td><td>Nothing was tried: the initial learning failed</td></tr>
+<tr><td class="mono">cal_http_ok</td><td>الصفحة ردت بشكل سليم</td><td class="mono"><a href="src/ui-js.html#L355">355</a></td><td>the page answered</td></tr>
+<tr><td class="mono">cal_internet_blocked</td><td>محجوب من الشبكة</td><td class="mono"><a href="src/ui-js.html#L144">144</a></td><td>blocked by the network</td></tr>
+<tr><td class="mono">cal_internet_offline</td><td>لا يوجد اتصال</td><td class="mono"><a href="src/ui-js.html#L143">143</a></td><td>no connection</td></tr>
+<tr><td class="mono">cal_internet_online</td><td>متصل بالإنترنت فعلاً</td><td class="mono"><a href="src/ui-js.html#L142">142</a></td><td>already online</td></tr>
+<tr><td class="mono">cal_internet_state</td><td>حالة الإنترنت قبل أي محاولة</td><td class="mono"><a href="src/ui-js.html#L350">350</a></td><td>Internet state before any attempt</td></tr>
+<tr><td class="mono">cal_internet_unknown</td><td>حالة الشبكة غير معروفة</td><td class="mono"><a href="src/ui-js.html#L145">145</a></td><td>network state unknown</td></tr>
+<tr><td class="mono">cal_internet_walled</td><td>خلف بوابة الدخول (يحتاج بطاقة)</td><td class="mono"><a href="src/ui-js.html#L141">141</a></td><td>behind the login portal (needs a card)</td></tr>
+<tr><td class="mono">cal_known_card_not_proven</td><td>لم أستطع إثبات أن هذا الكرت يعمل</td><td class="mono"><a href="src/ui-js.html#L147">147</a></td><td>this card could not be proven to work</td></tr>
+<tr><td class="mono">cal_known_card_out_of_format</td><td>الكرت لا يطابق صيغة البطاقات</td><td class="mono"><a href="src/ui-js.html#L146">146</a></td><td>the card does not match the card format</td></tr>
+<tr><td class="mono">cal_known_card_works</td><td>البطاقة المعروفة تعمل مع هذا الشكل</td><td class="mono"><a href="src/ui-js.html#L357">357</a></td><td>the known card works with this shape</td></tr>
+<tr><td class="mono">cal_learned</td><td>تم التعلّم بنجاح</td><td class="mono"><a href="src/ui-js.html#L356">356</a></td><td>learned</td></tr>
+<tr><td class="mono">cal_logout_unconfirmed</td><td>لم أستطع تأكيد تسجيل الخروج؛ أوقفت أي محاولات أخرى</td><td class="mono"><a href="src/ui-js.html#L148">148</a></td><td>could not confirm logout; stopped further attempts</td></tr>
+<tr><td class="mono">cal_no_rejection_baseline</td><td>لم يصل أي رد من الراوتر على بطاقات التجربة</td><td class="mono"><a href="src/ui-js.html#L347">347</a></td><td>no reply came back for the test cards</td></tr>
+<tr><td class="mono">cal_probe_looked_accepted</td><td>بطاقة تجريبية بدت مقبولة</td><td class="mono"><a href="src/ui-js.html#L353">353</a></td><td>A test card looked accepted</td></tr>
+<tr><td class="mono">cal_reach_login_page</td><td>الوصول إلى صفحة الدخول</td><td class="mono"><a href="src/ui-js.html#L349">349</a></td><td>Reaching the login page</td></tr>
+<tr><td class="mono">cal_rejection_baseline</td><td>تعلّم شكل صفحة الرفض</td><td class="mono"><a href="src/ui-js.html#L351">351</a></td><td>Learning the rejection page</td></tr>
+<tr><td class="mono">cal_rejection_probe</td><td>إرسال بطاقات تجريبية</td><td class="mono"><a href="src/ui-js.html#L352">352</a></td><td>Sending test cards</td></tr>
+<tr><td class="mono">cal_request_shape_rejected</td><td>الراوتر رفض شكل الطلب قبل أن يفحص الكرت (HTTP 400/405/415/422). الأداة أخذت الكوكي والرمز المخفي؛ جرّب هوية نفس متصفحك، وإن استمر فالصفحة تنفّذ JavaSc</td><td class="mono"><a href="src/ui-js.html#L348">348</a></td><td>The router rejected the request before judging the card (HTTP 400/405/415/422). Cookies an</td></tr>
+<tr><td class="mono">cal_shape_tuned</td><td>ضبط شكل الطلب باستخدام البطاقة المعروفة</td><td class="mono"><a href="src/ui-js.html#L354">354</a></td><td>Tuning the request shape with your known card</td></tr>
+<tr><td class="mono">calibration_applied</td><td>نجح الاختبار وطُبّق شكل الطلب على الإعدادات</td><td class="mono"><a href="src/ui-js.html#L92">92</a></td><td>Test passed; request settings applied</td></tr>
+<tr><td class="mono">calibration_required</td><td>يجب إكمال الاختبار أولاً</td><td class="mono"><a href="src/ui-js.html#L88">88</a></td><td>Calibration is required first</td></tr>
+<tr><td class="mono">calibration_required_hint</td><td>ارجع إلى فحص الشبكة، أدخل بطاقة مصرحاً بها تعمل، ثم نفّذ الاختبار. ستُطبّق إعدادات الطلب التي أثبتت نجاحها على الصفحة التالية.</td><td class="mono"><a href="src/ui-js.html#L89">89</a></td><td>Return to Network Check, enter an authorized working card, and run the test. Its proven re</td></tr>
+<tr><td class="mono">calibration_setup_hint</td><td>أدخل بطاقة مصرحاً بها وتعرف أنها تعمل. لن تُفتح إعدادات التخمين قبل أن يثبت الاختبار انتقال الإنترنت ثم تأكيد الخروج.</td><td class="mono"><a href="src/ui-js.html#L87">87</a></td><td>Enter an authorized card you know works. Card-format settings stay locked until the test c</td></tr>
+<tr><td class="mono">calibration_setup_title</td><td>اختبار البطاقة المعروفة وتعلّم الطلب</td><td class="mono"><a href="src/ui-js.html#L86">86</a></td><td>Test the known card and learn the request</td></tr>
+<tr><td class="mono">calibration_shape_changed</td><td>تغيّر شكل الطلب بعد الاختبار</td><td class="mono"><a href="src/ui-js.html#L90">90</a></td><td>The request shape changed after calibration</td></tr>
+<tr><td class="mono">calibration_shape_changed_hint</td><td>لن يبدأ التشغيل بإعدادات لم تُختبر. ارجع إلى فحص الشبكة وأعد اختبار البطاقة بعد مراجعة إعدادات الطلب.</td><td class="mono"><a href="src/ui-js.html#L91">91</a></td><td>The run will not start with untested request settings. Return to Network Check and calibra</td></tr>
+<tr><td class="mono">capture_blocked_body</td><td>تحويل كلمة المرور يستخدم JavaScript مخصصاً غير معروف. لا ندّعي أنه قابل للأتمتة.</td><td class="mono"><a href="src/ui-js.html#L127">127</a></td><td>The password transform uses unknown custom JavaScript. We do not claim it can be automated</td></tr>
+<tr><td class="mono">capture_blocked_next</td><td>الخطوة التالية: سجّل الدخول يدوياً عند الحاجة. التقرير المنقّح لا يحتوي رقم البطاقة ولا كلمة المرور.</td><td class="mono"><a href="src/ui-js.html#L128">128</a></td><td>Next: log in by hand when you need to. The redacted report contains neither the card numbe</td></tr>
+<tr><td class="mono">capture_blocked_title</td><td>التخمين الآلي غير متاح لهذه البوابة</td><td class="mono"><a href="src/ui-js.html#L126">126</a></td><td>Automated guessing is not available for this portal</td></tr>
+<tr><td class="mono">capture_curl_label</td><td>أمر curl منقّح (بدون أسرار)</td><td class="mono"><a href="src/ui-js.html#L65">65</a></td><td>Redacted curl command (no secrets)</td></tr>
+<tr><td class="mono">capture_fail</td><td>تعذّر بدء المسجّل</td><td class="mono"><a href="src/ui-js.html#L125">125</a></td><td>Could not start the recorder</td></tr>
+<tr><td class="mono">capture_finish</td><td>إنهاء + تنزيل التقرير</td><td class="mono"><a href="src/ui-js.html#L132">132</a></td><td>Finish + download the report</td></tr>
+<tr><td class="mono">capture_guide_link</td><td>دليل المسجل اليدوي</td><td class="mono"><a href="src/ui-js.html#L64">64</a></td><td>Manual recorder guide</td></tr>
+<tr><td class="mono">capture_hint</td><td>تُفتح البوابة داخل إطار معزول (بدون allow-same-origin) ولا يصل JavaScript الصفحة إلى واجهة KiraPass. سجّل دخولاً ناجحاً ثم علّم صفحات النجاح/الرفض/الإ</td><td class="mono"><a href="src/ui-js.html#L122">122</a></td><td>The portal opens in an isolated frame (no allow-same-origin). Its JavaScript cannot reach </td></tr>
+<tr><td class="mono">capture_mark_reject</td><td>هذه صفحة رفض</td><td class="mono"><a href="src/ui-js.html#L130">130</a></td><td>This is a reject page</td></tr>
+<tr><td class="mono">capture_mark_status</td><td>هذه صفحة الإحصائيات</td><td class="mono"><a href="src/ui-js.html#L131">131</a></td><td>This is the statistics page</td></tr>
+<tr><td class="mono">capture_mark_success</td><td>هذه صفحة النجاح</td><td class="mono"><a href="src/ui-js.html#L129">129</a></td><td>This is the success page</td></tr>
+<tr><td class="mono">capture_opened</td><td>فُتح المسجّل في نافذة جديدة.</td><td class="mono"><a href="src/ui-js.html#L123">123</a></td><td>The recorder opened in a new window.</td></tr>
+<tr><td class="mono">capture_popup_blocked</td><td>منع المتصفح فتح النافذة. اسمح بالنوافذ المنبثقة لهذا العنوان ثم حاول مجدداً.</td><td class="mono"><a href="src/ui-js.html#L124">124</a></td><td>Your browser blocked the new window. Allow pop-ups for this address, then try again.</td></tr>
+<tr><td class="mono">chap_detected</td><td>يستخدم تشفير MD5 الخاص بميكروتك</td><td class="mono"><a href="src/ui-js.html#L219">219</a></td><td>uses the MikroTik MD5 (chap) scheme</td></tr>
+<tr><td class="mono">chap_hint</td><td>تم اكتشاف md5.js لذلك ستُستخدم صيغة chap تلقائياً.</td><td class="mono"><a href="src/ui-js.html#L220">220</a></td><td>md5.js detected - the chap formula will be used automatically.</td></tr>
+<tr><td class="mono">close</td><td>إغلاق</td><td class="mono"><a href="src/ui-js.html#L232">232</a></td><td>Close</td></tr>
+<tr><td class="mono">confirm_clear_all</td><td>سيتم مسح كل شيء بما فيها الملفات التعريفية. متأكد؟</td><td class="mono"><a href="src/ui-js.html#L230">230</a></td><td>Everything will be deleted, including profiles. Sure?</td></tr>
+<tr><td class="mono">confirm_profiles</td><td>سيتم مسح الملفات التعريفية. متأكد؟</td><td class="mono"><a href="src/ui-js.html#L231">231</a></td><td>Profiles will be deleted. Sure?</td></tr>
+<tr><td class="mono">confirm_quit</td><td>سيتم إيقاف الأداة وإغلاق الصفحة. متأكد؟</td><td class="mono"><a href="src/ui-js.html#L234">234</a></td><td>The tool will shut down and this page will stop working. Sure?</td></tr>
+<tr><td class="mono">cs_alnum</td><td>أرقام وحروف صغيرة</td><td class="mono"><a href="src/ui-js.html#L391">391</a></td><td>digits + lowercase</td></tr>
+<tr><td class="mono">cs_alnum_upper</td><td>أرقام وحروف كبيرة</td><td class="mono"><a href="src/ui-js.html#L391">391</a></td><td>digits + uppercase</td></tr>
+<tr><td class="mono">cs_digits</td><td>أرقام فقط</td><td class="mono"><a href="src/ui-js.html#L390">390</a></td><td>digits</td></tr>
+<tr><td class="mono">cs_hex</td><td>سداسي عشري صغير</td><td class="mono"><a href="src/ui-js.html#L392">392</a></td><td>hex lowercase</td></tr>
+<tr><td class="mono">cs_hex_upper</td><td>سداسي عشري كبير</td><td class="mono"><a href="src/ui-js.html#L392">392</a></td><td>hex uppercase</td></tr>
+<tr><td class="mono">cs_lower</td><td>حروف صغيرة</td><td class="mono"><a href="src/ui-js.html#L390">390</a></td><td>lowercase</td></tr>
+<tr><td class="mono">cs_upper</td><td>حروف كبيرة</td><td class="mono"><a href="src/ui-js.html#L390">390</a></td><td>uppercase</td></tr>
+<tr><td class="mono">detected</td><td>ما اكتشفته الأداة</td><td class="mono"><a href="src/ui-js.html#L216">216</a></td><td>What the tool detected</td></tr>
+<tr><td class="mono">diag_ban_check</td><td>فحص الحجب</td><td class="mono"><a href="src/ui-js.html#L365">365</a></td><td>Block check</td></tr>
+<tr><td class="mono">diag_ban_page_seen</td><td>ظهرت صفحة حجب</td><td class="mono"><a href="src/ui-js.html#L367">367</a></td><td>a block page appeared</td></tr>
+<tr><td class="mono">diag_errors_present</td><td>توجد أخطاء</td><td class="mono"><a href="src/ui-js.html#L366">366</a></td><td>errors present</td></tr>
+<tr><td class="mono">diag_errors_rising</td><td>الأخطاء تزيد مع السرعة</td><td class="mono"><a href="src/ui-js.html#L366">366</a></td><td>errors rise with speed</td></tr>
+<tr><td class="mono">diag_internet</td><td>حالة الإنترنت</td><td class="mono"><a href="src/ui-js.html#L363">363</a></td><td>Internet state</td></tr>
+<tr><td class="mono">diag_no_ban_seen</td><td>لا يوجد حجب</td><td class="mono"><a href="src/ui-js.html#L367">367</a></td><td>no blocking seen</td></tr>
+<tr><td class="mono">diag_ok</td><td>سليم</td><td class="mono"><a href="src/ui-js.html#L366">366</a></td><td>clean</td></tr>
+<tr><td class="mono">diag_reach</td><td>الوصول للراوتر</td><td class="mono"><a href="src/ui-js.html#L363">363</a></td><td>Reaching the router</td></tr>
+<tr><td class="mono">diag_sample_parallel</td><td>قياس بعدة مسارات</td><td class="mono"><a href="src/ui-js.html#L364">364</a></td><td>Measuring under load</td></tr>
+<tr><td class="mono">diag_sample_single</td><td>قياس بمسار واحد</td><td class="mono"><a href="src/ui-js.html#L364">364</a></td><td>Measuring with one thread</td></tr>
+<tr><td class="mono">done_now</td><td>انتهى</td><td class="mono"><a href="src/ui-js.html#L222">222</a></td><td>Finished</td></tr>
+<tr><td class="mono">download_calibration_report</td><td>تنزيل تقرير المعايرة المنقّح</td><td class="mono"><a href="src/ui-js.html#L229">229</a></td><td>Download redacted calibration report</td></tr>
+<tr><td class="mono">dst_values</td><td>قيم dst الموجودة</td><td class="mono"><a href="src/ui-js.html#L219">219</a></td><td>dst values found</td></tr>
+<tr><td class="mono">dyn_tokens</td><td>رموز متغيّرة تم تجاهلها</td><td class="mono"><a href="src/ui-js.html#L361">361</a></td><td>dynamic tokens ignored</td></tr>
+<tr><td class="mono">edit_settings</td><td>تعديل الإعدادات</td><td class="mono"><a href="src/ui-js.html#L23">23</a></td><td>Edit settings</td></tr>
+<tr><td class="mono">exact_mode</td><td>مقارنة دقيقة جاهزة</td><td class="mono"><a href="src/ui-js.html#L361">361</a></td><td>exact comparison ready</td></tr>
+<tr><td class="mono">export_ok</td><td>تم تنزيل البروفايل</td><td class="mono"><a href="src/ui-js.html#L44">44</a></td><td>Profile downloaded</td></tr>
+<tr><td class="mono">extra_fields</td><td>حقول ثابتة</td><td class="mono"><a href="src/ui-js.html#L218">218</a></td><td>Fixed fields</td></tr>
+<tr><td class="mono">f_charset</td><td>الحروف/الأرقام المتغيّرة</td><td class="mono"><a href="src/ui-js.html#L102">102</a></td><td>Variable characters</td></tr>
+<tr><td class="mono">f_connect_timeout</td><td>مهلة فتح الاتصال (ثوانٍ)</td><td class="mono"><a href="src/ui-js.html#L49">49</a></td><td>Connect timeout (seconds)</td></tr>
+<tr><td class="mono">f_connect_timeout_hint</td><td>ارفعها للراوترات البطيئة (RADIUS). القيمة تُحفظ محلياً.</td><td class="mono"><a href="src/ui-js.html#L50">50</a></td><td>Raise this for slow RADIUS routers. The value is stored locally.</td></tr>
+<tr><td class="mono">f_custom</td><td>محارف مخصّصة</td><td class="mono"><a href="src/ui-js.html#L102">102</a></td><td>Custom characters</td></tr>
+<tr><td class="mono">f_dst</td><td>قيمة dst (وجهة الضيف)</td><td class="mono"><a href="src/ui-js.html#L103">103</a></td><td>dst value (guest destination)</td></tr>
+<tr><td class="mono">f_extra</td><td>حقول ثابتة إضافية (name=value)</td><td class="mono"><a href="src/ui-js.html#L110">110</a></td><td>Extra fixed fields (name=value)</td></tr>
+<tr><td class="mono">f_internet_check</td><td>رابط اختبار الإنترنت المخصص</td><td class="mono"><a href="src/ui-js.html#L47">47</a></td><td>Custom internet-check URL</td></tr>
+<tr><td class="mono">f_internet_check_hint</td><td>يُستخدم بدل روابط Google/Microsoft/Apple عندما تحظرها الشبكة. الصيغة: url|status|نص اختياري</td><td class="mono"><a href="src/ui-js.html#L48">48</a></td><td>Used instead of Google/Microsoft/Apple when the network blocks them. Format: url|status|op</td></tr>
+<tr><td class="mono">f_known</td><td>بطاقة مصرح بها تعرف أنها تعمل</td><td class="mono"><a href="src/ui-js.html#L114">114</a></td><td>An authorized card you know works</td></tr>
+<tr><td class="mono">f_length</td><td>طول الكرت الكامل</td><td class="mono"><a href="src/ui-js.html#L99">99</a></td><td>Full card length</td></tr>
+<tr><td class="mono">f_login_url</td><td>رابط إرسال الدخول (action)</td><td class="mono"><a href="src/ui-js.html#L107">107</a></td><td>Form action URL</td></tr>
+<tr><td class="mono">f_method</td><td>طريقة الطلب</td><td class="mono"><a href="src/ui-js.html#L105">105</a></td><td>Request method</td></tr>
+<tr><td class="mono">f_name</td><td>اسم الملف التعريفي</td><td class="mono"><a href="src/ui-js.html#L104">104</a></td><td>Profile name</td></tr>
+<tr><td class="mono">f_pass_field</td><td>اسم حقل كلمة المرور</td><td class="mono"><a href="src/ui-js.html#L107">107</a></td><td>Password field</td></tr>
+<tr><td class="mono">f_pass_mode</td><td>قيمة كلمة المرور</td><td class="mono"><a href="src/ui-js.html#L103">103</a></td><td>Password value</td></tr>
+<tr><td class="mono">f_prefix</td><td>البادئة الثابتة</td><td class="mono"><a href="src/ui-js.html#L99">99</a></td><td>Fixed prefix</td></tr>
+<tr><td class="mono">f_read_timeout</td><td>مهلة انتظار الرد (ثوانٍ)</td><td class="mono"><a href="src/ui-js.html#L51">51</a></td><td>Read timeout (seconds)</td></tr>
+<tr><td class="mono">f_referer</td><td>إرسال ترويسات المتصفح (Referer/Origin)</td><td class="mono"><a href="src/ui-js.html#L167">167</a></td><td>send browser headers (Referer/Origin)</td></tr>
+<tr><td class="mono">f_send_dst</td><td>إرسال حقل dst</td><td class="mono"><a href="src/ui-js.html#L108">108</a></td><td>Send the dst field</td></tr>
+<tr><td class="mono">f_send_popup</td><td>إرسال حقل popup</td><td class="mono"><a href="src/ui-js.html#L109">109</a></td><td>Send the popup field</td></tr>
+<tr><td class="mono">f_ua</td><td>هوية المتصفح User-Agent</td><td class="mono"><a href="src/ui-js.html#L161">161</a></td><td>browser identity (User-Agent)</td></tr>
+<tr><td class="mono">f_ua_custom</td><td>User-Agent مخصص</td><td class="mono"><a href="src/ui-js.html#L162">162</a></td><td>custom User-Agent</td></tr>
+<tr><td class="mono">f_user_field</td><td>اسم حقل المستخدم</td><td class="mono"><a href="src/ui-js.html#L106">106</a></td><td>Username field</td></tr>
+<tr><td class="mono">f_words</td><td>كلمات النجاح (اختياري)</td><td class="mono"><a href="src/ui-js.html#L111">111</a></td><td>Success words (optional)</td></tr>
+<tr><td class="mono">f_words_clear</td><td>مسح</td><td class="mono"><a href="src/ui-js.html#L112">112</a></td><td>Clear</td></tr>
+<tr><td class="mono">f_words_hint</td><td>تُطابق هذه الكلمات نص الصفحة الظاهر فقط. امسحها إذا كانت قديمة أو غير صحيحة.</td><td class="mono"><a href="src/ui-js.html#L113">113</a></td><td>Only visible page text is matched. Clear these if they came from an old or incorrect captu</td></tr>
+<tr><td class="mono">form_action</td><td>رابط الإرسال</td><td class="mono"><a href="src/ui-js.html#L216">216</a></td><td>Form action</td></tr>
+<tr><td class="mono">form_method</td><td>طريقة الإرسال</td><td class="mono"><a href="src/ui-js.html#L217">217</a></td><td>Method</td></tr>
+<tr><td class="mono">format_hint</td><td>اكتب شكل الكرت: البادئة الثابتة + طول الكرت الكامل. شكل طلب الدخول المعروض أدناه تعلّمناه واختبرناه في الخطوة السابقة؛ إذا غيّرت إعدادات الطلب المتقدم</td><td class="mono"><a href="src/ui-js.html#L98">98</a></td><td>Describe the card with its fixed prefix and full length. The login request shown below was</td></tr>
+<tr><td class="mono">format_title</td><td>2) صيغة البطاقة</td><td class="mono"><a href="src/ui-js.html#L97">97</a></td><td>2) Card format</td></tr>
+<tr><td class="mono">hits_none</td><td>لا شيء بعد.</td><td class="mono"><a href="src/ui-js.html#L190">190</a></td><td>Nothing yet.</td></tr>
+<tr><td class="mono">hits_title</td><td>البطاقات المقبولة</td><td class="mono"><a href="src/ui-js.html#L190">190</a></td><td>Accepted cards</td></tr>
+<tr><td class="mono">http_ok_word_ignored</td><td>الصفحة ترد سليم وفيها كلمة حجب، لكن ما زال فيها نموذج الدخول فاعتبرناها صفحة دخول</td><td class="mono"><a href="src/ui-js.html#L264">264</a></td><td>the page answers fine and mentions blocking, but it still offers the login form - treated </td></tr>
+<tr><td class="mono">import_fail</td><td>فشل الاستيراد</td><td class="mono"><a href="src/ui-js.html#L43">43</a></td><td>Import failed</td></tr>
+<tr><td class="mono">import_ok</td><td>تم استيراد البروفايل</td><td class="mono"><a href="src/ui-js.html#L42">42</a></td><td>Profile imported</td></tr>
+<tr><td class="mono">internet_BLOCKED</td><td>محجوب من قِبل الشبكة</td><td class="mono"><a href="src/ui-js.html#L212">212</a></td><td>Blocked by the network</td></tr>
+<tr><td class="mono">internet_OFFLINE</td><td>لا يوجد اتصال بالشبكة</td><td class="mono"><a href="src/ui-js.html#L211">211</a></td><td>No network connection</td></tr>
+<tr><td class="mono">internet_ONLINE</td><td>متصل بالإنترنت فعلاً الآن</td><td class="mono"><a href="src/ui-js.html#L209">209</a></td><td>Actually online right now</td></tr>
+<tr><td class="mono">internet_WALLED</td><td>خلف بوابة الدخول (يحتاج بطاقة)</td><td class="mono"><a href="src/ui-js.html#L210">210</a></td><td>Behind the login portal (needs a card)</td></tr>
+<tr><td class="mono">internet_detail_expected_answer</td><td>الرابط الخارجي رد كما يجب</td><td class="mono"><a href="src/ui-js.html#L213">213</a></td><td>the outside URL answered as expected</td></tr>
+<tr><td class="mono">internet_detail_portal_page</td><td>الشبكة ردّت بصفحتها بدل الموقع</td><td class="mono"><a href="src/ui-js.html#L215">215</a></td><td>the network answered with its own page</td></tr>
+<tr><td class="mono">internet_detail_portal_redirect</td><td>الشبكة حوّلت الطلب إلى صفحة الدخول</td><td class="mono"><a href="src/ui-js.html#L214">214</a></td><td>the network redirected us to the login page</td></tr>
+<tr><td class="mono">internet_online_verification_limited</td><td>جهازك متصل بالإنترنت مسبقاً - سأعتمد على تحويل الراوتر وصفحة الحالة</td><td class="mono"><a href="src/ui-js.html#L293">293</a></td><td>you are online already - I will rely on the portal redirect and status page</td></tr>
+<tr><td class="mono">internet_opened_hint</td><td>الراوتر أدخلك ولم يرد برد نجاح واضح، فلم نستطع تسمية الكرت من الرد وحده. أوقف الجلسة ثم جرّب هذه الكروت واحداً واحداً في صفحة الدخول - أحدها هو الذي ف</td><td class="mono"><a href="src/ui-js.html#L266">266</a></td><td>the router let us in but never answered with a clear success page, so the card could not b</td></tr>
+<tr><td class="mono">internet_opened_title</td><td>الإنترنت فتح أثناء التشغيل - أحد هذه الكروت هو الصحيح</td><td class="mono"><a href="src/ui-js.html#L265">265</a></td><td>the internet opened during the run - one of these cards is the working one</td></tr>
+<tr><td class="mono">job_timeout</td><td>انتهت مدة الانتظار - راجع السجل أسفل الشاشة</td><td class="mono"><a href="src/ui-js.html#L195">195</a></td><td>timed out waiting - check the log</td></tr>
+<tr><td class="mono">known_card_format_mismatch</td><td>صيغة البطاقة في الصفحة الثانية لا تطابق البطاقة التي اختُبرت؛ صحّح الطول والبادئة والمحارف قبل التشغيل.</td><td class="mono"><a href="src/ui-js.html#L93">93</a></td><td>The card format on Step 2 does not match the tested card. Correct its length, prefix, and </td></tr>
+<tr><td class="mono">known_card_hint</td><td>→ HTTP 400/405/415/422 يعني أن الراوتر رفض شكل الطلب قبل فحص الكرت. راجع الطريقة والرابط والحقول المعروضة، وطابقها مع طلب المتصفح الناجح. أما HTTP 200</td><td class="mono"><a href="src/ui-js.html#L154">154</a></td><td>→ HTTP 400/405/415/422 means the router rejected the request shape before judging the card</td></tr>
+<tr><td class="mono">known_card_tried</td><td>جرّبنا هذا الكرت بعدة أشكال للطلب، وكان رد الراوتر:</td><td class="mono"><a href="src/ui-js.html#L153">153</a></td><td>we tried this card in several request shapes; the router answered:</td></tr>
+<tr><td class="mono">lan_warning_body</td><td>التوكن يُرسل بدون تشفير (HTTP). استخدم فقط على شبكة تثق بها، وفضّل 127.0.0.1 إن أمكن.</td><td class="mono"><a href="src/ui-js.html#L46">46</a></td><td>The access token is sent without TLS (plain HTTP). Use only on a network you trust; prefer</td></tr>
+<tr><td class="mono">lan_warning_title</td><td>تحذير: الواجهة مفتوحة على الشبكة المحلية</td><td class="mono"><a href="src/ui-js.html#L45">45</a></td><td>Warning: UI is open on the LAN</td></tr>
+<tr><td class="mono">language_label</td><td>تغيير اللغة</td><td class="mono"><a href="src/ui-js.html#L77">77</a></td><td>Change language</td></tr>
+<tr><td class="mono">license_body</td><td>١) الأداة للاختبار على شبكة تملكها أو لديك إذن كتابي من صاحبها.\n٢) لا تستخدمها للوصول غير المصرّح به أو لتخمين أكواد لا تملكها.\n٣) أنت المسؤول قانون</td><td class="mono"><a href="src/ui-js.html#L207">207</a></td><td>1) Use only on networks you own or have written permission to test.\n2) Never use it for u</td></tr>
+<tr><td class="mono">license_check</td><td>أتعهّد بأنني أملك هذه الشبكة أو لدي إذن كتابي من صاحبها لاختبارها.</td><td class="mono"><a href="src/ui-js.html#L183">183</a></td><td>I confirm I own this network or hold written permission from its owner.</td></tr>
+<tr><td class="mono">license_link</td><td>الترخيص</td><td class="mono"><a href="src/ui-js.html#L75">75</a></td><td>License</td></tr>
+<tr><td class="mono">license_title</td><td>ترخيص الاستخدام</td><td class="mono"><a href="src/ui-js.html#L206">206</a></td><td>Authorized use</td></tr>
+<tr><td class="mono">loading</td><td>جاري العمل...</td><td class="mono"><a href="src/ui-js.html#L233">233</a></td><td>Working...</td></tr>
+<tr><td class="mono">lockout_after</td><td>الراوتر يحجب بعد</td><td class="mono"><a href="src/ui-js.html#L171">171</a></td><td>the router blocks after</td></tr>
+<tr><td class="mono">lockout_applied</td><td>تم ضبط المهلة والمسارات</td><td class="mono"><a href="src/ui-js.html#L160">160</a></td><td>delay and threads updated</td></tr>
+<tr><td class="mono">lockout_apply</td><td>طبّق الوتيرة الآمنة على الإعدادات</td><td class="mono"><a href="src/ui-js.html#L159">159</a></td><td>apply the safe pace to the settings</td></tr>
+<tr><td class="mono">lockout_clears</td><td>ويفكّ الحظر بعد</td><td class="mono"><a href="src/ui-js.html#L172">172</a></td><td>and the block clears after</td></tr>
+<tr><td class="mono">lockout_confirm</td><td>هذا الفحص الاختياري يرسل حتى ٨ محاولات دخول خاطئة وقد يفعّل حجب الشبكة. هل تريد المتابعة؟ إذا كانت الشبكة تحجبك الآن، ألغِ الفحص واتصل بمسؤول الشبكة.</td><td class="mono"><a href="src/ui-js.html#L170">170</a></td><td>This optional check sends up to 8 failed login attempts and may trigger a network block. C</td></tr>
+<tr><td class="mono">lockout_impossible</td><td>على هذا الراوتر لا يمكن التخمين دون حظر متكرر: إما مهلة طويلة جداً، أو تعديل الإعداد من الراوتر نفسه.</td><td class="mono"><a href="src/ui-js.html#L177">177</a></td><td>guessing on this router means getting blocked over and over: either a very long delay, or </td></tr>
+<tr><td class="mono">lockout_measuring</td><td>يجري فحص محدود (بحد أقصى ٨ طلبات) ويتوقف فور ظهور الحجب...</td><td class="mono"><a href="src/ui-js.html#L169">169</a></td><td>running a bounded check (up to 8 requests); it stops at the first block...</td></tr>
+<tr><td class="mono">lockout_never</td><td>لم يظهر حجب ضمن الحد الآمن من المحاولات</td><td class="mono"><a href="src/ui-js.html#L173">173</a></td><td>no block appeared within the safe attempt limit</td></tr>
+<tr><td class="mono">lockout_pace</td><td>أسرع وتيرة آمنة: محاولة كل</td><td class="mono"><a href="src/ui-js.html#L175">175</a></td><td>fastest pace that stays under the limit: one attempt every</td></tr>
+<tr><td class="mono">lockout_pace_hint</td><td>ضع هذه المهلة في خانة «مهلة بين المحاولات» واستخدم خيطاً واحداً أو اثنين.</td><td class="mono"><a href="src/ui-js.html#L176">176</a></td><td>put that in the delay box and use one or two threads.</td></tr>
+<tr><td class="mono">lockout_stopped_after_block</td><td>توقفت الأداة فور ظهور الحجب؛ لم تنتظر زواله ولم ترسل طلبات أخرى. أوقف المحاولات واطلب من مسؤول الشبكة مراجعة الوصول.</td><td class="mono"><a href="src/ui-js.html#L174">174</a></td><td>The tool stopped as soon as the block appeared; it did not wait for expiry or send more re</td></tr>
+<tr><td class="mono">logout_state</td><td>حالة ما بعد الخروج</td><td class="mono"><a href="src/ui-js.html#L118">118</a></td><td>state after logout</td></tr>
+<tr><td class="mono">manual_resume_ack</td><td>راجعت مسؤول الشبكة وأكد أن الشبكة جاهزة وأن الاستئناف مسموح</td><td class="mono"><a href="src/ui-js.html#L327">327</a></td><td>I checked with the network administrator; the network is ready and resuming is allowed</td></tr>
+<tr><td class="mono">manual_resume_button</td><td>استئناف يدوياً بعد مراجعة المشرف</td><td class="mono"><a href="src/ui-js.html#L67">67</a></td><td>Manual resume after admin review</td></tr>
+<tr><td class="mono">manual_resume_confirm_body</td><td>سيتم استئناف التشغيل بالإعدادات المحفوظة وموضع التقدم المستأنف. تأكد أن المشرف راجع الحالة وأن الاستئناف مسموح. لن يتم تغيير IP أو MAC أو فصل Wi‑Fi.</td><td class="mono"><a href="src/ui-js.html#L69">69</a></td><td>The run will resume with saved settings and progress. Make sure the administrator reviewed</td></tr>
+<tr><td class="mono">manual_resume_confirm_title</td><td>تأكيد الاستئناف اليدوي</td><td class="mono"><a href="src/ui-js.html#L68">68</a></td><td>Confirm manual resume</td></tr>
+<tr><td class="mono">manual_resume_hint</td><td>لا تستأنف بعد حظر أو انقطاع إلا بعد مراجعة مسؤول الشبكة وتأكيده أن المتابعة مسموحة.</td><td class="mono"><a href="src/ui-js.html#L326">326</a></td><td>After a block or outage, resume only after the network administrator reviews it and confir</td></tr>
+<tr><td class="mono">manual_resume_title</td><td>يلزم تأكيد المشرف قبل الاستئناف</td><td class="mono"><a href="src/ui-js.html#L325">325</a></td><td>Administrator confirmation required before resuming</td></tr>
+<tr><td class="mono">method_get</td><td>GET</td><td class="mono"><a href="src/ui-js.html#L105">105</a></td><td>GET</td></tr>
+<tr><td class="mono">method_post</td><td>POST (الأكثر توافقاً)</td><td class="mono"><a href="src/ui-js.html#L105">105</a></td><td>POST (widest support)</td></tr>
+<tr><td class="mono">missing_words</td><td>كلمات كانت في صفحة الرفض واختفت</td><td class="mono"><a href="src/ui-js.html#L227">227</a></td><td>Words that were on the rejection page and are gone</td></tr>
+<tr><td class="mono">net_bad_response</td><td>رد غير مفهوم من الراوتر</td><td class="mono"><a href="src/ui-js.html#L313">313</a></td><td>unreadable reply from the router</td></tr>
+<tr><td class="mono">net_connect_timeout</td><td>لا يوجد رد عند فتح الاتصال</td><td class="mono"><a href="src/ui-js.html#L307">307</a></td><td>no answer while opening the connection</td></tr>
+<tr><td class="mono">net_dns</td><td>اسم العنوان لم يُترجم (DNS)</td><td class="mono"><a href="src/ui-js.html#L305">305</a></td><td>host name could not be resolved</td></tr>
+<tr><td class="mono">net_no_session</td><td>لم نستطع أخذ جلسة من صفحة الدخول - لم يُجرَّب الكرت</td><td class="mono"><a href="src/ui-js.html#L317">317</a></td><td>could not obtain a login-page session - the card was not tested</td></tr>
+<tr><td class="mono">net_proto</td><td>رابط غير مدعوم</td><td class="mono"><a href="src/ui-js.html#L315">315</a></td><td>unsupported URL</td></tr>
+<tr><td class="mono">net_read_timeout</td><td>الاتصال نجح لكن الرد تأخر (راوتر مشغول أو RADIUS بطيء)</td><td class="mono"><a href="src/ui-js.html#L308">308</a></td><td>connected but the reply was too slow</td></tr>
+<tr><td class="mono">net_refused</td><td>الراوتر رفض الاتصال (البورت مقفول أو الحماية منعتك)</td><td class="mono"><a href="src/ui-js.html#L306">306</a></td><td>the router refused the connection</td></tr>
+<tr><td class="mono">net_reset</td><td>الراوتر قطع الاتصال فجأة</td><td class="mono"><a href="src/ui-js.html#L309">309</a></td><td>the router cut the connection</td></tr>
+<tr><td class="mono">net_settings_saved</td><td>تم حفظ إعدادات الشبكة</td><td class="mono"><a href="src/ui-js.html#L54">54</a></td><td>Network settings saved</td></tr>
+<tr><td class="mono">net_stale</td><td>اتصال قديم أُغلق من الراوتر (أُعيد تلقائياً)</td><td class="mono"><a href="src/ui-js.html#L310">310</a></td><td>a stale keep-alive socket was closed (auto-retried)</td></tr>
+<tr><td class="mono">net_tls</td><td>خطأ في شهادة TLS</td><td class="mono"><a href="src/ui-js.html#L311">311</a></td><td>TLS/certificate error</td></tr>
+<tr><td class="mono">net_too_many_redirects</td><td>دوران لا نهائي في التحويل</td><td class="mono"><a href="src/ui-js.html#L314">314</a></td><td>redirect loop</td></tr>
+<tr><td class="mono">net_unknown</td><td>خطأ غير متوقع</td><td class="mono"><a href="src/ui-js.html#L316">316</a></td><td>unexpected error</td></tr>
+<tr><td class="mono">net_unreachable</td><td>الشبكة غير قابلة للوصول (لست متصلاً بها)</td><td class="mono"><a href="src/ui-js.html#L312">312</a></td><td>network unreachable (you are not connected to it)</td></tr>
+<tr><td class="mono">netadvice_bad_response</td><td>رد غير مفهوم من الراوتر: جرّب رابط صفحة الدخول الذي يظهر للضيف فعلاً.</td><td class="mono"><a href="src/ui-js.html#L252">252</a></td><td>The router sent an unreadable reply: use the exact login URL a guest sees.</td></tr>
+<tr><td class="mono">netadvice_blocked_already</td><td>الشبكة تحجب هذا الجهاز. أوقف المحاولات واطلب من مسؤول الشبكة/الراوتر مراجعة الحجب وإعادة الخدمة.</td><td class="mono"><a href="src/ui-js.html#L256">256</a></td><td>The network is blocking this device. Stop attempts and ask the network/router administrato</td></tr>
+<tr><td class="mono">netadvice_blocked_before_probes</td><td>ظهر الحجب قبل أي بطاقة تجربة. لا تحاول تجاوزه؛ اطلب من مسؤول الشبكة/الراوتر مراجعة الوصول وإعادة الخدمة.</td><td class="mono"><a href="src/ui-js.html#L257">257</a></td><td>The block appeared before any test card. Do not try to bypass it; ask the network/router a</td></tr>
+<tr><td class="mono">netadvice_blocked_by_our_probes</td><td>ظهر رد حجب أثناء المعايرة، فتوقفت الأداة دون إعادة المحاولة. أوقف المحاولات واطلب من مسؤول الشبكة/الراوتر مراجعة الوصول وإعادة الخدمة.</td><td class="mono"><a href="src/ui-js.html#L258">258</a></td><td>A block reply appeared during calibration, so the tool stopped without retrying. Stop atte</td></tr>
+<tr><td class="mono">netadvice_blocked_from_the_start</td><td>الشبكة كانت تحجب هذا الجهاز قبل القياس. أوقف المحاولات واطلب من مسؤول الشبكة مراجعة الوصول وإعادة الخدمة.</td><td class="mono"><a href="src/ui-js.html#L180">180</a></td><td>The network was already blocking this device before the check. Stop attempts and ask the n</td></tr>
+<tr><td class="mono">netadvice_calibration_failed</td><td>أصلح السبب أعلاه، ثم اضغط «ابدأ التخمين» من جديد.</td><td class="mono"><a href="src/ui-js.html#L261">261</a></td><td>Fix the reason above, then press \&quot;start guessing\&quot; again.</td></tr>
+<tr><td class="mono">netadvice_card_space_empty</td><td>صيغة البطاقة لا تترك شيئاً للتخمين: البادئة + اللاحقة أطول من طول الكرت، أو المحارف المتغيّرة قليلة جداً.</td><td class="mono"><a href="src/ui-js.html#L260">260</a></td><td>The card format leaves nothing to guess: prefix + suffix are longer than the card, or ther</td></tr>
+<tr><td class="mono">netadvice_connect_timeout</td><td>لا يوجد رد عند فتح الاتصال: الراوتر بعيد أو مزدحم، أو لست متصلاً بشبكته.</td><td class="mono"><a href="src/ui-js.html#L246">246</a></td><td>No answer when opening the connection: the router is far, busy, or you are not on its netw</td></tr>
+<tr><td class="mono">netadvice_dns</td><td>اسم العنوان لم يُترجم: اكتب IP الراوتر بدل الاسم (مثل 10.5.50.1).</td><td class="mono"><a href="src/ui-js.html#L244">244</a></td><td>The host name did not resolve: use the router&#x27;s IP instead (like 10.5.50.1).</td></tr>
+<tr><td class="mono">netadvice_no_rejection_baseline</td><td>لم يصل أي رد على بطاقات التجربة: تحقق من الاتصال بالشبكة.</td><td class="mono"><a href="src/ui-js.html#L259">259</a></td><td>No answer at all to the test cards: check the connection to the network.</td></tr>
+<tr><td class="mono">netadvice_no_session</td><td>صفحة الدخول لم تعطِ جلسة: تأكد من الرابط، ثم اختر هوية نفس متصفح هاتفك وأعد الفحص. لم تُحسب البطاقات كمجرّبة.</td><td class="mono"><a href="src/ui-js.html#L245">245</a></td><td>The login page gave no session: verify the URL, pick the same browser identity as your pho</td></tr>
+<tr><td class="mono">netadvice_proto</td><td>الرابط غير مدعوم: يجب أن يبدأ بـ http:// أو https://</td><td class="mono"><a href="src/ui-js.html#L254">254</a></td><td>Unsupported URL: it must start with http:// or https://</td></tr>
+<tr><td class="mono">netadvice_read_timeout</td><td>الراوتر فتح الاتصال ولم يرد: انتظر قليلاً وقلّل عدد المسارات.</td><td class="mono"><a href="src/ui-js.html#L247">247</a></td><td>The router opened the connection but never answered: wait a little and lower the thread co</td></tr>
+<tr><td class="mono">netadvice_refused</td><td>تأكد أنك متصل بشبكة هذا الراوتر وأن الرابط صحيح (البورت مقفل أو الحماية رفضت جهازك).</td><td class="mono"><a href="src/ui-js.html#L243">243</a></td><td>Check that you are on this router&#x27;s network and the URL is right (the port is closed or th</td></tr>
+<tr><td class="mono">netadvice_reset</td><td>الراوتر قطع الاتصال فجأة: أعد الاتصال بالشبكة ثم أعد المحاولة.</td><td class="mono"><a href="src/ui-js.html#L248">248</a></td><td>The router cut the connection: reconnect to the network and try again.</td></tr>
+<tr><td class="mono">netadvice_stale</td><td>اتصال قديم أُغلق من الراوتر: أعد المحاولة.</td><td class="mono"><a href="src/ui-js.html#L249">249</a></td><td>An old keep-alive connection was closed by the router: try again.</td></tr>
+<tr><td class="mono">netadvice_tls</td><td>خطأ في شهادة TLS: جرّب http:// بدل https://</td><td class="mono"><a href="src/ui-js.html#L250">250</a></td><td>TLS certificate error: try http:// instead of https://</td></tr>
+<tr><td class="mono">netadvice_too_many_redirects</td><td>الراوتر يحوّل الطلب بلا نهاية: انسخ الرابط النهائي من المتصفح.</td><td class="mono"><a href="src/ui-js.html#L253">253</a></td><td>Endless redirect loop: copy the final URL from the browser.</td></tr>
+<tr><td class="mono">netadvice_unknown</td><td>خطأ غير متوقع: أعد المحاولة، وإن تكرر شغّل «تشخيص الشبكة أولاً».</td><td class="mono"><a href="src/ui-js.html#L255">255</a></td><td>Unexpected error: try again, and if it repeats run \&quot;diagnose the network first\&quot;.</td></tr>
+<tr><td class="mono">netadvice_unreachable</td><td>لست متصلاً بهذه الشبكة: اتصل بواي فاي الراوتر أولاً.</td><td class="mono"><a href="src/ui-js.html#L251">251</a></td><td>You are not connected to this network: join the router&#x27;s wifi first.</td></tr>
+<tr><td class="mono">next_format</td><td>التالي: صيغة البطاقة ←</td><td class="mono"><a href="src/ui-js.html#L95">95</a></td><td>Next: card format →</td></tr>
+<tr><td class="mono">next_run</td><td>التالي: التشغيل ←</td><td class="mono"><a href="src/ui-js.html#L96">96</a></td><td>Next: run →</td></tr>
+<tr><td class="mono">no</td><td>إلغاء</td><td class="mono"><a href="src/ui-js.html#L232">232</a></td><td>Cancel</td></tr>
+<tr><td class="mono">no_attempt_was_made</td><td>لم يبدأ تخمين نطاق البطاقات؛ طلبات المعايرة (إن وجدت) ظاهرة أعلاه.</td><td class="mono"><a href="src/ui-js.html#L242">242</a></td><td>The card-space guessing run did not start; any calibration requests are listed above.</td></tr>
+<tr><td class="mono">no_form</td><td>لم أجد نموذج دخول في الصفحة - جرّب رابط الصفحة نفسها التي تظهر للضيف.</td><td class="mono"><a href="src/ui-js.html#L221">221</a></td><td>No login form found on this page - try the exact URL the guest sees.</td></tr>
+<tr><td class="mono">no_saved_profiles</td><td>لا توجد بروفايلات محفوظة بعد. أنشئ بروفايل جديد أولاً.</td><td class="mono"><a href="src/ui-js.html#L25">25</a></td><td>No saved profiles yet. Create a new profile first.</td></tr>
+<tr><td class="mono">online_already_banner</td><td>جهازك متصل بالإنترنت مسبقاً — التحقق من نجاح البطاقة محدود ويعتمد على تحويل الراوتر وصفحة الحالة.</td><td class="mono"><a href="src/ui-js.html#L58">58</a></td><td>Your device is already online — card verification is limited and relies on the portal redi</td></tr>
+<tr><td class="mono">online_transition</td><td>انتقال إلى الإنترنت</td><td class="mono"><a href="src/ui-js.html#L118">118</a></td><td>transition to online</td></tr>
+<tr><td class="mono">p_covered</td><td>مغطى سابقاً</td><td class="mono"><a href="src/ui-js.html#L119">119</a></td><td>covered</td></tr>
+<tr><td class="mono">p_request_shape</td><td>شكل الطلب المتوقع (القيم الحساسة مخفية)</td><td class="mono"><a href="src/ui-js.html#L117">117</a></td><td>Expected request shape (sensitive values hidden)</td></tr>
+<tr><td class="mono">p_samples</td><td>أمثلة على البطاقات</td><td class="mono"><a href="src/ui-js.html#L116">116</a></td><td>Sample cards</td></tr>
+<tr><td class="mono">p_space</td><td>عدد الاحتمالات</td><td class="mono"><a href="src/ui-js.html#L116">116</a></td><td>Combinations</td></tr>
+<tr><td class="mono">pass_field</td><td>حقل كلمة المرور</td><td class="mono"><a href="src/ui-js.html#L218">218</a></td><td>Password field</td></tr>
+<tr><td class="mono">pm_chap</td><td>MD5 تشفير ميكروتك (chap) للبطاقة</td><td class="mono"><a href="src/ui-js.html#L384">384</a></td><td>MikroTik MD5 (chap) of the card</td></tr>
+<tr><td class="mono">pm_chap_empty</td><td>chap على قيمة فارغة</td><td class="mono"><a href="src/ui-js.html#L385">385</a></td><td>chap over an empty value</td></tr>
+<tr><td class="mono">pm_empty</td><td>فارغة</td><td class="mono"><a href="src/ui-js.html#L383">383</a></td><td>empty</td></tr>
+<tr><td class="mono">pm_fixed</td><td>قيمة ثابتة</td><td class="mono"><a href="src/ui-js.html#L384">384</a></td><td>fixed value</td></tr>
+<tr><td class="mono">pm_md5user</td><td>MD5 للبطاقة فقط</td><td class="mono"><a href="src/ui-js.html#L386">386</a></td><td>MD5 of the card only</td></tr>
+<tr><td class="mono">pm_omit</td><td>بدون إرسال الحقل</td><td class="mono"><a href="src/ui-js.html#L383">383</a></td><td>field omitted</td></tr>
+<tr><td class="mono">pm_same</td><td>نفس البطاقة</td><td class="mono"><a href="src/ui-js.html#L383">383</a></td><td>same as card</td></tr>
+<tr><td class="mono">pm_sha1user</td><td>SHA1 للبطاقة فقط</td><td class="mono"><a href="src/ui-js.html#L387">387</a></td><td>SHA1 of the card only</td></tr>
+<tr><td class="mono">pm_sha256user</td><td>SHA256 للبطاقة فقط</td><td class="mono"><a href="src/ui-js.html#L388">388</a></td><td>SHA256 of the card only</td></tr>
+<tr><td class="mono">preset_custom</td><td>مخصّص</td><td class="mono"><a href="src/ui-js.html#L198">198</a></td><td>Custom</td></tr>
+<tr><td class="mono">preset_fast</td><td>سريع (40)</td><td class="mono"><a href="src/ui-js.html#L198">198</a></td><td>Fast (40)</td></tr>
+<tr><td class="mono">preset_normal</td><td>عادي (12)</td><td class="mono"><a href="src/ui-js.html#L197">197</a></td><td>Normal (12)</td></tr>
+<tr><td class="mono">preset_safe</td><td>آمن (4 مسارات)</td><td class="mono"><a href="src/ui-js.html#L197">197</a></td><td>Safe (4 threads)</td></tr>
+<tr><td class="mono">prob_charset_mismatch</td><td>الكرت فيه رموز ليست ضمن الأبجدية المختارة</td><td class="mono"><a href="src/ui-js.html#L152">152</a></td><td>the card has characters outside the chosen charset</td></tr>
+<tr><td class="mono">prob_charset_too_small</td><td>المحارف المتغيّرة قليلة جداً</td><td class="mono"><a href="src/ui-js.html#L377">377</a></td><td>too few variable characters</td></tr>
+<tr><td class="mono">prob_fixed_password_empty</td><td>كلمة المرور الثابتة فارغة</td><td class="mono"><a href="src/ui-js.html#L379">379</a></td><td>the fixed password is empty</td></tr>
+<tr><td class="mono">prob_length_mismatch</td><td>طول الكرت لا يساوي الطول المضبوط</td><td class="mono"><a href="src/ui-js.html#L149">149</a></td><td>the card length does not match the profile length</td></tr>
+<tr><td class="mono">prob_length_not_bigger_than_prefix_and_suffix</td><td>البادئة + اللاحقة أطول من طول الكرت</td><td class="mono"><a href="src/ui-js.html#L376">376</a></td><td>prefix + suffix are longer than the card</td></tr>
+<tr><td class="mono">prob_needs_browser_js</td><td>تحويل كلمة المرور في هذه البوابة يحتاج متصفحاً ولا يمكن تشغيله آلياً</td><td class="mono"><a href="src/ui-js.html#L380">380</a></td><td>this portal&#x27;s password transform needs a browser and cannot be automated</td></tr>
+<tr><td class="mono">prob_prefix_mismatch</td><td>الكرت لا يبدأ بالبادئة المضبوطة</td><td class="mono"><a href="src/ui-js.html#L150">150</a></td><td>the card does not start with the prefix</td></tr>
+<tr><td class="mono">prob_space_is_astronomically_big</td><td>عدد الاحتمالات ضخم جداً - استخدم طولاً أقل أو مسارات أكثر</td><td class="mono"><a href="src/ui-js.html#L381">381</a></td><td>the space is enormous - shorten it or use more threads</td></tr>
+<tr><td class="mono">prob_suffix_mismatch</td><td>الكرت لا ينتهي باللاحقة المضبوطة</td><td class="mono"><a href="src/ui-js.html#L151">151</a></td><td>the card does not end with the suffix</td></tr>
+<tr><td class="mono">prob_unknown_pass_mode</td><td>طريقة كلمة المرور غير معروفة</td><td class="mono"><a href="src/ui-js.html#L378">378</a></td><td>unknown password mode</td></tr>
+<tr><td class="mono">prob_url_missing_or_invalid</td><td>رابط صفحة الدخول غير صالح</td><td class="mono"><a href="src/ui-js.html#L374">374</a></td><td>the login URL is invalid</td></tr>
+<tr><td class="mono">prob_user_field_missing</td><td>اسم حقل المستخدم مفقود</td><td class="mono"><a href="src/ui-js.html#L375">375</a></td><td>the username field is missing</td></tr>
+<tr><td class="mono">probe_cards</td><td>بطاقات تجربة</td><td class="mono"><a href="src/ui-js.html#L263">263</a></td><td>test cards</td></tr>
+<tr><td class="mono">probe_has_form</td><td>صفحة الدخول ظاهرة</td><td class="mono"><a href="src/ui-js.html#L36">36</a></td><td>login form is present</td></tr>
+<tr><td class="mono">probe_link_button</td><td>افحص الاتصال</td><td class="mono"><a href="src/ui-js.html#L33">33</a></td><td>Check link</td></tr>
+<tr><td class="mono">probe_link_hint</td><td>طلب GET واحد فقط للرابط — يعرض النتيجة دون تخمين أو إرسال بطاقات.</td><td class="mono"><a href="src/ui-js.html#L32">32</a></td><td>A single GET to the URL — shows the result with no guessing and no card posts.</td></tr>
+<tr><td class="mono">probe_link_title</td><td>فحص الاتصال بالراوتر</td><td class="mono"><a href="src/ui-js.html#L31">31</a></td><td>Check router connectivity</td></tr>
+<tr><td class="mono">probe_no_form</td><td>لا يوجد نموذج دخول واضح</td><td class="mono"><a href="src/ui-js.html#L37">37</a></td><td>no clear login form</td></tr>
+<tr><td class="mono">probe_reachable</td><td>الرابط يستجيب</td><td class="mono"><a href="src/ui-js.html#L34">34</a></td><td>URL is reachable</td></tr>
+<tr><td class="mono">probe_unreachable</td><td>تعذّر الوصول للرابط</td><td class="mono"><a href="src/ui-js.html#L35">35</a></td><td>URL could not be reached</td></tr>
+<tr><td class="mono">prof_new</td><td>— جديد —</td><td class="mono"><a href="src/ui-js.html#L100">100</a></td><td>- new -</td></tr>
+<tr><td class="mono">profile_invalid</td><td>البروفايل غير مكتمل</td><td class="mono"><a href="src/ui-js.html#L28">28</a></td><td>Profile incomplete</td></tr>
+<tr><td class="mono">profile_invalid_hint</td><td>بعض الإعدادات المطلوبة مفقودة أو غير صالحة. أصلحها يدوياً قبل التشغيل؛ لن يتم تخمين قيم أو إرسال طلبات تلقائية.</td><td class="mono"><a href="src/ui-js.html#L29">29</a></td><td>Some required settings are missing or invalid. Fix them manually before running; no values</td></tr>
+<tr><td class="mono">profile_summary</td><td>ملخص البروفايل</td><td class="mono"><a href="src/ui-js.html#L27">27</a></td><td>Profile summary</td></tr>
+<tr><td class="mono">profile_valid</td><td>البروفايل مكتمل وجاهز للتشغيل</td><td class="mono"><a href="src/ui-js.html#L30">30</a></td><td>Profile complete and ready to run</td></tr>
+<tr><td class="mono">progress_label</td><td>تقدم التشغيل</td><td class="mono"><a href="src/ui-js.html#L76">76</a></td><td>Run progress</td></tr>
+<tr><td class="mono">quit_done</td><td>تم إيقاف الأداة - يمكنك إغلاق هذه الصفحة.</td><td class="mono"><a href="src/ui-js.html#L235">235</a></td><td>The tool is stopped - you can close this page.</td></tr>
+<tr><td class="mono">quit_tool</td><td>إيقاف الأداة</td><td class="mono"><a href="src/ui-js.html#L234">234</a></td><td>Stop the tool</td></tr>
+<tr><td class="mono">r_accepted_internet_already_open</td><td>قبلها الراوتر (لم أستطع إثبات الإنترنت لأن جهازك كان متصلاً أصلاً)</td><td class="mono"><a href="src/ui-js.html#L292">292</a></td><td>router accepted (internet proof skipped: you were online already)</td></tr>
+<tr><td class="mono">r_attempts</td><td>عدد المحاولات</td><td class="mono"><a href="src/ui-js.html#L136">136</a></td><td>Attempts</td></tr>
+<tr><td class="mono">r_autostop</td><td>إيقاف تلقائي عند أول نتيجة قوية</td><td class="mono"><a href="src/ui-js.html#L139">139</a></td><td>Auto-stop on the first strong result</td></tr>
+<tr><td class="mono">r_ban_page</td><td>ظهرت صفحة حجب صريحة من الراوتر</td><td class="mono"><a href="src/ui-js.html#L287">287</a></td><td>an explicit block page from the router</td></tr>
+<tr><td class="mono">r_captcha_present</td><td>الصفحة فيها كابتشا - التخمين لم يعد مجدياً</td><td class="mono"><a href="src/ui-js.html#L290">290</a></td><td>the page has a captcha - guessing is over</td></tr>
+<tr><td class="mono">r_delay</td><td>الانتظار بين الطلبات (ms)</td><td class="mono"><a href="src/ui-js.html#L137">137</a></td><td>Delay between requests (ms)</td></tr>
+<tr><td class="mono">r_http_403</td><td>الراوتر يرفض الطلب (403)</td><td class="mono"><a href="src/ui-js.html#L288">288</a></td><td>the router refuses the request (403)</td></tr>
+<tr><td class="mono">r_http_429</td><td>طلبات كثيرة جداً (429) - تهدئة مطلوبة</td><td class="mono"><a href="src/ui-js.html#L289">289</a></td><td>too many requests (429) - slow down</td></tr>
+<tr><td class="mono">r_http_503</td><td>الراوتر أو خدمة RADIUS مشغولة/غير متاحة (503) - أبطأت الطلبات</td><td class="mono"><a href="src/ui-js.html#L296">296</a></td><td>the router or RADIUS is unavailable (503) - slowed down</td></tr>
+<tr><td class="mono">r_learned_success_words</td><td>ظهرت كلمات النجاح التي تعلّمتها الأداة</td><td class="mono"><a href="src/ui-js.html#L298">298</a></td><td>the success words learned from your own card appeared</td></tr>
+<tr><td class="mono">r_looks_rejected_but_success_words_found</td><td>الرد يشبه الرفض لكن فيه كلمات نجاح تعلّمتها - يحتاج نظرة منك</td><td class="mono"><a href="src/ui-js.html#L302">302</a></td><td>looks like the rejection page but contains success words - needs your eyes</td></tr>
+<tr><td class="mono">r_redirect_differs_from_rejection</td><td>الراوتر حوّل هذه البطاقة إلى مكان غير مكان البطاقات المرفوضة</td><td class="mono"><a href="src/ui-js.html#L286">286</a></td><td>the router sent this card somewhere else than a rejected one</td></tr>
+<tr><td class="mono">r_redirect_out_of_portal</td><td>الراوتر حوّل المتصفح خارج البوابة</td><td class="mono"><a href="src/ui-js.html#L294">294</a></td><td>the router redirected the browser out of the portal</td></tr>
+<tr><td class="mono">r_redirect_out_of_portal_and_online</td><td>الراوتر أعطى إنترنت فعلياً لهذه البطاقة</td><td class="mono"><a href="src/ui-js.html#L291">291</a></td><td>the router gave this card real internet</td></tr>
+<tr><td class="mono">r_redirect_out_of_portal_but_page_matches</td><td>الراوتر حوّلنا لجهة أخرى لكن الصفحة تشبه الرفض - لا نسمّيها رفضاً، محفوظة للمراجعة</td><td class="mono"><a href="src/ui-js.html#L303">303</a></td><td>the router sent us somewhere else though the page matches a rejection - not called a rejec</td></tr>
+<tr><td class="mono">r_redirect_to_another_portal_page</td><td>التحويل كان إلى صفحة داخل البوابة نفسها - ليس خروجاً</td><td class="mono"><a href="src/ui-js.html#L295">295</a></td><td>the redirect stayed inside the portal - not an exit</td></tr>
+<tr><td class="mono">r_rejection_wording</td><td>نص الرفض موجود في الصفحة</td><td class="mono"><a href="src/ui-js.html#L300">300</a></td><td>the rejection wording is on the page</td></tr>
+<tr><td class="mono">r_reply_differs_not_proven</td><td>الرد مختلف لكن لا دليل على القبول - احفظته للمراجعة</td><td class="mono"><a href="src/ui-js.html#L301">301</a></td><td>reply differs but nothing proves acceptance - saved for review</td></tr>
+<tr><td class="mono">r_resume</td><td>المتابعة من حيث توقفت (بلا تكرار)</td><td class="mono"><a href="src/ui-js.html#L140">140</a></td><td>Continue where you stopped (no repeats)</td></tr>
+<tr><td class="mono">r_same_as_rejection_page_empty</td><td>رد فارغ مثل صفحة الرفض</td><td class="mono"><a href="src/ui-js.html#L284">284</a></td><td>empty reply, like the rejection page</td></tr>
+<tr><td class="mono">r_same_as_rejection_page_exact</td><td>رد مطابق لصفحة الرفض</td><td class="mono"><a href="src/ui-js.html#L281">281</a></td><td>identical to the rejection page</td></tr>
+<tr><td class="mono">r_same_as_rejection_page_redirect</td><td>نفس تحويل صفحة الرفض (نفس المكان)</td><td class="mono"><a href="src/ui-js.html#L285">285</a></td><td>same redirect as a rejected card</td></tr>
+<tr><td class="mono">r_same_as_rejection_page_shape</td><td>نفس صفحة الرفض (مع اختلاف الرموز المؤقتة)</td><td class="mono"><a href="src/ui-js.html#L282">282</a></td><td>same page as a rejection (temporary tokens differ)</td></tr>
+<tr><td class="mono">r_same_as_rejection_page_similar</td><td>يشبه صفحة الرفض بشدة</td><td class="mono"><a href="src/ui-js.html#L283">283</a></td><td>very close to the rejection page</td></tr>
+<tr><td class="mono">r_success_url_contains</td><td>عنوان النجاح المتوقع ظهر في الرد</td><td class="mono"><a href="src/ui-js.html#L297">297</a></td><td>the learned success URL appeared</td></tr>
+<tr><td class="mono">r_threads</td><td>عدد المسارات (Threads)</td><td class="mono"><a href="src/ui-js.html#L136">136</a></td><td>Threads</td></tr>
+<tr><td class="mono">r_verify</td><td>تأكيد الإنترنت بعد أي بطاقة مقبولة</td><td class="mono"><a href="src/ui-js.html#L138">138</a></td><td>Verify internet after any accepted card</td></tr>
+<tr><td class="mono">r_welcome_words</td><td>كلمات ترحيب لا تظهر في صفحة الرفض</td><td class="mono"><a href="src/ui-js.html#L299">299</a></td><td>welcome words that never appear on the rejection page</td></tr>
+<tr><td class="mono">report_saved</td><td>حُفظ التقرير</td><td class="mono"><a href="src/ui-js.html#L228">228</a></td><td>Report saved</td></tr>
+<tr><td class="mono">res_title</td><td>4) النتائج الحيّة</td><td class="mono"><a href="src/ui-js.html#L185">185</a></td><td>4) Live results</td></tr>
+<tr><td class="mono">resume_from</td><td>متابعة من</td><td class="mono"><a href="src/ui-js.html#L236">236</a></td><td>continuing from</td></tr>
+<tr><td class="mono">resume_report</td><td>استئناف يدوي بعد توقف</td><td class="mono"><a href="src/ui-js.html#L72">72</a></td><td>Manual resume after stop</td></tr>
+<tr><td class="mono">retry_now</td><td>↻ أعد المحاولة الآن</td><td class="mono"><a href="src/ui-js.html#L268">268</a></td><td>↻ Try again now</td></tr>
+<tr><td class="mono">review_diff</td><td>كلمات ظهرت في هذا الرد ولم تظهر في صفحة الرفض</td><td class="mono"><a href="src/ui-js.html#L226">226</a></td><td>Words in this reply that are not on the rejection page</td></tr>
+<tr><td class="mono">review_hint</td><td>هذه ردود ليست مثل صفحة الرفض وليست نجاحاً مؤكداً. محفوظة لك لتفتحها وتقرأها بنفسك - الأداة لا تخمّن مكانك.</td><td class="mono"><a href="src/ui-js.html#L192">192</a></td><td>Replies that are neither the rejection page nor a proven success. Saved for you to inspect</td></tr>
+<tr><td class="mono">review_none</td><td>لا شيء بعد.</td><td class="mono"><a href="src/ui-js.html#L193">193</a></td><td>Nothing yet.</td></tr>
+<tr><td class="mono">review_open</td><td>افتح الصفحة المحفوظة</td><td class="mono"><a href="src/ui-js.html#L225">225</a></td><td>Open the saved page</td></tr>
+<tr><td class="mono">review_profile_hint</td><td>راجع الإعدادات المحفوظة قبل التشغيل. إذا كانت مكتملة يمكنك البدء مباشرة، وإذا كانت ناقصة أصلحها يدوياً من دون إرسال طلبات تلقائية.</td><td class="mono"><a href="src/ui-js.html#L22">22</a></td><td>Review saved settings before running. If complete you can start directly; if incomplete fi</td></tr>
+<tr><td class="mono">review_profile_title</td><td>مراجعة البروفايل</td><td class="mono"><a href="src/ui-js.html#L21">21</a></td><td>Profile review</td></tr>
+<tr><td class="mono">review_title</td><td>ردود غير واضحة (تحتاج نظرة منك)</td><td class="mono"><a href="src/ui-js.html#L191">191</a></td><td>Unclear replies (need your eyes)</td></tr>
+<tr><td class="mono">run_hint</td><td>اختر قوة مناسبة: كل ما زادت السرعة زاد احتمال أن يقطع الراوتر الاتصال أو يحجبك. عند بدء التشغيل يعيد البرنامج اختبار البطاقة المعروفة مرة واحدة بنفس ا</td><td class="mono"><a href="src/ui-js.html#L135">135</a></td><td>Choose a safe load: faster settings increase the chance of a disconnect or network block. </td></tr>
+<tr><td class="mono">run_title</td><td>3) التشغيل</td><td class="mono"><a href="src/ui-js.html#L134">134</a></td><td>3) Run</td></tr>
+<tr><td class="mono">running_now</td><td>يعمل الآن</td><td class="mono"><a href="src/ui-js.html#L222">222</a></td><td>Running</td></tr>
+<tr><td class="mono">s_covered</td><td>المغطى</td><td class="mono"><a href="src/ui-js.html#L186">186</a></td><td>Covered</td></tr>
+<tr><td class="mono">s_delay</td><td>التباطؤ الحالي</td><td class="mono"><a href="src/ui-js.html#L187">187</a></td><td>Current slowdown</td></tr>
+<tr><td class="mono">s_eta</td><td>الوقت المتبقي</td><td class="mono"><a href="src/ui-js.html#L155">155</a></td><td>time left</td></tr>
+<tr><td class="mono">s_latency</td><td>زمن الرد</td><td class="mono"><a href="src/ui-js.html#L187">187</a></td><td>Latency</td></tr>
+<tr><td class="mono">s_sent</td><td>أُرسل</td><td class="mono"><a href="src/ui-js.html#L186">186</a></td><td>Sent</td></tr>
+<tr><td class="mono">s_speed</td><td>السرعة</td><td class="mono"><a href="src/ui-js.html#L186">186</a></td><td>Speed</td></tr>
+<tr><td class="mono">s_state</td><td>الحالة</td><td class="mono"><a href="src/ui-js.html#L187">187</a></td><td>State</td></tr>
+<tr><td class="mono">saved_hint</td><td>اختر بروفايل لمراجعة إعداداته قبل التشغيل. لن يبدأ أي فحص أو تخمين تلقائياً.</td><td class="mono"><a href="src/ui-js.html#L16">16</a></td><td>Pick a profile to review its settings before running. No automatic scan or guessing will s</td></tr>
+<tr><td class="mono">saved_profile_count</td><td>عدد البروفايلات المحفوظة</td><td class="mono"><a href="src/ui-js.html#L26">26</a></td><td>Saved profiles count</td></tr>
+<tr><td class="mono">saved_profiles</td><td>الملف التعريفي المحفوظ</td><td class="mono"><a href="src/ui-js.html#L100">100</a></td><td>Saved profile</td></tr>
+<tr><td class="mono">saved_search</td><td>بحث في البروفايلات</td><td class="mono"><a href="src/ui-js.html#L38">38</a></td><td>Search profiles</td></tr>
+<tr><td class="mono">saved_search_ph</td><td>ابحث بالاسم أو الرابط…</td><td class="mono"><a href="src/ui-js.html#L39">39</a></td><td>Search by name or URL…</td></tr>
+<tr><td class="mono">saved_title</td><td>البروفايلات المحفوظة</td><td class="mono"><a href="src/ui-js.html#L15">15</a></td><td>Saved profiles</td></tr>
+<tr><td class="mono">scan_button</td><td>افحص الآن</td><td class="mono"><a href="src/ui-js.html#L84">84</a></td><td>Scan now</td></tr>
+<tr><td class="mono">scan_fail</td><td>تعذّر فتح الصفحة</td><td class="mono"><a href="src/ui-js.html#L208">208</a></td><td>Could not open the page</td></tr>
+<tr><td class="mono">scan_hint</td><td>الصق رابط صفحة دخول الهوتسبوت كما تفتحه في المتصفح. بعد الفحص أدخل بطاقة مصرحاً بها تعرف أنها تعمل واختبرها هنا؛ لن تنتقل لصيغة التخمين حتى يُثبت الاخ</td><td class="mono"><a href="src/ui-js.html#L83">83</a></td><td>Paste the hotspot login URL as it opens in your browser. After scanning, enter an authoriz</td></tr>
+<tr><td class="mono">scan_ok</td><td>الصفحة قُرئت</td><td class="mono"><a href="src/ui-js.html#L208">208</a></td><td>Page read</td></tr>
+<tr><td class="mono">scan_title</td><td>1) فحص الشبكة واختبار البطاقة المعروفة</td><td class="mono"><a href="src/ui-js.html#L82">82</a></td><td>1) Check the network and test the known card</td></tr>
+<tr><td class="mono">scan_url_label</td><td>رابط صفحة الدخول</td><td class="mono"><a href="src/ui-js.html#L85">85</a></td><td>Login page URL</td></tr>
+<tr><td class="mono">seconds</td><td>ثانية</td><td class="mono"><a href="src/ui-js.html#L178">178</a></td><td>seconds</td></tr>
+<tr><td class="mono">server_gone</td><td>انقطع الاتصال بالأداة. إذا كنت أوقفتها فهذا طبيعي - شغّلها من جديد لتكمل.</td><td class="mono"><a href="src/ui-js.html#L238">238</a></td><td>Lost contact with the tool. If you stopped it, that is expected - start it again to contin</td></tr>
+<tr><td class="mono">server_gone_title</td><td>الأداة توقفت</td><td class="mono"><a href="src/ui-js.html#L237">237</a></td><td>The tool stopped</td></tr>
+<tr><td class="mono">shape_mode</td><td>مقارنة بالشكل (الصفحة تتغير وحدها)</td><td class="mono"><a href="src/ui-js.html#L362">362</a></td><td>comparing by shape (page changes by itself)</td></tr>
+<tr><td class="mono">skip_content</td><td>تجاوز إلى المحتوى</td><td class="mono"><a href="src/ui-js.html#L73">73</a></td><td>Skip to content</td></tr>
+<tr><td class="mono">start_hint</td><td>اختر مسار العمل. لن يبدأ أي فحص أو تخمين تلقائياً قبل تأكيدك الصريح.</td><td class="mono"><a href="src/ui-js.html#L12">12</a></td><td>Choose your workflow. No scan or guessing starts automatically before your explicit confir</td></tr>
+<tr><td class="mono">start_title</td><td>KiraPass — البداية</td><td class="mono"><a href="src/ui-js.html#L11">11</a></td><td>KiraPass — Start</td></tr>
+<tr><td class="mono">state_calibrating</td><td>جارٍ فحص البطاقة وتحديث خط أساس الرفض</td><td class="mono"><a href="src/ui-js.html#L194">194</a></td><td>Checking card and refreshing rejection baseline</td></tr>
+<tr><td class="mono">state_done</td><td>انتهى</td><td class="mono"><a href="src/ui-js.html#L196">196</a></td><td>Finished</td></tr>
+<tr><td class="mono">state_idle</td><td>جاهز</td><td class="mono"><a href="src/ui-js.html#L194">194</a></td><td>Ready</td></tr>
+<tr><td class="mono">state_running</td><td>يعمل</td><td class="mono"><a href="src/ui-js.html#L194">194</a></td><td>Running</td></tr>
+<tr><td class="mono">state_stopping</td><td>يتوقف</td><td class="mono"><a href="src/ui-js.html#L196">196</a></td><td>Stopping</td></tr>
+<tr><td class="mono">step_format</td><td>صيغة البطاقة</td><td class="mono"><a href="src/ui-js.html#L9">9</a></td><td>Card format</td></tr>
+<tr><td class="mono">step_results</td><td>النتائج</td><td class="mono"><a href="src/ui-js.html#L10">10</a></td><td>Results</td></tr>
+<tr><td class="mono">step_run</td><td>التشغيل</td><td class="mono"><a href="src/ui-js.html#L10">10</a></td><td>Run</td></tr>
+<tr><td class="mono">step_scan</td><td>فحص الشبكة</td><td class="mono"><a href="src/ui-js.html#L9">9</a></td><td>Scan</td></tr>
+<tr><td class="mono">step_start</td><td>البداية</td><td class="mono"><a href="src/ui-js.html#L8">8</a></td><td>Start</td></tr>
+<tr><td class="mono">steps_label</td><td>خطوات الاستخدام</td><td class="mono"><a href="src/ui-js.html#L78">78</a></td><td>Workflow steps</td></tr>
+<tr><td class="mono">stop_attempts_done</td><td>انتهى عدد المحاولات المطلوب. شغّل مرة أخرى - ستكمل من حيث توقفت.</td><td class="mono"><a href="src/ui-js.html#L329">329</a></td><td>Requested attempts finished. Run again - it continues, it does not repeat.</td></tr>
+<tr><td class="mono">stop_banned_by_router</td><td>الراوتر حجب الطلبات. أوقف المحاولات واطلب من مسؤول الشبكة مراجعة الوصول وإعادة الخدمة.</td><td class="mono"><a href="src/ui-js.html#L322">322</a></td><td>The router blocked requests. Stop attempts and ask the network administrator to review acc</td></tr>
+<tr><td class="mono">stop_calibration_failed</td><td>لم أبدأ التخمين لأن التعلّم الأولي فشل - السبب مكتوب بالأسفل.</td><td class="mono"><a href="src/ui-js.html#L331">331</a></td><td>Nothing was started because the initial learning failed - the reason is written below.</td></tr>
+<tr><td class="mono">stop_captcha_challenge</td><td>ظهرت كابتشا، والتخمين بعدها بلا فائدة.</td><td class="mono"><a href="src/ui-js.html#L333">333</a></td><td>A captcha appeared; guessing is pointless after that.</td></tr>
+<tr><td class="mono">stop_engine_error</td><td>خطأ داخلي - التفاصيل في السجل.</td><td class="mono"><a href="src/ui-js.html#L332">332</a></td><td>Internal error - see the log.</td></tr>
+<tr><td class="mono">stop_found_strong_evidence</td><td>ظهرت بطاقة بدليل قوي (تحويل خارج البوابة) وتوقفت.</td><td class="mono"><a href="src/ui-js.html#L320">320</a></td><td>A card produced strong evidence (redirect out of the portal).</td></tr>
+<tr><td class="mono">stop_found_unverified</td><td>قبل الراوتر البطاقة لكن لم أستطع تأكيد الإنترنت.</td><td class="mono"><a href="src/ui-js.html#L334">334</a></td><td>The router accepted the card but the internet check failed.</td></tr>
+<tr><td class="mono">stop_found_verified</td><td>وجدت بطاقة تعمل وتحقّقت من الإنترنت فعلياً.</td><td class="mono"><a href="src/ui-js.html#L319">319</a></td><td>Found a working card and verified real internet access.</td></tr>
+<tr><td class="mono">stop_internet_opened</td><td>توقف لأن الإنترنت فتح أثناء التشغيل: أحد آخر الكروت المجربة هو الصحيح.</td><td class="mono"><a href="src/ui-js.html#L267">267</a></td><td>stopped because the internet opened during the run: one of the last cards tried is the wor</td></tr>
+<tr><td class="mono">stop_rate_limited_by_router</td><td>الشبكة حدّت من الطلبات (429). أوقفت الأداة المحاولات؛ اطلب من مسؤول الشبكة مراجعة الوصول قبل المتابعة.</td><td class="mono"><a href="src/ui-js.html#L323">323</a></td><td>The network rate limited requests (429). The tool stopped; ask the network administrator t</td></tr>
+<tr><td class="mono">stop_space_done</td><td>غطّيت كل الاحتمالات في هذا النطاق.</td><td class="mono"><a href="src/ui-js.html#L330">330</a></td><td>Every combination in this range has been covered.</td></tr>
+<tr><td class="mono">stop_target_unreachable</td><td>توقفت بعد تكرر فشل الاتصال؛ قد يكون انقطاعاً أو حظراً ولا يمكن تمييزهما من التقرير. أوقفت الطلبات ولم أعد الاتصال تلقائياً. راجع مسؤول الشبكة قبل المح</td><td class="mono"><a href="src/ui-js.html#L324">324</a></td><td>Stopped after repeated connection failures; this may be an outage or a block, which the re</td></tr>
+<tr><td class="mono">stop_user_stop</td><td>أوقفت التشغيل بنفسك.</td><td class="mono"><a href="src/ui-js.html#L321">321</a></td><td>You stopped it.</td></tr>
+<tr><td class="mono">suggest_threads</td><td>المسارات المقترحة</td><td class="mono"><a href="src/ui-js.html#L372">372</a></td><td>Suggested threads</td></tr>
+<tr><td class="mono">t_card</td><td>البطاقة</td><td class="mono"><a href="src/ui-js.html#L188">188</a></td><td>Card</td></tr>
+<tr><td class="mono">t_len</td><td>الحجم</td><td class="mono"><a href="src/ui-js.html#L188">188</a></td><td>Size</td></tr>
+<tr><td class="mono">t_ms</td><td>ms</td><td class="mono"><a href="src/ui-js.html#L188">188</a></td><td>ms</td></tr>
+<tr><td class="mono">t_result</td><td>النتيجة</td><td class="mono"><a href="src/ui-js.html#L188">188</a></td><td>Result</td></tr>
+<tr><td class="mono">t_why</td><td>السبب</td><td class="mono"><a href="src/ui-js.html#L188">188</a></td><td>Reason</td></tr>
+<tr><td class="mono">target_unreachable_doc</td><td>target_unreachable يعني انقطاعاً أو حظراً إدارياً لا يمكن تمييزهما تلقائياً — راجع المشرف يدوياً قبل أي استئناف.</td><td class="mono"><a href="src/ui-js.html#L66">66</a></td><td>target_unreachable means an outage or an admin block that cannot be told apart automatical</td></tr>
+<tr><td class="mono">th_auto_slowed_router_complaining</td><td>أبطأت تلقائياً: الراوتر بدأ يشتكي (أخطاء/تقييد)</td><td class="mono"><a href="src/ui-js.html#L156">156</a></td><td>slowed down automatically: the router started complaining (errors/limits)</td></tr>
+<tr><td class="mono">th_auto_sped_up</td><td>أسرعت تلقائياً: الراوتر يستجيب بلا أخطاء</td><td class="mono"><a href="src/ui-js.html#L157">157</a></td><td>sped up automatically: the router is answering cleanly</td></tr>
+<tr><td class="mono">th_auto_sped_up_more_threads</td><td>أسرعت تلقائياً: أضفت مسارات لأن الراوتر يستجيب بلا أخطاء</td><td class="mono"><a href="src/ui-js.html#L158">158</a></td><td>sped up automatically: added threads because the router is answering cleanly</td></tr>
+<tr><td class="mono">th_ban_page_slowing_down</td><td>أوقفت الطلبات بعد ظهور صفحة حجب</td><td class="mono"><a href="src/ui-js.html#L337">337</a></td><td>Stopped further requests after a block page appeared</td></tr>
+<tr><td class="mono">th_connections_refused_slowing_down</td><td>أبطأت الطلبات لأن الراوتر يرفض الاتصالات</td><td class="mono"><a href="src/ui-js.html#L338">338</a></td><td>Slowed down because the router refuses connections</td></tr>
+<tr><td class="mono">th_network_errors_slowing_down</td><td>أبطأت الطلبات بسبب أخطاء شبكة متكررة</td><td class="mono"><a href="src/ui-js.html#L339">339</a></td><td>Slowed down because of repeated network errors</td></tr>
+<tr><td class="mono">th_rate_limited_slowing_down</td><td>أوقفت الطلبات بعد رد تحديد المعدل (429)</td><td class="mono"><a href="src/ui-js.html#L336">336</a></td><td>Stopped further requests after a rate-limit response (429)</td></tr>
+<tr><td class="mono">th_recovering_speed</td><td>الشبكة هدأت - أعيد رفع السرعة تدريجياً</td><td class="mono"><a href="src/ui-js.html#L340">340</a></td><td>Network calmed down - raising the speed again</td></tr>
+<tr><td class="mono">ua_android</td><td>أندرويد Chrome</td><td class="mono"><a href="src/ui-js.html#L164">164</a></td><td>Android Chrome</td></tr>
+<tr><td class="mono">ua_custom</td><td>اكتبها بنفسك…</td><td class="mono"><a href="src/ui-js.html#L165">165</a></td><td>write a custom value…</td></tr>
+<tr><td class="mono">ua_default</td><td>المتصفح الافتراضي (Chrome/Windows)</td><td class="mono"><a href="src/ui-js.html#L163">163</a></td><td>default browser (Chrome/Windows)</td></tr>
+<tr><td class="mono">ua_hint</td><td>غيّرها فقط إذا كان الكرت يعمل في متصفح هاتفك لكن الراوتر يرفض شكل طلب الأداة.</td><td class="mono"><a href="src/ui-js.html#L166">166</a></td><td>Change this only when a card works in your phone browser but the router rejects the tool&#x27;s</td></tr>
+<tr><td class="mono">ua_iphone</td><td>آيفون Safari</td><td class="mono"><a href="src/ui-js.html#L164">164</a></td><td>iPhone Safari</td></tr>
+<tr><td class="mono">user_field</td><td>حقل المستخدم</td><td class="mono"><a href="src/ui-js.html#L217">217</a></td><td>Username field</td></tr>
+<tr><td class="mono">v_ACCEPTED</td><td>مقبولة</td><td class="mono"><a href="src/ui-js.html#L271">271</a></td><td>Accepted</td></tr>
+<tr><td class="mono">v_ACCEPTED_UNVERIFIED</td><td>قبلها الراوتر (تأكيد الإنترنت فشل)</td><td class="mono"><a href="src/ui-js.html#L272">272</a></td><td>Router accepted (internet check failed)</td></tr>
+<tr><td class="mono">v_ACCEPTED_VERIFIED</td><td>مقبولة ومؤكدة</td><td class="mono"><a href="src/ui-js.html#L270">270</a></td><td>Accepted &amp; verified</td></tr>
+<tr><td class="mono">v_BANNED</td><td>محظور من الراوتر</td><td class="mono"><a href="src/ui-js.html#L275">275</a></td><td>Blocked by router</td></tr>
+<tr><td class="mono">v_CHALLENGE</td><td>ظهر اختبار كابتشا</td><td class="mono"><a href="src/ui-js.html#L277">277</a></td><td>Captcha appeared</td></tr>
+<tr><td class="mono">v_INTERNAL_ERROR</td><td>خلل داخلي بالأداة (يُبلَّغ عنه)</td><td class="mono"><a href="src/ui-js.html#L279">279</a></td><td>Internal tool error (reported)</td></tr>
+<tr><td class="mono">v_NET_ERROR</td><td>خطأ في الاتصال</td><td class="mono"><a href="src/ui-js.html#L278">278</a></td><td>Network error</td></tr>
+<tr><td class="mono">v_RATE_LIMITED</td><td>الشبكة تبطّئك/تحدّ من الطلبات</td><td class="mono"><a href="src/ui-js.html#L276">276</a></td><td>Throttled / rate limited</td></tr>
+<tr><td class="mono">v_REJECTED</td><td>مرفوضة</td><td class="mono"><a href="src/ui-js.html#L273">273</a></td><td>Rejected</td></tr>
+<tr><td class="mono">v_UNKNOWN</td><td>رد غير واضح</td><td class="mono"><a href="src/ui-js.html#L274">274</a></td><td>Unclear reply</td></tr>
+<tr><td class="mono">warn_big_space</td><td>عدد الاحتمالات ضخم جداً — قد يستغرق وقتاً طويلاً ويزيد ضغط الراوتر.</td><td class="mono"><a href="src/ui-js.html#L56">56</a></td><td>The combination space is huge — it may take a long time and put pressure on the router.</td></tr>
+<tr><td class="mono">warn_fast_preset</td><td>الإعداد السريع قد يحظر جهازك بسرعة. راجع مسؤول الشبكة قبل المتابعة. هل أنت متأكد؟</td><td class="mono"><a href="src/ui-js.html#L55">55</a></td><td>The fast preset can lock your device out quickly. Confirm with the network admin before co</td></tr>
+<tr><td class="mono">warn_many_threads</td><td>عدد المسارات مرتفع وقد يؤدي إلى حظر سريع. قلّله إن أمكن.</td><td class="mono"><a href="src/ui-js.html#L57">57</a></td><td>Thread count is high and may trigger a quick lockout. Lower it if you can.</td></tr>
+<tr><td class="mono">why_stopped</td><td>لماذا توقف</td><td class="mono"><a href="src/ui-js.html#L223">223</a></td><td>Why it stopped</td></tr>
+<tr><td class="mono">why_title</td><td>لماذا انتهت كل محاولة بهذه النتيجة؟</td><td class="mono"><a href="src/ui-js.html#L328">328</a></td><td>Why each attempt ended the way it did</td></tr>
+<tr><td class="mono">yes</td><td>نعم</td><td class="mono"><a href="src/ui-js.html#L232">232</a></td><td>Yes</td></tr>
+</tbody></table></div>
+<h2 id="machine">٣) المفاتيح الآلية في بايثون (لا تُترجم هناك)</h2>
+<div class="scroll-x"><table class="t compact"><thead><tr><th>العائلة</th>
+<th>أين تولَّد</th><th>أين تُترجم</th><th>القيم</th></tr></thead><tbody>
+<tr><td>الأحكام <code>v_*</code></td><td><code>fingerprint.Judge.classify</code></td>
+<td><code>I18N.verdict_*</code></td>
+<td class="mono">ACCEPTED_VERIFIED · ACCEPTED · ACCEPTED_UNVERIFIED · REJECTED ·
+UNKNOWN · BANNED · RATE_LIMITED · CHALLENGE · NET_ERROR · INTERNAL_ERROR</td></tr>
+<tr><td>أسباب التوقف <code>stop_*</code></td><td><code>engine.Engine.stop</code></td>
+<td><code>I18N.stop_*</code></td>
+<td class="mono">found_verified · found_strong_evidence · user_stop ·
+banned_by_router · rate_limited_by_router · target_unreachable · captcha_challenge ·
+internet_opened · attempts_done · space_done · calibration_failed · engine_error</td></tr>
+<tr><td>أسباب الحكم <code>r_*</code></td><td><code>Judge.classify</code></td>
+<td><code>I18N.reason_*</code></td>
+<td class="mono">same_as_rejection_page_exact/shape/similar/empty/redirect ·
+redirect_out_of_portal · redirect_differs_from_rejection · success_url_contains ·
+learned_success_words · rejection_wording · reply_differs_not_proven · ban_page ·
+http_403/429/503 · captcha_present · accepted_internet_already_open · …</td></tr>
+<tr><td>أنواع أخطاء الشبكة <code>net_*</code></td><td><code>errors.classify</code></td>
+<td><code>errors.KINDS</code> (عربي جاهز)</td>
+<td class="mono">dns · refused · connect_timeout · read_timeout · reset · stale ·
+tls · unreachable · bad_response · too_many_redirects · proto · unknown · no_session</td></tr>
+<tr><td>مشاكل الصيغة</td><td><code>store.validate</code></td>
+<td><code>I18N.problem_*</code></td>
+<td class="mono">url_missing_or_invalid · user_field_missing ·
+length_not_bigger_than_prefix_and_suffix · charset_too_small · unknown_pass_mode ·
+fixed_password_empty · needs_browser_js · space_is_astronomically_big</td></tr>
+<tr><td>أخطاء المعايرة</td><td><code>engine.calibrate</code></td>
+<td><code>I18N.cal_*</code></td>
+<td class="mono">profile_valid · reach_login_page · internet_state · rejection_probe ·
+rejection_baseline · probe_looked_accepted · known_card_preflight · shape_tuned ·
+blocked_already · captcha_challenge · request_shape_rejected · no_rejection_baseline ·
+card_space_empty · known_card_out_of_format · known_card_not_proven · logout_unconfirmed</td></tr>
+</tbody></table></div>
+<h2 id="pytext">٤) نصوص عربية مكتوبة داخل بايثون</h2><p>هذه <b>معروضة للمستخدم مباشرة</b> (لا تمرّ بالواجهة):</p>
+<table class="t compact"><thead><tr><th>الثابت</th><th>السطر</th><th>الاستخدام</th></tr></thead><tbody>
+<tr><td class="mono">REJECT_WORDS</td><td class="mono"><a href="src/config.html#L159">159</a></td><td>كلمات تُطابق صفحة «بطاقة خاطئة»</td></tr>
+<tr><td class="mono">BAN_WORDS</td><td class="mono"><a href="src/config.html#L172">172</a></td><td>كلمات تُطابق صفحة حجب (عربية/إنجليزية/فرنسية)</td></tr>
+<tr><td class="mono">ACCEPT_WORDS</td><td class="mono"><a href="src/config.html#L191">191</a></td><td>كلمات تُطابق صفحة نجاح</td></tr>
+<tr><td class="mono">KINDS</td><td class="mono"><a href="src/errors.html#L22">22</a></td><td>وصف عربي قصير لكل نوع خطأ شبكة (العمود الثاني في كل مدخل)</td></tr>
+</tbody></table>
+<h2 id="howto">٥) كيف أغيّر نصّاً؟</h2>
+<table class="t"><thead><tr><th>أريد أن…</th><th>أذهب إلى</th><th>الخطوات</th></tr></thead>
+<tbody>
+<tr><td>أغيّر نصاً ثابتاً في الصفحة</td><td><code>ui.html</code> + <code>I18N</code></td>
+<td>غيّر النص داخل العنصر (العربي)، ثم غيّر <code>I18N.en.&lt;المفتاح&gt;</code>.
+لا تغيّر <code>data-i18n</code> نفسه إلا إن غيّرت الاثنين.</td></tr>
+<tr><td>أغيّر رسالة ديناميكية</td><td><code>I18N.ar/en</code> في <code>ui.js</code></td>
+<td>ابحث عن المفتاح، غيّر النصّين. لا تضف مفاتيح في جهة واحدة.</td></tr>
+<tr><td>أضيف مفتاحاً جديداً</td><td>الاثنان معاً</td>
+<td>أضف في <code>I18N.ar</code> و<code>I18N.en</code>، ثم استخدمه بـ<code>t(key)</code>
+أو <code>data-i18n</code>، ثم شغّل <code>UIIntegrityTests</code>.</td></tr>
+<tr><td>أضيف كلمة كشف (رفض/حجب/نجاح)</td><td><code>config.py</code></td>
+<td>أضف الكلمة <b>ككلمة كاملة</b>، ثم شغّل <code>PhraseTests</code> و
+<code>MaskingTests</code>. انظر <a href="editing.html#recipe3">وصفة 3</a>.</td></tr>
+<tr><td>أغيّر وصفاً عربياً لخطأ شبكة</td><td><code>errors.KINDS</code></td>
+<td>العمود الثاني من كل مدخل. لا تغيّر <code>kind</code> نفسه (مفتاح آلي).</td></tr>
+<tr><td>أترجم مفتاحاً آلياً جديداً</td><td><code>I18N</code></td>
+<td>أضف <code>stop_&lt;الجديد&gt;</code> أو <code>r_&lt;الجديد&gt;</code> في
+<code>ar</code> و<code>en</code>. المفتاح غير المترجم يظهر كما هو (لا ينهار).</td></tr>
+</tbody></table>
+<footer class="docfoot">صفحة مولّدة آلياً من مصدر الكود · KiraPass —
+<code>texts</code> · 2026-10-01 02:26</footer>
+</main>
+</div>
+<script src="assets/docs.js"></script>
+<script>KPInit("texts");</script>
+</body>
+</html>
