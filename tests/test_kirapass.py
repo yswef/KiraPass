@@ -16,6 +16,7 @@ from pathlib import Path
 import shutil
 import sys
 import tempfile
+import threading
 import time
 import unittest
 from html.parser import HTMLParser
@@ -92,6 +93,92 @@ class UIIntegrityTests(unittest.TestCase):
         self.assertGreater(html.index('id="calibrateBtn"'), scan_panel)
         self.assertIn("S.calibrationReady", js)
         self.assertIn("preflight_only: true", js)
+        results_start = html.index('id="panel-results"')
+        results_end = html.index("</section>", results_start)
+        stop_button = html.index('id="stopBtn"')
+        self.assertLess(results_start, stop_button)
+        self.assertLess(stop_button, results_end,
+                        "the stop control must stay on the visible results panel")
+        add_row = js[js.index("function addRow"):js.index("function renderHits")]
+        self.assertIn("body.prepend(tr)", add_row)
+        self.assertIn("body.lastElementChild", add_row)
+
+
+class RunStopControlTests(unittest.TestCase):
+    def test_stop_marks_the_run_stopping_and_rejects_a_second_start(self):
+        eng = engine.Engine(store.Store(), persist=False)
+        eng.state = "running"
+
+        eng.stop()
+
+        self.assertTrue(eng.stop_event.is_set())
+        self.assertEqual(eng.status()["state"], "stopping")
+        self.assertEqual(eng.start({}, attempts=1, threads=1),
+                         {"ok": False, "error": "already_running"})
+
+    def test_calibration_honors_stop_before_opening_a_session(self):
+        from unittest import mock
+
+        profile = selftest.make_profile("http://portal.test/login")
+        stop_event = threading.Event()
+        stop_event.set()
+        with mock.patch.object(engine, "new_session") as new_session:
+            cal = engine.calibrate(profile, stop_event=stop_event)
+        self.assertEqual(cal.error, "user_stop")
+        new_session.assert_not_called()
+
+    def test_stop_during_calibration_does_not_enter_running_state(self):
+        from unittest import mock
+
+        entered = threading.Event()
+        release = threading.Event()
+
+        def paused_calibration(*args, **kwargs):
+            entered.set()
+            release.wait(2)
+            return engine.Calibration()
+
+        eng = engine.Engine(store.Store(), persist=False)
+        profile = selftest.make_profile("http://portal.test/login")
+        with mock.patch.object(engine, "calibrate", side_effect=paused_calibration):
+            self.assertTrue(eng.start(profile, attempts=1, threads=1)["ok"])
+            self.assertTrue(entered.wait(2), "calibration did not start")
+            eng.stop()
+            release.set()
+            eng.thread.join(3)
+        self.assertFalse(eng.thread.is_alive())
+        self.assertEqual(eng.state, "done")
+        self.assertEqual(eng.stop_reason, "user_stop")
+        states = [event["data"].get("state") for event in eng.events
+                  if event["kind"] == "state"]
+        self.assertNotIn("running", states)
+
+    def test_stop_during_request_delay_prevents_the_next_login_request(self):
+        from unittest import mock
+
+        waiting = threading.Event()
+
+        class StopAwareEvent(threading.Event):
+            def wait(self, timeout=None):
+                waiting.set()
+                return super().wait(timeout)
+
+        eng = engine.Engine(store.Store(), persist=False)
+        eng.state = "running"
+        eng.stop_event = StopAwareEvent()
+        eng.throttle["delay_ms"] = 2000
+        session = type("Session", (), {})()
+        profile = {"login_url": "http://portal.test/login"}
+        with mock.patch.object(engine, "send_login") as send_login:
+            worker = threading.Thread(target=eng._attempt,
+                                      args=(session, None, "CARD", 1, profile))
+            worker.start()
+            self.assertTrue(waiting.wait(2), "attempt did not enter its delay")
+            eng.stop()
+            worker.join(2)
+        self.assertFalse(worker.is_alive())
+        send_login.assert_not_called()
+        self.assertEqual(eng._unevaluated, 1)
 
 
 class MaskingTests(unittest.TestCase):

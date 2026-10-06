@@ -600,12 +600,6 @@
       ابدأ التخمين
     <!-- إغلاق العنصر السابق -->
     </button>
-    <!-- زر بمعرّف stopBtn وصنف btn danger big hidden -->
-    <button class="btn danger big hidden" id="stopBtn" data-i18n="btn_stop">
-      <!-- تكملة العنصر السابق -->
-      إيقاف
-    <!-- إغلاق العنصر السابق -->
-    </button>
   <!-- إغلاق العنصر السابق -->
   </div>
 <!-- إغلاق العنصر السابق -->
@@ -616,6 +610,11 @@
 <section class="panel" id="panel-results">
   <!-- عنوان مستوى 2 -->
   <h2 data-i18n="res_title">4) النتائج الحيّة</h2>
+
+  <div class="run-stop-row hidden" id="runStopRow">
+    <p class="run-stop-hint" data-i18n="run_stop_hint">أوقف التشغيل قبل تجربة بطاقة يدوياً على نفس الجهاز؛ الجلسات المتزامنة قد تؤثر على ردّ البوابة.</p>
+    <button type="button" class="btn danger big" id="stopBtn" data-i18n="btn_stop">إيقاف التخمين</button>
+  </div>
 
   <!-- حاوية (div) وصنف statline -->
   <div class="statline">

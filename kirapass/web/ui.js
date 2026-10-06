@@ -181,7 +181,8 @@ const I18N = {  // تعريف الثابت I18N = كائن
     btn_diagnose: "تشخيص الشبكة أولاً",  // مفتاح btn_diagnose في الكائن = نص
     btn_clear_review: "مسح صفحات المراجعة",  // مفتاح btn_clear_review في الكائن = نص
     license_check: "أتعهّد بأنني أملك هذه الشبكة أو لدي إذن كتابي من صاحبها لاختبارها.",  // مفتاح license_check في الكائن = نص
-    btn_start: "ابدأ التخمين", btn_stop: "إيقاف",  // مفتاح btn_start في الكائن = نص
+    btn_start: "ابدأ التخمين", btn_stop: "إيقاف التخمين",  // مفتاح btn_start في الكائن = نص
+    run_stop_hint: "أوقف التشغيل قبل تجربة بطاقة يدوياً على نفس الجهاز؛ الجلسات المتزامنة قد تؤثر على ردّ البوابة.",
     res_title: "4) النتائج الحيّة",  // مفتاح res_title في الكائن = نص
     s_speed: "السرعة", s_sent: "أُرسل", s_covered: "المغطى",  // مفتاح s_speed في الكائن = نص
     s_latency: "زمن الرد", s_delay: "التباطؤ الحالي", s_eta: "الوقت المتبقي", s_state: "الحالة",  // مفتاح s_latency في الكائن = نص
@@ -562,7 +563,8 @@ const I18N = {  // تعريف الثابت I18N = كائن
     netadvice_blocked_from_the_start: "The network was already blocking this device before the check. Stop attempts and ask the network administrator to review access and restore service.",  // مفتاح netadvice_blocked_from_the_start في الكائن = نص
     btn_diagnose: "Diagnose the network first", btn_clear_review: "Clear review pages",  // مفتاح btn_diagnose في الكائن = نص
     license_check: "I confirm I own this network or hold written permission from its owner.",  // مفتاح license_check في الكائن = نص
-    btn_start: "Start guessing", btn_stop: "Stop",  // مفتاح btn_start في الكائن = نص
+    btn_start: "Start guessing", btn_stop: "Stop guessing",  // مفتاح btn_start في الكائن = نص
+    run_stop_hint: "Stop the run before testing a card manually on the same device; concurrent portal sessions can affect the reply.",
     res_title: "4) Live results",  // مفتاح res_title في الكائن = نص
     s_speed: "Speed", s_sent: "Sent", s_covered: "Covered",  // مفتاح s_speed في الكائن = نص
     s_latency: "Latency", s_delay: "Current slowdown", s_eta: "Time left", s_state: "State",  // مفتاح s_latency في الكائن = نص
@@ -1909,7 +1911,8 @@ async function startRun() {  // تكملة السطر السابق
   S.lastSeq = 0; S.rows = 0;  // إسناد رقم إلى S.lastSeq
   $("logBody").innerHTML = ""; $("hitsBox").innerHTML = t("hits_none");  // استدعاء الدالة $("logBody").innerHTML = ""; $("hitsBox").)
   $("reviewBox").innerHTML = t("review_none");  // استدعاء الدالة $("reviewBox").innerHTML = t("review_none")
-  $("startBtn").classList.add("hidden"); $("stopBtn").classList.remove("hidden");  // استدعاء الدالة $("startBtn").classList.add("hidden"); $(")
+  $("startBtn").classList.add("hidden");
+  setRunStopVisible(true);
   S.running = true;  // إسناد قيمة منطقية إلى S.running
   step("results");  // استدعاء الدالة step("results")
   pollStatus();  // استدعاء الدالة pollStatus()
@@ -1951,18 +1954,50 @@ async function startFromReview() {  // تكملة السطر السابق
   $("logBody").innerHTML = ""; $("hitsBox").innerHTML = t("hits_none");  // استدعاء الدالة $("logBody").innerHTML = ""; $("hitsBox").)
   $("reviewBox").innerHTML = t("review_none");  // استدعاء الدالة $("reviewBox").innerHTML = t("review_none")
   const startBtn = $("startBtn");  // تعريف الثابت startBtn = نتيجة استدعاء
-  const stopBtn = $("stopBtn");  // تعريف الثابت stopBtn = نتيجة استدعاء
   if (startBtn) startBtn.classList.add("hidden");  // تنفيذ التعليمة السابقة
-  if (stopBtn) stopBtn.classList.remove("hidden");  // تنفيذ التعليمة السابقة
+  setRunStopVisible(true);
   S.running = true;  // إسناد قيمة منطقية إلى S.running
   step("results");  // استدعاء الدالة step("results")
   pollStatus();  // استدعاء الدالة pollStatus()
 }  // إغلاق الكتلة السابقة
 
+function setRunStopVisible(visible) {
+  const row = $("runStopRow");
+  const button = $("stopBtn");
+  if (row) row.classList.toggle("hidden", !visible);
+  if (button && visible) button.disabled = false;
+}
+
 async function stopRun() {  // تكملة السطر السابق
-  await api("/api/run/stop", {});  // تنفيذ التعليمة السابقة
-  toast(t("state_stopping"));  // استدعاء الدالة toast(t("state_stopping"))
-}  // إغلاق الكتلة السابقة
+  const button = $("stopBtn");
+  if (button) button.disabled = true;
+  const res = await api("/api/run/stop", {});
+  if (!res.ok) {
+    if (button) button.disabled = false;
+    toast(res.error === "server_gone" ? t("server_gone") : t("scan_fail"));
+    return;
+  }
+  toast(t("state_stopping"));
+  pollStatus();
+}
+
+async function restoreActiveRun() {
+  // Get the state snapshot without replaying an unbounded event history; the
+  // next poll loads only the newest 400 events for the visible log.
+  const res = await api("/api/run/status?since=9999999999999999");
+  const st = res.status || {};
+  if (!res.ok || !["calibrating", "running", "stopping"].includes(st.state)) return;
+  S.running = true;
+  S.lastSeq = Math.max(0, (Number(st.seq) || 0) - 400);
+  S.rows = 0;
+  const startButton = $("startBtn");
+  if (startButton) startButton.classList.add("hidden");
+  setRunStopVisible(true);
+  if (st.state === "stopping" && $("stopBtn")) $("stopBtn").disabled = true;
+  step("results");
+  renderStatus(st, []);
+  pollStatus();
+}
 
 function pollStatus() {  // تعريف الدالة pollStatus()
   clearTimeout(S.poll);  // استدعاء الدالة clearTimeout(S.poll)
@@ -1979,7 +2014,7 @@ function pollStatus() {  // تعريف الدالة pollStatus()
     if (res.status.state === "done" && S.running) {  // شرط: res.status.state === "done" && S.running
       S.running = false;  // إسناد قيمة منطقية إلى S.running
       $("startBtn").classList.remove("hidden");  // استدعاء الدالة $("startBtn").classList.remove("hidden")
-      $("stopBtn").classList.add("hidden");  // استدعاء الدالة $("stopBtn").classList.add("hidden")
+      setRunStopVisible(false);
       renderStop(res.status);  // استدعاء الدالة renderStop(res.status)
       refreshProfiles();          /* the engine saved where the run stopped */  // تكملة السطر السابق
       setTimeout(pollStatus, 1500);  // استدعاء الدالة setTimeout(pollStatus, 1500)
@@ -1991,6 +2026,10 @@ function pollStatus() {  // تعريف الدالة pollStatus()
 
 function renderStatus(st, events) {  // تعريف الدالة renderStatus(st, events)
   S.state = st.state;  // إسناد قيمة إلى S.state
+  const runStopActive = ["calibrating", "running", "stopping"].includes(st.state);
+  setRunStopVisible(runStopActive);
+  const stopButton = $("stopBtn");
+  if (stopButton) stopButton.disabled = st.state === "stopping";
   const statePill = $("statePill");  // تعريف الثابت statePill = نتيجة استدعاء
   statePill.textContent = stateLabel(st.state);  // إسناد نتيجة استدعاء إلى statePill.textContent
   statePill.className = "pill " + (st.state === "running" ? "run"  // إسناد نص إلى statePill.className
@@ -2070,7 +2109,8 @@ function renderStatus(st, events) {  // تعريف الدالة renderStatus(st,
 }  // إغلاق الكتلة السابقة
 
 function addRow(d) {  // تعريف الدالة addRow(d)
-  if (S.rows > 400) { $("logBody").removeChild($("logBody").firstChild); }  // تكملة السطر السابق
+  const body = $("logBody");
+  if (body.children.length >= 400) body.removeChild(body.lastElementChild);
   const tr = document.createElement("tr");  // تعريف الثابت tr = نتيجة استدعاء
   tr.className = d.code;  // إسناد قيمة إلى tr.className
   const reason = d.code === "NET_ERROR" ? t("net_" + d.reason, d.reason)  // تعريف الثابت reason = نتيجة استدعاء
@@ -2083,10 +2123,10 @@ function addRow(d) {  // تعريف الدالة addRow(d)
     "<td class='why'>" + esc(reason) + "</td>" +  // تكملة السطر السابق
     "<td>" + (d.ms || 0) + "</td>" +  // تكملة السطر السابق
     "<td>" + (d.length || 0) + "</td>";  // تنفيذ التعليمة السابقة
-  $("logBody").appendChild(tr);  // استدعاء الدالة $("logBody").appendChild(tr)
-  const wrap = $("logBody").closest(".logwrap");  // تعريف الثابت wrap = نتيجة استدعاء
-  if (wrap) wrap.scrollTop = 0;  // تنفيذ التعليمة السابقة
-  S.rows++;  // تنفيذ التعليمة السابقة
+  body.prepend(tr);
+  const wrap = body.closest(".logwrap");
+  if (wrap) wrap.scrollTop = 0;
+  S.rows = Math.min(body.children.length, 400);
 }  // إغلاق الكتلة السابقة
 
 function renderHits(hit, all) {  // تعريف الدالة renderHits(hit, all)
@@ -2229,7 +2269,8 @@ function openManualResumeConfirm() {  // تعريف الدالة openManualResum
       S.lastSeq = 0; S.rows = 0;  // إسناد رقم إلى S.lastSeq
       $("logBody").innerHTML = ""; $("hitsBox").innerHTML = t("hits_none");  // استدعاء الدالة $("logBody").innerHTML = ""; $("hitsBox").)
       $("reviewBox").innerHTML = t("review_none");  // استدعاء الدالة $("reviewBox").innerHTML = t("review_none")
-      $("startBtn").classList.add("hidden"); $("stopBtn").classList.remove("hidden");  // استدعاء الدالة $("startBtn").classList.add("hidden"); $(")
+      $("startBtn").classList.add("hidden");
+      setRunStopVisible(true);
       S.running = true;  // إسناد قيمة منطقية إلى S.running
       step("results");  // استدعاء الدالة step("results")
       pollStatus();  // استدعاء الدالة pollStatus()
@@ -2658,4 +2699,5 @@ function applyNetSettingsFromMeta(meta) {  // تعريف الدالة applyNetSe
   renderProfiles(meta.profiles || []);  // استدعاء الدالة renderProfiles(meta.profiles || [])
   renderSavedList(meta.profiles || []);  // استدعاء الدالة renderSavedList(meta.profiles || [])
   showStart();  // استدعاء الدالة showStart()
+  await restoreActiveRun();
 })();  // تنفيذ التعليمة السابقة

