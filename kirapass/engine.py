@@ -1282,6 +1282,7 @@ class Engine:  # تعريف الصنف Engine
         self._retried = {}  # إسناد قاموس إلى self._retried
         self._pending = []  # إسناد قائمة إلى self._pending
         self._retry_processed = 0  # إسناد القيمة الثابتة self._retry_processed
+        self._run_start_pos = 0
 
     # -- الأحداث ----------------------------------------------------------
     def emit(self, kind: str, payload=None) -> None:  # تعريف الدالة emit(self, kind, payload) ترجع None
@@ -1304,6 +1305,7 @@ class Engine:  # تعريف الصنف Engine
             processed = sum(self.counters.values())  # إسناد نتيجة استدعاء sum (معامل واحد) إلى processed
             self.progress["attempts"] = processed   # بطاقات جُرّبت فعلاً
             progress = dict(self.progress)  # إسناد نتيجة استدعاء dict (معامل واحد) إلى progress
+            progress["covered"] = self._covered_now(processed)
             progress.setdefault("queued", processed)  # استدعاء progress.setdefault (2 معاملات)
             planned = max(0, int(progress.get("total") or 0))  # إسناد نتيجة استدعاء max (2 معاملات) إلى planned
             progress["percent"] = round(  # إسناد نتيجة استدعاء round (2 معاملات) إلى progress['percent']
@@ -1416,6 +1418,7 @@ class Engine:  # تعريف الصنف Engine
         self._clean_streak = 0  # إسناد القيمة الثابتة self._clean_streak
         space = store.space_size(p)  # إسناد نتيجة استدعاء store.space_size (معامل واحد) إلى space
         pos = max(0, int(p.get("space_pos", 0)))  # إسناد نتيجة استدعاء max (2 معاملات) إلى pos
+        self._run_start_pos = pos
         total = int(attempts)  # إسناد نتيجة استدعاء int (معامل واحد) إلى total
         if space:  # شرط: space
             remaining = space - (pos % space)  # حساب طرح بين space وباقي القسمة وإسناده إلى remaining
@@ -1822,8 +1825,8 @@ class Engine:  # تعريف الصنف Engine
             # مشتبه بها؛ عند 200 بطاقة/ثانية فإن مخزناً ثابت الحجم سيرمي
             # البطاقة العاملة قبل أن ننظر إليها أصلاً
             self._since_check.append(row)  # استدعاء self._since_check.append (معامل واحد)
-            if verdict.code in ("BANNED", "RATE_LIMITED"):  # شرط: verdict.code ضمن مجموعة
-                # الراوتر رفض الحكم على هذه البطاقة: لم تُختبر بعد،
+            if verdict.code in ("BANNED", "RATE_LIMITED", "CHALLENGE"):
+                # الراوتر رفض الحكم على هذه البطاقة أو طلب كابتشا: لم تُختبر بعد،
                 # لذلك يجب ألا تُعلَّم كمغطّاة
                 self._unevaluated += 1  # تحديث self._unevaluated بعملية جمع
         self._emit_attempt(card, resp, verdict, sent_index)  # استدعاء self._emit_attempt (4 معاملات)
@@ -2006,12 +2009,27 @@ class Engine:  # تعريف الصنف Engine
         self._last_event_at = now  # إسناد now إلى self._last_event_at
         self.emit("stats", self.status_snapshot())  # استدعاء self.emit (2 معاملات)
 
+    def _covered_now(self, processed: int) -> int:
+        """Return the unique, judged cards covered in this run so far.
+
+        Retry requests do not add coverage, nor do cards the router refused to
+        judge or cards still waiting for a retry. Call while holding ``self.lock``.
+        """
+        unique_done = max(
+            0, int(processed) - self._retry_processed - self._unevaluated
+            - len(self._pending))
+        covered = max(0, self._run_start_pos) + unique_done
+        space = int(self.progress.get("space") or 0)
+        return min(covered, space) if space else covered
+
     def status_snapshot(self) -> dict:  # تعريف الدالة status_snapshot(self) ترجع dict
         with self.lock:  # سياق مُدار: self.lock
+            progress = dict(self.progress)
+            progress["covered"] = self._covered_now(sum(self.counters.values()))
             return {"counters": dict(self.counters),  # إرجاع قاموس
                     "reason_counts": dict(self.reason_counts),  # مفتاح reason_counts في القاموس
                     "net_kinds": dict(self.net_kinds),  # مفتاح net_kinds في القاموس
-                    "progress": dict(self.progress),  # مفتاح progress في القاموس
+                    "progress": progress,  # مفتاح progress في القاموس
                     "speed": round(self.speed, 1),  # مفتاح speed في القاموس
                     "delay_ms": self.throttle["delay_ms"],  # مفتاح delay_ms في القاموس
                     "throttle_reason": self.throttle["reason"]}  # مفتاح throttle_reason في القاموس

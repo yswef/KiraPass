@@ -882,6 +882,24 @@ class BrowserParityTests(unittest.TestCase):
 
 
 class ResumeProgressTests(unittest.TestCase):
+    def test_live_coverage_advances_for_unique_judged_cards(self):
+        eng = engine.Engine(store.Store(), persist=False)
+        eng.state = "running"
+        eng.started_at = time.time() - 10
+        eng._run_start_pos = 200
+        eng.progress.update(total=1000, covered=200, space=2000)
+        eng.counters["REJECTED"] = 1000
+
+        self.assertEqual(eng.status()["progress"]["covered"], 1200)
+
+        # Retries and cards that are blocked, unanswered, or still awaiting a
+        # retry are requests, but they do not add unique coverage.
+        eng._retry_processed = 25
+        eng._unevaluated = 4
+        eng._pending = [("pending", 1001, True)]
+        self.assertEqual(eng.status()["progress"]["covered"], 1170)
+        self.assertEqual(eng.status_snapshot()["progress"]["covered"], 1170)
+
     def test_resumed_run_only_queues_the_remaining_unique_cards(self):
         with MockPortal(valid_cards={"9999"}, pass_mode="empty") as portal:
             info = selftest.scan(portal.url)
